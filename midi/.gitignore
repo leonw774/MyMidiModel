@@ -1,4 +1,5 @@
 .mscbackup
 midis
+*.txt
 *.mid
 !example_midi/*.mid

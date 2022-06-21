@@ -16,16 +16,16 @@ def mp_worker(args_dict):
 
 
 def mp_handler(
-        midi_filepath_set: set[str],
+        midi_filepath_set: set,
         mp_work_number: int,
         args_dict: dict):
 
     error_count = 0
-    args_dict_set = set()
+    args_dict_set = list()
     for midi_filepath in midi_filepath_set:
         a = args_dict.copy() # shallow copy of args_dict
         a['midi_filepath'] = midi_filepath
-        args_dict_set.add(a)
+        args_dict_set.append(a)
 
     print(f'start process with {mp_work_number} workers')
 
@@ -33,11 +33,11 @@ def mp_handler(
     with Pool(mp_work_number) as p:
         for text in p.imap_unordered(mp_worker, args_dict_set):
             if len(text) != 0:
-                text_set.append(text)
+                text_set.add(text)
             else:
                 error_count += 1
     print('Error count:', error_count)
-
+    return text_set
 
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -54,8 +54,8 @@ if __name__ == '__main__':
         dest='max_track_num',
         type=int,
         default=None,
-        help='The maximum tracks nubmer to keep in text, if the input midi has more "instruments" \
-            than this value, some tracks would be merged or discard. Default is 24.'
+        help='The maximum tracks nubmer to keep in text, if the input midi has more "instruments" than this value, \
+            some tracks would be merged or discard. Default is 24.'
     )
     parser.add_argument(
         '--max-duration',
@@ -74,7 +74,7 @@ if __name__ == '__main__':
         help='Three integers: (min, max, step), where min and max are INCLUSIVE. Default is 56, 184, 4'
     )
     parser.add_argument(
-        '--not-merge-percussions',
+        '--not-merge-drums',
         action='store_false',
         dest='use_merge_drums'
     )
@@ -100,7 +100,7 @@ if __name__ == '__main__':
         dest='mp_work_number',
         type=int,
         default=1,
-        help='The number of worker in multiprocessing. Default is 1. \
+        help='The number of worker for multiprocessing. Default is 1. \
             If this number is 1 or below, multiprocessing would not be used.'
     )
     parser.add_argument(
@@ -109,7 +109,8 @@ if __name__ == '__main__':
         type=str,
         default=os.path.join(os.getcwd(), 'output.txt'),
         help='The path of the output file of the inputs files/directories. \
-            All texts from the input midi files will be written into this file, seperated by breaklines.'
+            All texts from the input midi files will be written into this file, \
+            seperated by breaklines. Default is "output.txt".'
     )
     parser.add_argument(
         'input_path',
@@ -144,7 +145,10 @@ if __name__ == '__main__':
             for filepath in filepath_set:
                 out_file.write(midi_2_text(filepath, **args_dict) + '\n')
     else:
-        mp_handler(filepath_set, args.mp_work_number, args_dict)
+        text_set = mp_handler(filepath_set, args.mp_work_number, args_dict)
+        with open(args.output_path, 'w+', encoding='utf8') as out_file:
+            for text in text_set:
+                out_file.write(text + '\n')
 
     print('Processed', len(filepath_set), 'files.')
     print('Output path:', args.output_path)

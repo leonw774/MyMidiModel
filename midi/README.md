@@ -1,0 +1,52 @@
+# midi
+
+This directory stores midi files and python scripts for processing midi files.
+
+## example_midi
+
+Example midi files for checking/debuging the result of processing.
+
+## midis
+
+Directory to put all other midi files (as dataset).
+
+## midi_util.py
+
+Where processing logics are implemented.
+
+## tokens.py
+
+Define all token related classes and functions.
+
+## midi_2_text.py
+
+Tool to process one or multiple midi files into a text file. 
+
+```
+usage: midi_2_texts.py [-h] [--nth NTH] [--max-track-num MAX_TRACK_NUM] [--max-duration MAX_DURATION] [--tempo-quantization TEMPO_MIN TEMPO_MAX TEMPO_STEP] [--not-merge-drums] [--not-merge-sparse] [--debug] [-r] [-w MP_WORK_NUMBER] [-o OUTPUT_PATH] input_path [input_path ...]
+
+positional arguments:
+  input_path            The path(s) of input files/dictionaries
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --nth NTH             The time unit length would be the length of a n-th note. Must be multiples of 4. Default is 96.
+  --max-track-num MAX_TRACK_NUM
+                        The maximum tracks nubmer to keep in text, if the input midi has more "instruments" than this value, some tracks would be merged or discard. Default is 24.
+  --max-duration MAX_DURATION
+                        Max length of duration in unit of quarter note (beat)
+  --tempo-quantization TEMPO_MIN TEMPO_MAX TEMPO_STEP
+                        Three integers: (min, max, step), where min and max are INCLUSIVE. Default is 56, 184, 4
+  --not-merge-drums
+  --not-merge-sparse
+  --debug
+  -r, --recursive       If set, the input path will have to be directory path(s). And it will process all ".mid" files recursively under them.
+  -w MP_WORK_NUMBER, --workers MP_WORK_NUMBER
+                        The number of worker for multiprocessing. Default is 1. If this number is 1 or below, multiprocessing would not be used.
+  -o OUTPUT_PATH, --output-path OUTPUT_PATH
+                        The path of the output file of the inputs files/directories. All texts from the input midi files will be written into this file, seperated by breaklines. Default is "output.txt".
+```
+
+## text_2_midi.py
+
+A simpler tool that turns a text file back to midi files. The usage is `python3 text_2_midi.py text_path nth`. The restored midi files are named in their order in the texts: "restored_1", "restored_2", ... , "restored_N". 
