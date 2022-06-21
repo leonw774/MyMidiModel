@@ -6,10 +6,6 @@ This directory stores midi files and python scripts for processing midi files.
 
 Example midi files for checking/debuging the result of processing.
 
-## midis
-
-Directory to put all other midi files (as dataset).
-
 ## midi_util.py
 
 Where processing logics are implemented.

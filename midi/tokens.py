@@ -78,17 +78,7 @@ def is_supported_time_signature(numerator, denominator):
 ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 BASE = 36
 
-def uint2b16(x: int) -> str:
-    b36 = ''
-    if x == 0:
-        return '0'
-    while x:
-        x, d = divmod(x, BASE)
-        b36 = ALPHABET[d] + b36
-    return b36
-
-
-def uint2b16(x: int) -> str:
+def uint2base(x: int) -> str:
     b16 = ''
     if x == 0:
         return '0'
@@ -103,23 +93,24 @@ def token_2_text(token: namedtuple) -> str:
     if typename == 'BeginOfScoreToken': # BOS
         return 'BOS'
     elif typename == 'TrackToken': # Track
-        # type:track:instrument
-        return f'R{uint2b16(token.track_num)}:{uint2b16(token.instrument)}'
+        # type track:instrument
+        return f'R{uint2base(token.track_num)}:{uint2base(token.instrument)}'
     elif typename == 'MeasureToken': # Measure
         return 'M'
     elif typename == 'TimeSignatureToken': # TimeSig
-        return f'S{uint2b16(token.time_signature[0])}/{uint2b16(token.time_signature[1])}'
+        return f'S{uint2base(token.time_signature[0])}/{uint2base(token.time_signature[1])}'
     elif typename == 'TempoToken': # Tempo
-        return f'T{uint2b16(token.bpm)}'
+        return f'T{uint2base(token.bpm)}'
     elif typename == 'PositionToken': # Position
-        return f'P{uint2b16(token.position)}'
+        return f'P{uint2base(token.position)}'
     elif typename == 'NoteToken': # Note
-        # type:pitch:duration:velocity:track:instrument
-        return f'N{uint2b16(token.pitch)}:{uint2b16(token.duration)}:{uint2b16(token.velocity)}:{uint2b16(token.track_num)}:{uint2b16(token.instrument)}'
+        # type pitch:duration:velocity:track:instrument
+        return f'N{uint2base(token.pitch)}:{uint2base(token.duration)}:{uint2base(token.velocity)}:{uint2base(token.track_num)}:{uint2base(token.instrument)}'
     elif typename == 'EndOfScoreToken': # EOS
         return 'EOS'
     else:
         raise ValueError()
+
 
 def text_2_token(text: str):
     typename = text[0]

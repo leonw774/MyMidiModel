@@ -193,7 +193,7 @@ def get_measure_related_tokens(
     first_note_onset_tick = note_token_list[0].onset
     last_note_end_tick = note_token_list[-1].onset + note_token_list[-1].duration
 
-    assert time_signature_changes
+    assert len(time_signature_changes) > 0
     assert time_signature_changes[0].time <= first_note_onset_tick
 
     # clean duplicate time_signature_changes
@@ -326,6 +326,23 @@ def get_measure_related_tokens(
     return measure_related_token_list
 
 
+def quantize_by_nth(note_measure_token_list: list, nth: int, ticks_per_beat: int):
+    ticks_per_nth = round(ticks_per_beat / (nth / 4))
+    quatized_note_measure_token_list = []
+    for token in note_measure_token_list:
+        ratio = token.onset / ticks_per_nth
+        quantized_onset = 1 if ratio < 1 else round(ratio)
+        new_token = token._replace(
+            onset=quantized_onset
+        )
+        quatized_note_measure_token_list.append(new_token)
+
+    # remove duplicated note tokens
+    quatized_note_measure_token_list = list(set(quatized_note_measure_token_list))
+    quatized_note_measure_token_list.sort()
+    return quatized_note_measure_token_list
+
+
 def get_position_tokens(quatized_note_measure_token_list: list) -> list:
     position_token_list = []
     cur_measure_onset_time = 0
@@ -357,35 +374,18 @@ def get_head_tokens(midi: MidiFile) -> list:
     return [BeginOfScoreToken()] + track_token_list
 
 
-def quantize_by_nth(note_measure_token_list: list, nth: int, ticks_per_beat: int):
-    ticks_per_nth = round(ticks_per_beat / (nth / 4))
-    quatized_note_measure_token_list = []
-    for token in note_measure_token_list:
-        ratio = token.onset / ticks_per_nth
-        quantized_onset = 1 if ratio < 1 else round(ratio)
-        new_token = token._replace(
-            onset=quantized_onset
-        )
-        quatized_note_measure_token_list.append(new_token)
-
-    # remove duplicated note tokens
-    quatized_note_measure_token_list = list(set(quatized_note_measure_token_list))
-    quatized_note_measure_token_list.sort()
-    return quatized_note_measure_token_list
-
-
 def midi_2_tokens(midi: MidiFile, nth: int, max_duration: int, tempo_quantization: tuple, debug: bool = False) -> list:
     start_time=time()
     note_token_list = get_note_tokens(midi, max_duration)
     if debug:
-        print('Get notes:', len(note_token_list), ':', time()-start_time)
+        print('Get notes:', len(note_token_list), 'time:', time()-start_time)
         start_time=time()
-    
+
     measure_related_tokens_list = get_measure_related_tokens(midi, note_token_list, tempo_quantization)
     note_measure_tokens_list = measure_related_tokens_list + note_token_list
     note_measure_tokens_list.sort()
     if debug:
-        print('Get measures:', len(measure_related_tokens_list), ':', time()-start_time)
+        print('Get measures:', len(measure_related_tokens_list), 'time:', time()-start_time)
         start_time=time()
 
     # align the first tick to zero
@@ -397,14 +397,21 @@ def midi_2_tokens(midi: MidiFile, nth: int, max_duration: int, tempo_quantizatio
         ]
     quatized_note_measure_token_list = quantize_by_nth(note_measure_tokens_list, nth, midi.ticks_per_beat)
     if debug:
-        print('Quatized :', time()-start_time)
+        print('Quatized time:', time()-start_time)
         start_time=time()
-    
+
     pos_token_list = get_position_tokens(quatized_note_measure_token_list)
     body_token_list = pos_token_list + quatized_note_measure_token_list
     body_token_list.sort()
+    if debug:
+        print('Get position:', len(pos_token_list), 'time:', time()-start_time)
+        start_time=time()
+
     head_tokens_list = get_head_tokens(midi)
     full_token_list = head_tokens_list + body_token_list + [EndOfScoreToken()]
+    if debug:
+        print('Full token:', len(full_token_list))
+        print('--------')
     return full_token_list
 
 
@@ -433,6 +440,8 @@ def midi_2_text(
     assert tempo_quantization[0] <= tempo_quantization[1] and tempo_quantization[2] > 0
 
     midi = MidiFile(midi_filepath)
+    if debug:
+        print('tick/beat:', midi.ticks_per_beat)
 
     for ins in midi.instruments:
         ins.remove_invalid_notes(verbose=False)

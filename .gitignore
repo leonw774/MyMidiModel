@@ -1,4 +1,8 @@
 genmidi-env
+.mscbackup
+*.txt
+*.mid
+!example_midi/*.mid
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

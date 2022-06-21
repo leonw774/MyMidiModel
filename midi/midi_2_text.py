@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 from multiprocessing import Pool
 from time import time
 
-from midi_util import *
+from midi_util import midi_2_text
 
 def mp_worker(args_dict):
     try:
@@ -140,16 +140,21 @@ if __name__ == '__main__':
             filepath_set.add(inpath)
 
     start_time = time()
+    text_lengths = []
     if args.mp_work_number <= 1:
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             for filepath in filepath_set:
-                out_file.write(midi_2_text(filepath, **args_dict) + '\n')
+                text = midi_2_text(filepath, **args_dict)
+                text_lengths.append(len(text))
+                out_file.write(text + '\n')
     else:
         text_set = mp_handler(filepath_set, args.mp_work_number, args_dict)
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             for text in text_set:
                 out_file.write(text + '\n')
+            text_lengths = [len(text) for text in text_set]
 
-    print('Processed', len(filepath_set), 'files.')
+    print(f'Processed {len(filepath_set)} files.')
+    print(f'Total token count: {sum(text_lengths)}. Average {sum(text_lengths)/len(text_lengths)} per file.')
     print('Output path:', args.output_path)
     print('Time:', time()-start_time)
