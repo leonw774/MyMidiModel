@@ -1,0 +1,4 @@
+.mscbackup
+midis
+*.mid
+!example_midi/*.mid
