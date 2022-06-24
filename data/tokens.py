@@ -11,14 +11,13 @@
     token is the start time of its position or measure in the time unit.
 
     For track tokens:
-    Except for type_priority, track_num and instrument, other attributes are meaningless.
+    Except for type_priority, track_number and instrument, other attributes are meaningless.
 
     For begin-of-score and end-of-score token:
     Every attributes should be left as default.
 
 """
 
-import base64
 from collections import namedtuple
 
 COMMON_FIELD_NAMES = ['onset', 'type_priority']
@@ -30,7 +29,7 @@ BeginOfScoreToken = namedtuple(
 )
 TrackToken = namedtuple(
     'TrackToken',
-    COMMON_FIELD_NAMES+['track_num', 'instrument'],
+    COMMON_FIELD_NAMES+['track_number', 'instrument'],
     defaults=[-1, 1, -1, -1]
 )
 MeasureToken = namedtuple(
@@ -55,7 +54,7 @@ PositionToken = namedtuple(
 )
 NoteToken = namedtuple(
     'NoteToken',
-    COMMON_FIELD_NAMES+['pitch', 'duration', 'velocity', 'track_num', 'instrument'],
+    COMMON_FIELD_NAMES+['pitch', 'duration', 'velocity', 'track_number', 'instrument'],
     defaults=[-1, 6, -1, -1, -1, -1, -1]
 )
 EndOfScoreToken = namedtuple(
@@ -76,17 +75,18 @@ def is_supported_time_signature(numerator, denominator):
 
 # python support up to base=36 in int function
 ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-BASE = 36
+TOKEN_UINT2STR_BASE = 36
 
-def uint2base(x: int) -> str:
-    b16 = ''
+def uint2str(x: int) -> str:
+    b = ''
     if x == 0:
         return '0'
     while x:
-        x, d = divmod(x, BASE)
-        b16 = ALPHABET[d] + b16
-    return b16
+        x, d = divmod(x, TOKEN_UINT2STR_BASE)
+        b = ALPHABET[d] + b
+    return b
 
+SPECIAL_TOKEN_TEXTS = ['BOS', 'EOS', 'PAD', 'UNK', 'EOP']
 
 def token_2_text(token: namedtuple) -> str:
     typename = token.__class__.__name__
@@ -94,18 +94,18 @@ def token_2_text(token: namedtuple) -> str:
         return 'BOS'
     elif typename == 'TrackToken': # Track
         # type track:instrument
-        return f'R{uint2base(token.track_num)}:{uint2base(token.instrument)}'
+        return f'R{uint2str(token.track_number)}:{uint2str(token.instrument)}'
     elif typename == 'MeasureToken': # Measure
         return 'M'
     elif typename == 'TimeSignatureToken': # TimeSig
-        return f'S{uint2base(token.time_signature[0])}/{uint2base(token.time_signature[1])}'
+        return f'S{uint2str(token.time_signature[0])}/{uint2str(token.time_signature[1])}'
     elif typename == 'TempoToken': # Tempo
-        return f'T{uint2base(token.bpm)}'
+        return f'T{uint2str(token.bpm)}'
     elif typename == 'PositionToken': # Position
-        return f'P{uint2base(token.position)}'
+        return f'P{uint2str(token.position)}'
     elif typename == 'NoteToken': # Note
         # type pitch:duration:velocity:track:instrument
-        return f'N{uint2base(token.pitch)}:{uint2base(token.duration)}:{uint2base(token.velocity)}:{uint2base(token.track_num)}:{uint2base(token.instrument)}'
+        return f'N{uint2str(token.pitch)}:{uint2str(token.duration)}:{uint2str(token.velocity)}:{uint2str(token.track_number)}:{uint2str(token.instrument)}'
     elif typename == 'EndOfScoreToken': # EOS
         return 'EOS'
     else:
@@ -115,18 +115,18 @@ def token_2_text(token: namedtuple) -> str:
 def text_2_token(text: str):
     typename = text[0]
     if typename == 'B' or typename == 'E' or typename == 'M' :
-        attr = None
+        attr = tuple()
     elif typename == 'R':
-        attr = tuple(int(x, BASE) for x in text[1:].split(':'))
+        attr = tuple(int(x, TOKEN_UINT2STR_BASE) for x in text[1:].split(':'))
     elif typename == 'S':
-        attr = tuple(int(x, BASE) for x in text[1:].split('/'))
+        attr = tuple(int(x, TOKEN_UINT2STR_BASE) for x in text[1:].split('/'))
     elif typename == 'T':
-        attr = int(text[1:], BASE)
+        attr = int(text[1:], TOKEN_UINT2STR_BASE)
     elif typename == 'P':
-        attr = int(text[1:], BASE)
+        attr = int(text[1:], TOKEN_UINT2STR_BASE)
     elif typename == 'N':
         # add note to instrument
-        attr = tuple(int(x, BASE) for x in text[1:].split(':'))
+        attr = tuple(int(x, TOKEN_UINT2STR_BASE) for x in text[1:].split(':'))
     else:
         raise ValueError()
     return typename, attr
