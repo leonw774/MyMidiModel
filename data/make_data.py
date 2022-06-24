@@ -23,8 +23,8 @@ def piece_2_numpy(piece: str, vocabs: dict) -> np.ndarray:
         if typename == 'R':
             event_text = text.split(':')[0]
             x[i, 0] = vocabs['event_tokens']['text2id'][event_text]
-            x[i, 3] = int(event_text[1:], TOKEN_UINT2STR_BASE)
-            x[i, 4] = int(text.split(':')[1], TOKEN_UINT2STR_BASE)
+            x[i, 3] = tokenstr2int(event_text[1:])
+            x[i, 4] = tokenstr2int(text.split(':')[1])
         elif typename == 'M':
             x[i, 0] = vocabs['event_tokens']['text2id']['M']
         else:
@@ -35,9 +35,9 @@ def piece_2_numpy(piece: str, vocabs: dict) -> np.ndarray:
                 x[i, 0] = vocabs['event_tokens']['text2id']['UNK']
             if len(attr) > 0:
                 for j, a in enumerate(attr):
-                    x[i, j+1] = int(a, TOKEN_UINT2STR_BASE)
+                    x[i, j+1] = tokenstr2int(a)
             if typename == 'P':
-                cur_position = int(text[1:], TOKEN_UINT2STR_BASE)
+                cur_position = tokenstr2int(text[1:])
                 x[i, 5] = cur_position
             if typename == 'N':
                 x[i, 5] = cur_position
@@ -63,14 +63,14 @@ def build_vocabs(body: str, paras: dict, max_sample_length: str):
     # time signature is sampled from corpus
     # measure number size = max amount of measures that a max_sample_length can fit in
     pitche_tokens = [
-        'N'+uint2str(i) for i in range(128)
+        'N'+int2str(i) for i in range(128)
     ]
     tempo_min, tempo_max, tempo_step = paras['tempo_quantization']
     tempo_tokens = [
-        'T'+uint2str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
+        'T'+int2str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
     ]
     track_token = [
-        'R'+uint2str(i) for i in range(paras['max_track_number'])
+        'R'+int2str(i) for i in range(paras['max_track_number'])
     ]
     measure_token = ['M']
 
@@ -119,16 +119,17 @@ def build_vocabs(body: str, paras: dict, max_sample_length: str):
     print(f'- Corpus position tokens number: {len(position_tokens)}. Max corpus position: {max(text_2_token(ptoken)[1] for ptoken in position_tokens)}')
     print(f'  (theoretical largest position = {31 * (paras["nth"] // 16)})')
     print(f'Max measure span size that fits in max_sample_length: {max_fitting_measure_number}')
-    print(f'  (max sample slength = {max_sample_length}, max measure number in piece = {max_measure_length})')
-    print(f'Time: {time()-start_time}')
+    print(f'  (max sample length = {max_sample_length}, max measure number in piece = {max_measure_length})')
 
     # Note attribute tokens are durations, velocities, track numbers and instruments
     # all of them are determined by arguments
-    # but duration could be sparse due to large nth
-    duration_tokens = list(map(uint2str, range(paras['nth'] * paras['max_duration'])))
-    velocity_tokens = list(map(uint2str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
-    track_number_tokens = list(map(uint2str, range(paras['max_track_number'])))
-    instrument_tokens = list(map(uint2str, range(129)))
+    # duration could be sparse due to large nth
+    duration_tokens = list(map(int2str, range(paras['nth'] * paras['max_duration'])))
+    # for continuing duration: represented as negtive max_duration
+    duration_tokens += [int2str(-paras['nth'] * paras['max_duration'])]
+    velocity_tokens = list(map(int2str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
+    track_number_tokens = list(map(int2str, range(paras['max_track_number'])))
+    instrument_tokens = list(map(int2str, range(129)))
     duration_tokens.sort()
     velocity_tokens.sort()
     track_number_tokens.sort()
@@ -138,11 +139,12 @@ def build_vocabs(body: str, paras: dict, max_sample_length: str):
     print('Corpus duration tokens size:', len(corpus_duration_tokens))
     print('Largest corpus duration:', max(
         # corpus_duration_tokens, key=lambda x: int(x, TOKEN_UINT2STR_BASE)
-        int(x, TOKEN_UINT2STR_BASE) for x in corpus_duration_tokens
+        tokenstr2int(x) for x in corpus_duration_tokens
     ))
     print('Velocity token size:', len(velocity_tokens))
     print('Track tokens size:', paras['max_track_number'])
     print('Instrument tokens size: 129')
+    print('Time:', time()-start_time)
 
     # build a dictionary for every token list
     vocab_dicts = {

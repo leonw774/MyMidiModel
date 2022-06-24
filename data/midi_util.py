@@ -133,8 +133,7 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int) -> li
             track_number=track_number,
             pitch=note.pitch,
             duration=note.end-note.start,
-            velocity=(note.velocity//velocity_step)*velocity_step+half_vel_step,
-            instrument=inst.program,
+            velocity=(note.velocity//velocity_step)*velocity_step+half_vel_step
         )
         for track_number, inst in enumerate(midi.instruments)
         for note in inst.notes
@@ -143,6 +142,9 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int) -> li
     # handle too long duration
     # max_duration is in unit of quarter note (beat)
     max_duration_in_ticks = max_duration * midi.ticks_per_beat
+    # continuing means this note this going to connect to a note after max_duration
+    # it is represented as negtive to seperate from notes that's really max_duration long
+    continuing_duration = -max_duration * midi.ticks_per_beat
     note_list_length = len(note_token_list)
     for i in range(note_list_length):
         note_token = note_token_list[i]
@@ -150,15 +152,14 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int) -> li
             cur_dur = note_token.duration
             cur_onset = note_token.onset
             while cur_dur != 0:
-                if cur_dur >= max_duration_in_ticks:
+                if cur_dur > max_duration_in_ticks:
                     note_token_list.append(
                         NoteToken(
                             onset=cur_onset,
                             track_number=note_token.track_number,
                             pitch=note_token.pitch,
-                            duration=max_duration_in_ticks,
-                            velocity=note_token.velocity,
-                            instrument=note_token.instrument
+                            duration=continuing_duration,
+                            velocity=note_token.velocity
                         )
                     )
                     cur_onset += max_duration_in_ticks
@@ -170,8 +171,7 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int) -> li
                             track_number=note_token.track_number,
                             pitch=note_token.pitch,
                             duration=cur_dur,
-                            velocity=note_token.velocity,
-                            instrument=note_token.instrument
+                            velocity=note_token.velocity
                         )
                     )
                     cur_dur = 0
@@ -179,8 +179,7 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int) -> li
         n for n in note_token_list
         if n.duration <= max_duration_in_ticks
     ]
-
-    note_token_list = list(set(note_token_list))
+    # note_token_list = list(set(note_token_list))
     note_token_list.sort()
     return note_token_list
 
@@ -197,6 +196,7 @@ def get_measure_related_tokens(
     # note_token_list is sorted
     first_note_onset_tick = note_token_list[0].onset
     last_note_end_tick = note_token_list[-1].onset + note_token_list[-1].duration
+    print(first_note_onset_tick, last_note_end_tick)
 
     assert len(time_signature_changes) > 0
     assert time_signature_changes[0].time <= first_note_onset_tick
@@ -311,6 +311,7 @@ def get_measure_related_tokens(
                     if weighted_tempo != prev_tempo:
                         tempo_token_list.append(TempoToken(onset=cur_measure_start_tick,bpm=weighted_tempo))
 
+    print(len(measure_token_list), len(time_sig_token_list), len(tempo_token_list))
     measure_related_token_list = measure_token_list + time_sig_token_list + tempo_token_list
     # measure_related_token_list.sort() # dont have to sort
     return measure_related_token_list
@@ -322,7 +323,7 @@ def quantize_by_nth(note_measure_token_list: list, nth: int, ticks_per_beat: int
     for token in note_measure_token_list:
         quantized_onset = max(1, round(token.onset / ticks_per_nth))
         if token.__class__.__name__ == 'NoteToken':
-            quantized_duration = max(1, round(token.duration / ticks_per_nth))
+            quantized_duration = max(1, round(token.duration / ticks_per_nth)) if token.duration > 0 else round(token.duration / ticks_per_nth)
             new_token = token._replace(
                 onset=quantized_onset,
                 duration=quantized_duration
@@ -480,6 +481,7 @@ def text_2_midi(texts: str, nth: int, debug=False) -> MidiFile:
     cur_time_in_ticks = 0
     cur_measure_length_in_ticks = -1
     cur_measure_onset_in_ticks = -1
+    pending_continuing_notes = dict()
     for text in text_list[1:-1]:
         typename, attr = text_2_token(text)
         if is_head:
@@ -522,11 +524,35 @@ def text_2_midi(texts: str, nth: int, debug=False) -> MidiFile:
 
             elif typename == 'N':
                 # add note to instrument
-                pitch, duration, velocity, track_number, instrument = attr
-                n = Note(velocity, pitch, cur_time_in_ticks, cur_time_in_ticks + duration * ticks_per_nth)
-                midi.instruments[track_number].notes.append(n)
-                # if debug: print('N', pitch, duration, velocity, track_number, instrument)
+                pitch, duration, velocity, track_number = attr
 
+                if cur_time_in_ticks in pending_continuing_notes:
+                    info = (pitch, velocity, track_number)
+                    if info in pending_continuing_notes[cur_time_in_ticks]:
+                        if len(pending_continuing_notes[cur_time_in_ticks][info]) > 0:
+                            onset = pending_continuing_notes[cur_time_in_ticks][info].pop()
+                        # print(cur_time_in_ticks, 'onset pop', pending_continuing_notes)
+                        if len(pending_continuing_notes[cur_time_in_ticks][info]) == 0:
+                            pending_continuing_notes.pop(cur_time_in_ticks)
+                else:
+                    onset = cur_time_in_ticks
+
+                if duration < 0:
+                    # this note is going to connect to a note after max_duration
+                    info = (pitch, velocity, track_number)
+                    pending_continuing_time = cur_time_in_ticks + (-duration) * ticks_per_nth
+                    if pending_continuing_time not in pending_continuing_notes:
+                        pending_continuing_notes[pending_continuing_time] = dict()
+                    if info in pending_continuing_notes[pending_continuing_time]:
+                        pending_continuing_notes[pending_continuing_time][info].append(onset)
+                    else:
+                        pending_continuing_notes[pending_continuing_time] = {info : [onset]}
+                    # print(cur_time_in_ticks, 'onset append', pending_continuing_notes)
+                else:
+                    n = Note(velocity, pitch, onset, cur_time_in_ticks + duration * ticks_per_nth)
+                    midi.instruments[track_number].notes.append(n)
+                    # if debug:
+                    #     print('N', pitch, duration, velocity, track_number, instrument)
             else:
                 raise ValueError('Undefined typename')
     # end loop text_list

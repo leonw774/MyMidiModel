@@ -54,8 +54,8 @@ PositionToken = namedtuple(
 )
 NoteToken = namedtuple(
     'NoteToken',
-    COMMON_FIELD_NAMES+['pitch', 'duration', 'velocity', 'track_number', 'instrument'],
-    defaults=[-1, 6, -1, -1, -1, -1, -1]
+    COMMON_FIELD_NAMES+['pitch', 'track_number', 'duration', 'velocity'],
+    defaults=[-1, 6, -1, -1, -1, -1]
 )
 EndOfScoreToken = namedtuple(
     'EndOfScoreToken',
@@ -75,16 +75,24 @@ def is_supported_time_signature(numerator, denominator):
 
 # python support up to base=36 in int function
 ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-TOKEN_UINT2STR_BASE = 36
+TOKEN_INT2STR_BASE = 36
 
-def uint2str(x: int) -> str:
-    b = ''
+def int2str(x: int) -> str:
     if x == 0:
         return '0'
+    isneg = x < 0
+    if isneg:
+        x = -x
+    b = ''
     while x:
-        x, d = divmod(x, TOKEN_UINT2STR_BASE)
+        x, d = divmod(x, TOKEN_INT2STR_BASE)
         b = ALPHABET[d] + b
+    if isneg:
+        b = '-' + b
     return b
+
+def tokenstr2int(x: str):
+    return int(x, TOKEN_INT2STR_BASE)
 
 SPECIAL_TOKEN_TEXTS = ['BOS', 'EOS', 'PAD', 'UNK', 'EOP']
 
@@ -94,18 +102,18 @@ def token_2_text(token: namedtuple) -> str:
         return 'BOS'
     elif typename == 'TrackToken': # Track
         # type track:instrument
-        return f'R{uint2str(token.track_number)}:{uint2str(token.instrument)}'
+        return f'R{int2str(token.track_number)}:{int2str(token.instrument)}'
     elif typename == 'MeasureToken': # Measure
         return 'M'
     elif typename == 'TimeSignatureToken': # TimeSig
-        return f'S{uint2str(token.time_signature[0])}/{uint2str(token.time_signature[1])}'
+        return f'S{int2str(token.time_signature[0])}/{int2str(token.time_signature[1])}'
     elif typename == 'TempoToken': # Tempo
-        return f'T{uint2str(token.bpm)}'
+        return f'T{int2str(token.bpm)}'
     elif typename == 'PositionToken': # Position
-        return f'P{uint2str(token.position)}'
+        return f'P{int2str(token.position)}'
     elif typename == 'NoteToken': # Note
         # type pitch:duration:velocity:track:instrument
-        return f'N{uint2str(token.pitch)}:{uint2str(token.duration)}:{uint2str(token.velocity)}:{uint2str(token.track_number)}:{uint2str(token.instrument)}'
+        return f'N{int2str(token.pitch)}:{int2str(token.duration)}:{int2str(token.velocity)}:{int2str(token.track_number)}'
     elif typename == 'EndOfScoreToken': # EOS
         return 'EOS'
     else:
@@ -117,16 +125,16 @@ def text_2_token(text: str):
     if typename == 'B' or typename == 'E' or typename == 'M' :
         attr = tuple()
     elif typename == 'R':
-        attr = tuple(int(x, TOKEN_UINT2STR_BASE) for x in text[1:].split(':'))
+        attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[1:].split(':'))
     elif typename == 'S':
-        attr = tuple(int(x, TOKEN_UINT2STR_BASE) for x in text[1:].split('/'))
+        attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[1:].split('/'))
     elif typename == 'T':
-        attr = int(text[1:], TOKEN_UINT2STR_BASE)
+        attr = int(text[1:], TOKEN_INT2STR_BASE)
     elif typename == 'P':
-        attr = int(text[1:], TOKEN_UINT2STR_BASE)
+        attr = int(text[1:], TOKEN_INT2STR_BASE)
     elif typename == 'N':
         # add note to instrument
-        attr = tuple(int(x, TOKEN_UINT2STR_BASE) for x in text[1:].split(':'))
+        attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[1:].split(':'))
     else:
         raise ValueError()
     return typename, attr
