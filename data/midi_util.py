@@ -119,20 +119,26 @@ def merge_tracks(
         midi.instruments = good_insts_mapping
 
 
-def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int) -> list:
+def quatize_to_nth(time_in_tick: int, ticks_per_nth: float) -> int:
+    return max(1, round(time_in_tick / ticks_per_nth)) if time_in_tick > 0 else round(time_in_tick / ticks_per_nth)
+
+
+def get_note_tokens(midi: MidiFile, nth: int, max_duration: int, velocity_step: int) -> list:
     """
         This return all note token in the midi as a list sorted in the ascending
         orders of onset time, track number, pitch, duration, velocity and instrument.
         The time unit used is tick
     """
     half_vel_step = velocity_step//2
+    nth_per_beat = nth // 4
+    ticks_per_nth = midi.ticks_per_beat / nth_per_beat
 
     note_token_list = [
         NoteToken(
-            onset=note.start,
+            onset=quatize_to_nth(note.start, ticks_per_nth),
             track_number=track_number,
             pitch=note.pitch,
-            duration=note.end-note.start,
+            duration=quatize_to_nth(note.end-note.start, ticks_per_nth),
             velocity=(note.velocity//velocity_step)*velocity_step+half_vel_step
         )
         for track_number, inst in enumerate(midi.instruments)
@@ -141,18 +147,18 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int) -> li
 
     # handle too long duration
     # max_duration is in unit of quarter note (beat)
-    max_duration_in_ticks = max_duration * midi.ticks_per_beat
+    max_duration_in_nth = max_duration * nth_per_beat
     # continuing means this note this going to connect to a note after max_duration
     # it is represented as negtive to seperate from notes that's really max_duration long
-    continuing_duration = -max_duration * midi.ticks_per_beat
+    continuing_duration = -max_duration_in_nth
     note_list_length = len(note_token_list)
     for i in range(note_list_length):
         note_token = note_token_list[i]
-        if note_token.duration > max_duration_in_ticks:
+        if note_token.duration > max_duration_in_nth:
             cur_dur = note_token.duration
             cur_onset = note_token.onset
             while cur_dur != 0:
-                if cur_dur > max_duration_in_ticks:
+                if cur_dur > max_duration_in_nth:
                     note_token_list.append(
                         NoteToken(
                             onset=cur_onset,
@@ -162,8 +168,8 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int) -> li
                             velocity=note_token.velocity
                         )
                     )
-                    cur_onset += max_duration_in_ticks
-                    cur_dur -= max_duration_in_ticks
+                    cur_onset += max_duration_in_nth
+                    cur_dur -= max_duration_in_nth
                 else:
                     note_token_list.append(
                         NoteToken(
@@ -177,7 +183,7 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int) -> li
                     cur_dur = 0
     note_token_list = [
         n for n in note_token_list
-        if n.duration <= max_duration_in_ticks
+        if n.duration <= max_duration_in_nth
     ]
     # note_token_list = list(set(note_token_list))
     note_token_list.sort()
@@ -187,50 +193,58 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int) -> li
 def get_measure_related_tokens(
         midi: MidiFile,
         note_token_list: list,
+        nth: int,
         tempo_quantization: list) -> list:
     """
         This return measure, tempo, and time signature token. The first measure have to contain the
         first note and the last note must end at the last measure
     """
+    nth_per_beat = nth // 4
+    ticks_per_nth = midi.ticks_per_beat / nth_per_beat
     time_signature_changes = midi.time_signature_changes
     # note_token_list is sorted
-    first_note_onset_tick = note_token_list[0].onset
-    last_note_end_tick = note_token_list[-1].onset + note_token_list[-1].duration
-    print(first_note_onset_tick, last_note_end_tick)
+    first_note_onset = note_token_list[0].onset
+    last_note_end = note_token_list[-1].onset + note_token_list[-1].duration
+    # if debug:
+    #     print('first, last:', first_note_onset, last_note_end)
 
-    assert len(time_signature_changes) > 0
-    assert time_signature_changes[0].time <= first_note_onset_tick
-
-    # remove duplicated time_signature_changes
-    time_sig_tuple_list = []
-    for i, time_sig in enumerate(time_signature_changes):
-        time_sig_tuple = (time_sig.numerator, time_sig.denominator, time_sig.time)
-        assert time_sig.numerator != 0 and time_sig.denominator != 0
-        if i == 0:
-            time_sig_tuple_list.append(time_sig_tuple)
-        elif (time_sig_tuple[0] != time_signature_changes[i-1].numerator or \
-                time_sig_tuple[1] != time_signature_changes[i-1].denominator):
-            time_sig_tuple_list.append(time_sig_tuple)
+    if len(time_signature_changes) == 0:
+        time_sig_tuple_list = [(4, 4, 0)]
+    else:
+        # remove duplicated time_signature_changes
+        time_sig_tuple_list = []
+        for i, time_sig in enumerate(time_signature_changes):
+            time_sig_tuple = (time_sig.numerator, time_sig.denominator, quatize_to_nth(time_sig.time, ticks_per_nth))
+            assert time_sig.numerator != 0 and time_sig.denominator != 0, 'bad time signature'
+            if i == 0:
+                time_sig_tuple_list.append(time_sig_tuple)
+            elif (time_sig_tuple[0] != time_signature_changes[i-1].numerator or \
+                    time_sig_tuple[1] != time_signature_changes[i-1].denominator):
+                time_sig_tuple_list.append(time_sig_tuple)
+        if time_sig_tuple_list[0][2] <= first_note_onset:
+            time_sig_tuple_list = [(4, 4, 0)] + time_sig_tuple_list
     # print(time_sig_tuple_list)
 
     tempo_min, tempo_max, tempo_step = tempo_quantization
     tempo_changes = midi.tempo_changes
-    assert len(tempo_changes) > 0
-
-    # remove duplicated
-    prev_bpm = None
-    tempo_change_ticks = []
-    tempo_bpms = []
-    for tempo_change in tempo_changes:
-        bpm = tempo_change.tempo
-        if prev_bpm != bpm:
-            tempo_change_ticks.append(tempo_change.time)
-            tempo_bpms.append(bpm)
-        prev_bpm = bpm
+    if len(tempo_changes) == 0:
+        tempo_change_time = [0]
+        tempo_bpms = [120]
+    else:
+        # remove duplicated
+        prev_bpm = None
+        tempo_change_time = []
+        tempo_bpms = []
+        for tempo_change in tempo_changes:
+            bpm = tempo_change.tempo
+            if prev_bpm != bpm:
+                tempo_change_time.append(quatize_to_nth(tempo_change.time, ticks_per_nth))
+                tempo_bpms.append(bpm)
+            prev_bpm = bpm
     # to handle edge condition
-    tempo_change_ticks.append(float('inf'))
+    tempo_change_time.append(float('inf'))
     tempo_bpms.append(-1)
-    # print(tempo_change_ticks)
+    # print(tempo_change_time)
     # print(tempo_bpms)
 
     tempo_token_list = []
@@ -238,116 +252,95 @@ def get_measure_related_tokens(
     time_sig_token_list = []
     measure_token_list = []
     for i, time_sig_tuple in enumerate(time_sig_tuple_list):
-        ticks_per_measure = round(midi.ticks_per_beat * time_sig_tuple[0] * (4 / time_sig_tuple[1]))
+        nth_per_measure = round(nth_per_beat * time_sig_tuple[0] * (4 / time_sig_tuple[1]))
         # find start
-        cur_timesig_start_tick = time_sig_tuple[2]
+        cur_timesig_start_time = time_sig_tuple[2]
         # find end
         if i < len(time_sig_tuple_list) - 1:
-            next_timesig_start_tick = time_sig_tuple_list[i+1][2]
+            next_timesig_start_time = time_sig_tuple_list[i+1][2]
         else:
             # measure should end when no notes are ending any more
-            ticks_to_last = last_note_end_tick - cur_timesig_start_tick
-            num_of_measures = (ticks_to_last // ticks_per_measure) + 1
-            next_timesig_start_tick = cur_timesig_start_tick + num_of_measures * ticks_per_measure
+            time_to_last_note_end = last_note_end - cur_timesig_start_time
+            num_of_measures = (time_to_last_note_end // nth_per_measure) + 1
+            next_timesig_start_time = cur_timesig_start_time + num_of_measures * nth_per_measure
         # if note already end
-        if cur_timesig_start_tick > last_note_end_tick:
+        if cur_timesig_start_time > last_note_end:
             break
         # if note not started yet
-        if next_timesig_start_tick <= first_note_onset_tick:
+        if next_timesig_start_time <= first_note_onset:
             continue
 
         # find the first measure that contain the first note
-        while cur_timesig_start_tick + ticks_per_measure <= first_note_onset_tick:
-            cur_timesig_start_tick += ticks_per_measure
+        while cur_timesig_start_time + nth_per_measure <= first_note_onset:
+            cur_timesig_start_time += nth_per_measure
 
-        # now cur_measure_start_tick is the REAL first measure
+        # now cur_measure_start_time is the REAL first measure
         if is_supported_time_signature(time_sig_tuple[0], time_sig_tuple[1]):
             time_sig_token_list.append(
                 TimeSignatureToken(
-                    onset=cur_timesig_start_tick,
+                    onset=cur_timesig_start_time,
                     time_signature=(time_sig_tuple[0], time_sig_tuple[1])
                 )
             )
         else:
-            raise NotImplementedError('A unsupported time signature appeared. Don\'t know what to do.')
-        # print(f'TimeSig {i}:', cur_measure_start_tick, next_timesig_start_tick, ticks_per_measure)
+            raise NotImplementedError(f'Encounter unsupported time signature {time_sig_tuple[0]}/{time_sig_tuple[1]}')
+        # print(f'TimeSig {i}:', cur_measure_start_time, next_timesig_start_time, nth_per_measure)
 
-        for cur_measure_start_tick in range(cur_timesig_start_tick, next_timesig_start_tick, ticks_per_measure):
-            measure_token_list.append(
-                MeasureToken(onset=cur_measure_start_tick)
-            )
+        for cur_measure_start_time in range(cur_timesig_start_time, next_timesig_start_time, nth_per_measure):
+            measure_token_list.append(MeasureToken(onset=cur_measure_start_time))
             # handle tempo
             cur_measure_tempo_list = []
             cur_measure_tempo_length_list = []
-            # if the current tempo_change_tick is in previous measure
-            # because we know in previous measure the tempo_change_tick stopped at the position
+            # if the current tempo_change_time is in previous measure
+            # because we know in previous measure the tempo_change_time stopped at the position
             # closest to this measure, so this measure's tempo could be different to previous's
-            # but when current tempo_change_tick is at least two measures away, it is only possible
+            # but when current tempo_change_time is at least two measures away, it is only possible
             # to have tempo change when the next tempo change is in current measure
-            if (cur_measure_start_tick - ticks_per_measure < tempo_change_ticks[tempo_cursor] or
-                cur_measure_start_tick <= tempo_change_ticks[tempo_cursor+1] < cur_measure_start_tick + ticks_per_measure):
+            if (cur_measure_start_time - nth_per_measure < tempo_change_time[tempo_cursor] or
+                cur_measure_start_time <= tempo_change_time[tempo_cursor+1] < cur_measure_start_time + nth_per_measure):
                 while True:
-                    # look at the zone between current and next tempo change
+                    # look at the time between current and next tempo change
                     cur_measure_tempo_list.append(tempo_bpms[tempo_cursor])
-                    cur_tempo_start = max(tempo_change_ticks[tempo_cursor], cur_measure_start_tick)
+                    cur_tempo_start = max(tempo_change_time[tempo_cursor], cur_measure_start_time)
                     # because the last change is set at infinity so no need to worry index error
-                    cur_tempo_end = min(tempo_change_ticks[tempo_cursor+1], cur_measure_start_tick + ticks_per_measure)
+                    cur_tempo_end = min(tempo_change_time[tempo_cursor+1], cur_measure_start_time + nth_per_measure)
                     cur_measure_tempo_length_list.append(cur_tempo_end - cur_tempo_start)
-                    if tempo_change_ticks[tempo_cursor+1] > cur_measure_start_tick + ticks_per_measure:
-                        # if the next tempo_chagne_tick is not in current measure, stop increasing cursor
-                        # because next measure needs current tempo to calculate
-                        # when you reach the last "real" tempo change, its "next" tick change is at infinity
+                    if tempo_change_time[tempo_cursor+1] > cur_measure_start_time + nth_per_measure:
+                        # if the next tempo_change_time is not in current measure, stop increasing cursor
+                        # because next measure needs value of current tempo to calculate
+                        # when it reach the last "real" tempo change, its "next" tick change is at infinity
                         # so the tempo_cursor will never reach it
                         break
                     tempo_cursor += 1
-
-                if len(cur_measure_tempo_list) != 0:
-                    weighted_tempo = sum(t * w / ticks_per_measure for t, w in zip(cur_measure_tempo_list, cur_measure_tempo_length_list))
+                if len(cur_measure_tempo_list) == 1:
+                    tempo_token_list.append(TempoToken(onset=cur_measure_start_time, bpm=cur_measure_tempo_list[0]))
+                elif len(cur_measure_tempo_list) > 1:
+                    weighted_tempo = sum(
+                        t * w / nth_per_measure
+                        for t, w in zip(cur_measure_tempo_list, cur_measure_tempo_length_list)
+                    )
                     # snap
                     weighted_tempo = tempo_min + tempo_step * round((weighted_tempo - tempo_min) / tempo_step)
                     # clamp
                     weighted_tempo = min(tempo_max, max(tempo_min, weighted_tempo))
                     prev_tempo = tempo_token_list[-1].bpm if len(tempo_token_list) != 0 else -1
                     if weighted_tempo != prev_tempo:
-                        tempo_token_list.append(TempoToken(onset=cur_measure_start_tick,bpm=weighted_tempo))
+                        tempo_token_list.append(TempoToken(onset=cur_measure_start_time, bpm=weighted_tempo))
 
-    print(len(measure_token_list), len(time_sig_token_list), len(tempo_token_list))
     measure_related_token_list = measure_token_list + time_sig_token_list + tempo_token_list
     # measure_related_token_list.sort() # dont have to sort
     return measure_related_token_list
 
 
-def quantize_by_nth(note_measure_token_list: list, nth: int, ticks_per_beat: int):
-    ticks_per_nth = round(ticks_per_beat / (nth // 4))
-    quatized_note_measure_token_list = []
-    for token in note_measure_token_list:
-        quantized_onset = max(1, round(token.onset / ticks_per_nth))
-        if token.__class__.__name__ == 'NoteToken':
-            quantized_duration = max(1, round(token.duration / ticks_per_nth)) if token.duration > 0 else round(token.duration / ticks_per_nth)
-            new_token = token._replace(
-                onset=quantized_onset,
-                duration=quantized_duration
-            )
-        else:
-            new_token = token._replace(
-                onset=quantized_onset
-            )
-        quatized_note_measure_token_list.append(new_token)
-    # remove duplicated note tokens
-    quatized_note_measure_token_list = list(set(quatized_note_measure_token_list))
-    quatized_note_measure_token_list.sort()
-    return quatized_note_measure_token_list
-
-
-def get_position_tokens(quatized_note_measure_token_list: list) -> list:
+def get_position_tokens(note_measure_tokens_list: list) -> list:
     position_token_list = []
     cur_measure_onset_time = 0
     cur_note_onset_time = 0
-    for token in quatized_note_measure_token_list:
-        if token.__class__.__name__ == 'MeasureToken':
-            cur_measure_onset_time = token.onset
-        if token.__class__.__name__ == 'NoteToken':
-            if token.onset > cur_note_onset_time:
+    for token in note_measure_tokens_list:
+        if token.onset > cur_note_onset_time:
+            if token.__class__.__name__ == 'MeasureToken':
+                cur_measure_onset_time = token.onset
+            if token.__class__.__name__ == 'NoteToken':
                 position_token_list.append(
                     PositionToken(
                         onset=token.onset,
@@ -377,13 +370,14 @@ def midi_2_tokens(
         velocity_step: int,
         tempo_quantization: list,
         debug: bool = False) -> list:
+
     start_time=time()
-    note_token_list = get_note_tokens(midi, max_duration, velocity_step)
+    note_token_list = get_note_tokens(midi, nth, max_duration, velocity_step)
     if debug:
         print('Get notes:', len(note_token_list), 'time:', time()-start_time)
         start_time=time()
 
-    measure_related_tokens_list = get_measure_related_tokens(midi, note_token_list, tempo_quantization)
+    measure_related_tokens_list = get_measure_related_tokens(midi, note_token_list, nth, tempo_quantization)
     note_measure_tokens_list = measure_related_tokens_list + note_token_list
     note_measure_tokens_list.sort()
     if debug:
@@ -397,13 +391,9 @@ def midi_2_tokens(
             token._replace(onset=token.onset-first_onset_tick)
             for token in note_measure_tokens_list
         ]
-    quatized_note_measure_token_list = quantize_by_nth(note_measure_tokens_list, nth, midi.ticks_per_beat)
-    if debug:
-        print('Quatized time:', time()-start_time)
-        start_time=time()
 
-    pos_token_list = get_position_tokens(quatized_note_measure_token_list)
-    body_token_list = pos_token_list + quatized_note_measure_token_list
+    pos_token_list = get_position_tokens(note_measure_tokens_list)
+    body_token_list = pos_token_list + note_measure_tokens_list
     body_token_list.sort()
     if debug:
         print('Get position:', len(pos_token_list), 'time:', time()-start_time)
@@ -439,10 +429,11 @@ def midi_2_text(
         - use_merge_sparse: to merge sparse tracks or not
     """
 
-    assert nth > 4 and nth % 4 == 0
-    assert tempo_quantization[0] <= tempo_quantization[1] and tempo_quantization[2] > 0
+    assert nth > 4 and nth % 4 == 0, 'nth is not multiple of 4'
+    assert tempo_quantization[0] <= tempo_quantization[1] and tempo_quantization[2] > 0, 'bad tempo_quantization'
 
     midi = MidiFile(midi_filepath)
+    assert midi.ticks_per_beat >= (nth//4), f'midi.ticks_per_beat ({midi.ticks_per_beat}) is less than one-fourth of nth ({nth})'
     if debug:
         print('tick/beat:', midi.ticks_per_beat)
 
@@ -553,8 +544,6 @@ def text_2_midi(texts: str, nth: int, debug=False) -> MidiFile:
                     midi.instruments[track_number].notes.append(n)
                     # if debug:
                     #     print('N', pitch, duration, velocity, track_number, instrument)
-            else:
-                raise ValueError('Undefined typename')
     # end loop text_list
     return midi
 

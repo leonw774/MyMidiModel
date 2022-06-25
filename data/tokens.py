@@ -65,13 +65,12 @@ EndOfScoreToken = namedtuple(
 
 SUPPORTED_TIME_SIGNATURES = {
     (numerator, denominator)
-    for denominator in [2, 4, 8, 16]
-    for numerator in range(1, denominator*2)
+    for denominator in [2, 4, 8, 16, 32]
+    for numerator in range(1, denominator*3+1)
 }
 
 def is_supported_time_signature(numerator, denominator):
     return (numerator, denominator) in SUPPORTED_TIME_SIGNATURES
-
 
 # python support up to base=36 in int function
 ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -96,6 +95,9 @@ def tokenstr2int(x: str):
 
 SPECIAL_TOKEN_TEXTS = ['BOS', 'EOS', 'PAD', 'UNK', 'EOP']
 
+class TokenParseError(Exception):
+    pass
+
 def token_2_text(token: namedtuple) -> str:
     typename = token.__class__.__name__
     if typename == 'BeginOfScoreToken': # BOS
@@ -117,7 +119,7 @@ def token_2_text(token: namedtuple) -> str:
     elif typename == 'EndOfScoreToken': # EOS
         return 'EOS'
     else:
-        raise ValueError()
+        raise TokenParseError(f'bad token class name: {typename}')
 
 
 def text_2_token(text: str):
@@ -136,5 +138,5 @@ def text_2_token(text: str):
         # add note to instrument
         attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[1:].split(':'))
     else:
-        raise ValueError()
+        raise TokenParseError(f'bad token string: {text}')
     return typename, attr

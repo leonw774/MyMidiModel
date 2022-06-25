@@ -115,11 +115,11 @@ def build_vocabs(body: str, paras: dict, max_sample_length: str):
     event_tokens = SPECIAL_TOKEN_TEXTS + pitche_tokens + position_tokens + tempo_tokens + times_sig_tokens + track_token + measure_token
 
     print(f'Event tokens size: {len(event_tokens)}')
-    print(f'- Times sig tokens number: {len(times_sig_tokens)} ({times_sig_tokens})')
-    print(f'- Corpus position tokens number: {len(position_tokens)}. Max corpus position: {max(text_2_token(ptoken)[1] for ptoken in position_tokens)}')
-    print(f'  (theoretical largest position = {31 * (paras["nth"] // 16)})')
+    print(f'- Times sig tokens size: {len(times_sig_tokens)} ({times_sig_tokens})')
+    print(f'- Corpus position tokens size: {len(position_tokens)}. Max corpus position: {max(text_2_token(ptoken)[1] for ptoken in position_tokens)}')
+    print(f'  (theoretical largest position = {96 * (paras["nth"] // 32)})')
     print(f'Max measure span size that fits in max_sample_length: {max_fitting_measure_number}')
-    print(f'  (max sample length = {max_sample_length}, max measure number in piece = {max_measure_length})')
+    print(f'  (max_sample_length = {max_sample_length}, max measure number in piece = {max_measure_length})')
 
     # Note attribute tokens are durations, velocities, track numbers and instruments
     # all of them are determined by arguments
@@ -135,12 +135,12 @@ def build_vocabs(body: str, paras: dict, max_sample_length: str):
     track_number_tokens.sort()
     instrument_tokens.sort()
 
-    print('Theoretical duration tokens size:', paras['max_duration'] * paras['nth'] // 4)
-    print('Corpus duration tokens size:', len(corpus_duration_tokens))
+    print('Largest possible duration:', paras['max_duration'] * paras['nth'] // 4)
     print('Largest corpus duration:', max(
         # corpus_duration_tokens, key=lambda x: int(x, TOKEN_UINT2STR_BASE)
         tokenstr2int(x) for x in corpus_duration_tokens
     ))
+    print('Corpus duration tokens size:', len(corpus_duration_tokens))
     print('Velocity token size:', len(velocity_tokens))
     print('Track tokens size:', paras['max_track_number'])
     print('Instrument tokens size: 129')

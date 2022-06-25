@@ -1,3 +1,4 @@
+#!/bin/bash
 # midi preprocessing
 NTH=96
 MAX_TRACK_NUMBER=24
@@ -6,5 +7,7 @@ VELOCITY_STEP=16
 TEMPO_MIN=8
 TEMPO_MAX=264
 TEMPO_STEP=4
+PROCESS_WORKERS=8
+MIDI_DIR_PATH="data/midi/lakh_clean_midi"
 # make vocabulary
 MAX_SAMPLE_LENGTH=4096

@@ -1,18 +1,22 @@
 import os
+import traceback
 from argparse import ArgumentParser
+from copy import deepcopy
 from multiprocessing import Pool
 from time import time
+from tqdm import tqdm
 
 from midi_util import midi_2_text, make_para_yaml
+from tokens import TokenParseError
+
 
 def mp_worker(args_dict):
     try:
-        text = midi_2_text(**args_dict)
+        return midi_2_text(**args_dict)
     except Exception as e:
-        print(args_dict['midi_filepath'])
-        print(str(e))
-        text = ''
-    return text
+        # print(args_dict['midi_filepath'])
+        # print(e)
+        return None
 
 
 def mp_handler(
@@ -20,24 +24,28 @@ def mp_handler(
         mp_work_number: int,
         args_dict: dict):
 
-    error_count = 0
-    args_dict_set = list()
+    args_dict_list = list()
     for midi_filepath in midi_filepath_set:
         a = args_dict.copy() # shallow copy of args_dict
         a['midi_filepath'] = midi_filepath
-        args_dict_set.append(a)
+        args_dict_list.append(a)
+    print(f'Start process with {mp_work_number} workers')
 
-    print(f'start process with {mp_work_number} workers')
-
+    error_count = 0
     text_set = set()
+    text_lengths = []
     with Pool(mp_work_number) as p:
-        for text in p.imap_unordered(mp_worker, args_dict_set):
-            if len(text) != 0:
+        for text in tqdm(p.imap_unordered(mp_worker, args_dict_list)):
+            if text is not None:
                 text_set.add(text)
+                text_lengths.append(len(text))
             else:
+                print(len(text_set))
                 error_count += 1
+        p.close()
+        p.join()
     print('Error count:', error_count)
-    return text_set
+    return text_set, text_lengths
 
 
 if __name__ == '__main__':
@@ -137,7 +145,7 @@ if __name__ == '__main__':
         for k, v in args_dict.items()
         if k not in ['debug', 'use_merge_drums', 'use_merge_sparse']
     }
-    print(args_dict)
+    print(args_vars)
 
     filepath_set = set()
     for inpath in args.input_path:
@@ -151,27 +159,33 @@ if __name__ == '__main__':
             assert os.path.isfile(inpath), f'Path {inpath} is not a file or doesn\'t exist.'
             filepath_set.add(inpath)
     if len(filepath_set) == 0:
-        print('No file to process.')
+        print('No file to process')
         exit()
+    else:
+        print(f'Find {len(filepath_set)} files')
 
     start_time = time()
     text_lengths = []
     if args.mp_work_number <= 1:
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
-            for filepath in filepath_set:
-                text = midi_2_text(filepath, **args_dict)
-                text_lengths.append(len(text))
+            for filepath in tqdm(filepath_set):
+                try:
+                    text = midi_2_text(filepath, **args_dict)
+                    text_lengths.append(len(text))
+                except Exception as e:
+                    print(filepath)
+                    print(e)
+                    text = ''
                 out_file.write(text + '\n')
     else:
-        text_set = mp_handler(filepath_set, args.mp_work_number, args_dict)
+        text_set, text_lengths = mp_handler(filepath_set, args.mp_work_number, args_dict)
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
             for text in text_set:
                 out_file.write(text + '\n')
-            text_lengths = [len(text) for text in text_set]
 
-    print(f'Processed {len(filepath_set)} files.')
-    print(f'Total token count: {sum(text_lengths)}. Average {sum(text_lengths)/len(text_lengths)} per file.')
+    print(f'{len(text_lengths)} files processed')
+    print(f'Total token count: {sum(text_lengths)}. Average {sum(text_lengths)/len(text_lengths)} per file')
     print('Output path:', args.output_path)
     print('Time:', time()-start_time)
