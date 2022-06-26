@@ -139,7 +139,7 @@ def build_vocabs(body: str, paras: dict, max_sample_length: str):
     print('Largest corpus duration:', max(
         # corpus_duration_tokens, key=lambda x: int(x, TOKEN_UINT2STR_BASE)
         tokenstr2int(x) for x in corpus_duration_tokens
-    ))
+    ), corpus_duration_tokens)
     print('Corpus duration tokens size:', len(corpus_duration_tokens))
     print('Velocity token size:', len(velocity_tokens))
     print('Track tokens size:', paras['max_track_number'])
@@ -202,6 +202,7 @@ if __name__ == '__main__':
     with open(vocabs_json_path, 'w+', encoding='utf8') as vocabs_file:
         json.dump(vocabs, vocabs_file)
 
+    start_time = time()
     # split body texts into train, test and valid
     pieces = body.split('\n')
     random.shuffle(pieces)
@@ -209,9 +210,7 @@ if __name__ == '__main__':
     test_split_size  = int(len(pieces)*args.split_ratio[1]/sum(args.split_ratio))
     valid_split_size = len(pieces) - train_split_size - test_split_size
     print('Total pieces:', len(pieces))
-    print('Train split size', train_split_size)
-    print('Test split size', test_split_size)
-    print('Valid split size', valid_split_size)
+    print('Split sizes (train test valid):', train_split_size, test_split_size, valid_split_size)
     train_pieces = pieces[:train_split_size]
     test_pieces = pieces[train_split_size:train_split_size+test_split_size]
     valid_pieces = pieces[train_split_size+test_split_size:]
@@ -231,3 +230,4 @@ if __name__ == '__main__':
     np.save(os.path.join(args.output_dir_path, 'train.npy'), train_pieces_numpy, allow_pickle=True)
     np.save(os.path.join(args.output_dir_path, 'test.npy'), test_pieces_numpy, allow_pickle=True)
     np.save(os.path.join(args.output_dir_path, 'valid.npy'), valid_pieces_numpy, allow_pickle=True)
+    print('Split time:', time()-start_time)

@@ -1,4 +1,6 @@
 import os
+import sys
+import zlib
 import traceback
 from argparse import ArgumentParser
 from copy import deepcopy
@@ -10,24 +12,33 @@ from midi_util import midi_2_text, make_para_yaml
 from tokens import TokenParseError
 
 
-def mp_worker(args_dict):
+def mp_worker(args_dict: dict) -> bytes:
+    n = args_dict.pop('n', 0)
+    # print(n, 'pid', os.getpid(), args_dict['midi_filepath'])
     try:
-        return midi_2_text(**args_dict)
+        texts = midi_2_text(**args_dict)
+        # compress the return value because passing large object to pipe may cause deadlock
+        compressed_texts = zlib.compress(texts.encode())
+        # print(n, len(compressed_texts))
+        return compressed_texts
     except Exception as e:
         # print(args_dict['midi_filepath'])
-        # print(e)
-        return None
+        # print(n, traceback.format_exc())
+        # print(n, e)
+        return b''
 
 
 def mp_handler(
-        midi_filepath_set: set,
+        midi_filepath_list: set,
         mp_work_number: int,
         args_dict: dict):
 
     args_dict_list = list()
-    for midi_filepath in midi_filepath_set:
+    for n, midi_filepath in enumerate(midi_filepath_list):
         a = args_dict.copy() # shallow copy of args_dict
+        # a = deepcopy(args_dict)
         a['midi_filepath'] = midi_filepath
+        a['n'] = n
         args_dict_list.append(a)
     print(f'Start process with {mp_work_number} workers')
 
@@ -35,15 +46,18 @@ def mp_handler(
     text_set = set()
     text_lengths = []
     with Pool(mp_work_number) as p:
-        for text in tqdm(p.imap_unordered(mp_worker, args_dict_list)):
-            if text is not None:
-                text_set.add(text)
-                text_lengths.append(len(text))
-            else:
-                print(len(text_set))
-                error_count += 1
-        p.close()
-        p.join()
+        compressed_text_list = list(tqdm(
+            p.imap_unordered(mp_worker, args_dict_list),
+            total=len(args_dict_list)
+        ))
+    print('mp end. object size:', sys.getsizeof(compressed_text_list))
+    for compressed_text in compressed_text_list:
+        if len(compressed_text) != 0:
+            text = zlib.decompress(compressed_text).decode()
+            text_set.add(text)
+        else:
+            error_count += 1
+    text_lengths = list(map(len, text_set))
     print('Error count:', error_count)
     return text_set, text_lengths
 
@@ -147,45 +161,49 @@ if __name__ == '__main__':
     }
     print(args_vars)
 
-    filepath_set = set()
+    filepath_list = list()
     for inpath in args.input_path:
         if args.recursive:
             assert os.path.isdir(inpath), f'Path {inpath} is not a directory or doesn\'t exist.'
             for root, dirs, files in os.walk(inpath):
                 for filename in files:
                     if filename.endswith('.mid') or filename.endswith('.MID'):
-                        filepath_set.add(os.path.join(root, filename))
+                        filepath_list.append(os.path.join(root, filename))
         else:
             assert os.path.isfile(inpath), f'Path {inpath} is not a file or doesn\'t exist.'
-            filepath_set.add(inpath)
-    if len(filepath_set) == 0:
+            filepath_list.append(inpath)
+    filepath_list.sort()
+    if len(filepath_list) == 0:
         print('No file to process')
         exit()
     else:
-        print(f'Find {len(filepath_set)} files')
+        print(f'Find {len(filepath_list)} files')
 
     start_time = time()
     text_lengths = []
     if args.mp_work_number <= 1:
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
-            for filepath in tqdm(filepath_set):
+            for n, filepath in tqdm(enumerate(filepath_list)):
+                # print(n, filepath)
                 try:
-                    text = midi_2_text(filepath, **args_dict)
-                    text_lengths.append(len(text))
+                    texts = midi_2_text(filepath, **args_dict)
                 except Exception as e:
-                    print(filepath)
-                    print(e)
-                    text = ''
-                out_file.write(text + '\n')
+                    # print(filepath)
+                    # print(traceback.format_exc())
+                    # print(n, e)
+                    texts = ''
+                if len(texts) > 0:
+                    text_lengths.append(len(texts))
+                    out_file.write(texts + '\n')
     else:
-        text_set, text_lengths = mp_handler(filepath_set, args.mp_work_number, args_dict)
+        text_set, text_lengths = mp_handler(filepath_list, args.mp_work_number, args_dict)
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
             for text in text_set:
                 out_file.write(text + '\n')
 
     print(f'{len(text_lengths)} files processed')
-    print(f'Total token count: {sum(text_lengths)}. Average {sum(text_lengths)/len(text_lengths)} per file')
+    print(f'Average tokens: {sum(text_lengths)/len(text_lengths)} per file')
     print('Output path:', args.output_path)
     print('Time:', time()-start_time)

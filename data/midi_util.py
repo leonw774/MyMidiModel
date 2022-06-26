@@ -1,8 +1,4 @@
-import copy
-from mimetypes import init
 import random
-
-from collections import namedtuple
 from miditoolkit.midi.parser import MidiFile
 from miditoolkit.midi.containers import Note, Instrument, TimeSignature, TempoChange
 from time import time
@@ -120,7 +116,8 @@ def merge_tracks(
 
 
 def quatize_to_nth(time_in_tick: int, ticks_per_nth: float) -> int:
-    return max(1, round(time_in_tick / ticks_per_nth)) if time_in_tick > 0 else round(time_in_tick / ticks_per_nth)
+    q = round(time_in_tick / ticks_per_nth)
+    return q if q != 0 else 1
 
 
 def get_note_tokens(midi: MidiFile, nth: int, max_duration: int, velocity_step: int) -> list:
@@ -129,9 +126,18 @@ def get_note_tokens(midi: MidiFile, nth: int, max_duration: int, velocity_step: 
         orders of onset time, track number, pitch, duration, velocity and instrument.
         The time unit used is tick
     """
-    half_vel_step = velocity_step//2
+    half_vel_step = velocity_step // 2
     nth_per_beat = nth // 4
     ticks_per_nth = midi.ticks_per_beat / nth_per_beat
+
+    # because sometimes mido give value more than 32 bits to note.start and note.end
+    # and those extra bits makes the while loop hangs forever
+    for inst in midi.instruments:
+        for note in inst.notes:
+            if note.start > (1 << 32):
+                note.start = note.start & 0xFFFFFFFF
+            if note.end > (1 << 32):
+                note.end = note.end & 0xFFFFFFFF
 
     note_token_list = [
         NoteToken(
@@ -145,6 +151,11 @@ def get_note_tokens(midi: MidiFile, nth: int, max_duration: int, velocity_step: 
         for note in inst.notes
     ]
 
+    for inst in midi.instruments:
+        for note in inst.notes:
+            if quatize_to_nth(note.end-note.start, ticks_per_nth) > (1 << 28):
+                print(note.end, note.start)
+
     # handle too long duration
     # max_duration is in unit of quarter note (beat)
     max_duration_in_nth = max_duration * nth_per_beat
@@ -157,27 +168,21 @@ def get_note_tokens(midi: MidiFile, nth: int, max_duration: int, velocity_step: 
         if note_token.duration > max_duration_in_nth:
             cur_dur = note_token.duration
             cur_onset = note_token.onset
-            while cur_dur != 0:
+            while cur_dur > 0:
                 if cur_dur > max_duration_in_nth:
                     note_token_list.append(
-                        NoteToken(
+                        note_token._replace(
                             onset=cur_onset,
-                            track_number=note_token.track_number,
-                            pitch=note_token.pitch,
-                            duration=continuing_duration,
-                            velocity=note_token.velocity
+                            duration=continuing_duration
                         )
                     )
                     cur_onset += max_duration_in_nth
                     cur_dur -= max_duration_in_nth
                 else:
                     note_token_list.append(
-                        NoteToken(
+                        note_token._replace(
                             onset=cur_onset,
-                            track_number=note_token.track_number,
-                            pitch=note_token.pitch,
-                            duration=cur_dur,
-                            velocity=note_token.velocity
+                            duration=cur_dur
                         )
                     )
                     cur_dur = 0
@@ -185,7 +190,7 @@ def get_note_tokens(midi: MidiFile, nth: int, max_duration: int, velocity_step: 
         n for n in note_token_list
         if n.duration <= max_duration_in_nth
     ]
-    # note_token_list = list(set(note_token_list))
+    note_token_list = list(set(note_token_list))
     note_token_list.sort()
     return note_token_list
 
@@ -239,7 +244,7 @@ def get_measure_related_tokens(
             bpm = tempo_change.tempo
             if prev_bpm != bpm:
                 tempo_change_time.append(quatize_to_nth(tempo_change.time, ticks_per_nth))
-                tempo_bpms.append(bpm)
+                tempo_bpms.append(int(bpm))
             prev_bpm = bpm
     # to handle edge condition
     tempo_change_time.append(float('inf'))
@@ -312,15 +317,13 @@ def get_measure_related_tokens(
                         # so the tempo_cursor will never reach it
                         break
                     tempo_cursor += 1
-                if len(cur_measure_tempo_list) == 1:
-                    tempo_token_list.append(TempoToken(onset=cur_measure_start_time, bpm=cur_measure_tempo_list[0]))
-                elif len(cur_measure_tempo_list) > 1:
+                if len(cur_measure_tempo_list) > 1:
                     weighted_tempo = sum(
                         t * w / nth_per_measure
                         for t, w in zip(cur_measure_tempo_list, cur_measure_tempo_length_list)
                     )
                     # snap
-                    weighted_tempo = tempo_min + tempo_step * round((weighted_tempo - tempo_min) / tempo_step)
+                    weighted_tempo = round(tempo_min + tempo_step * round((weighted_tempo - tempo_min) / tempo_step))
                     # clamp
                     weighted_tempo = min(tempo_max, max(tempo_min, weighted_tempo))
                     prev_tempo = tempo_token_list[-1].bpm if len(tempo_token_list) != 0 else -1
@@ -338,9 +341,9 @@ def get_position_tokens(note_measure_tokens_list: list) -> list:
     cur_note_onset_time = 0
     for token in note_measure_tokens_list:
         if token.onset > cur_note_onset_time:
-            if token.__class__.__name__ == 'MeasureToken':
+            if token.type_priority == 2: # MeasureToken
                 cur_measure_onset_time = token.onset
-            if token.__class__.__name__ == 'NoteToken':
+            if token.type_priority == 6: # NoteToken
                 position_token_list.append(
                     PositionToken(
                         onset=token.onset,
@@ -384,11 +387,11 @@ def midi_2_tokens(
         print('Get measures:', len(measure_related_tokens_list), 'time:', time()-start_time)
         start_time=time()
 
-    # align the first tick to zero
-    first_onset_tick = note_measure_tokens_list[0].onset
-    if first_onset_tick != 0:
+    # align the first time to zero
+    first_onset_time = note_measure_tokens_list[0].onset
+    if first_onset_time != 0:
         note_measure_tokens_list = [
-            token._replace(onset=token.onset-first_onset_tick)
+            token._replace(onset=token.onset-first_onset_time)
             for token in note_measure_tokens_list
         ]
 
@@ -403,7 +406,7 @@ def midi_2_tokens(
     full_token_list = head_tokens_list + body_token_list + [EndOfScoreToken()]
     if debug:
         print('Full token:', len(full_token_list))
-        print('--------')
+
     return full_token_list
 
 
@@ -447,7 +450,7 @@ def midi_2_text(
         if inst.is_drum:
             midi.instruments[i].program = 128
 
-    token_list  = midi_2_tokens(midi, nth, max_duration, velocity_step, tempo_quantization, debug)
+    token_list = midi_2_tokens(midi, nth, max_duration, velocity_step, tempo_quantization, debug)
 
     # with open('tokens.txt', 'w+', encoding='utf8') as f:
     #     f.write('\n'.join(map(str, token_list)))
@@ -457,6 +460,8 @@ def midi_2_text(
     text = ' '.join(map(str, text_list))
     if debug:
         print('Make text from tokens:', time()-start_time)
+        print('--------')
+
     return text
 
 

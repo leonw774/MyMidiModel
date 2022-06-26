@@ -73,22 +73,19 @@ def is_supported_time_signature(numerator, denominator):
     return (numerator, denominator) in SUPPORTED_TIME_SIGNATURES
 
 # python support up to base=36 in int function
-ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 TOKEN_INT2STR_BASE = 36
 
 def int2str(x: int) -> str:
-    if x == 0:
-        return '0'
+    if 0 <= x < TOKEN_INT2STR_BASE:
+        return '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[x]
     isneg = x < 0
     if isneg:
         x = -x
     b = ''
     while x:
         x, d = divmod(x, TOKEN_INT2STR_BASE)
-        b = ALPHABET[d] + b
-    if isneg:
-        b = '-' + b
-    return b
+        b = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[d] + b
+    return ('-' + b) if isneg else b
 
 def tokenstr2int(x: str):
     return int(x, TOKEN_INT2STR_BASE)
@@ -99,27 +96,28 @@ class TokenParseError(Exception):
     pass
 
 def token_2_text(token: namedtuple) -> str:
-    typename = token.__class__.__name__
-    if typename == 'BeginOfScoreToken': # BOS
-        return 'BOS'
-    elif typename == 'TrackToken': # Track
-        # type track:instrument
-        return f'R{int2str(token.track_number)}:{int2str(token.instrument)}'
-    elif typename == 'MeasureToken': # Measure
-        return 'M'
-    elif typename == 'TimeSignatureToken': # TimeSig
-        return f'S{int2str(token.time_signature[0])}/{int2str(token.time_signature[1])}'
-    elif typename == 'TempoToken': # Tempo
-        return f'T{int2str(token.bpm)}'
-    elif typename == 'PositionToken': # Position
-        return f'P{int2str(token.position)}'
-    elif typename == 'NoteToken': # Note
+    # typename = token.__class__.__name__
+    type_priority = token.type_priority
+    if type_priority == 7: # EOS
+        return 'EOS'
+    elif type_priority == 6: # BOS
         # type pitch:duration:velocity:track:instrument
         return f'N{int2str(token.pitch)}:{int2str(token.duration)}:{int2str(token.velocity)}:{int2str(token.track_number)}'
-    elif typename == 'EndOfScoreToken': # EOS
-        return 'EOS'
+    elif type_priority == 5: # Position
+        return f'P{int2str(token.position)}'
+    elif type_priority == 2: # Measure
+        return 'M'
+    elif type_priority == 3: # TimeSig
+        return f'S{int2str(token.time_signature[0])}/{int2str(token.time_signature[1])}'
+    elif type_priority == 4: # Tempo
+        return f'T{int2str(token.bpm)}'
+    elif type_priority == 1: # Track
+        # type track:instrument
+        return f'R{int2str(token.track_number)}:{int2str(token.instrument)}'
+    elif type_priority == 0:
+        return 'BOS'
     else:
-        raise TokenParseError(f'bad token class name: {typename}')
+        raise TokenParseError(f'bad token namedtuple: {token}')
 
 
 def text_2_token(text: str):
