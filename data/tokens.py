@@ -69,13 +69,19 @@ SUPPORTED_TIME_SIGNATURES = {
     for numerator in range(1, denominator*3+1)
 }
 
+def get_theoretical_max_position(nth: int) -> int:
+    return max(
+        s[0] * (nth // s[1])
+        for s in SUPPORTED_TIME_SIGNATURES
+    )
+
 def is_supported_time_signature(numerator, denominator):
     return (numerator, denominator) in SUPPORTED_TIME_SIGNATURES
 
 # python support up to base=36 in int function
 TOKEN_INT2STR_BASE = 36
 
-def int2str(x: int) -> str:
+def tokenint2str(x: int) -> str:
     if 0 <= x < TOKEN_INT2STR_BASE:
         return '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[x]
     isneg = x < 0
@@ -90,7 +96,7 @@ def int2str(x: int) -> str:
 def tokenstr2int(x: str):
     return int(x, TOKEN_INT2STR_BASE)
 
-SPECIAL_TOKEN_TEXTS = ['BOS', 'EOS', 'PAD', 'UNK', 'EOP']
+SPECIAL_TOKENS = ['[PAD]', '[UNK]']
 
 class TokenParseError(Exception):
     pass
@@ -102,18 +108,18 @@ def token_2_text(token: namedtuple) -> str:
         return 'EOS'
     elif type_priority == 6: # BOS
         # type pitch:duration:velocity:track:instrument
-        return f'N{int2str(token.pitch)}:{int2str(token.duration)}:{int2str(token.velocity)}:{int2str(token.track_number)}'
+        return f'N{tokenint2str(token.pitch)}:{tokenint2str(token.duration)}:{tokenint2str(token.velocity)}:{tokenint2str(token.track_number)}'
     elif type_priority == 5: # Position
-        return f'P{int2str(token.position)}'
+        return f'P{tokenint2str(token.position)}'
     elif type_priority == 2: # Measure
         return 'M'
     elif type_priority == 3: # TimeSig
-        return f'S{int2str(token.time_signature[0])}/{int2str(token.time_signature[1])}'
+        return f'S{tokenint2str(token.time_signature[0])}/{tokenint2str(token.time_signature[1])}'
     elif type_priority == 4: # Tempo
-        return f'T{int2str(token.bpm)}'
+        return f'T{tokenint2str(token.bpm)}'
     elif type_priority == 1: # Track
         # type track:instrument
-        return f'R{int2str(token.track_number)}:{int2str(token.instrument)}'
+        return f'R{tokenint2str(token.track_number)}:{tokenint2str(token.instrument)}'
     elif type_priority == 0:
         return 'BOS'
     else:

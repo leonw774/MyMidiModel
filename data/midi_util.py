@@ -138,6 +138,7 @@ def get_note_tokens(midi: MidiFile, nth: int, max_duration: int, velocity_step: 
                 note.start = note.start & 0xFFFFFFFF
             if note.end > (1 << 32):
                 note.end = note.end & 0xFFFFFFFF
+            assert note.end > note.start, "non-positive note duration"
 
     note_token_list = [
         NoteToken(
@@ -150,11 +151,6 @@ def get_note_tokens(midi: MidiFile, nth: int, max_duration: int, velocity_step: 
         for track_number, inst in enumerate(midi.instruments)
         for note in inst.notes
     ]
-
-    for inst in midi.instruments:
-        for note in inst.notes:
-            if quatize_to_nth(note.end-note.start, ticks_per_nth) > (1 << 28):
-                print(note.end, note.start)
 
     # handle too long duration
     # max_duration is in unit of quarter note (beat)
@@ -226,7 +222,7 @@ def get_measure_related_tokens(
             elif (time_sig_tuple[0] != time_signature_changes[i-1].numerator or \
                     time_sig_tuple[1] != time_signature_changes[i-1].denominator):
                 time_sig_tuple_list.append(time_sig_tuple)
-        if time_sig_tuple_list[0][2] <= first_note_onset:
+        if time_sig_tuple_list[0][2] > first_note_onset:
             time_sig_tuple_list = [(4, 4, 0)] + time_sig_tuple_list
     # print(time_sig_tuple_list)
 
@@ -343,7 +339,7 @@ def get_position_tokens(note_measure_tokens_list: list) -> list:
         if token.onset > cur_note_onset_time:
             if token.type_priority == 2: # MeasureToken
                 cur_measure_onset_time = token.onset
-            if token.type_priority == 6: # NoteToken
+            elif token.type_priority == 6: # NoteToken
                 position_token_list.append(
                     PositionToken(
                         onset=token.onset,
@@ -381,8 +377,10 @@ def midi_2_tokens(
         start_time=time()
 
     measure_related_tokens_list = get_measure_related_tokens(midi, note_token_list, nth, tempo_quantization)
+    assert len(note_token_list) * 2 > len(measure_related_tokens_list) * len(midi.instruments), 'music too sparse'
     note_measure_tokens_list = measure_related_tokens_list + note_token_list
     note_measure_tokens_list.sort()
+    assert note_measure_tokens_list[0].type_priority == 2, 'first element of body is not measure token'
     if debug:
         print('Get measures:', len(measure_related_tokens_list), 'time:', time()-start_time)
         start_time=time()
@@ -578,3 +576,12 @@ def parse_para_yaml(yaml: str) -> dict:
         else:
             args_dict[k] = int(v)
     return args_dict
+
+def text_2_paras_and_pieces(raw_file_texts: str):
+    # get settings and main texts
+    texts = raw_file_texts
+    _, head, body = texts.split('---')
+    paras = parse_para_yaml(head)
+    body = body.lstrip('\n').rstrip('\n')
+    pieces = body.split('\n')
+    return paras, pieces

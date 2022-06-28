@@ -1,9 +1,7 @@
 import os
 import sys
-import zlib
 import traceback
 from argparse import ArgumentParser
-from copy import deepcopy
 from multiprocessing import Pool
 from time import time
 from tqdm import tqdm
@@ -12,20 +10,18 @@ from midi_util import midi_2_text, make_para_yaml
 from tokens import TokenParseError
 
 
-def mp_worker(args_dict: dict) -> bytes:
+def mp_worker(args_dict: dict):
     n = args_dict.pop('n', 0)
-    # print(n, 'pid', os.getpid(), args_dict['midi_filepath'])
+    verbose = args_dict.pop('verbose', False)
+    print(n, 'pid', os.getpid(), args_dict['midi_filepath'])
     try:
         texts = midi_2_text(**args_dict)
-        # compress the return value because passing large object to pipe may cause deadlock
-        compressed_texts = zlib.compress(texts.encode())
-        # print(n, len(compressed_texts))
-        return compressed_texts
+        # print(n, len(texts))
+        return texts
     except Exception as e:
-        # print(args_dict['midi_filepath'])
-        # print(n, traceback.format_exc())
-        # print(n, e)
-        return b''
+        if verbose:
+            print(n, traceback.format_exc())
+        return ''
 
 
 def mp_handler(
@@ -36,30 +32,30 @@ def mp_handler(
     args_dict_list = list()
     for n, midi_filepath in enumerate(midi_filepath_list):
         a = args_dict.copy() # shallow copy of args_dict
-        # a = deepcopy(args_dict)
         a['midi_filepath'] = midi_filepath
         a['n'] = n
         args_dict_list.append(a)
     print(f'Start process with {mp_work_number} workers')
 
-    error_count = 0
-    text_set = set()
-    text_lengths = []
+    exception_count = 0
+    good_filepath_list = []
+    good_texts_list = []
+    texts_lengths = []
     with Pool(mp_work_number) as p:
-        compressed_text_list = list(tqdm(
-            p.imap_unordered(mp_worker, args_dict_list),
+        texts_list = list(tqdm(
+            p.imap(mp_worker, args_dict_list),
             total=len(args_dict_list)
         ))
-    print('mp end. object size:', sys.getsizeof(compressed_text_list))
-    for compressed_text in compressed_text_list:
-        if len(compressed_text) != 0:
-            text = zlib.decompress(compressed_text).decode()
-            text_set.add(text)
+    print('mp end. object size:', sys.getsizeof(texts_list))
+    for i, texts in enumerate(texts_list):
+        if len(texts) != 0:
+            good_texts_list.append(texts)
+            good_filepath_list.append(midi_filepath_list[i])
         else:
-            error_count += 1
-    text_lengths = list(map(len, text_set))
-    print('Error count:', error_count)
-    return text_set, text_lengths
+            exception_count += 1
+    texts_lengths = list(map(len, good_texts_list))
+    print('Bad file count:', exception_count)
+    return good_texts_list, texts_lengths, good_filepath_list
 
 
 if __name__ == '__main__':
@@ -119,6 +115,11 @@ if __name__ == '__main__':
         dest='debug'
     )
     parser.add_argument(
+        '--verbose',
+        action='store_true',
+        dest='verbose'
+    )
+    parser.add_argument(
         '-r', '--recursive',
         action='store_true',
         dest='recursive',
@@ -157,7 +158,7 @@ if __name__ == '__main__':
     paras_dict = {
         k: v
         for k, v in args_dict.items()
-        if k not in ['debug', 'use_merge_drums', 'use_merge_sparse']
+        if k not in ['debug', 'verbose', 'use_merge_drums', 'use_merge_sparse']
     }
     print(args_vars)
 
@@ -180,30 +181,31 @@ if __name__ == '__main__':
         print(f'Find {len(filepath_list)} files')
 
     start_time = time()
-    text_lengths = []
     if args.mp_work_number <= 1:
+        texts_lengths = []
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
-            for n, filepath in tqdm(enumerate(filepath_list)):
-                # print(n, filepath)
+            for n, filepath in tqdm(enumerate(filepath_list), total=len(filepath_list)):
+                verbose = args_dict.pop('verbose', False)
+                if verbose:
+                    print(n, filepath)
                 try:
                     texts = midi_2_text(filepath, **args_dict)
                 except Exception as e:
-                    # print(filepath)
-                    # print(traceback.format_exc())
-                    # print(n, e)
+                    if verbose:
+                        print(traceback.format_exc())
                     texts = ''
                 if len(texts) > 0:
-                    text_lengths.append(len(texts))
+                    texts_lengths.append(len(texts))
                     out_file.write(texts + '\n')
     else:
-        text_set, text_lengths = mp_handler(filepath_list, args.mp_work_number, args_dict)
+        good_texts_list, texts_lengths, good_filepath_list = mp_handler(filepath_list, args.mp_work_number, args_dict)
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
-            for text in text_set:
-                out_file.write(text + '\n')
+            for texts in good_texts_list:
+                out_file.write(texts + '\n')
 
-    print(f'{len(text_lengths)} files processed')
-    print(f'Average tokens: {sum(text_lengths)/len(text_lengths)} per file')
+    print(f'{len(texts_lengths)} files processed')
+    print(f'Average tokens: {sum(texts_lengths)/len(texts_lengths)} per file')
     print('Output path:', args.output_path)
     print('Time:', time()-start_time)

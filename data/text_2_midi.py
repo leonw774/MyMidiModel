@@ -1,16 +1,14 @@
 import sys
-from midi_util import text_2_midi, parse_para_yaml
+from midi_util import text_2_midi, text_2_paras_and_pieces
 
 filename = sys.argv[1]
 
 with open(filename, 'r', encoding='utf8') as f:
     texts = f.read()
-_, head, body =  texts.split('---')
-paras = parse_para_yaml(head)
-body = body.rstrip('\n').lstrip('\n')
+paras, pieces = text_2_paras_and_pieces(texts)
 print(paras)
 # decode
-for i, text in enumerate(body.split('\n')):
+for i, text in enumerate(pieces):
     if len(text) == 0:
         continue
     midi_obj = text_2_midi(text, paras['nth'])
