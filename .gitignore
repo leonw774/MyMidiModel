@@ -1,8 +1,7 @@
 *env
 .mscbackup
-*.txt
-*.mid
-!data/example_midis/*.mid
+data/texts
+data/midis
 data/data
 
 # Byte-compiled / optimized / DLL files
