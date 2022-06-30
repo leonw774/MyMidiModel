@@ -1,0 +1,6 @@
+.mscbackup
+*.txt
+*.mid
+*.npz
+*.json
+!example_midis/*.mid
