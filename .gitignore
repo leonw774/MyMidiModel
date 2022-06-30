@@ -1,8 +1,8 @@
-genmidinet-env
+*env
 .mscbackup
 *.txt
 *.mid
-!data/example_midi/*.mid
+!data/example_midis/*.mid
 data/data
 
 # Byte-compiled / optimized / DLL files

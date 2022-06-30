@@ -1,4 +1,4 @@
-# GenMidiNet
+# MyMidiModel
 
 1. This line is reserved for `pip install -r requirement.txt`
 2. Make you own copy of `config.sh` if you want to make some changes to the settings.

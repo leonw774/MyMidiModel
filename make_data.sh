@@ -12,12 +12,12 @@ else
     exit 0
 fi
 
-echo $PROCFILE_SUFFIX
+echo $PROC_DATA_NAME
 
 python3 data/midi_to_text.py --nth ${NTH} --max-track-number ${MAX_TRACK_NUMBER} --max-duration ${MAX_DURATION} \
     --velocity-step ${VELOCITY_STEP} --tempo-quantization ${TEMPO_MIN} ${TEMPO_MAX} ${TEMPO_STEP} ${ADDITIONAL_ARGUMENTS} \
-    -w ${PROCESS_WORKERS} -r -o data/processed_midi/corpus_${PROCFILE_SUFFIX}.txt ${MIDI_DIR_PATH}
+    -w ${PROCESS_WORKERS} -r -o data/texts/corpus_${PROC_DATA_NAME}.txt ${MIDI_DIR_PATH}
 
 python3 data/make_data.py --max-sample-length ${MAX_SAMPLE_LENGTH} \
-    data/processed_midi/corpus_${PROCFILE_SUFFIX}.txt \
-    data/data/${PROCFILE_SUFFIX}
+    data/texts/corpus_${PROC_DATA_NAME}.txt \
+    data/data/${PROC_DATA_NAME}

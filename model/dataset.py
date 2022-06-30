@@ -25,8 +25,8 @@ class MidiMultiHeadDataset(Dataset):
               Lazy loading can save space in memory, but will make the __getitem__ method bounded by file system I/O.
               If `lazy_load_data` is false, the entire data will be copyed into memory.
             - max_sample_length: The unit is always token
-            - sample_stride: When sampling from a piece, the moving window moves `sample_stride` token(s) for the next sample.
-            - sample_in_equaltime_sequence: If true, use "equal-time sequence" as unit to split smaple, and ignore `sample_stride`.
+            - sample_stride: The moving window moves `sample_stride` to right for the next sample.
+            - sample_in_equaltime_sequence: Use "equal-time sequence" as unit to split sample. Ignore `sample_stride`.
               An "equal-time sequence" can be:
               - A "BOS", "EOS" or position token. (sequence of length one)
               - The track tokens in the head section.
