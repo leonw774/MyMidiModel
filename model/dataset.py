@@ -10,12 +10,13 @@ class MidiMultiHeadDataset(Dataset):
             data_dir_path: str,
             lazy_load_data: bool,
             max_sample_length: int,
-            sample_stride: int = 1,
-            sample_in_equaltime_sequence: bool = False,
-            sample_always_include_head: bool = False,
-            permute_notes_in_position: bool = True,
-            permute_track_number: bool = True,
-            measure_number_augument_range: int = 1
+            sample_stride: int,
+            sample_in_equaltime_sequence: bool,
+            sample_always_include_head: bool,
+            permute_notes_in_position: bool,
+            puermute_positions_in_measure: bool,
+            permute_track_number: bool,
+            measure_number_augument_range: int
         ) -> None:
         """
             Parameters:
@@ -32,7 +33,8 @@ class MidiMultiHeadDataset(Dataset):
               - A continuous sequence of measure-related tokens, i.e. "Measure", "Tempo", "TimeSignature", in that order.
               - A continuous sequence of note tokens
             - sample_always_include_head: sample will alway have head section no matter is starts with measure tokens or not
-            - permute_notes_in_position: Randomly orders the notes in the same position
+            - permute_notes_in_position: Randomly order the notes in a position sequence
+            - puermute_positions_in_measure: Randomly order the position sequences in a measure
             - permute_tracks: Permute all the track numbers
             - measure_number_augument_range: the measure number of sample will increase or decrease in range of it
         """
@@ -64,9 +66,9 @@ class MidiMultiHeadDataset(Dataset):
 
         # Seperators are: EOS, BOS, first track token (R0), measure token (M), position tokens (P[0-9A-Z]+) and PAD
         # this set stores thier index in event vocab, and is empty when `sample_in_equaltime_sequence` is not set
-        self.equaltime_sequence_seperator = set()
+        self.equaltime_sequence_seperator = []
         if sample_in_equaltime_sequence:
-            self.equaltime_sequence_seperator = set([
+            self.equaltime_sequence_seperator = list([
                 self.bos_id,
                 self.eos_id,
                 self.vocabs['event_tokens']['text2id']['R0'],
@@ -88,19 +90,27 @@ class MidiMultiHeadDataset(Dataset):
 
         # (pieces_array_key, start_index, end_index)
         self.samples_indices = []
+        # {filename : numpy array of indices of every seperator}
+        self.equaltime_sequence_sep_indices = dict()
         for filename, array in self.pieces_arrays.items():
             if sample_in_equaltime_sequence:
-                for begin_index in range(array.shape[0]):
-                    if array[begin_index] in self.equaltime_sequence_seperator:
-                        end_index = begin_index + (max_sample_length - self.max_head_length)
-                        # if end_index exceed array length, set end_index to last index and stop finding
-                        if end_index >= array.shape[0]:
-                            self.samples_indices.append((filename, begin_index, array.shape[0]))
-                            break
-                        # find valid end index
-                        while array[end_index] not in self.equaltime_sequence_seperator:
-                            end_index -= 1
+                # find all split index
+                ets_sep_indices = np.flatnonzero(np.isin(array[:, 0], self.equaltime_sequence_seperator))
+                self.equaltime_sequence_sep_indices[filename] = ets_sep_indices
+                begin_ptr = 0
+                end_ptr = 0
+                while True:
+                    if ets_sep_indices[end_ptr] - ets_sep_indices[begin_ptr] >= max_sample_length-self.max_head_length:
+                        begin_index = ets_sep_indices[begin_ptr]
+                        end_index = ets_sep_indices[end_ptr-1]
                         self.samples_indices.append((filename, begin_index, end_index))
+                        begin_ptr += 1
+                    else:
+                        end_ptr += 1
+                        if end_ptr > ets_sep_indices.shape[0]:
+                            # because we need a sample that include EOS
+                            self.samples_indices.append((filename, ets_sep_indices[begin_ptr], array.shape[0]))
+                            break
             else:
                 for begin_index in range(0, array.shape[0]-max_sample_length-self.max_head_length, sample_stride):
                     self.samples_indices.append((filename, begin_index, begin_index+max_sample_length-self.max_head_length))
@@ -108,23 +118,33 @@ class MidiMultiHeadDataset(Dataset):
 
     def __getitem__(self, index):
         filename, begin_index, end_index = self.samples_indices[index]
-        sliced_array = self.pieces_arrays[filename][begin_index:end_index]
+        sliced_array = np.array(self.pieces_arrays[filename][begin_index:end_index]) # copy
 
         if self.sample_always_include_head:
-            pass
+            # do we need a [SEP] token to seperate head and body?
+            sliced_array = np.concatenate(self.pieces_heads[filename], sliced_array, axis=0)
 
         if self.permute_track_number:
             # use self.pieces_heads to know how many tracks there are in this piece
             track_count = self.pieces_heads[filename].shape[0] - 1
             perm_array = np.random.permutation(track_count)
-            for i in range(sliced_array.shape[0]):
-                sliced_array[i][3] = perm_array[sliced_array[i][3]]
+            track_num_column = sliced_array[:, 3] # view
+            track_num_column_expand = np.asarray([
+                (track_num_column == i) for i in range(track_count)
+            ])
+            for i in range(perm_array.shape[0]):
+                track_num_column[track_num_column_expand[i]] = perm_array[i]
 
         if self.permute_notes_in_position:
             pass
 
-        # measure number augumentation: move them up or down in range of self.
+        # measure number augumentation: move them up or down in range of self.measure_number_augument_range
+        if self.measure_number_augument_range != 0:
+            pass
 
+        # return sequences split indices as numpy array if self.sample_in_equaltime_sequence
+        if self.sample_in_equaltime_sequence:
+            pass
 
     def __del__(self):
         # because self.pieces_arrays is a NpzFile object which is memory-mapped to a opened file

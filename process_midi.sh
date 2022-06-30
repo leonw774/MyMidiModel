@@ -14,7 +14,7 @@ fi
 
 echo $PROCFILE_SUFFIX
 
-python3 data/midi_2_text.py --nth ${NTH} --max-track-number ${MAX_TRACK_NUMBER} --max-duration ${MAX_DURATION} \
+python3 data/midi_to_text.py --nth ${NTH} --max-track-number ${MAX_TRACK_NUMBER} --max-duration ${MAX_DURATION} \
     --velocity-step ${VELOCITY_STEP} --tempo-quantization ${TEMPO_MIN} ${TEMPO_MAX} ${TEMPO_STEP} ${ADDITIONAL_ARGUMENTS} \
     -w ${PROCESS_WORKERS} -r -o data/processed_midi/corpus_${PROCFILE_SUFFIX}.txt ${MIDI_DIR_PATH}
 

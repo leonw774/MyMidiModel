@@ -274,21 +274,18 @@ def get_measure_related_tokens(
         # find the first measure that contain the first note
         while cur_timesig_start_time + nth_per_measure <= first_note_onset:
             cur_timesig_start_time += nth_per_measure
-
         # now cur_measure_start_time is the REAL first measure
-        if is_supported_time_signature(time_sig_tuple[0], time_sig_tuple[1]):
-            time_sig_token_list.append(
-                TimeSignatureToken(
-                    onset=cur_timesig_start_time,
-                    time_signature=(time_sig_tuple[0], time_sig_tuple[1])
-                )
-            )
-        else:
-            raise NotImplementedError(f'Encounter unsupported time signature {time_sig_tuple[0]}/{time_sig_tuple[1]}')
+
+        if not is_supported_time_signature(time_sig_tuple[0], time_sig_tuple[1]):
+            raise NotImplementedError(f'Encounter unsupported time signature {time_sig_tuple}')
         # print(f'TimeSig {i}:', cur_measure_start_time, next_timesig_start_time, nth_per_measure)
 
         for cur_measure_start_time in range(cur_timesig_start_time, next_timesig_start_time, nth_per_measure):
-            measure_token_list.append(MeasureToken(onset=cur_measure_start_time))
+            measure_token_list.append(
+                MeasureToken(
+                    onset=cur_measure_start_time,
+                    time_signature=time_sig_tuple)
+            )
             # handle tempo
             cur_measure_tempo_list = []
             cur_measure_tempo_length_list = []
@@ -337,9 +334,9 @@ def get_position_tokens(note_measure_tokens_list: list) -> list:
     cur_note_onset_time = 0
     for token in note_measure_tokens_list:
         if token.onset > cur_note_onset_time:
-            if token.type_priority == 2: # MeasureToken
+            if token.type_priority == TYPE_PRIORITY['MeasureToken']:
                 cur_measure_onset_time = token.onset
-            elif token.type_priority == 6: # NoteToken
+            elif token.type_priority == TYPE_PRIORITY['NoteToken']:
                 position_token_list.append(
                     PositionToken(
                         onset=token.onset,
@@ -362,7 +359,7 @@ def get_head_tokens(midi: MidiFile) -> list:
     return [BeginOfScoreToken()] + track_token_list
 
 
-def midi_2_tokens(
+def midi_to_tokens(
         midi: MidiFile,
         nth: int,
         max_duration: int,
@@ -408,7 +405,7 @@ def midi_2_tokens(
     return full_token_list
 
 
-def midi_2_text(
+def midi_to_text(
         midi_filepath: str,
         nth: int,
         max_track_number: int,
@@ -434,7 +431,8 @@ def midi_2_text(
     assert tempo_quantization[0] <= tempo_quantization[1] and tempo_quantization[2] > 0, 'bad tempo_quantization'
 
     midi = MidiFile(midi_filepath)
-    assert midi.ticks_per_beat >= (nth//4), f'midi.ticks_per_beat ({midi.ticks_per_beat}) is less than one-fourth of nth ({nth})'
+    assert midi.ticks_per_beat >= (nth//2), \
+        f'midi.ticks_per_beat ({midi.ticks_per_beat}) is less than half of nth ({nth})'
     if debug:
         print('tick/beat:', midi.ticks_per_beat)
 
@@ -448,13 +446,13 @@ def midi_2_text(
         if inst.is_drum:
             midi.instruments[i].program = 128
 
-    token_list = midi_2_tokens(midi, nth, max_duration, velocity_step, tempo_quantization, debug)
+    token_list = midi_to_tokens(midi, nth, max_duration, velocity_step, tempo_quantization, debug)
 
     # with open('tokens.txt', 'w+', encoding='utf8') as f:
     #     f.write('\n'.join(map(str, token_list)))
     if debug:
         start_time = time()
-    text_list = map(token_2_text, token_list)
+    text_list = map(token_to_text, token_list)
     text = ' '.join(map(str, text_list))
     if debug:
         print('Make text from tokens:', time()-start_time)
@@ -463,7 +461,7 @@ def midi_2_text(
     return text
 
 
-def text_2_midi(texts: str, nth: int, debug=False) -> MidiFile:
+def text_to_midi(texts: str, nth: int, debug=False) -> MidiFile:
     midi = MidiFile(ticks_per_beat=nth)
     ticks_per_nth = 4 # convenient huh
 
@@ -475,9 +473,10 @@ def text_2_midi(texts: str, nth: int, debug=False) -> MidiFile:
     cur_time_in_ticks = 0
     cur_measure_length_in_ticks = -1
     cur_measure_onset_in_ticks = -1
+    cur_time_signature = None
     pending_continuing_notes = dict()
     for text in text_list[1:-1]:
-        typename, attr = text_2_token(text)
+        typename, attr = text_to_token(text)
         if is_head:
             if typename == 'R':
                 track_number, instrument = attr
@@ -492,34 +491,31 @@ def text_2_midi(texts: str, nth: int, debug=False) -> MidiFile:
                 if cur_measure_onset_in_ticks == -1: # first measure
                     cur_measure_onset_in_ticks = 0
                     cur_time_in_ticks = 0
+                    cur_time_signature = attr
+                    midi.time_signature_changes.append(TimeSignature(attr[0], attr[1], cur_time_in_ticks))
+                    cur_measure_length_in_ticks = round(4 * attr[0] * (midi.ticks_per_beat / attr[1]))
                 else:
                     assert cur_measure_length_in_ticks > 0
                     cur_measure_onset_in_ticks += cur_measure_length_in_ticks
                     cur_time_in_ticks = cur_measure_onset_in_ticks
-                if debug:
-                    print("M", cur_measure_onset_in_ticks)
-
-            elif typename == 'S':
-                n, d = attr
-                cur_measure_length_in_ticks = round(4 * n * (midi.ticks_per_beat / d))
-                midi.time_signature_changes.append(TimeSignature(n, d, cur_time_in_ticks))
-                if debug:
-                    print(f'S {n}/{d}', cur_time_in_ticks)
+                if cur_time_signature != attr:
+                    midi.time_signature_changes.append(TimeSignature(n, d, cur_time_in_ticks))
+                # if debug:
+                #     print("M", attr, cur_measure_onset_in_ticks)
 
             elif typename == 'T':
                 midi.tempo_changes.append(TempoChange(attr, cur_time_in_ticks))
-                if debug:
-                    print('T', attr, cur_time_in_ticks)
+                # if debug:
+                #     print('T', attr, cur_time_in_ticks)
 
             elif typename == 'P':
                 cur_time_in_ticks = attr * ticks_per_nth + cur_measure_onset_in_ticks
-                if debug:
-                    print('P', attr)
+                # if debug:
+                #     print('P', attr)
 
             elif typename == 'N':
                 # add note to instrument
                 pitch, duration, velocity, track_number = attr
-
                 if cur_time_in_ticks in pending_continuing_notes:
                     info = (pitch, velocity, track_number)
                     if info in pending_continuing_notes[cur_time_in_ticks]:
@@ -577,7 +573,9 @@ def parse_para_yaml(yaml: str) -> dict:
             args_dict[k] = int(v)
     return args_dict
 
-def text_2_paras_and_pieces(raw_file_texts: str):
+def file_to_paras_and_pieces(file_path: str):
+    with open(file_path, 'r', encoding='utf8') as corpus_file:
+        raw_file_texts = corpus_file.read()
     # get settings and main texts
     texts = raw_file_texts
     _, head, body = texts.split('---')

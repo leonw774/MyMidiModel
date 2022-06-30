@@ -2,11 +2,10 @@
     Define tokens as collections.namedtuple
 
     For all tokens:
-    The time unit of onset is absolute timing. It would be tick at the first stage of preprocessing
-    and n-th note at the end.
+    The time unit of onset is absolute timing. The unit is n-th note.
 
-    For position tokens and measure-related tokens (Measure, Tempo, TimeSignature):
-    Except for onset, position, relative_onset, bpm and time_signature, the other attributes are meaningless and should
+    For position tokens and measure-related tokens (Measure, Tempo):
+    Except for onset, position, bpm and time_signature, the other attributes are meaningless and should
     always be the default value (-1). The onset time of a position token or a measure-related
     token is the start time of its position or measure in the time unit.
 
@@ -15,12 +14,20 @@
 
     For begin-of-score and end-of-score token:
     Every attributes should be left as default.
-
 """
 
 from collections import namedtuple
 
 COMMON_FIELD_NAMES = ['onset', 'type_priority']
+TYPE_PRIORITY = {
+    'BeginOfScoreToken' : 0,
+    'TrackToken' : 1,
+    'MeasureToken' : 2,
+    'TempoToken' : 3,
+    'PositionToken' : 4,
+    'NoteToken' : 5,
+    'EndOfScoreToken' : 6,
+}
 
 BeginOfScoreToken = namedtuple(
     'BeginOfScoreToken',
@@ -34,33 +41,28 @@ TrackToken = namedtuple(
 )
 MeasureToken = namedtuple(
     'MeasureToken',
-    COMMON_FIELD_NAMES,
-    defaults=[-1, 2]
-)
-TimeSignatureToken = namedtuple(
-    'TimeSignatureToken',
     COMMON_FIELD_NAMES+['time_signature'],
-    defaults=[-1, 3, -1]
+    defaults=[-1, 2, -1]
 )
 TempoToken = namedtuple(
     'TempoToken',
     COMMON_FIELD_NAMES+['bpm'],
-    defaults=[-1, 4, -1]
+    defaults=[-1, 3, -1]
 )
 PositionToken = namedtuple(
     'PositionToken',
     COMMON_FIELD_NAMES+['position'],
-    defaults=[-1, 5, -1]
+    defaults=[-1, 4, -1]
 )
 NoteToken = namedtuple(
     'NoteToken',
     COMMON_FIELD_NAMES+['pitch', 'track_number', 'duration', 'velocity'],
-    defaults=[-1, 6, -1, -1, -1, -1]
+    defaults=[-1, 5, -1, -1, -1, -1]
 )
 EndOfScoreToken = namedtuple(
     'EndOfScoreToken',
     COMMON_FIELD_NAMES,
-    defaults=[float('inf'), 7]
+    defaults=[float('inf'), 6]
 )
 
 SUPPORTED_TIME_SIGNATURES = {
@@ -96,43 +98,42 @@ def tokenint2str(x: int) -> str:
 def tokenstr2int(x: str):
     return int(x, TOKEN_INT2STR_BASE)
 
-SPECIAL_TOKENS = ['[PAD]', '[UNK]']
+SPECIAL_TOKENS = ['[PAD]', '[MASK]', '[UNK]']
+# SPECIAL_TOKENS = ['[PAD]', '[MASK]', '[UNK]', '[SEP]', '[START]', '[END]']
 
 class TokenParseError(Exception):
     pass
 
-def token_2_text(token: namedtuple) -> str:
+def token_to_text(token: namedtuple) -> str:
     # typename = token.__class__.__name__
     type_priority = token.type_priority
-    if type_priority == 7: # EOS
+    if type_priority == 6: #TYPE_PRIORITY['EndOfScoreToken']:
         return 'EOS'
-    elif type_priority == 6: # BOS
-        # type pitch:duration:velocity:track:instrument
+    elif type_priority == 5: #TYPE_PRIORITY['NoteToken']:
+        # type-pitch:duration:velocity:track:instrument
         return f'N{tokenint2str(token.pitch)}:{tokenint2str(token.duration)}:{tokenint2str(token.velocity)}:{tokenint2str(token.track_number)}'
-    elif type_priority == 5: # Position
+    elif type_priority == 4: #TYPE_PRIORITY['PositionToken']:
         return f'P{tokenint2str(token.position)}'
-    elif type_priority == 2: # Measure
-        return 'M'
-    elif type_priority == 3: # TimeSig
-        return f'S{tokenint2str(token.time_signature[0])}/{tokenint2str(token.time_signature[1])}'
-    elif type_priority == 4: # Tempo
+    elif type_priority == 3: #TYPE_PRIORITY['TempoToken']:
         return f'T{tokenint2str(token.bpm)}'
-    elif type_priority == 1: # Track
-        # type track:instrument
+    elif type_priority == 2: #TYPE_PRIORITY['MeasureToken']:
+        return f'M{tokenint2str(token.time_signature[0])}/{tokenint2str(token.time_signature[1])}'
+    elif type_priority == 1: #TYPE_PRIORITY['TrackToken']:
+        # type-track:instrument
         return f'R{tokenint2str(token.track_number)}:{tokenint2str(token.instrument)}'
-    elif type_priority == 0:
+    elif type_priority == TYPE_PRIORITY['BeginOfScoreToken']:
         return 'BOS'
     else:
         raise TokenParseError(f'bad token namedtuple: {token}')
 
 
-def text_2_token(text: str):
+def text_to_token(text: str):
     typename = text[0]
-    if typename == 'B' or typename == 'E' or typename == 'M' :
+    if typename == 'B' or typename == 'E':
         attr = tuple()
     elif typename == 'R':
         attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[1:].split(':'))
-    elif typename == 'S':
+    elif typename == 'M':
         attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[1:].split('/'))
     elif typename == 'T':
         attr = int(text[1:], TOKEN_INT2STR_BASE)

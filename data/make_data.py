@@ -5,11 +5,11 @@ import random
 from argparse import ArgumentParser
 from time import time
 
-from midi_util import text_2_paras_and_pieces
+from midi_util import file_to_paras_and_pieces
 from tokens import *
 
 
-def piece_2_numpy(piece: str, vocabs: dict) -> np.ndarray:
+def piece_to_numpy(piece: str, vocabs: dict) -> np.ndarray:
     text_list = piece.split(' ')
     x = np.full((len(text_list), 7), fill_value=-1, dtype=np.int16)
     # event, duration, velocity, track_numer, instrument, position, measure_number
@@ -30,7 +30,7 @@ def piece_2_numpy(piece: str, vocabs: dict) -> np.ndarray:
             continue
         if typename == 'B' or typename == 'E':
             x[i] = [
-                (vocabs['event_tokens']['text2id']['BOS'] if typename == 'B' else vocabs['event_tokens']['text2id']['EOS']),
+                vocabs['event_tokens']['text2id'][text],
                 dur_pad_id,
                 vel_pad_id,
                 trn_pad_id,
@@ -38,27 +38,27 @@ def piece_2_numpy(piece: str, vocabs: dict) -> np.ndarray:
                 0,
                 0
             ]
-        elif typename == 'R':
-            event_text = text.split(':')[0]
-            x[i] = [
-                vocabs['event_tokens']['text2id'][event_text],
-                dur_pad_id,
-                vel_pad_id,
-                tokenstr2int(event_text[1:]),
-                tokenstr2int(text.split(':')[1]),
-                0,
-                cur_measure_number
-            ]
         elif typename == 'M':
             cur_position = 0
             cur_measure_number += 1
             x[i] = [
-                vocabs['event_tokens']['text2id']['M'],
+                vocabs['event_tokens']['text2id'][text],
                 dur_pad_id,
                 vel_pad_id,
                 trn_pad_id,
                 ins_pad_id,
                 cur_position,
+                cur_measure_number
+            ]
+        elif typename == 'R':
+            track_number, instrument = text[1:].split(':')
+            x[i] = [
+                vocabs['event_tokens']['text2id']['R'],
+                dur_pad_id,
+                vel_pad_id,
+                tokenstr2int(track_number),
+                tokenstr2int(instrument),
+                0,
                 cur_measure_number
             ]
         else:
@@ -84,7 +84,7 @@ def piece_2_numpy(piece: str, vocabs: dict) -> np.ndarray:
                     cur_position,
                     cur_measure_number
                 ]
-            elif typename == 'T' or typename == 'S':
+            elif typename == 'T':
                 x[i] = [
                     vocabs['event_tokens']['text2id'][event_text],
                     dur_pad_id,
@@ -104,7 +104,6 @@ def piece_2_numpy(piece: str, vocabs: dict) -> np.ndarray:
                     0,
                     0
                 ]
-    # np.savetxt('piece2numpy', x, fmt='%d')
     return x
 
 
@@ -136,16 +135,13 @@ def build_vocabs(pieces: list, paras: dict, max_sample_length: str):
     tempo_tokens = [
         'T'+tokenint2str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
     ]
-    track_token = [
-        'R'+tokenint2str(i) for i in range(paras['max_track_number'])
-    ]
-    measure_token = ['M']
+    track_tokens = ['R']
 
     # max measure number in all pieces
     max_measure_length = 0
     # the most number of measures span that can fit in the size of max_sample_length
     max_fitting_measure_number = 0
-    times_sig_tokens = set()
+    measure_tokens = set()
     corpus_position_tokens = set()
     corpus_duration_tokens = set()
     for piece in pieces:
@@ -163,18 +159,18 @@ def build_vocabs(pieces: list, paras: dict, max_sample_length: str):
                 break
         max_fitting_measure_number = max(cur_fitting_measure_number, max_fitting_measure_number)
 
-        time_sigs = {t for t in text_list if t[0] == 'S'}
+        measures = {t for t in text_list if t[0] == 'M'}
         positions = {t for t in text_list if t[0] == 'P'}
         durations = {t.split(':')[1] for t in text_list if t[0] == 'N'}
-        times_sig_tokens.update(time_sigs)
+        measure_tokens.update(measures)
         corpus_position_tokens.update(positions)
         corpus_duration_tokens.update(durations)
-    times_sig_tokens = list(times_sig_tokens)
+    measure_tokens = list(measure_tokens)
     corpus_position_tokens = list(corpus_position_tokens)
     corpus_duration_tokens = list(corpus_duration_tokens)
 
     # place special token in front so that they have same index across all vocabulary
-    event_tokens = SPECIAL_TOKENS + ['BOS', 'EOS'] + track_token + measure_token + tempo_tokens + times_sig_tokens + pitche_tokens + position_tokens
+    event_tokens = SPECIAL_TOKENS + ['BOS', 'EOS'] + track_tokens + measure_tokens + tempo_tokens + pitche_tokens + position_tokens
     max_duration = paras['max_duration'] * (paras['nth'] // 4)
     duration_tokens = SPECIAL_TOKENS + list(map(tokenint2str, range(1, max_duration+1))) + [tokenint2str(-max_duration)]
     velocity_tokens = SPECIAL_TOKENS + list(map(tokenint2str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
@@ -182,23 +178,22 @@ def build_vocabs(pieces: list, paras: dict, max_sample_length: str):
     instrument_tokens = SPECIAL_TOKENS + list(map(tokenint2str, range(129)))
 
     print(f'Event tokens size: {len(event_tokens)}')
-    print(f'- Times sig tokens size: {len(times_sig_tokens)} ({times_sig_tokens})')
+    print(f'- Measure tokens size: {len(measure_tokens)} ({measure_tokens})')
     print(f'- Corpus position tokens size: {len(corpus_position_tokens)}')
-    print(f'- Max corpus position: {max(text_2_token(cptoken)[1] for cptoken in corpus_position_tokens)}')
+    print(f'- Max corpus position: {max(text_to_token(cptoken)[1] for cptoken in corpus_position_tokens)}')
     print(f'- Theoretical largest position = {get_theoretical_max_position(paras["nth"])})')
     print(f'Max measure span size that fits in max_sample_length: {max_fitting_measure_number}', )
     print(f'  (max_sample_length = {max_sample_length}, max measure number in piece = {max_measure_length})')
 
-    print('Largest possible duration:', paras['max_duration'] * paras['nth'] // 4)
-    print('Largest corpus duration:', max(
+    print('Duration token size:', len(duration_tokens), duration_tokens)
+    print('- Corpus duration tokens size:', len(corpus_duration_tokens))
+    print('- Largest possible duration:', paras['max_duration'] * paras['nth'] // 4)
+    print('- Largest corpus duration:', max(
         # corpus_duration_tokens, key=lambda x: int(x, TOKEN_INT2STR_BASE)
         tokenstr2int(x) for x in corpus_duration_tokens
     ))
-    print('Corpus duration tokens size:', len(corpus_duration_tokens))
-    print('Duration token size:', len(duration_tokens), duration_tokens)
+
     print('Velocity token size:', len(velocity_tokens), velocity_tokens)
-    print('Track tokens size:', paras['max_track_number'])
-    print('Instrument tokens size: 129')
     print('Time:', time()-start_time)
 
     # build a dictionary for every token list
@@ -233,9 +228,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    with open(args.input_file_path, 'r', encoding='utf8') as corpus_file:
-        raw_file_text = corpus_file.read()
-    paras, pieces = text_2_paras_and_pieces(raw_file_text)
+    paras, pieces = file_to_paras_and_pieces(args.input_file_path)
+    assert len(pieces) > 0, 'empty corpus'
 
     if not os.path.isdir(args.output_dir_path):
         os.makedirs(args.output_dir_path)
@@ -254,6 +248,8 @@ if __name__ == '__main__':
     # if a token doesn't have an attribute of some type, fill the index of PAD instead.
     # if a token has an attrbute, but it is not in the dictionary, fill the index of UNK.
     # measure_number attribute is dynamically determined in training time, so don't fill it now.
-    pieces_numpy_list = [piece_2_numpy(p, vocabs) for p in pieces]
+    pieces_numpy_list = [piece_to_numpy(p, vocabs) for p in pieces]
+    # if debug:
+    # np.savetxt('piece_to_numpy0.txt', pieces_numpy_list[0], fmt='%d')
     np.savez_compressed(os.path.join(args.output_dir_path, 'data.npz'), *pieces_numpy_list)
     print('Time:', time()-start_time)

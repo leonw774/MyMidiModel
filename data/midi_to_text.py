@@ -6,16 +6,17 @@ from multiprocessing import Pool
 from time import time
 from tqdm import tqdm
 
-from midi_util import midi_2_text, make_para_yaml
+from midi_util import midi_to_text, make_para_yaml
 from tokens import TokenParseError
 
 
 def mp_worker(args_dict: dict):
     n = args_dict.pop('n', 0)
     verbose = args_dict.pop('verbose', False)
-    print(n, 'pid', os.getpid(), args_dict['midi_filepath'])
+    if verbose:
+        print(n, 'pid', os.getpid(), args_dict['midi_filepath'])
     try:
-        texts = midi_2_text(**args_dict)
+        texts = midi_to_text(**args_dict)
         # print(n, len(texts))
         return texts
     except Exception as e:
@@ -185,8 +186,8 @@ if __name__ == '__main__':
         texts_lengths = []
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
+            verbose = args_dict.pop('verbose', False)
             for n, filepath in tqdm(enumerate(filepath_list), total=len(filepath_list)):
-                verbose = args_dict.pop('verbose', False)
                 if verbose:
                     print(n, filepath)
                 try:
