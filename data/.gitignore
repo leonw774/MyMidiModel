@@ -3,4 +3,4 @@
 *.mid
 *.npz
 *.json
-!example_midis/*.mid
+!test_midis/*.mid

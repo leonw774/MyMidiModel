@@ -1,16 +1,17 @@
 #!/bin/bash
 # midi preprocessing
 NTH=96
-MAX_TRACK_NUMBER=10
+MAX_TRACK_NUMBER=24
 MAX_DURATION=4
 VELOCITY_STEP=16
 TEMPO_MIN=8
 TEMPO_MAX=264
 TEMPO_STEP=8
+TEMPO_METHOD="position_event"
 PROCESS_WORKERS=1
-MIDI_DIR_PATH="data/example_midi"
+MIDI_DIR_PATH="data/example_midis"
 ADDITIONAL_ARGUMENTS="--verbose"
-PROCFILE_SUFFIX="test_example_midi"
+PROC_DATA_NAME="test_example_midis"
 
 # make vocabulary
 MAX_SAMPLE_LENGTH=1024

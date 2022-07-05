@@ -6,7 +6,7 @@ from multiprocessing import Pool
 from time import time
 from tqdm import tqdm
 
-from midi_util import midi_to_text, make_para_yaml
+from midi_util import midi_to_text_list, make_para_yaml
 from tokens import TokenParseError
 
 
@@ -16,13 +16,13 @@ def mp_worker(args_dict: dict):
     if verbose:
         print(n, 'pid', os.getpid(), args_dict['midi_filepath'])
     try:
-        texts = midi_to_text(**args_dict)
-        # print(n, len(texts))
-        return texts
+        text_list = midi_to_text_list(**args_dict)
+        # print(n, len(text_list))
+        return text_list
     except Exception as e:
         if verbose:
             print(n, traceback.format_exc())
-        return ''
+        return []
 
 
 def mp_handler(
@@ -40,23 +40,22 @@ def mp_handler(
 
     exception_count = 0
     good_filepath_list = []
-    good_texts_list = []
-    texts_lengths = []
+    good_text_lists = []
     with Pool(mp_work_number) as p:
-        texts_list = list(tqdm(
+        text_list_list = list(tqdm(
             p.imap(mp_worker, args_dict_list),
             total=len(args_dict_list)
         ))
-    print('mp end. object size:', sys.getsizeof(texts_list))
-    for i, texts in enumerate(texts_list):
-        if len(texts) != 0:
-            good_texts_list.append(texts)
+    print('mp end. object size:', sys.getsizeof(text_list_list))
+    for i, text_list in enumerate(text_list_list):
+        if len(text_list) != 0:
+            good_text_lists.append(text_list)
             good_filepath_list.append(midi_filepath_list[i])
         else:
             exception_count += 1
-    texts_lengths = list(map(len, good_texts_list))
+    text_lists_lengths = list(map(len, good_text_lists))
     print('Bad file count:', exception_count)
-    return good_texts_list, texts_lengths, good_filepath_list
+    return good_text_lists, text_lists_lengths, good_filepath_list
 
 
 if __name__ == '__main__':
@@ -99,6 +98,18 @@ if __name__ == '__main__':
         default=(120-4*28, 120+4*36, 4), # 8, 264, 4
         metavar=('TEMPO_MIN', 'TEMPO_MAX', 'TEMPO_STEP'),
         help='Three integers: (min, max, step), where min and max are INCLUSIVE. Default is 8, 264, 4'
+    )
+    parser.add_argument(
+        '--tempo-method',
+        dest='tempo_method',
+        type=str,
+        choices=['measure_attribute', 'position_attribute', 'measure_event', 'position_event'],
+        default='position_event',
+        help='Could be one of four options:\
+            \'measure_attribute\', \'position_attribute\', \'measure_event\' and \'position_event\'. \
+            \'attribute\' means tempo info is part of the measure or position event token \
+            \'event\' means tempo will be its own token, and it will be in the sequence where there tempo change occurs. \
+            The token will be placed after the measure token and before position token'
     )
     parser.add_argument(
         '--not-merge-drums',
@@ -183,7 +194,7 @@ if __name__ == '__main__':
 
     start_time = time()
     if args.mp_work_number <= 1:
-        texts_lengths = []
+        text_lists_lengths = []
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
             verbose = args_dict.pop('verbose', False)
@@ -191,22 +202,23 @@ if __name__ == '__main__':
                 if verbose:
                     print(n, filepath)
                 try:
-                    texts = midi_2_text(filepath, **args_dict)
+                    text_list = midi_to_text_list(filepath, **args_dict)
                 except Exception as e:
                     if verbose:
                         print(traceback.format_exc())
-                    texts = ''
-                if len(texts) > 0:
-                    texts_lengths.append(len(texts))
-                    out_file.write(texts + '\n')
+                    text_list = []
+                if len(text_list) > 0:
+                    text_lists_lengths.append(len(text_list))
+                    out_file.write(' '.join(text_list) + '\n')
     else:
-        good_texts_list, texts_lengths, good_filepath_list = mp_handler(filepath_list, args.mp_work_number, args_dict)
+        good_text_lists, text_lists_lengths, good_filepath_list = mp_handler(filepath_list, args.mp_work_number, args_dict)
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
-            for texts in good_texts_list:
-                out_file.write(texts + '\n')
+            for text_list in good_text_lists:
+                out_file.write(' '.join(text_list) + '\n')
 
-    print(f'{len(texts_lengths)} files processed')
-    print(f'Average tokens: {sum(texts_lengths)/len(texts_lengths)} per file')
+    print(f'{len(text_lists_lengths)} files processed')
+    if len(text_lists_lengths) > 0:
+        print(f'Average tokens: {sum(text_lists_lengths)/len(text_lists_lengths)} per file')
     print('Output path:', args.output_path)
     print('Time:', time()-start_time)

@@ -10,5 +10,5 @@ for i, text in enumerate(pieces):
     if len(text) == 0:
         continue
     midi_obj = text_to_midi(text, paras['nth'])
-    midi_obj.dump(f'restored_{i}.mid')
-    print(f'restored_{i}.mid')
+    midi_obj.dump(f'{filename}_restored_{i}.mid')
+    print(f'{filename}_restored_{i}.mid')

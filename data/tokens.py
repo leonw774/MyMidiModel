@@ -16,6 +16,7 @@
     Every attributes should be left as default.
 """
 
+import re
 from collections import namedtuple
 
 COMMON_FIELD_NAMES = ['onset', 'type_priority']
@@ -41,8 +42,8 @@ TrackToken = namedtuple(
 )
 MeasureToken = namedtuple(
     'MeasureToken',
-    COMMON_FIELD_NAMES+['time_signature'],
-    defaults=[-1, 2, -1]
+    COMMON_FIELD_NAMES+['time_signature', 'bpm'],
+    defaults=[-1, 2, -1, -1]
 )
 TempoToken = namedtuple(
     'TempoToken',
@@ -51,8 +52,8 @@ TempoToken = namedtuple(
 )
 PositionToken = namedtuple(
     'PositionToken',
-    COMMON_FIELD_NAMES+['position'],
-    defaults=[-1, 4, -1]
+    COMMON_FIELD_NAMES+['position', 'bpm'],
+    defaults=[-1, 4, -1, -1]
 )
 NoteToken = namedtuple(
     'NoteToken',
@@ -71,7 +72,7 @@ SUPPORTED_TIME_SIGNATURES = {
     for numerator in range(1, denominator*3+1)
 }
 
-def get_theoretical_max_position(nth: int) -> int:
+def get_largest_possible_position(nth: int) -> int:
     return max(
         s[0] * (nth // s[1])
         for s in SUPPORTED_TIME_SIGNATURES
@@ -113,11 +114,17 @@ def token_to_text(token: namedtuple) -> str:
         # type-pitch:duration:velocity:track:instrument
         return f'N{tokenint2str(token.pitch)}:{tokenint2str(token.duration)}:{tokenint2str(token.velocity)}:{tokenint2str(token.track_number)}'
     elif type_priority == 4: #TYPE_PRIORITY['PositionToken']:
-        return f'P{tokenint2str(token.position)}'
+        if token.bpm == -1:
+            return f'P{tokenint2str(token.position)}'
+        else:
+            return f'P{tokenint2str(token.position)}+{tokenint2str(token.bpm)}'
     elif type_priority == 3: #TYPE_PRIORITY['TempoToken']:
         return f'T{tokenint2str(token.bpm)}'
     elif type_priority == 2: #TYPE_PRIORITY['MeasureToken']:
-        return f'M{tokenint2str(token.time_signature[0])}/{tokenint2str(token.time_signature[1])}'
+        if token.bpm == -1:
+            return f'M{tokenint2str(token.time_signature[0])}/{tokenint2str(token.time_signature[1])}'
+        else:
+            return f'M{tokenint2str(token.time_signature[0])}/{tokenint2str(token.time_signature[1])}+{tokenint2str(token.bpm)}'
     elif type_priority == 1: #TYPE_PRIORITY['TrackToken']:
         # type-track:instrument
         return f'R{tokenint2str(token.track_number)}:{tokenint2str(token.instrument)}'
@@ -127,18 +134,18 @@ def token_to_text(token: namedtuple) -> str:
         raise TokenParseError(f'bad token namedtuple: {token}')
 
 
-def text_to_token(text: str):
+def text_to_attrs(text: str):
     typename = text[0]
     if typename == 'B' or typename == 'E':
         attr = tuple()
     elif typename == 'R':
         attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[1:].split(':'))
     elif typename == 'M':
-        attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[1:].split('/'))
+        attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in re.split(r'[:/+]', text[1:]))
     elif typename == 'T':
-        attr = int(text[1:], TOKEN_INT2STR_BASE)
+        attr = (int(text[1:], TOKEN_INT2STR_BASE), )
     elif typename == 'P':
-        attr = int(text[1:], TOKEN_INT2STR_BASE)
+        attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in re.split(r'[:+]', text[1:]))
     elif typename == 'N':
         # add note to instrument
         attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[1:].split(':'))
