@@ -10,7 +10,7 @@ TEMPO_STEP=16
 TEMPO_METHOD="position_event"
 PROCESS_WORKERS=8
 MIDI_DIR_PATH="data/midis/lmd_full"
-MIDI_OTHER_ARGUMENTSs="--make-stats"
+MIDI_OTHER_ARGUMENTS="--make-stats"
 PROC_DATA_NAME=nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}_v${VELOCITY_STEP}_t${TEMPO_MIN}-${TEMPO_MAX}-${TEMPO_STEP}
 
 # make vocabulary

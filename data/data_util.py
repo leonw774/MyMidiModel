@@ -11,7 +11,7 @@ def make_token_dict(token_list: list) -> dict:
     return token_dict
 
 
-def build_vocabs(pieces: list, paras: dict, max_sample_length: str):
+def build_vocabs(piece_iterator, paras: dict, max_sample_length: str):
     start_time = time()
     # Event tokens include:
     #   note pitches, positions in measure, end-of-position, measure numbers, time signatures,
@@ -64,7 +64,7 @@ def build_vocabs(pieces: list, paras: dict, max_sample_length: str):
     corpus_measure_tokens = set()
     corpus_position_tokens = set()
     corpus_duration_tokens = set()
-    for piece in pieces:
+    for piece in piece_iterator:
         text_list = piece.split(' ')
         measure_indices = [i for i, t in enumerate(text_list) if t[0] == 'M']
         max_measure_length = max(max_measure_length, len(measure_indices))

@@ -1,14 +1,15 @@
 import sys
-from midi_util import text_to_midi, file_to_paras_and_pieces
+from midi_util import piece_to_midi, file_to_paras_and_pieces_iterator
 
 filename = sys.argv[1]
 
-paras, pieces = file_to_paras_and_pieces(filename)
-print(paras)
-# decode
-for i, text in enumerate(pieces):
-    if len(text) == 0:
-        continue
-    midi_obj = text_to_midi(text, paras['nth'])
-    midi_obj.dump(f'{filename}_restored_{i}.mid')
-    print(f'{filename}_restored_{i}.mid')
+with open(filename, 'r', encoding='utf8') as infile:
+    paras, piece_iterator = file_to_paras_and_pieces_iterator(infile)
+    print(paras)
+    # decode
+    for i, piece in enumerate(piece_iterator):
+        if len(piece) == 0:
+            continue
+        midi_obj = piece_to_midi(piece, paras['nth'])
+        midi_obj.dump(f'{filename}_restored_{i}.mid')
+        print(f'{filename}_restored_{i}.mid')

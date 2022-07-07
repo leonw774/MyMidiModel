@@ -543,11 +543,11 @@ def midi_to_text_list(
     return text_list
 
 
-def text_to_midi(texts: str, nth: int) -> MidiFile:
+def piece_to_midi(piece: str, nth: int) -> MidiFile:
     midi = MidiFile(ticks_per_beat=nth)
     ticks_per_nth = 4 # convenient huh
 
-    text_list = texts.split(' ')
+    text_list = piece.split(' ')
     assert text_list[0] == 'BOS' and text_list[-1] == 'EOS'
     assert text_list[1][0] == 'R', 'No track token in head'
 
@@ -634,15 +634,12 @@ def text_to_midi(texts: str, nth: int) -> MidiFile:
 
 
 def make_para_yaml(args: dict) -> str:
-    s = '---\n'
     lines = [
         f'{k}: {v}\n'
         for k, v in args.items()
         if v is not None
     ]
-    s += ''.join(lines)
-    s += '---\n'
-    return s
+    return ''.join(lines) +  '---\n'
 
 def parse_para_yaml(yaml: str) -> dict:
     pairs = yaml.split('\n')
@@ -661,13 +658,36 @@ def parse_para_yaml(yaml: str) -> dict:
             args_dict[k] = int(v)
     return args_dict
 
-def file_to_paras_and_pieces(file_path: str):
-    with open(file_path, 'r', encoding='utf8') as corpus_file:
-        raw_file_texts = corpus_file.read()
-    # get settings and main texts
-    texts = raw_file_texts
-    _, head, body = texts.split('---')
-    paras = parse_para_yaml(head)
-    body = body.lstrip('\n').rstrip('\n')
-    pieces = body.split('\n')
-    return paras, pieces
+# use iterator to handle large file
+class PieceIterator:
+    def __init__(self, corpus_file) -> None:
+        self.file = corpus_file
+        self.length = None
+
+    def __len__(self) -> int:
+        if self.length is None:
+            self.file.seek(0)
+            self.length = sum(
+            1 if line.startswith('BOS') else 0
+            for line in self.file
+        )
+        return self.length
+
+    def __iter__(self):
+        self.file.seek(0)
+        body_start = False
+        for line in self.file:
+            if line == '---\n':
+                body_start = True
+                continue
+            if body_start:
+                yield line[:-1] # remove \n at the end
+
+def file_to_paras_and_pieces_iterator(corpus_file):
+    yaml_string = ''
+    for line in corpus_file:
+        if line == '---':
+            break
+        yaml_string += line
+    paras = parse_para_yaml(yaml_string)
+    return paras, PieceIterator(corpus_file)

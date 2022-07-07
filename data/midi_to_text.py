@@ -9,8 +9,8 @@ from multiprocessing import Pool
 from time import time, localtime, strftime
 from tqdm import tqdm
 
-from midi_util import midi_to_text_list, make_para_yaml
-from tokens import TokenParseError
+from midi_util import midi_to_text_list, make_para_yaml, file_to_paras_and_pieces_iterator
+from tokens import TokenParseError, tokenstr2int
 
 
 def mp_worker(args_dict: dict):
@@ -28,6 +28,7 @@ def mp_worker(args_dict: dict):
 
 def mp_handler(
         midi_filepath_list: set,
+        output_path: str,
         mp_work_number: int,
         args_dict: dict):
 
@@ -39,25 +40,26 @@ def mp_handler(
         args_dict_list.append(a)
     logging.info('Start process with %d workers', mp_work_number)
 
-    exception_count = 0
+    bad_count = 0
     good_filepath_list = []
-    good_piece_list = []
+    token_number_list = []
     with Pool(mp_work_number) as p:
         compressed_piece_list = list(tqdm(
             p.imap(mp_worker, args_dict_list),
             total=len(args_dict_list)
         ))
-    logging.info('mp end. object size: %d B', sum(sys.getsizeof(cp) for cp in compressed_piece_list))
-    for i, compressed_piece in enumerate(compressed_piece_list):
-        if len(compressed_piece) > 0:
-            piece = zlib.decompress(compressed_piece).decode()
-            good_piece_list.append(piece)
-            good_filepath_list.append(midi_filepath_list[i])
-        else:
-            exception_count += 1
-    token_counts_list = [piece.count(' ') + 1 for piece in good_piece_list]
-    logging.info('Bad file: %d', exception_count)
-    return good_piece_list, token_counts_list, good_filepath_list
+    logging.info('mp end. object size: %d bytes', sum(sys.getsizeof(cp) for cp in compressed_piece_list))
+    with open(output_path, 'w', encoding='utf8') as outfile:
+        for i, compressed_piece in enumerate(compressed_piece_list):
+            if len(compressed_piece) > 0:
+                piece = zlib.decompress(compressed_piece).decode()
+                outfile.write(piece+'\n')
+                token_number_list.append(piece.count(' ')+1) # token number = space number + 1
+                good_filepath_list.append(midi_filepath_list[i])
+            else:
+                bad_count += 1
+    logging.info('Bad file: %d', bad_count)
+    return token_number_list, good_filepath_list
 
 
 if __name__ == '__main__':
@@ -152,7 +154,7 @@ if __name__ == '__main__':
         '-s', '--make-stats',
         action='store_true',
         dest='make_stats',
-        help='Record statics of the processed midi files. The output file path is [OUTPUT_PATH] appended by a suffix \".stat\"'
+        help='Record statics of the processed midi files. The output file path is [OUTPUT_PATH] appended by a suffix \"_stat.json\"'
     )
     parser.add_argument(
         '-o', '--output-path',
@@ -217,7 +219,7 @@ if __name__ == '__main__':
         logging.info('Find %d files', len(filepath_list))
 
     if args.mp_work_number <= 1:
-        token_counts_list = []
+        token_number_list = []
         good_filepath_list = []
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
@@ -229,52 +231,58 @@ if __name__ == '__main__':
                     logging.debug(traceback.format_exc())
                     text_list = []
                 if len(text_list) > 0:
-                    token_counts_list.append(len(text_list))
+                    token_number_list.append(len(text_list))
                     good_filepath_list.append(filepath)
                     out_file.write(' '.join(text_list) + '\n')
     else:
-        good_piece_list, text_lists_lengths, good_filepath_list = mp_handler(filepath_list, args.mp_work_number, args_dict)
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
-            out_file.write('\n'.join(good_piece_list))
+        token_number_list, good_filepath_list = mp_handler(filepath_list, args.output_path, args.mp_work_number, args_dict)
 
-    logging.info('Processed %d files', len(token_counts_list))
-    if len(token_counts_list) > 0:
-        logging.info('Average tokens: %.3f per file', sum(token_counts_list)/len(token_counts_list))
+    logging.info('Processed %d files', len(token_number_list))
+    if len(token_number_list) > 0:
+        logging.info('Average tokens: %.3f per file', sum(token_number_list)/len(token_number_list))
     logging.info('Process time: %.3f', time()-start_time)
 
     if args.make_stats:
         start_time = time()
         logging.info('Making statistics')
         import json
-        from miditoolkit import MidiFile
         from pandas import Series
-        midi_stats = {
-            'note_counts': [],
+        text_stats = {
             'track_number_distribution': Counter(),
             'instrument_distribution': Counter(),
-            'time_lengths_in_beat': list()
+            'token_type_distribution': Counter(),
+            'note_number_per_piece' : list(),
         }
-        for filepath in good_filepath_list:
-            m = MidiFile(filepath)
-            midi_stats['note_counts'].append(sum(len(inst.notes) for inst in m.instruments))
-            midi_stats['track_number_distribution'][len(m.instruments)] += 1
-            for inst in m.instruments:
-                inst_id = inst.program if not inst.is_drum else 128
-                midi_stats['instrument_distribution'][int(inst_id)] += 1
-            midi_stats['time_lengths_in_beat'].append(m.max_tick / m.ticks_per_beat)
+        with open(args.output_path, 'r', encoding='utf8') as outfile:
+            paras, piece_iterator = file_to_paras_and_pieces_iterator(outfile)
+            for piece in piece_iterator:
+                text_stats['track_number_distribution'][piece.count(' R')] += 1
+                head_end = piece.find(' M') # find first occurence of measure token
+                tracks_text = piece[4:head_end]
+                track_tokens = tracks_text.split()
+                for track_token in track_tokens:
+                    instrument_id = tokenstr2int(track_token.split(':')[1])
+                    text_stats['instrument_distribution'][instrument_id] += 1
+                note_token_number = piece.count(' N')
+                text_stats['token_type_distribution']['note'] += note_token_number
+                text_stats['token_type_distribution']['position'] += piece.count(' P')
+                text_stats['token_type_distribution']['tempo'] += piece.count(' T')
+                text_stats['token_type_distribution']['measure'] += piece.count(' M')
+                text_stats['token_type_distribution']['track'] += piece.count(' R')
+                text_stats['note_number_per_piece'].append(note_token_number)
 
-        midi_stats['note_counts_stats'] = dict(Series(midi_stats['note_counts']).describe())
-        del midi_stats['note_counts']
-        midi_stats['note_counts_stats'] = { k:float(v) for k, v in midi_stats['note_counts_stats'].items() }
-        midi_stats['track_number_distribution'] = dict(midi_stats['track_number_distribution'])
-        midi_stats['instrument_distribution'] = dict(midi_stats['instrument_distribution'])
-        midi_stats['time_lengths_in_beat_stats'] = dict(Series(midi_stats['time_lengths_in_beat']).describe())
-        midi_stats['time_lengths_in_beat_stats'] = { k:float(v) for k, v in midi_stats['time_lengths_in_beat_stats'].items() }
-        del midi_stats['time_lengths_in_beat']
+        text_stats['track_number_distribution'] = dict(text_stats['track_number_distribution'])
+        text_stats['instrument_distribution'] = dict(text_stats['instrument_distribution'])
+        text_stats['token_type_distribution'] = dict(text_stats['token_type_distribution'])
+        text_stats['note_number_per_piece_describe'] = {
+            k:float(v) for k, v in dict(Series(text_stats['note_number_per_piece']).describe()).items()
+        }
+        del text_stats['note_number_per_piece']
 
-        with open(args.output_path+'.stat', 'w+', encoding='utf8') as statfile:
-            statfile.write(json.dumps(midi_stats))
-        logging.info('Write stats file to %s', args.output_path+'.stat')
+        with open(args.output_path+'_stat.json', 'w+', encoding='utf8') as statfile:
+            statfile.write(json.dumps(text_stats))
+        logging.info('Write stats file to %s', args.output_path+'_stat.json')
         logging.info('Stat time: %.3f', time()-start_time)
     logging.info('midi_to_text.py exited')
