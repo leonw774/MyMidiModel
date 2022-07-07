@@ -1,7 +1,9 @@
 import json
+import logging
 import numpy as np
 import os
 from argparse import ArgumentParser
+from time import localtime, strftime
 
 from midi_util import file_to_paras_and_pieces
 from data_util import *
@@ -17,11 +19,25 @@ if __name__ == '__main__':
         default=4096
     )
     parser.add_argument(
+        '--debug',
+        action='store_true'
+    )
+    parser.add_argument(
         'input_file_path',
     )
     parser.add_argument(
         'output_dir_path',
     )
+
+    loglevel = logging.INFO
+    logging.basicConfig(
+        filename=strftime("logs/make_data-%Y%m%d-%H%M.log", localtime()),
+        filemode='w',
+        level=loglevel
+    )
+    console = logging.StreamHandler()
+    console.setLevel(loglevel)
+    logging.getLogger().addHandler(console)
 
     args = parser.parse_args()
 
@@ -31,13 +47,14 @@ if __name__ == '__main__':
     if not os.path.isdir(args.output_dir_path):
         os.makedirs(args.output_dir_path)
 
-    vocabs = build_vocabs(pieces, paras, args.max_sample_length)
+    vocabs, summary_string = build_vocabs(pieces, paras, args.max_sample_length)
+    logging.info(summary_string)
     vocabs_json_path = os.path.join(args.output_dir_path, 'vocabs.json')
     with open(vocabs_json_path, 'w+', encoding='utf8') as vocabs_file:
         json.dump(vocabs, vocabs_file)
 
     start_time = time()
-    print('Begin write npz')
+    logging.info('Begin write npz')
     # serialize pieces into lists of numpy arrays
     # each is processed from a token and has length of seven:
     #   event, duration, velocity, track_numer, instrument, position, measure_number
@@ -46,19 +63,23 @@ if __name__ == '__main__':
     # if a token has an attrbute, but it is not in the dictionary, fill the index of UNK.
     # measure_number attribute is dynamically determined in training time, so don't fill it now.
     pieces_numpy_list = [text_list_to_numpy(p.split(' '), vocabs) for p in pieces]
-    print('Average piece length:', sum(x.shape[0] for x in pieces_numpy_list) / len(pieces_numpy_list))
 
-    # # for debugging
-    # np.savetxt('text_list_to_numpy0.txt', pieces_numpy_list[0], fmt='%d')
-    # with open('text_list_to_numpy0.txt', 'r', encoding='utf8') as f:
-    #     data_list = f.read().split('\n')
-    #     text_list = pieces[0].split()
-    # data_text_list = [ t + ' '*(max(0, 16-len(t))) + d.replace(' ', '\t') for t, d  in zip(text_list, data_list) ]
-    # with open('text_list_to_numpy0.txt', 'w+', encoding='utf8') as f:
-    #     f.write('token_text      evt\tdur\tvel\ttrn\tins\ttmp\tpos\tmea\n')
-    #     f.write('\n'.join(data_text_list))
-    # with open('numpy_to_text_list0.txt', 'w+', encoding='utf8') as f:
-    #     f.write('\n'.join(numpy_to_text_list(pieces_numpy_list[0], vocabs, paras['tempo_method'])))
+    # for debugging
+    if args.debug:
+        np.savetxt('text_list_to_numpy_debug.txt', pieces_numpy_list[0], fmt='%d')
+        with open('text_list_to_numpy_debug.txt', 'r', encoding='utf8') as f:
+            data_list = f.read().split('\n')
+            text_list = pieces[0].split()
+        reconst_text_list = numpy_to_text_list(pieces_numpy_list[0], vocabs, paras['tempo_method'])
+        text_data_reconst_text_list = [(t, *d.split(), rt) for t, d, rt in zip(text_list, data_list, reconst_text_list)]
+        with open('text_list_to_numpy_debug.txt', 'w+', encoding='utf8') as f:
+            f.write(f"{'token_text':<14}{'evt':>5}{'dur':>5}{'vel':>5}{'trn':>5}{'ins':>5}{'tmp':>5}{'pos':>5}{'mea':>5} {'reconstructed_text':<14}\n")
+            formated_lines = [
+                f"{line[0]:<14}{line[1]:>5}{line[2]:>5}{line[3]:>5}{line[4]:>5}{line[5]:>5}{line[6]:>5}{line[7]:>5}{line[8]:>5} {line[9]:<14}"
+                for line in text_data_reconst_text_list
+            ]
+            f.write('\n'.join(formated_lines))
 
     np.savez_compressed(os.path.join(args.output_dir_path, 'data.npz'), *pieces_numpy_list)
-    print('Time:', time()-start_time)
+    logging.info('npz write time: %.3f', time()-start_time)
+    logging.info('make_data.py exited')

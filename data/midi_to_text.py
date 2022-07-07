@@ -1,9 +1,12 @@
+import logging
 import os
 import sys
 import traceback
+import zlib
 from argparse import ArgumentParser
+from collections import Counter
 from multiprocessing import Pool
-from time import time
+from time import time, localtime, strftime
 from tqdm import tqdm
 
 from midi_util import midi_to_text_list, make_para_yaml
@@ -12,17 +15,15 @@ from tokens import TokenParseError
 
 def mp_worker(args_dict: dict):
     n = args_dict.pop('n', 0)
-    verbose = args_dict.pop('verbose', False)
-    if verbose:
-        print(n, 'pid', os.getpid(), args_dict['midi_filepath'])
+    logging.debug('%d pid: %d filepath: %s', n, os.getpid(), args_dict['midi_filepath'])
     try:
         text_list = midi_to_text_list(**args_dict)
-        # print(n, len(text_list))
-        return text_list
-    except Exception as e:
-        if verbose:
-            print(n, traceback.format_exc())
-        return []
+        # return compressed text because memory usage issue
+        piece = ' '.join(text_list)
+        return zlib.compress(piece.encode())
+    except:
+        logging.debug('%d %s', n, traceback.format_exc())
+        return b''
 
 
 def mp_handler(
@@ -36,26 +37,27 @@ def mp_handler(
         a['midi_filepath'] = midi_filepath
         a['n'] = n
         args_dict_list.append(a)
-    print(f'Start process with {mp_work_number} workers')
+    logging.info('Start process with %d workers', mp_work_number)
 
     exception_count = 0
     good_filepath_list = []
-    good_text_lists = []
+    good_piece_list = []
     with Pool(mp_work_number) as p:
-        text_list_list = list(tqdm(
+        compressed_piece_list = list(tqdm(
             p.imap(mp_worker, args_dict_list),
             total=len(args_dict_list)
         ))
-    print('mp end. object size:', sys.getsizeof(text_list_list))
-    for i, text_list in enumerate(text_list_list):
-        if len(text_list) != 0:
-            good_text_lists.append(text_list)
+    logging.info('mp end. object size: %d B', sum(sys.getsizeof(cp) for cp in compressed_piece_list))
+    for i, compressed_piece in enumerate(compressed_piece_list):
+        if len(compressed_piece) > 0:
+            piece = zlib.decompress(compressed_piece).decode()
+            good_piece_list.append(piece)
             good_filepath_list.append(midi_filepath_list[i])
         else:
             exception_count += 1
-    text_lists_lengths = list(map(len, good_text_lists))
-    print('Bad file count:', exception_count)
-    return good_text_lists, text_lists_lengths, good_filepath_list
+    token_counts_list = [piece.count(' ') + 1 for piece in good_piece_list]
+    logging.info('Bad file: %d', exception_count)
+    return good_piece_list, token_counts_list, good_filepath_list
 
 
 if __name__ == '__main__':
@@ -72,9 +74,9 @@ if __name__ == '__main__':
         '--max-track-number',
         dest='max_track_number',
         type=int,
-        default=32,
+        default=24,
         help='The maximum tracks nubmer to keep in text, if the input midi has more "instruments" than this value, \
-            some tracks would be merged or discard. Default is 32.'
+            some tracks would be merged or discard. Default is 24.'
     )
     parser.add_argument(
         '--max-duration',
@@ -95,9 +97,9 @@ if __name__ == '__main__':
         nargs=3,
         dest='tempo_quantization',
         type=int,
-        default=(120-4*28, 120+4*36, 4), # 8, 264, 4
+        default=(120-16*6, 120+16*5, 4), # 24, 200, 16
         metavar=('TEMPO_MIN', 'TEMPO_MAX', 'TEMPO_STEP'),
-        help='Three integers: (min, max, step), where min and max are INCLUSIVE. Default is 8, 264, 4'
+        help='Three integers: (min, max, step), where min and max are INCLUSIVE. Default is 24, 200, 16'
     )
     parser.add_argument(
         '--tempo-method',
@@ -147,6 +149,12 @@ if __name__ == '__main__':
             If this number is 1 or below, multiprocessing would not be used.'
     )
     parser.add_argument(
+        '-s', '--make-stats',
+        action='store_true',
+        dest='make_stats',
+        help='Record statics of the processed midi files. The output file path is [OUTPUT_PATH] appended by a suffix \".stat\"'
+    )
+    parser.add_argument(
         '-o', '--output-path',
         dest='output_path',
         type=str,
@@ -165,15 +173,31 @@ if __name__ == '__main__':
     args_dict = {
         k: v
         for k, v in args_vars.items()
-        if k not in ['input_path', 'output_path', 'mp_work_number', 'recursive'] and v is not None
+        if k not in ['input_path', 'output_path', 'make_stats', 'mp_work_number', 'recursive', 'verbose'] and v is not None
     }
     paras_dict = {
         k: v
         for k, v in args_dict.items()
         if k not in ['debug', 'verbose', 'use_merge_drums', 'use_merge_sparse']
     }
-    print(args_vars)
 
+    # when not verbose, only info level or higher will be printed to stderr and logged into file
+    loglevel = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(
+        filename=strftime("logs/midi_to_text-%Y%m%d-%H%M.log", localtime()),
+        filemode='w+',
+        level=loglevel
+    )
+    console = logging.StreamHandler()
+    console.setLevel(loglevel)
+    logging.getLogger().addHandler(console)
+
+    args_str = '\n'.join([
+        str(k)+':'+str(v) for k, v in args_vars.items()
+    ])
+    logging.info(args_str)
+
+    start_time = time()
     filepath_list = list()
     for inpath in args.input_path:
         if args.recursive:
@@ -187,38 +211,70 @@ if __name__ == '__main__':
             filepath_list.append(inpath)
     filepath_list.sort()
     if len(filepath_list) == 0:
-        print('No file to process')
-        exit()
+        logging.info('No file to process')
+        exit(1)
     else:
-        print(f'Find {len(filepath_list)} files')
+        logging.info('Find %d files', len(filepath_list))
 
-    start_time = time()
     if args.mp_work_number <= 1:
-        text_lists_lengths = []
+        token_counts_list = []
+        good_filepath_list = []
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
-            verbose = args_dict.pop('verbose', False)
             for n, filepath in tqdm(enumerate(filepath_list), total=len(filepath_list)):
-                if verbose:
-                    print(n, filepath)
+                logging.debug('%d %s', n, filepath)
                 try:
                     text_list = midi_to_text_list(filepath, **args_dict)
-                except Exception as e:
-                    if verbose:
-                        print(traceback.format_exc())
+                except:
+                    logging.debug(traceback.format_exc())
                     text_list = []
                 if len(text_list) > 0:
-                    text_lists_lengths.append(len(text_list))
+                    token_counts_list.append(len(text_list))
+                    good_filepath_list.append(filepath)
                     out_file.write(' '.join(text_list) + '\n')
     else:
-        good_text_lists, text_lists_lengths, good_filepath_list = mp_handler(filepath_list, args.mp_work_number, args_dict)
+        good_piece_list, text_lists_lengths, good_filepath_list = mp_handler(filepath_list, args.mp_work_number, args_dict)
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
-            for text_list in good_text_lists:
-                out_file.write(' '.join(text_list) + '\n')
+            out_file.write('\n'.join(good_piece_list))
 
-    print(f'{len(text_lists_lengths)} files processed')
-    if len(text_lists_lengths) > 0:
-        print(f'Average tokens: {sum(text_lists_lengths)/len(text_lists_lengths)} per file')
-    print('Output path:', args.output_path)
-    print('Time:', time()-start_time)
+    logging.info('Processed %d files', len(token_counts_list))
+    if len(token_counts_list) > 0:
+        logging.info('Average tokens: %.3f per file', sum(token_counts_list)/len(token_counts_list))
+    logging.info('Process time: %.3f', time()-start_time)
+
+    if args.make_stats:
+        start_time = time()
+        logging.info('Making statistics')
+        import json
+        from miditoolkit import MidiFile
+        from pandas import Series
+        midi_stats = {
+            'note_counts': [],
+            'track_number_distribution': Counter(),
+            'instrument_distribution': Counter(),
+            'time_lengths_in_beat': list()
+        }
+        for filepath in good_filepath_list:
+            m = MidiFile(filepath)
+            midi_stats['note_counts'].append(sum(len(inst.notes) for inst in m.instruments))
+            midi_stats['track_number_distribution'][len(m.instruments)] += 1
+            for inst in m.instruments:
+                inst_id = inst.program if not inst.is_drum else 128
+                midi_stats['instrument_distribution'][int(inst_id)] += 1
+            midi_stats['time_lengths_in_beat'].append(m.max_tick / m.ticks_per_beat)
+
+        midi_stats['note_counts_stats'] = dict(Series(midi_stats['note_counts']).describe())
+        del midi_stats['note_counts']
+        midi_stats['note_counts_stats'] = { k:float(v) for k, v in midi_stats['note_counts_stats'].items() }
+        midi_stats['track_number_distribution'] = dict(midi_stats['track_number_distribution'])
+        midi_stats['instrument_distribution'] = dict(midi_stats['instrument_distribution'])
+        midi_stats['time_lengths_in_beat_stats'] = dict(Series(midi_stats['time_lengths_in_beat']).describe())
+        midi_stats['time_lengths_in_beat_stats'] = { k:float(v) for k, v in midi_stats['time_lengths_in_beat_stats'].items() }
+        del midi_stats['time_lengths_in_beat']
+
+        with open(args.output_path+'.stat', 'w+', encoding='utf8') as statfile:
+            statfile.write(json.dumps(midi_stats))
+        logging.info('Write stats file to %s', args.output_path+'.stat')
+        logging.info('Stat time: %.3f', time()-start_time)
+    logging.info('midi_to_text.py exited')

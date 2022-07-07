@@ -1,5 +1,6 @@
 .mscbackup
 *.txt
+*.stat
 *.mid
 *.npz
 *.json
