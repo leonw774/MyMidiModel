@@ -1,3 +1,4 @@
+import glob
 import logging
 import os
 import sys
@@ -10,7 +11,7 @@ from time import time, localtime, strftime
 from tqdm import tqdm
 
 from midi_util import midi_to_text_list, make_para_yaml, file_to_paras_and_pieces_iterator
-from tokens import TokenParseError, tokenstr2int
+from tokens import tokenstr2int
 
 
 def mp_worker(args_dict: dict):
@@ -28,7 +29,7 @@ def mp_worker(args_dict: dict):
 
 def mp_handler(
         midi_filepath_list: set,
-        output_path: str,
+        outfile,
         mp_work_number: int,
         args_dict: dict):
 
@@ -41,7 +42,6 @@ def mp_handler(
     logging.info('Start process with %d workers', mp_work_number)
 
     bad_count = 0
-    good_filepath_list = []
     token_number_list = []
     with Pool(mp_work_number) as p:
         compressed_piece_list = list(tqdm(
@@ -49,17 +49,15 @@ def mp_handler(
             total=len(args_dict_list)
         ))
     logging.info('mp end. object size: %d bytes', sum(sys.getsizeof(cp) for cp in compressed_piece_list))
-    with open(output_path, 'w', encoding='utf8') as outfile:
-        for i, compressed_piece in enumerate(compressed_piece_list):
-            if len(compressed_piece) > 0:
-                piece = zlib.decompress(compressed_piece).decode()
-                outfile.write(piece+'\n')
-                token_number_list.append(piece.count(' ')+1) # token number = space number + 1
-                good_filepath_list.append(midi_filepath_list[i])
-            else:
-                bad_count += 1
+    for i, compressed_piece in enumerate(compressed_piece_list):
+        if len(compressed_piece) > 0:
+            piece = zlib.decompress(compressed_piece).decode()
+            outfile.write(piece+'\n')
+            token_number_list.append(piece.count(' ')+1) # token number = space number + 1
+        else:
+            bad_count += 1
     logging.info('Bad file: %d', bad_count)
-    return token_number_list, good_filepath_list
+    return token_number_list
 
 
 if __name__ == '__main__':
@@ -154,7 +152,8 @@ if __name__ == '__main__':
         '-s', '--make-stats',
         action='store_true',
         dest='make_stats',
-        help='Record statics of the processed midi files. The output file path is [OUTPUT_PATH] appended by a suffix \"_stat.json\"'
+        help='Record statics of the processed midi files. \
+            The output file path is [OUTPUT_PATH] appended by a suffix \"_stat.json\"'
     )
     parser.add_argument(
         '-o', '--output-path',
@@ -203,24 +202,23 @@ if __name__ == '__main__':
     filepath_list = list()
     for inpath in args.input_path:
         if args.recursive:
-            assert os.path.isdir(inpath), f'Path {inpath} is not a directory or doesn\'t exist.'
-            for root, dirs, files in os.walk(inpath):
-                for filename in files:
-                    if filename.endswith('.mid') or filename.endswith('.MID'):
-                        filepath_list.append(os.path.join(root, filename))
+            if not os.path.isdir(inpath):
+                print(f'Path {inpath} is not a directory or doesn\'t exist.')
+            filepath_list = glob.glob(inpath+'/**/*.mid', recursive=True)
         else:
-            assert os.path.isfile(inpath), f'Path {inpath} is not a file or doesn\'t exist.'
+            if not os.path.isfile(inpath):
+                print(f'Path {inpath} is not a file or doesn\'t exist.')
             filepath_list.append(inpath)
-    filepath_list.sort()
+
     if len(filepath_list) == 0:
         logging.info('No file to process')
         exit(1)
     else:
         logging.info('Find %d files', len(filepath_list))
+    filepath_list.sort()
 
     if args.mp_work_number <= 1:
         token_number_list = []
-        good_filepath_list = []
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
             for n, filepath in tqdm(enumerate(filepath_list), total=len(filepath_list)):
@@ -232,12 +230,11 @@ if __name__ == '__main__':
                     text_list = []
                 if len(text_list) > 0:
                     token_number_list.append(len(text_list))
-                    good_filepath_list.append(filepath)
                     out_file.write(' '.join(text_list) + '\n')
     else:
         with open(args.output_path, 'w+', encoding='utf8') as out_file:
             out_file.write(make_para_yaml(paras_dict))
-        token_number_list, good_filepath_list = mp_handler(filepath_list, args.output_path, args.mp_work_number, args_dict)
+            token_number_list = mp_handler(filepath_list, out_file, args.mp_work_number, args_dict)
 
     logging.info('Processed %d files', len(token_number_list))
     if len(token_number_list) > 0:
@@ -254,6 +251,7 @@ if __name__ == '__main__':
             'instrument_distribution': Counter(),
             'token_type_distribution': Counter(),
             'note_number_per_piece' : list(),
+            'token_number_per_piece': token_number_list
         }
         with open(args.output_path, 'r', encoding='utf8') as outfile:
             paras, piece_iterator = file_to_paras_and_pieces_iterator(outfile)

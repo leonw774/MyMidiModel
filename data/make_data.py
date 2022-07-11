@@ -2,6 +2,7 @@ import json
 import logging
 import numpy as np
 import os
+import shutil
 from argparse import ArgumentParser
 from time import localtime, strftime
 
@@ -48,6 +49,7 @@ if __name__ == '__main__':
         if not os.path.isdir(args.output_dir_path):
             os.makedirs(args.output_dir_path)
 
+        logging.info('Begin build vocabs')
         vocabs, summary_string = build_vocabs(piece_iterator, paras, args.max_sample_length)
         logging.info(summary_string)
         vocabs_json_path = os.path.join(args.output_dir_path, 'vocabs.json')
@@ -55,25 +57,35 @@ if __name__ == '__main__':
             json.dump(vocabs, vocabs_file)
 
         start_time = time()
-        logging.info('Begin write npz')
-        # serialize pieces into lists of numpy arrays
-        # each is processed from a token and has length of seven:
-        #   event, duration, velocity, track_numer, instrument, position, measure_number
-        # fill each attribute with the index of the text.
-        # if a token doesn't have an attribute of some type, fill the index of PAD instead.
-        # if a token has an attrbute, but it is not in the dictionary, fill the index of UNK.
-        # measure_number attribute is dynamically determined in training time, so don't fill it now.
-        pieces_numpy_list = [text_list_to_numpy(p.split(' '), vocabs) for p in piece_iterator]
+        logging.info('Begin write npy')
+        npy_dir_path = os.path.join(args.output_dir_path, 'arrays')
+        if os.path.exists(npy_dir_path):
+            shutil.rmtree(npy_dir_path)
+            print(f'Find existing {npy_dir_path}, removed.')
+        os.makedirs(npy_dir_path)
+
+        for i, p in enumerate(piece_iterator):
+            array = text_list_to_numpy(p.split(), vocabs)
+            np.save(os.path.join(npy_dir_path, str(i)), array)
+
+        # zip all the npy files into one file with '.npz' extension
+        shutil.make_archive(npy_dir_path, 'zip', root_dir=npy_dir_path)
+        os.rename(os.path.join(args.output_dir_path, 'arrays.zip'), os.path.join(args.output_dir_path, 'arrays.npz'))
+        # delete the npys
+        shutil.rmtree(npy_dir_path)
 
         # for debugging
         if args.debug:
-            np.savetxt('text_list_to_numpy_debug.txt', pieces_numpy_list[0], fmt='%d')
-            with open('text_list_to_numpy_debug.txt', 'r', encoding='utf8') as f:
+            p0 = next(piece_iterator.__iter__())
+            array_data = text_list_to_numpy(p0.split(' '), vocabs)
+            debug_txt_path = os.path.join(args.output_dir_path, 'text_list_to_numpy_debug.txt')
+            np.savetxt(debug_txt_path, array_data, fmt='%d')
+            with open(debug_txt_path, 'r', encoding='utf8') as f:
                 data_list = f.read().split('\n')
                 text_list = next(piece_iterator.__iter__()).split()
-            reconst_text_list = numpy_to_text_list(pieces_numpy_list[0], vocabs, paras['tempo_method'])
+            reconst_text_list = numpy_to_text_list(array_data, vocabs, paras['tempo_method'])
             text_data_reconst_text_list = [(t, *d.split(), rt) for t, d, rt in zip(text_list, data_list, reconst_text_list)]
-            with open('text_list_to_numpy_debug.txt', 'w+', encoding='utf8') as f:
+            with open(debug_txt_path, 'w+', encoding='utf8') as f:
                 f.write(
                     f"{'token_text':<14}{'evt':>5}{'dur':>5}{'vel':>5}{'trn':>5}{'ins':>5}{'tmp':>5}{'pos':>5}{'mea':>5} {'reconstructed_text':<14}\n")
                 formated_lines = [
@@ -82,6 +94,5 @@ if __name__ == '__main__':
                 ]
                 f.write('\n'.join(formated_lines))
 
-    np.savez_compressed(os.path.join(args.output_dir_path, 'data.npz'), *pieces_numpy_list)
-    logging.info('npz write time: %.3f', time()-start_time)
+    logging.info('npys write time: %.3f', time()-start_time)
     logging.info('make_data.py exited')

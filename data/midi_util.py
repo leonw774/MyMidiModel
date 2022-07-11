@@ -639,6 +639,7 @@ def make_para_yaml(args: dict) -> str:
         for k, v in args.items()
         if v is not None
     ]
+    # print(''.join(lines) +  '---\n')
     return ''.join(lines) +  '---\n'
 
 def parse_para_yaml(yaml: str) -> dict:
@@ -668,9 +669,9 @@ class PieceIterator:
         if self.length is None:
             self.file.seek(0)
             self.length = sum(
-            1 if line.startswith('BOS') else 0
-            for line in self.file
-        )
+                1 if line.startswith('BOS') else 0
+                for line in self.file
+            )
         return self.length
 
     def __iter__(self):
@@ -685,8 +686,9 @@ class PieceIterator:
 
 def file_to_paras_and_pieces_iterator(corpus_file):
     yaml_string = ''
+    corpus_file.seek(0)
     for line in corpus_file:
-        if line == '---':
+        if line == '---\n':
             break
         yaml_string += line
     paras = parse_para_yaml(yaml_string)

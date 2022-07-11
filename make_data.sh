@@ -16,7 +16,7 @@ echo $PROC_DATA_NAME
 
 python3 data/midi_to_text.py --nth ${NTH} --max-track-number ${MAX_TRACK_NUMBER} --max-duration ${MAX_DURATION} --velocity-step ${VELOCITY_STEP} \
     --tempo-quantization ${TEMPO_MIN} ${TEMPO_MAX} ${TEMPO_STEP} --tempo-method ${TEMPO_METHOD} ${MIDI_OTHER_ARGUMENTS} \
-    -w ${PROCESS_WORKERS} -r -o data/texts/corpus_${PROC_DATA_NAME}.txt ${MIDI_DIR_PATH}
+    -w ${PROCESS_WORKERS} -r -o data/corpus/${PROC_DATA_NAME}.txt ${MIDI_DIR_PATH}
 
 test $? -ne 0 || python3 data/make_data.py ${DATA_OTHER_ARGUMENTS} --max-sample-length ${MAX_SAMPLE_LENGTH} \
-    data/texts/corpus_${PROC_DATA_NAME}.txt  data/data/${PROC_DATA_NAME}
+    data/corpus/${PROC_DATA_NAME}.txt  data/data/${PROC_DATA_NAME}

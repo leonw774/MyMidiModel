@@ -29,32 +29,23 @@ def build_vocabs(piece_iterator, paras: dict, max_sample_length: str):
     tempo_min, tempo_max, tempo_step = paras['tempo_quantization']
     # tempo_max is inclusive
     tempo_attribute_tokens = list(map(tokenint2str, range(tempo_min, tempo_max+tempo_step, tempo_step)))
+    position_tokens = [
+        'P'+tokenint2str(i) for i in range(get_largest_possible_position(paras['nth']))
+    ]
+    measure_tokens = [
+        f'M{tokenint2str(n)}/{tokenint2str(d)}' for n, d in SUPPORTED_TIME_SIGNATURES
+    ]
     if paras['tempo_method'] == 'position_attribute':
-
         position_tokens = [
-            'P'+tokenint2str(i)+'+'+tempo_attribute
-            for i in range(get_largest_possible_position(paras['nth']))
+            position_token+'+'+tempo_attribute
+            for position_token in position_tokens
             for tempo_attribute in tempo_attribute_tokens
-        ]
-        measure_tokens = [
-            f'M{n}/{d}' for n, d in SUPPORTED_TIME_SIGNATURES
         ]
     elif paras['tempo_method'] == 'measure_attribute':
-        position_tokens = [
-            'P'+tokenint2str(i)
-            for i in range(get_largest_possible_position(paras['nth']))
-        ]
         measure_tokens = [
-            f'M{n}/{d}'+'+'+tempo_attribute
-            for n, d in SUPPORTED_TIME_SIGNATURES
+            measure_token+'+'+tempo_attribute
+            for measure_token in measure_tokens
             for tempo_attribute in tempo_attribute_tokens
-        ]
-    else:
-        position_tokens = [
-            'P'+tokenint2str(i) for i in range(get_largest_possible_position(paras['nth']))
-        ]
-        measure_tokens = [
-            f'M{n}/{d}' for n, d in SUPPORTED_TIME_SIGNATURES
         ]
 
     # max measure number in all pieces
@@ -92,7 +83,7 @@ def build_vocabs(piece_iterator, paras: dict, max_sample_length: str):
     event_tokens = SPECIAL_TOKENS + ['BOS', 'EOS'] + track_tokens + measure_tokens + pitche_tokens + position_tokens
 
     if paras['tempo_method'].endswith('event'):
-        tempo_event_tokens = ['T'+tokenint2str(t) for t in range(tempo_min, tempo_max, tempo_step)]
+        tempo_event_tokens = ['T'+tokenint2str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)]
         event_tokens += tempo_event_tokens
 
     max_duration = paras['max_duration'] * (paras['nth'] // 4)
@@ -109,7 +100,7 @@ def build_vocabs(piece_iterator, paras: dict, max_sample_length: str):
         + f'Position token size: {len(position_tokens)}\n'
         + f'- Corpus position tokens size: {len(corpus_position_tokens)}\n'
         + f'- Max corpus position: {max(text_to_attrs(cptoken)[1][0] for cptoken in corpus_position_tokens)}\n'
-        + f'Max measure span size that fits in max_sample_length: {max_fitting_measure_number}\n'
+        + f'Max measure number that fits max_sample_length: {max_fitting_measure_number}\n'
         + f'  (max_sample_length = {max_sample_length}, max measure number in piece = {max_measure_length})\n'
         + (f'Tempo token size: {len(tempo_event_tokens)}\n' if tempo_event_tokens else '')
         + f'Duration token size: {len(duration_tokens)}\n'
@@ -137,18 +128,28 @@ def build_vocabs(piece_iterator, paras: dict, max_sample_length: str):
 
 
 def text_list_to_numpy(text_list: str, vocabs: dict) -> np.ndarray:
-    # event, duration, velocity, track_number, instrument, tempo, position, measure_number
+    """
+        Serialize pieces into of numpy arrays.
+        Each token is processed into an 8-dimension vector:
+            event, duration, velocity, track_number, instrument, tempo, position, measure_number
+        If a token doesn't have an attribute, fill the index of PAD.
+        If a token has an attrbute, but it is not in the dictionary, fill the index of UNK.
+    """
     x = np.full((len(text_list), 8), fill_value=-1, dtype=np.int16)
 
     event_text2id = vocabs['events']['text2id']
-    d_pad_id = vocabs['durations']['text2id']['[PAD]']
-    v_pad_id = vocabs['velocities']['text2id']['[PAD]']
-    r_pad_id = vocabs['track_numbers']['text2id']['[PAD]']
-    i_pad_id = vocabs['instruments']['text2id']['[PAD]']
-    t_pad_id = vocabs['tempos']['text2id']['[PAD]']
+    # d_pad_id = vocabs['durations']['text2id']['[PAD]']
+    # v_pad_id = vocabs['velocities']['text2id']['[PAD]']
+    # r_pad_id = vocabs['track_numbers']['text2id']['[PAD]']
+    # i_pad_id = vocabs['instruments']['text2id']['[PAD]']
+    # t_pad_id = vocabs['tempos']['text2id']['[PAD]']
 
     # in build_vocabs, [PAD] is made to be 0
-    d_pad_id = 0; v_pad_id = 0; r_pad_id = 0; i_pad_id = 0; t_pad_id = 0
+    d_pad_id = 0
+    v_pad_id = 0
+    r_pad_id = 0
+    i_pad_id = 0
+    t_pad_id = 0
 
     # position and measure use pure integer instead of id
     # head section and eos are all measure=0, position=0
