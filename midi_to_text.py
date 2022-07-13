@@ -8,10 +8,10 @@ from argparse import ArgumentParser
 from collections import Counter
 from multiprocessing import Pool
 from time import time, localtime, strftime
+
 from tqdm import tqdm
 
-from midi_util import midi_to_text_list, make_para_yaml, file_to_paras_and_pieces_iterator
-from tokens import tokenstr2int
+from data import *
 
 
 def mp_worker(args_dict: dict):

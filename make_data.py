@@ -1,13 +1,14 @@
+import io
 import json
 import logging
-import numpy as np
 import os
 import shutil
 from argparse import ArgumentParser
 from time import localtime, strftime
 
-from midi_util import file_to_paras_and_pieces_iterator
-from data_util import *
+import numpy as np
+
+from data import *
 
 
 if __name__ == '__main__':
@@ -76,15 +77,18 @@ if __name__ == '__main__':
 
         # for debugging
         if args.debug:
-            p0 = next(piece_iterator.__iter__())
-            array_data = text_list_to_numpy(p0.split(' '), vocabs)
+            p0 = next(iter(piece_iterator))
+            array_data = text_list_to_numpy(p0.split(), vocabs)
+            array_text_byteio = io.BytesIO()
             debug_txt_path = os.path.join(args.output_dir_path, 'text_list_to_numpy_debug.txt')
-            np.savetxt(debug_txt_path, array_data, fmt='%d')
-            with open(debug_txt_path, 'r', encoding='utf8') as f:
-                data_list = f.read().split('\n')
-                text_list = next(piece_iterator.__iter__()).split()
-            reconst_text_list = numpy_to_text_list(array_data, vocabs, paras['tempo_method'])
-            text_data_reconst_text_list = [(t, *d.split(), rt) for t, d, rt in zip(text_list, data_list, reconst_text_list)]
+            np.savetxt(array_text_byteio, array_data, fmt='%d')
+            array_text_list = array_text_byteio.getvalue().decode().split('\n')
+            original_text_list = p0.split()
+            reconst_text_list = numpy_to_text_list(array_data, vocabs)
+            text_data_reconst_text_list = [
+                (t, *d.split(), rt)
+                for t, d, rt in zip(original_text_list, array_text_list, reconst_text_list)
+            ]
             with open(debug_txt_path, 'w+', encoding='utf8') as f:
                 f.write(
                     f"{'token_text':<14}{'evt':>5}{'dur':>5}{'vel':>5}{'trn':>5}{'ins':>5}{'tmp':>5}{'pos':>5}{'mea':>5} {'reconstructed_text':<14}\n")

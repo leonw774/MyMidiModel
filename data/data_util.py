@@ -1,11 +1,14 @@
-import numpy as np
 from time import time
-from tokens import *
+
+import numpy as np
+
+from .tokens import *
+
 
 def make_token_dict(token_list: list) -> dict:
     token_dict = {
         'size': len(token_list),
-        'id2text': {i:t for i, t in enumerate(token_list)},
+        'id2text': {str(i):t for i, t in enumerate(token_list)}, # in json, key can only be string
         'text2id': {t:i for i, t in enumerate(token_list)},
     }
     return token_dict
@@ -116,6 +119,7 @@ def build_vocabs(piece_iterator, paras: dict, max_sample_length: str):
     vocab_dicts = {
         'paras': paras,
         'max_sample_length': max_sample_length,
+        'special_tokens': SPECIAL_TOKENS,
         'max_measure_number': max_fitting_measure_number + 1, # plus 1 for head section
         'events': make_token_dict(event_tokens),
         'durations': make_token_dict(duration_tokens),
@@ -227,13 +231,16 @@ def text_list_to_numpy(text_list: str, vocabs: dict) -> np.ndarray:
     return x
 
 
-def numpy_to_text_list(data: np.ndarray, vocabs: dict, tempo_method: str):
+def numpy_to_text_list(data: np.ndarray, vocabs: dict):
     # event, duration, velocity, track_number, instrument, tempo, position, measure_number
-    assert data.shape[0] > 2 and data.shape[1] == 8, f'bad numpy array shape: {data.shape}'
+    assert data.shape[0] > 1 and data.shape[1] == 8, f'bad numpy array shape: {data.shape}'
+
+    track_number_to_event = dict()
 
     text_list = []
     for i in range(data.shape[0]):
-        event_text = vocabs['events']['id2text'][data[i][0]]
+        # in json, key can only be string
+        event_text = vocabs['events']['id2text'][str(data[i][0])]
         typename = event_text[0]
 
         if typename == 'B' or typename == 'E':
@@ -241,7 +248,8 @@ def numpy_to_text_list(data: np.ndarray, vocabs: dict, tempo_method: str):
 
         elif typename == 'R':
             # track token has instrument attribute
-            token_text = event_text + ':' + vocabs['instruments']['id2text'][data[i][4]]
+            track_number_to_event[data[i][3]] = event_text[1:]
+            token_text = event_text + ':' + vocabs['instruments']['id2text'][str(data[i][4])]
             text_list.append(token_text)
 
         elif typename == 'M':
@@ -254,13 +262,15 @@ def numpy_to_text_list(data: np.ndarray, vocabs: dict, tempo_method: str):
             text_list.append(event_text)
 
         elif typename == 'N':
+            corresponded_track_event = track_number_to_event[data[i][3]]
             token_text = event_text + ':' \
-                + vocabs['durations']['id2text'][data[i][1]] + ':' \
-                + vocabs['velocities']['id2text'][data[i][2]] + ':' \
-                + vocabs['track_numbers']['id2text'][data[i][3]]
+                + vocabs['durations']['id2text'][str(data[i][1])] + ':' \
+                + vocabs['velocities']['id2text'][str(data[i][2])] + ':' \
+                + corresponded_track_event
             text_list.append(token_text)
-
+        elif event_text in SPECIAL_TOKENS:
+            pass
         else:
-            raise ValueError('unknown typename')
+            raise ValueError(f'unknown typename of event_text: {event_text}')
 
     return text_list

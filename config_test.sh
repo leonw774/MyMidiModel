@@ -10,7 +10,7 @@ TEMPO_STEP=16
 TEMPO_METHOD="position_event"
 PROCESS_WORKERS=1
 MIDI_DIR_PATH="data/test_midis"
-MIDI_OTHER_ARGUMENTS="--verbose --make-stats"
+MIDI_OTHER_ARGUMENTS="--verbose"
 PROC_DATA_NAME="test_midis"
 
 # make vocabulary

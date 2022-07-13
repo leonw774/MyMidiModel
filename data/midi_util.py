@@ -1,8 +1,10 @@
 import random
+from time import time
+
 from miditoolkit.midi.parser import MidiFile
 from miditoolkit.midi.containers import Note, Instrument, TimeSignature, TempoChange
-from time import time
-from tokens import *
+
+from .tokens import *
 
 
 def merge_drums(midi: MidiFile) -> None:
