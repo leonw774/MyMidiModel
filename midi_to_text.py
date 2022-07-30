@@ -14,6 +14,23 @@ from tqdm import tqdm
 from data import *
 
 
+def loop_func(
+        midi_filepath_list,
+        out_file,
+        args_dict: dict):
+    token_number_list = []
+    for n, filepath in tqdm(enumerate(midi_filepath_list), total=len(midi_filepath_list)):
+        logging.debug('%d %s', n, filepath)
+        try:
+            text_list = midi_to_text_list(filepath, **args_dict)
+        except:
+            logging.debug(traceback.format_exc())
+            text_list = []
+        if len(text_list) > 0:
+            token_number_list.append(len(text_list))
+            out_file.write(' '.join(text_list) + '\n')
+    return token_number_list
+
 def mp_worker(args_dict: dict):
     n = args_dict.pop('n', 0)
     logging.debug('%d pid: %d filepath: %s', n, os.getpid(), args_dict['midi_filepath'])
@@ -217,23 +234,11 @@ if __name__ == '__main__':
         logging.info('Find %d files', len(filepath_list))
     filepath_list.sort()
 
-    if args.mp_work_number <= 1:
-        token_number_list = []
-        with open(args.output_path, 'w+', encoding='utf8') as out_file:
-            out_file.write(make_para_yaml(paras_dict))
-            for n, filepath in tqdm(enumerate(filepath_list), total=len(filepath_list)):
-                logging.debug('%d %s', n, filepath)
-                try:
-                    text_list = midi_to_text_list(filepath, **args_dict)
-                except:
-                    logging.debug(traceback.format_exc())
-                    text_list = []
-                if len(text_list) > 0:
-                    token_number_list.append(len(text_list))
-                    out_file.write(' '.join(text_list) + '\n')
-    else:
-        with open(args.output_path, 'w+', encoding='utf8') as out_file:
-            out_file.write(make_para_yaml(paras_dict))
+    with open(args.output_path, 'w+', encoding='utf8') as out_file:
+        out_file.write(make_para_yaml(paras_dict))
+        if args.mp_work_number <= 1:
+            token_number_list = loop_func(filepath_list, out_file, args_dict)
+        else:
             token_number_list = mp_handler(filepath_list, out_file, args.mp_work_number, args_dict)
 
     logging.info('Processed %d files', len(token_number_list))

@@ -4,7 +4,7 @@
     For all tokens:
     The time unit of onset is absolute timing. The unit is n-th note.
 
-    For position tokens and measure-related tokens (Measure, Tempo):
+    For position tokens, tempo tokens and measure tokens:
     Except for onset, position, bpm and time_signature, the other attributes are meaningless and should
     always be the default value (-1). The onset time of a position token or a measure-related
     token is the start time of its position or measure in the time unit.
@@ -16,10 +16,9 @@
     Every attributes should be left as default.
 """
 
-import re
 from collections import namedtuple
 
-COMMON_FIELD_NAMES = ['onset', 'type_priority']
+_COMMON_FIELD_NAMES = ['onset', 'type_priority']
 TYPE_PRIORITY = {
     'BeginOfScoreToken' : 0,
     'TrackToken' : 1,
@@ -32,37 +31,37 @@ TYPE_PRIORITY = {
 
 BeginOfScoreToken = namedtuple(
     'BeginOfScoreToken',
-    COMMON_FIELD_NAMES,
+    _COMMON_FIELD_NAMES,
     defaults=[-1, 0]
 )
 TrackToken = namedtuple(
     'TrackToken',
-    COMMON_FIELD_NAMES+['track_number', 'instrument'],
+    _COMMON_FIELD_NAMES+['track_number', 'instrument'],
     defaults=[-1, 1, -1, -1]
 )
 MeasureToken = namedtuple(
     'MeasureToken',
-    COMMON_FIELD_NAMES+['time_signature', 'bpm'],
+    _COMMON_FIELD_NAMES+['time_signature', 'bpm'],
     defaults=[-1, 2, -1, -1]
 )
 TempoToken = namedtuple(
     'TempoToken',
-    COMMON_FIELD_NAMES+['bpm'],
+    _COMMON_FIELD_NAMES+['bpm'],
     defaults=[-1, 3, -1]
 )
 PositionToken = namedtuple(
     'PositionToken',
-    COMMON_FIELD_NAMES+['position', 'bpm'],
+    _COMMON_FIELD_NAMES+['position', 'bpm'],
     defaults=[-1, 4, -1, -1]
 )
 NoteToken = namedtuple(
     'NoteToken',
-    COMMON_FIELD_NAMES+['pitch', 'track_number', 'duration', 'velocity'],
+    _COMMON_FIELD_NAMES+['track_number', 'pitch', 'duration', 'velocity'],
     defaults=[-1, 5, -1, -1, -1, -1]
 )
 EndOfScoreToken = namedtuple(
     'EndOfScoreToken',
-    COMMON_FIELD_NAMES,
+    _COMMON_FIELD_NAMES,
     defaults=[float('inf'), 6]
 )
 
@@ -105,14 +104,18 @@ SPECIAL_TOKENS = ['[PAD]', '[MASK]', '[UNK]']
 class TokenParseError(Exception):
     pass
 
+
 def token_to_text(token: namedtuple) -> str:
     # typename = token.__class__.__name__
     type_priority = token.type_priority
     if type_priority == 6: #TYPE_PRIORITY['EndOfScoreToken']:
         return 'EOS'
     elif type_priority == 5: #TYPE_PRIORITY['NoteToken']:
-        # type-pitch:duration:velocity:track:instrument
-        return f'N{tokenint2str(token.pitch)}:{tokenint2str(token.duration)}:{tokenint2str(token.velocity)}:{tokenint2str(token.track_number)}'
+        # event:pitch:duration:velocity:track:instrument
+        if token.duration > 0:
+            return f'N:{tokenint2str(token.pitch)}:{tokenint2str(token.duration)}:{tokenint2str(token.velocity)}:{tokenint2str(token.track_number)}'
+        else:
+            return f'N~:{tokenint2str(token.pitch)}:{tokenint2str(-token.duration)}:{tokenint2str(token.velocity)}:{tokenint2str(token.track_number)}'
     elif type_priority == 4: #TYPE_PRIORITY['PositionToken']:
         if token.bpm == -1:
             return f'P{tokenint2str(token.position)}'
@@ -132,23 +135,3 @@ def token_to_text(token: namedtuple) -> str:
         return 'BOS'
     else:
         raise TokenParseError(f'bad token namedtuple: {token}')
-
-
-def text_to_attrs(text: str):
-    typename = text[0]
-    if typename == 'B' or typename == 'E':
-        attr = tuple()
-    elif typename == 'R':
-        attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[1:].split(':'))
-    elif typename == 'M':
-        attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in re.split(r'[:/+]', text[1:]))
-    elif typename == 'T':
-        attr = (int(text[1:], TOKEN_INT2STR_BASE), )
-    elif typename == 'P':
-        attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in re.split(r'[:+]', text[1:]))
-    elif typename == 'N':
-        # add note to instrument
-        attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[1:].split(':'))
-    else:
-        raise TokenParseError(f'bad token string: {text}')
-    return typename, attr

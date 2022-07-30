@@ -1,4 +1,5 @@
 import random
+import re
 from time import time
 
 from miditoolkit.midi.parser import MidiFile
@@ -208,7 +209,7 @@ def get_time_structure_tokens(
         tempo_quantization: list,
         tempo_method: str) -> list:
     """
-        This return measure and tempo tokens. The first measure have to contain the
+        This return measure and tempo  The first measure have to contain the
         first note and the last note must end at the last measure
     """
     nth_per_beat = nth // 4
@@ -479,7 +480,6 @@ def midi_to_token_list(
 
     return full_token_list
 
-
 def midi_to_text_list(
         midi_filepath: str,
         nth: int,
@@ -508,6 +508,8 @@ def midi_to_text_list(
     """
 
     assert nth > 4 and nth % 4 == 0, 'nth is not multiple of 4'
+    assert (nth // 4) * max_duration <= 128, f'max_duration in tick is greater than 128: {nth * max_duration}'
+    assert max_track_number <= 255, f'max_track_number is greater than 255'
     assert tempo_quantization[0] <= tempo_quantization[1] and tempo_quantization[2] > 0, 'bad tempo_quantization'
     assert tempo_method in ['measure_attribute', 'position_attribute', 'measure_event', 'position_event'], \
         'bad tempo_method name'
@@ -535,14 +537,52 @@ def midi_to_text_list(
 
     token_list = midi_to_token_list(midi, nth, max_duration, velocity_step, tempo_quantization, tempo_method)
 
-    text_list = list(map(token_to_text, token_list))
-    # text = ' '.join(map(str, text_list))
     if debug:
         print('Token list length:', len(token_list))
         print('Time:', time()-start_time)
         print('--------')
 
+    text_list = list(map(token_to_text, token_list))
+    # text = ' '.join(map(str, text_list))
     return text_list
+
+
+def handle_note_continuation(
+        is_cont: bool,
+        note_attrs: tuple,
+        ticks_per_nth: int,
+        cur_time_in_ticks: int,
+        pending_cont_notes: dict):
+    # pending_cont_notes is dict object so it is pass by reference
+    pitch, duration, velocity, track_number = note_attrs
+    # check if there is a note to continue at this time position
+    if cur_time_in_ticks in pending_cont_notes:
+        info = (pitch, velocity, track_number)
+        if info in pending_cont_notes[cur_time_in_ticks]:
+            if len(pending_cont_notes[cur_time_in_ticks][info]) > 0:
+                onset = pending_cont_notes[cur_time_in_ticks][info].pop()
+            # print(cur_time_in_ticks, 'onset pop', pending_cont_notes)
+            if len(pending_cont_notes[cur_time_in_ticks][info]) == 0:
+                pending_cont_notes.pop(cur_time_in_ticks)
+        else:
+            onset = cur_time_in_ticks
+    else:
+        onset = cur_time_in_ticks
+
+    if is_cont:
+        # this note is going to connect to a note after max_duration
+        info = (pitch, velocity, track_number)
+        pending_cont_time = cur_time_in_ticks + duration * ticks_per_nth
+        if pending_cont_time not in pending_cont_notes:
+            pending_cont_notes[pending_cont_time] = dict()
+        if info in pending_cont_notes[pending_cont_time]:
+            pending_cont_notes[pending_cont_time][info].append(onset)
+        else:
+            pending_cont_notes[pending_cont_time] = {info : [onset]}
+        # print(cur_time_in_ticks, 'onset append', pending_cont_notes)
+    else:
+        return Note(velocity, pitch, onset, cur_time_in_ticks + duration * ticks_per_nth)
+    return None
 
 
 def piece_to_midi(piece: str, nth: int) -> MidiFile:
@@ -561,10 +601,10 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
     cur_tempo = None
     pending_cont_notes = dict()
     for text in text_list[1:-1]:
-        typename, attr = text_to_attrs(text)
+        typename = text[0]
         if is_head:
             if typename == 'R':
-                track_number, instrument = attr
+                track_number, instrument = (int(x, TOKEN_INT2STR_BASE) for x in text[1:].split(':'))
                 assert len(midi.instruments) == track_number
                 midi.instruments.append(
                     Instrument(program=instrument%128, is_drum=instrument==128, name=f'Track_{track_number}')
@@ -573,6 +613,7 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
                 is_head = False
         if not is_head:
             if typename == 'M':
+                numer, denom, *tempo_change = (int(x, TOKEN_INT2STR_BASE) for x in re.split(r'[:/+]', text[1:]))
                 if cur_measure_onset_in_ticks == -1: # first measure
                     cur_measure_onset_in_ticks = 0
                     cur_time_in_ticks = 0
@@ -581,56 +622,58 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
                     cur_measure_onset_in_ticks += cur_measure_length_in_ticks
                     cur_time_in_ticks = cur_measure_onset_in_ticks
 
-                cur_measure_length_in_ticks = round(4 * attr[0] * (midi.ticks_per_beat / attr[1]))
-                if cur_time_signature != (attr[0], attr[1]):
-                    cur_time_signature = (attr[0], attr[1])
-                    midi.time_signature_changes.append(TimeSignature(attr[0], attr[1], cur_time_in_ticks))
+                cur_measure_length_in_ticks = round(4 * numer * (midi.ticks_per_beat / denom))
+                if cur_time_signature != (numer, denom):
+                    cur_time_signature = (numer, denom)
+                    midi.time_signature_changes.append(TimeSignature(numer, denom, cur_time_in_ticks))
 
-                if len(attr) == 3:
-                    if cur_tempo != attr[2]:
-                        midi.tempo_changes.append(TempoChange(attr[2], cur_time_in_ticks))
+                if len(tempo_change):
+                    if cur_tempo != tempo_change[0]:
+                        midi.tempo_changes.append(TempoChange(tempo_change[0], cur_time_in_ticks))
                 # print("M", attr, cur_measure_onset_in_ticks)
 
             elif typename == 'T':
-                midi.tempo_changes.append(TempoChange(attr[0], cur_time_in_ticks))
+                midi.tempo_changes.append(TempoChange(int(text[1:], TOKEN_INT2STR_BASE), cur_time_in_ticks))
                 # print('T', attr, cur_time_in_ticks)
 
             elif typename == 'P':
-                cur_time_in_ticks = attr[0] * ticks_per_nth + cur_measure_onset_in_ticks
-                if len(attr) == 2:
-                    if cur_tempo != attr[1]:
-                        midi.tempo_changes.append(TempoChange(attr[1], cur_time_in_ticks))
+                time_position, *tempo_change = (int(x, TOKEN_INT2STR_BASE) for x in re.split(r'[:+]', text[1:]))
+                cur_time_in_ticks = time_position * ticks_per_nth + cur_measure_onset_in_ticks
+                if len(tempo_change):
+                    if cur_tempo != tempo_change[0]:
+                        midi.tempo_changes.append(TempoChange(tempo_change[0], cur_time_in_ticks))
                 # print('P', attr)
 
             elif typename == 'N':
-                # add note to instrument
-                pitch, duration, velocity, track_number = attr
-                if cur_time_in_ticks in pending_cont_notes:
-                    info = (pitch, velocity, track_number)
-                    if info in pending_cont_notes[cur_time_in_ticks]:
-                        if len(pending_cont_notes[cur_time_in_ticks][info]) > 0:
-                            onset = pending_cont_notes[cur_time_in_ticks][info].pop()
-                        # print(cur_time_in_ticks, 'onset pop', pending_cont_notes)
-                        if len(pending_cont_notes[cur_time_in_ticks][info]) == 0:
-                            pending_cont_notes.pop(cur_time_in_ticks)
+                is_cont = text[1] == '~'
+                if is_cont:
+                    note_attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[3:].split(':'))
                 else:
-                    onset = cur_time_in_ticks
+                    note_attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[2:].split(':'))
+                n = handle_note_continuation(is_cont, note_attr, ticks_per_nth, cur_time_in_ticks, pending_cont_notes)
+                if n is not None:
+                    midi.instruments[note_attr[3]].notes.append(n)
 
-                if duration < 0:
-                    # this note is going to connect to a note after max_duration
-                    info = (pitch, velocity, track_number)
-                    pending_cont_time = cur_time_in_ticks + (-duration) * ticks_per_nth
-                    if pending_cont_time not in pending_cont_notes:
-                        pending_cont_notes[pending_cont_time] = dict()
-                    if info in pending_cont_notes[pending_cont_time]:
-                        pending_cont_notes[pending_cont_time][info].append(onset)
+            elif typename == 'S':
+                shape_string, *pdvt = text[1:].split(':')
+                relnote_list = []
+                for s in shape_string.split(';'):
+                    is_cont = s[-1] == '~'
+                    if is_cont:
+                        relnote = [int(a, TOKEN_INT2STR_BASE) for a in s[:-1].split(',')]
                     else:
-                        pending_cont_notes[pending_cont_time] = {info : [onset]}
-                    # print(cur_time_in_ticks, 'onset append', pending_cont_notes)
-                else:
-                    n = Note(velocity, pitch, onset, cur_time_in_ticks + duration * ticks_per_nth)
-                    midi.instruments[track_number].notes.append(n)
-                    # print('N', pitch, duration, velocity, track_number, instrument)
+                        relnote = [int(a, TOKEN_INT2STR_BASE) for a in s.split(',')]
+                    relnote = [True] + relnote
+                    relnote_list.append(relnote)
+
+                base_pitch, time_unit, velocity, track_num = (int(x, TOKEN_INT2STR_BASE) for x in pdvt)
+                for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
+                    note_attr = (base_pitch+rel_pitch, time_unit*rel_dur, velocity, track_num)
+                    n = handle_note_continuation(is_cont, note_attr, ticks_per_nth, cur_time_in_ticks+rel_onset*time_unit, pending_cont_notes)
+                    if n is not None:
+                        midi.instruments[track_num].notes.append(n)
+            else:
+                raise TokenParseError(f'bad token string: {text}')
     # end loop text_list
     return midi
 
@@ -686,7 +729,7 @@ class PieceIterator:
             if body_start:
                 yield line[:-1] # remove \n at the end
 
-def file_to_paras_and_pieces_iterator(corpus_file):
+def file_to_paras_and_piece_iterator(corpus_file):
     yaml_string = ''
     corpus_file.seek(0)
     for line in corpus_file:
