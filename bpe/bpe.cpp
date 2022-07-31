@@ -421,7 +421,7 @@ int main(int argc, char *argv[]) {
 
     map<Shape, set<ShapeOccurence>> shapeOccurs;
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
-        cout << "iter:" << iterCount << endl;
+        cout << "iter:" << iterCount << ", ";
         // count shape frequency
         
         // for each piece
@@ -443,7 +443,7 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-        cout << "Find " << shapeOccurs.size() << " unique pairs" << endl;
+        cout << "Find " << shapeOccurs.size() << " unique pairs" << ", ";
     
         // add shape with highest frequency into shapeDict
         Shape maxFreqShape;
@@ -456,7 +456,7 @@ int main(int argc, char *argv[]) {
             // cout << shape2String((*it).first) << endl;
         }
         shapeDict.push_back(maxFreqShape);
-        cout << "add new shape: " << shape2String(maxFreqShape) << " with freq=" << maxFreq << endl;
+        cout << "Add new shape: " << shape2String(maxFreqShape) << " with freq=" << maxFreq << endl;
 
         // merge MultiNotes with new added shape
         Shape* pairShapePtr = &(shapeDict.back());

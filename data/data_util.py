@@ -7,6 +7,7 @@ from time import time
 import numpy as np
 
 from .tokens import (
+    tokenstr2int,
     tokenint2str,
     get_largest_possible_position,
     SPECIAL_TOKENS,
@@ -111,8 +112,6 @@ def do_bpe(piece_iterator, paras: dict, bpe_iter: int, result_filepath: str) -> 
                 mnline = next(bpe_mntext_file)
                 mn_list = mnline.split()
                 piece_time_struct_list = [t for t in piece.split(' ') if t[0] != 'N']
-                if i == 1:
-                    print(piece_time_struct_list)
 
                 result_str = ""
                 piece_cursor = 0
@@ -148,7 +147,7 @@ def do_bpe(piece_iterator, paras: dict, bpe_iter: int, result_filepath: str) -> 
                             continue
                         mn_cur_onset = int(mn_list[mn_cursor].split('@')[0], TOKEN_INT2STR_BASE)
 
-                bpe_result_file.write(result_str[-1]+'\n') # replace the last space to newline
+                bpe_result_file.write(result_str[:-1]+'\n') # replace the last space with newline
 
     os.remove(os.path.join('bpe', shape_vocab_filename))
     os.remove(os.path.join('bpe', bpe_mntext_filename))
@@ -293,10 +292,10 @@ def text_list_to_numpy(text_list: str, vocabs: dict) -> np.ndarray:
         Serialize pieces into of numpy arrays.
         Each token is processed into an 9-dimension vector:
             event, pitch, duration, velocity, track_number, instrument, tempo, position, measure_number
-        If a token doesn't have an attribute, fill the index of PAD.
+        If a token doesn't have an attribute, fill the index of PAD (which should be zero)
         If a token has an attrbute, but it is not in the dictionary, fill the index of UNK.
     """
-    x = np.full((len(text_list), 8), fill_value=-1, dtype=np.int16)
+    x = np.full((len(text_list), 9), fill_value=-1, dtype=np.uint16)
 
     event_text2id = vocabs['events']['text2id']
     # d_pad_id = vocabs['durations']['text2id']['[PAD]']
@@ -314,12 +313,12 @@ def text_list_to_numpy(text_list: str, vocabs: dict) -> np.ndarray:
     t_pad_id = 0
 
     # position and measure use pure integer instead of id
-    # head section and eos are all measure=0, position=0
+    # head section and eos are measure=0, position=0
     # measure index begin at 1
     cur_position = 0
     cur_measure_number = 0
     cur_tempo_id = -1
-    cur_timesig_id = -1
+    # cur_timesig_id = -1
     for i, text in enumerate(text_list):
         if len(text) > 0:
             typename = text[0]
@@ -327,13 +326,13 @@ def text_list_to_numpy(text_list: str, vocabs: dict) -> np.ndarray:
             continue
 
         if typename == 'B' or typename == 'E':
-            x[i] = [event_text2id[text], d_pad_id, v_pad_id, r_pad_id, i_pad_id, t_pad_id, 0, 0]
+            x[i] = [event_text2id[text], p_pad_id, d_pad_id, v_pad_id, r_pad_id, i_pad_id, t_pad_id, 0, 0]
 
         elif typename == 'R':
             event_text, instrument = text.split(':')
             track_number = event_text[1:]
             x[i] = [
-                event_text2id[event_text], d_pad_id, v_pad_id, vocabs['track_numbers']['text2id'][track_number],
+                event_text2id[event_text], p_pad_id, d_pad_id, v_pad_id, vocabs['track_numbers']['text2id'][track_number],
                 vocabs['instruments']['text2id'][instrument], t_pad_id, 0, 0
             ]
 
@@ -344,14 +343,14 @@ def text_list_to_numpy(text_list: str, vocabs: dict) -> np.ndarray:
                 tempo_text = text.split('+')[1]
                 cur_tempo_id = vocabs['tempos']['text2id'][tempo_text]
             x[i] = [
-                event_text2id[text], d_pad_id, v_pad_id, r_pad_id,
+                event_text2id[text], p_pad_id, d_pad_id, v_pad_id, r_pad_id,
                 i_pad_id, t_pad_id, cur_position, cur_measure_number
             ]
 
         elif typename == 'T':
             cur_tempo_id = vocabs['tempos']['text2id'][text[1:]]
             x[i] = [
-                event_text2id[text], d_pad_id, v_pad_id, r_pad_id,
+                event_text2id[text], p_pad_id, d_pad_id, v_pad_id, r_pad_id,
                 i_pad_id, cur_tempo_id, cur_position, cur_measure_number
             ]
 
@@ -361,25 +360,26 @@ def text_list_to_numpy(text_list: str, vocabs: dict) -> np.ndarray:
                 cur_position = int(event_text[1:], TOKEN_INT2STR_BASE)
                 cur_tempo_id = vocabs['tempos']['text2id'][tempo_text]
                 x[i] = [
-                    event_text2id[text], d_pad_id, v_pad_id, r_pad_id,
+                    event_text2id[text], p_pad_id, d_pad_id, v_pad_id, r_pad_id,
                     i_pad_id, cur_tempo_id, cur_position, cur_measure_number
                 ]
             else:
-                cur_position = int(event_text[1:], TOKEN_INT2STR_BASE)
+                cur_position = int(text[1:], TOKEN_INT2STR_BASE)
                 x[i] = [
-                    event_text2id[text], d_pad_id, v_pad_id, r_pad_id,
+                    event_text2id[text], p_pad_id, d_pad_id, v_pad_id, r_pad_id,
                     i_pad_id, cur_tempo_id, cur_position, cur_measure_number
                 ]
 
-        elif typename == 'N':
+        elif typename == 'N' or typename == 'S':
             event_text, *attr = text.split(':')
             x[i] = [
                 event_text2id[event_text],
-                vocabs['durations']['text2id'][attr[0]],
-                vocabs['velocities']['text2id'][attr[1]],
-                vocabs['track_numbers']['text2id'][attr[2]],
+                vocabs['pitches']['text2id'][attr[0]],
+                vocabs['durations']['text2id'][attr[1]],
+                vocabs['velocities']['text2id'][attr[2]],
+                vocabs['track_numbers']['text2id'][attr[3]],
                 # get instrument id from track token
-                x[tokenstr2int(attr[2])+1, 4],
+                x[tokenstr2int(attr[3])+1, 5],
                 cur_tempo_id,
                 cur_position,
                 cur_measure_number
@@ -391,8 +391,8 @@ def text_list_to_numpy(text_list: str, vocabs: dict) -> np.ndarray:
 
 
 def numpy_to_text_list(data: np.ndarray, vocabs: dict):
-    # event, duration, velocity, track_number, instrument, tempo, position, measure_number
-    assert data.shape[0] > 1 and data.shape[1] == 8, f'bad numpy array shape: {data.shape}'
+    # event, pitch, duration, velocity, track_number, instrument, tempo, position, measure_number
+    assert data.shape[0] > 1 and data.shape[1] == 9, f'bad numpy array shape: {data.shape}'
 
     track_number_to_event = dict()
 
@@ -407,8 +407,8 @@ def numpy_to_text_list(data: np.ndarray, vocabs: dict):
 
         elif typename == 'R':
             # track token has instrument attribute
-            track_number_to_event[data[i][3]] = event_text[1:]
-            token_text = event_text + ':' + vocabs['instruments']['id2text'][str(data[i][4])]
+            track_number_to_event[data[i][4]] = event_text[1:]
+            token_text = event_text + ':' + vocabs['instruments']['id2text'][str(data[i][5])]
             text_list.append(token_text)
 
         elif typename == 'M':
@@ -420,16 +420,18 @@ def numpy_to_text_list(data: np.ndarray, vocabs: dict):
         elif typename == 'P':
             text_list.append(event_text)
 
-        elif typename == 'N':
-            corresponded_track_event = track_number_to_event[data[i][3]]
-            token_text = event_text + ':' \
-                + vocabs['durations']['id2text'][str(data[i][1])] + ':' \
-                + vocabs['velocities']['id2text'][str(data[i][2])] + ':' \
-                + corresponded_track_event
+        elif typename == 'N' or typename == 'S':
+            corresponded_track_event = track_number_to_event[data[i][4]]
+            token_text = (
+                event_text + ':'
+                + vocabs['pitches']['id2text'][str(data[i][1])] + ':'
+                + vocabs['durations']['id2text'][str(data[i][2])] + ':'
+                + vocabs['velocities']['id2text'][str(data[i][3])] + ':'
+                + corresponded_track_event)
             text_list.append(token_text)
         elif event_text in SPECIAL_TOKENS:
             pass
         else:
             raise ValueError(f'unknown typename of event_text: {event_text}')
-
+    print(track_number_to_event)
     return text_list
