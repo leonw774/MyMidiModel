@@ -3,6 +3,7 @@ import os
 import random
 import subprocess
 from time import time
+from tqdm import tqdm
 
 import numpy as np
 
@@ -16,7 +17,7 @@ from .tokens import (
 )
 
 
-def do_bpe(piece_iterator, paras: dict, bpe_iter: int, result_filepath: str) -> str:
+def do_bpe(piece_iterator, paras: dict, bpe_iter: int, corpus_file_path: str, result_file_path: str) -> str:
     # Shape format:
     #     'S' (rel_onset ',' rel_pitch ',' rel_duration (is_coutinuing?'~') ';')+ ':' duration_unit ':' velocity ':' track_num
     #
@@ -31,87 +32,33 @@ def do_bpe(piece_iterator, paras: dict, bpe_iter: int, result_filepath: str) -> 
     # with the substitution of "S0,0,1" to "N" and "S0,0,-1" to "N~"
 
     nth = paras['nth']
+    shape_vocabs_file_path = corpus_file_path+'_vocabs'
+    multinotes_file_path = corpus_file_path+'_multinotes'
 
-    # turn pieces into compact formet and write to file
-    tmp_corpus_filename = f'{random.randbytes(4).hex()}'
-    tmp_corpus_filepath = os.path.join('bpe', tmp_corpus_filename)
-    with open(tmp_corpus_filepath, 'wb') as tmpfile:
-        for piece in piece_iterator:
-            # Each note has onset, pitch, duration, velocity, tracknum
-            # 32 bits are enough for onset
-            # pitch is at most 127
-            # asuuming duration, velocity and track_num are all less then 128
-            # each note can be expressed in 8 bytes
-            # use negtive pitch to indicate continuing note
-
-            note_bytes = b''
-            cur_onset = 0
-            cur_measure_onset = 0
-            cur_measure_length = 0
-            for text in piece.split(' '):
-                if text[0] == 'M':
-                    cur_measure_onset += cur_measure_length
-                    cur_onset = cur_measure_onset
-                    n, d = (int(x, TOKEN_INT2STR_BASE) for x in text[1:].split('/'))
-                    cur_measure_length = n * nth // d
-                elif text[0] == 'P':
-                    cur_onset = cur_measure_onset + int(text[1:], TOKEN_INT2STR_BASE)
-                elif text[0] == 'N':
-                    if text[1] == '~':
-                        attr_text = '-' + text[3:] # use negtive pitch to represent continuing note
-                    else:
-                        attr_text = text[2:]
-                    note_bytes += cur_onset.to_bytes(4, 'little')
-                    note_bytes += bytes([
-                        256 + int(a, TOKEN_INT2STR_BASE) if int(a, TOKEN_INT2STR_BASE) < 0 else int(a, TOKEN_INT2STR_BASE)
-                        for a in attr_text.split(':')
-                    ])
-            note_bytes += b'\x00' * 8 # end of score
-            tmpfile.write(note_bytes)
-
-    # run bpe program written in C++ to get vocab
-    bpe_program_path = 'bpe/bpe.exe'
-    if not tmp_corpus_filepath:
-        raise FileNotFoundError(f'Cannot find program file: {tmp_corpus_filename}')
-    args = (
-        bpe_program_path,
-        str(paras['max_duration'] * paras['nth']),
-        str(bpe_iter),
-        tmp_corpus_filepath
-    )
-    try:
-        # p = subprocess.check_output(args, stderr=subprocess.STDOUT, shell=True)
-        p = subprocess.check_output(args, stderr=subprocess.STDOUT)
-        print(p.decode())
-        os.remove(tmp_corpus_filepath)
-    except subprocess.CalledProcessError as e:
-        print(e.output.decode())
-        print('CalledProcessError:')
-        print('return code:', e.returncode)
-        os.remove(tmp_corpus_filepath)
-        raise e
+    bpe_program_path = './bpe/bpe'
 
     # check bpe shape vocab file
-    shape_vocab_filename = tmp_corpus_filename+'_vocab'
-    if not os.path.isfile(os.path.join('bpe', shape_vocab_filename)):
-        raise FileNotFoundError(f'Cannot find output file: {shape_vocab_filename}')
+    if not os.path.isfile(shape_vocabs_file_path):
+        raise FileNotFoundError(f'Cannot find vocabs output file: {shape_vocabs_file_path}')
 
     # get shape_tokens
-    with open(os.path.join('bpe', shape_vocab_filename), 'r', encoding='utf8') as shape_vocab_file:
-        bpe_shapes_list = shape_vocab_file.read().splitlines()
+    with open(shape_vocabs_file_path, 'r', encoding='utf8') as vocabs_file:
+        bpe_shapes_list = vocabs_file.read().splitlines()
 
     # check bpe encoded multinote text file
-    bpe_mntext_filename = tmp_corpus_filename+'_mntext'
-    if not os.path.isfile(os.path.join('bpe', bpe_mntext_filename)):
-        raise FileNotFoundError(f'Cannot find output file: {bpe_mntext_filename}')
+    if not os.path.isfile(multinotes_file_path):
+        raise FileNotFoundError(f'Cannot find multinotes output file: {multinotes_file_path}')
 
     # rebuild text midi now with shapes
-    with open(result_filepath, 'a', encoding='utf8') as bpe_result_file:
-        with open(os.path.join('bpe', bpe_mntext_filename), 'r', encoding='utf8') as bpe_mntext_file:
-            for i, piece in enumerate(piece_iterator):
-                mnline = next(bpe_mntext_file)
+    print('Rebuild text corpus now with shape vocabs')
+    token_number_list = []
+    with open(result_file_path, 'a', encoding='utf8') as bpe_result_file:
+        with open(multinotes_file_path, 'r', encoding='utf8') as mn_file:
+            for piece in tqdm(piece_iterator, total=len(piece_iterator)):
+                mnline = next(mn_file)
                 mn_list = mnline.split()
                 piece_time_struct_list = [t for t in piece.split(' ') if t[0] != 'N']
+                token_number_list.append(len(mn_list) + len(piece_time_struct_list))
 
                 result_str = ""
                 piece_cursor = 0
@@ -121,10 +68,12 @@ def do_bpe(piece_iterator, paras: dict, bpe_iter: int, result_filepath: str) -> 
                 added_last_type = 'B'
                 mn_cursor = 0
                 mn_cur_onset = int(mn_list[0].split('@')[0], TOKEN_INT2STR_BASE)
-                while piece_cursor < len(piece_time_struct_list) and mn_cursor < len(mn_list):
+                while (piece_cursor < len(piece_time_struct_list)) or (mn_cursor < len(mn_list)):
                     if piece_cur_onset <= mn_cur_onset:
                         if not (added_last_type == 'P' and piece_time_struct_list[piece_cursor][0] == 'P'):
                             result_str += piece_time_struct_list[piece_cursor] + ' '
+                        else:
+                            token_number_list[-1] -= 1
                         added_last_type = piece_time_struct_list[piece_cursor][0]
                         piece_cursor += 1
                         if piece_cursor >= len(piece_time_struct_list):
@@ -138,20 +87,28 @@ def do_bpe(piece_iterator, paras: dict, bpe_iter: int, result_filepath: str) -> 
                             piece_cur_measure_length = n * nth // d
                         elif text[0] == 'P':
                             piece_cur_onset = piece_cur_measure_onset + int(text[1:], TOKEN_INT2STR_BASE)
-
+                        elif text[0] == 'E':
+                            piece_cur_onset += piece_cur_measure_length
                     else:
-                        result_str += mn_list[mn_cursor].split('@')[1] + ' '
+                        mn_text = mn_list[mn_cursor].split('@')[1]
+                        if mn_text[0] == 'S':
+                            shape_text = bpe_shapes_list[int(mn_text[1:mn_text.find(':')], TOKEN_INT2STR_BASE)]
+                            mn_text = shape_text + mn_text[mn_text.find(':'):]
+                        result_str += mn_text + ' '
                         added_last_type = 'N'
                         mn_cursor += 1
                         if mn_cursor >= len(mn_list):
-                            continue
-                        mn_cur_onset = int(mn_list[mn_cursor].split('@')[0], TOKEN_INT2STR_BASE)
+                            mn_cur_onset = float('inf')
+                        else:
+                            mn_cur_onset = int(mn_list[mn_cursor].split('@')[0], TOKEN_INT2STR_BASE)
 
                 bpe_result_file.write(result_str[:-1]+'\n') # replace the last space with newline
 
-    os.remove(os.path.join('bpe', shape_vocab_filename))
-    os.remove(os.path.join('bpe', bpe_mntext_filename))
-    print(bpe_shapes_list)
+    print('End rebuild')
+    print('Avg token per piece:', sum(token_number_list) / len(token_number_list))
+    # os.remove(os.path.join('bpe', shape_vocabs_file_path))
+    # os.remove(os.path.join('bpe', multinotes_file_path))
+    # print(bpe_shapes_list)
     return bpe_shapes_list
 
 
@@ -433,5 +390,5 @@ def numpy_to_text_list(data: np.ndarray, vocabs: dict):
             pass
         else:
             raise ValueError(f'unknown typename of event_text: {event_text}')
-    print(track_number_to_event)
+    # print(track_number_to_event)
     return text_list

@@ -481,7 +481,7 @@ def midi_to_token_list(
     return full_token_list
 
 def midi_to_text_list(
-        midi_filepath: str,
+        midi_file_path: str,
         nth: int,
         max_track_number: int,
         max_duration: int,
@@ -493,7 +493,7 @@ def midi_to_text_list(
         debug: bool = False) -> list:
     """
         Parameters:
-        - midi_filepath: midi file path
+        - midi_file_path: midi file path
         - nth: to quantize notes to nth (96, 64 or 32)
         - max_track_number: the maximum tracks nubmer to keep in text, if the input midi has more
         'instruments' than this value, some tracks would be merged or discard
@@ -516,7 +516,7 @@ def midi_to_text_list(
 
     start_time = time()
 
-    midi = MidiFile(midi_filepath)
+    midi = MidiFile(midi_file_path)
     assert midi.ticks_per_beat >= (nth//2), \
         f'midi.ticks_per_beat ({midi.ticks_per_beat}) is less than half of nth ({nth})'
     if debug:
@@ -607,7 +607,7 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
                 track_number, instrument = (int(x, TOKEN_INT2STR_BASE) for x in text[1:].split(':'))
                 assert len(midi.instruments) == track_number
                 midi.instruments.append(
-                    Instrument(program=instrument%128, is_drum=instrument==128, name=f'Track_{track_number}')
+                    Instrument(program=(instrument%128), is_drum=(instrument==128), name=f'Track_{track_number}')
                 )
             else:
                 is_head = False
@@ -645,7 +645,7 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
                 # print('P', attr)
 
             elif typename == 'N':
-                is_cont = text[1] == '~'
+                is_cont = (text[1] == '~')
                 if is_cont:
                     note_attr = tuple(int(x, TOKEN_INT2STR_BASE) for x in text[3:].split(':'))
                 else:
@@ -657,23 +657,26 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
             elif typename == 'S':
                 shape_string, *pdvt = text[1:].split(':')
                 relnote_list = []
-                for s in shape_string.split(';'):
-                    is_cont = s[-1] == '~'
+                for s in shape_string[:-1].split(';'):
+                    is_cont = (s[-1] == '~')
                     if is_cont:
                         relnote = [int(a, TOKEN_INT2STR_BASE) for a in s[:-1].split(',')]
                     else:
                         relnote = [int(a, TOKEN_INT2STR_BASE) for a in s.split(',')]
-                    relnote = [True] + relnote
+                    relnote = [is_cont] + relnote
                     relnote_list.append(relnote)
-
-                base_pitch, time_unit, velocity, track_num = (int(x, TOKEN_INT2STR_BASE) for x in pdvt)
+                base_pitch, time_unit, velocity, track_number = (int(x, TOKEN_INT2STR_BASE) for x in pdvt)
                 for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
-                    note_attr = (base_pitch+rel_pitch, time_unit*rel_dur, velocity, track_num)
-                    n = handle_note_continuation(is_cont, note_attr, ticks_per_nth, cur_time_in_ticks+rel_onset*time_unit, pending_cont_notes)
+                    note_attr = (base_pitch+rel_pitch, time_unit*rel_dur, velocity, track_number)
+                    onset_time_in_tick = cur_time_in_ticks + rel_onset * time_unit * ticks_per_nth
+                    n = handle_note_continuation(is_cont, note_attr, ticks_per_nth, onset_time_in_tick, pending_cont_notes)
                     if n is not None:
-                        midi.instruments[track_num].notes.append(n)
+                        print(n)
+                        midi.instruments[track_number].notes.append(n)
             else:
                 raise TokenParseError(f'bad token string: {text}')
+    
+
     # end loop text_list
     return midi
 
@@ -704,6 +707,16 @@ def parse_para_yaml(yaml: str) -> dict:
             args_dict[k] = int(v)
     return args_dict
 
+def file_to_paras_and_piece_iterator(corpus_file):
+    yaml_string = ''
+    corpus_file.seek(0)
+    for line in corpus_file:
+        if line == '---\n':
+            break
+        yaml_string += line
+    paras = parse_para_yaml(yaml_string)
+    return paras, PieceIterator(corpus_file)
+
 # use iterator to handle large file
 class PieceIterator:
     def __init__(self, corpus_file) -> None:
@@ -728,13 +741,3 @@ class PieceIterator:
                 continue
             if body_start:
                 yield line[:-1] # remove \n at the end
-
-def file_to_paras_and_piece_iterator(corpus_file):
-    yaml_string = ''
-    corpus_file.seek(0)
-    for line in corpus_file:
-        if line == '---\n':
-            break
-        yaml_string += line
-    paras = parse_para_yaml(yaml_string)
-    return paras, PieceIterator(corpus_file)

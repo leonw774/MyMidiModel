@@ -15,14 +15,14 @@ from data import *
 
 
 def loop_func(
-        midi_filepath_list,
+        midi_file_path_list,
         out_file,
         args_dict: dict):
     token_number_list = []
-    for n, filepath in tqdm(enumerate(midi_filepath_list), total=len(midi_filepath_list)):
-        logging.debug('%d %s', n, filepath)
+    for n, file_path in tqdm(enumerate(midi_file_path_list), total=len(midi_file_path_list)):
+        logging.debug('%d %s', n, file_path)
         try:
-            text_list = midi_to_text_list(filepath, **args_dict)
+            text_list = midi_to_text_list(file_path, **args_dict)
         except:
             logging.debug(traceback.format_exc())
             text_list = []
@@ -33,7 +33,7 @@ def loop_func(
 
 def mp_worker(args_dict: dict):
     n = args_dict.pop('n', 0)
-    logging.debug('%d pid: %d filepath: %s', n, os.getpid(), args_dict['midi_filepath'])
+    logging.debug('%d pid: %d file path: %s', n, os.getpid(), args_dict['midi_file_path'])
     try:
         text_list = midi_to_text_list(**args_dict)
         # return compressed text because memory usage issue
@@ -45,15 +45,15 @@ def mp_worker(args_dict: dict):
 
 
 def mp_handler(
-        midi_filepath_list: set,
+        midi_file_path_list: set,
         outfile,
         mp_work_number: int,
         args_dict: dict):
 
     args_dict_list = list()
-    for n, midi_filepath in enumerate(midi_filepath_list):
+    for n, midi_file_path in enumerate(midi_file_path_list):
         a = args_dict.copy() # shallow copy of args_dict
-        a['midi_filepath'] = midi_filepath
+        a['midi_file_path'] = midi_file_path
         a['n'] = n
         args_dict_list.append(a)
     logging.info('Start process with %d workers', mp_work_number)
@@ -151,6 +151,11 @@ if __name__ == '__main__':
         dest='verbose'
     )
     parser.add_argument(
+        '--log',
+        dest='log_file_path',
+        default='./logs/defaultlog.log'
+    )
+    parser.add_argument(
         '-r', '--recursive',
         action='store_true',
         dest='recursive',
@@ -191,7 +196,7 @@ if __name__ == '__main__':
     args_dict = {
         k: v
         for k, v in args_vars.items()
-        if k not in ['input_path', 'output_path', 'make_stats', 'mp_work_number', 'recursive', 'verbose'] and v is not None
+        if k not in ['input_path', 'output_path', 'make_stats', 'log_file_path', 'mp_work_number', 'recursive', 'verbose'] and v is not None
     }
     paras_dict = {
         k: v
@@ -202,13 +207,14 @@ if __name__ == '__main__':
     # when not verbose, only info level or higher will be printed to stderr and logged into file
     loglevel = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
-        filename=strftime("logs/midi_to_text-%Y%m%d-%H%M.log", localtime()),
-        filemode='w+',
+        filename=args.log_file_path,
+        filemode='a',
         level=loglevel
     )
     console = logging.StreamHandler()
     console.setLevel(loglevel)
     logging.getLogger().addHandler(console)
+    logging.info(strftime('----midi_to_text.py start at %Y%m%d-%H%M----'))
 
     args_str = '\n'.join([
         str(k)+':'+str(v) for k, v in args_vars.items()
@@ -216,30 +222,30 @@ if __name__ == '__main__':
     logging.info(args_str)
 
     start_time = time()
-    filepath_list = list()
+    file_path_list = list()
     for inpath in args.input_path:
         if args.recursive:
             if not os.path.isdir(inpath):
                 print(f'Path {inpath} is not a directory or doesn\'t exist.')
-            filepath_list = glob.glob(inpath+'/**/*.mid', recursive=True)
+            file_path_list = glob.glob(inpath+'/**/*.mid', recursive=True)
         else:
             if not os.path.isfile(inpath):
                 print(f'Path {inpath} is not a file or doesn\'t exist.')
-            filepath_list.append(inpath)
+            file_path_list.append(inpath)
 
-    if len(filepath_list) == 0:
+    if len(file_path_list) == 0:
         logging.info('No file to process')
         exit(1)
     else:
-        logging.info('Find %d files', len(filepath_list))
-    filepath_list.sort()
+        logging.info('Find %d files', len(file_path_list))
+    file_path_list.sort()
 
     with open(args.output_path, 'w+', encoding='utf8') as out_file:
         out_file.write(make_para_yaml(paras_dict))
         if args.mp_work_number <= 1:
-            token_number_list = loop_func(filepath_list, out_file, args_dict)
+            token_number_list = loop_func(file_path_list, out_file, args_dict)
         else:
-            token_number_list = mp_handler(filepath_list, out_file, args.mp_work_number, args_dict)
+            token_number_list = mp_handler(file_path_list, out_file, args.mp_work_number, args_dict)
 
     logging.info('Processed %d files', len(token_number_list))
     if len(token_number_list) > 0:
@@ -259,7 +265,7 @@ if __name__ == '__main__':
             'token_number_per_piece': token_number_list
         }
         with open(args.output_path, 'r', encoding='utf8') as outfile:
-            paras, piece_iterator = file_to_paras_and_pieces_iterator(outfile)
+            paras, piece_iterator = file_to_paras_and_piece_iterator(outfile)
             for piece in piece_iterator:
                 text_stats['track_number_distribution'][piece.count(' R')] += 1
                 head_end = piece.find(' M') # find first occurence of measure token

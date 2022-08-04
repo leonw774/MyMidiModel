@@ -14,5 +14,6 @@ MIDI_OTHER_ARGUMENTS="--verbose"
 PROC_DATA_NAME="test_midis"
 
 # make vocabulary
+BPE_ITER=10
 MAX_SAMPLE_LENGTH=1024
 DATA_OTHER_ARGUMENTS='--debug'

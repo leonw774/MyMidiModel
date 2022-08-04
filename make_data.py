@@ -28,7 +28,12 @@ if __name__ == '__main__':
         type=int,
         default=0,
         help='The number of iteration the BPE algorithm does. Default is 0.\
-            If the number is integer that greater than 0, BPE will be performed.'
+            If the number is integer that greater than 0, it implicated that BPE was performed.'
+    )
+    parser.add_argument(
+        '--log',
+        dest='log_file_path',
+        default='./logs/defaultlog.log'
     )
     parser.add_argument(
         'input_file_path',
@@ -37,17 +42,19 @@ if __name__ == '__main__':
         'output_dir_path',
     )
 
+    args = parser.parse_args()
+
     loglevel = logging.INFO
     logging.basicConfig(
-        filename=strftime("logs/make_data-%Y%m%d-%H%M.log", localtime()),
-        filemode='w',
+        filename=args.log_file_path,
+        filemode='a',
         level=loglevel
     )
     console = logging.StreamHandler()
     console.setLevel(loglevel)
     logging.getLogger().addHandler(console)
+    logging.info(strftime('----make_data.py start at %Y%m%d-%H%M---'))
 
-    args = parser.parse_args()
 
     with open(args.input_file_path, 'r', encoding='utf8') as infile:
         paras, piece_iterator = file_to_paras_and_piece_iterator(infile)
@@ -59,12 +66,12 @@ if __name__ == '__main__':
         if args.bpe > 0:
             logging.info('Use BPE')
             root_name, ext = os.path.splitext(args.input_file_path)
-            bpe_input_file_path = root_name + '_bpe' + ext
+            bpe_result_file_path = root_name + '_bpe' + ext
             # prepare parameter yaml for bpe program to append to
-            with open(bpe_input_file_path, 'w+', encoding='utf8') as bpe_input_file:
+            with open(bpe_result_file_path, 'w+', encoding='utf8') as bpe_input_file:
                 bpe_input_file.write(make_para_yaml(paras))
-            bpe_shapes_list = do_bpe(piece_iterator, paras, args.bpe, bpe_input_file_path)
-            buildvocab_input_file_path = bpe_input_file_path
+            bpe_shapes_list = do_bpe(piece_iterator, paras, args.bpe, args.input_file_path, bpe_result_file_path)
+            buildvocab_input_file_path = bpe_result_file_path
 
         else:
             bpe_shapes_list = []

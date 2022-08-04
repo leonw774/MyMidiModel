@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
+#include <ctime>
 #include <string>
 #include <sstream>
 #include <algorithm>
@@ -8,26 +9,28 @@
 #include <list>
 #include <set>
 #include <map>
+#include "omp.h"
 
-#define DEBUG false
+// #define DEBUG false
 // #define DEBUG true
-// #define DEBUG p == 0 && t == 0
+// #define DEBUG i == 0 && j == 0
 
 using namespace std;
 
-/*
-def tokenint2str(x: int) -> str:
-    if 0 <= x < TOKEN_INT2STR_BASE:
-        return '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[x]
-    isneg = x < 0
-    if isneg:
-        x = -x
-    b = ''
-    while x:
-        x, d = divmod(x, TOKEN_INT2STR_BASE)
-        b = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[d] + b
-    return ('-' + b) if isneg else b
-*/
+long b36strtol(const char* s) {
+    unsigned int l = strlen(s);
+    bool isNeg = s[0] == '-';
+    long r = 0;
+    for (unsigned int i = (isNeg ? 1 : 0); i < l; ++i) {
+        if ('0' <= s[i] && s[i] <= '9') {
+            r = (r << 5) + (r << 2) + s[i] - '0'; // r * 36 --> r = (r * 32 + r * 4)
+        }
+        else if ('A' <= s[i] && s[i] <= 'Z') {
+            r = (r << 5) + (r << 2) + s[i] - 'A' + 10;
+        }
+    }
+    return (isNeg ? -r : r);
+}
 
 string ltob36str(long x) {
     if (0 <= x && x < 36) return string(1, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[x]);
@@ -44,9 +47,9 @@ string ltob36str(long x) {
 }
 
 int gcd (int a, int b) {
-    int tmp;
     if (a == b) return a;
     if (a == 1 || b == 1) return 1;
+    int tmp;
     while (b > 0) {
         tmp = b;
         b = a % b;
@@ -56,22 +59,14 @@ int gcd (int a, int b) {
 }
 
 int gcd (int* arr, unsigned int size) {
-    int g = abs(arr[0]);
+    int g = arr[0];
     for (int i = 1; i < size; ++i) {
-        g = gcd(g, abs(arr[i]));
+        g = gcd(g, arr[i]);
         if (g == 1) return 1;
     }
     return g;
 }
 
-struct Note {
-    // pitch, duration, velocity, track number
-    uint32_t onset;
-    int8_t pitch;
-    uint8_t dur;
-    uint8_t vel;
-    uint8_t trn;
-};
 
 struct RelNote {
     uint8_t isContAndRelOnset;
@@ -98,23 +93,23 @@ struct RelNote {
         isContAndRelOnset = (isContAndRelOnset & 0x80) | (o & 0x7f);
     }
 
-    inline unsigned int getRelPitch() const {
-        return relPitch;
-    }
-
-    inline unsigned int getRelDur() const {
-        return relDur;
-    }
-
-    inline bool operator < (const RelNote& right) const {
-        if (getRelOnset() + relDur == right.getRelOnset() + right.relDur) {
-            if (getRelOnset() == right.getRelOnset()) {
-                return relPitch < right.relPitch;
+    inline bool operator < (const RelNote& rhs) const {
+        // sort on offset first, so that when we want to know the length of shape
+        // we can just sort it and look at last relNote
+        if ((isContAndRelOnset & 0x7f) + relDur == rhs.getRelOnset() + rhs.relDur) {
+            if ((isContAndRelOnset & 0x7f) == rhs.getRelOnset()) {
+                return relPitch < rhs.relPitch;
             }
-            return getRelOnset() < right.getRelOnset();
+            return (isContAndRelOnset & 0x7f) < rhs.getRelOnset();
         }
-        return getRelOnset() + relDur < right.getRelOnset() + right.relDur;
-    } 
+        return (isContAndRelOnset & 0x7f) + relDur < rhs.getRelOnset() + rhs.relDur;
+    }
+
+    inline bool operator == (const RelNote& rhs) const {
+        return (isContAndRelOnset == rhs.isContAndRelOnset
+            && relPitch == rhs.relPitch
+            && relDur == rhs.relDur);
+    }
 };
 
 typedef vector<RelNote> Shape;
@@ -122,77 +117,36 @@ typedef vector<RelNote> Shape;
 Shape DEFAULT_SHAPE_END({RelNote(0, 0, 0, 1)});
 Shape DEFAULT_SHAPE_CONT({RelNote(1, 0, 0, 1)});
 
-struct ShapeOccurence {
-    // piece_idx use upper 24 bit, track_idx use lower 8 bits
-    uint32_t pieceTrackIdx;
-    uint16_t mnLeftIdx;
-    uint16_t mnRightIdx;
-
-    ShapeOccurence (unsigned int p, unsigned int t, unsigned int l, unsigned int r) {
-        pieceTrackIdx = (p << 8) | (t & 0xff);
-        mnLeftIdx = l;
-        mnRightIdx = r;
-    }
-
-    inline unsigned int getPidx() const {
-        return pieceTrackIdx >> 8;
-    }
-
-    inline unsigned int getTidx() const {
-        return pieceTrackIdx & 0xff;
-    }
-
-    inline unsigned int getLidx() const {
-        return mnLeftIdx;
-    }
-
-    inline unsigned int getRidx() const {
-        return mnRightIdx;
-    }
-
-    inline bool operator < (const ShapeOccurence& right) const {
-        if (pieceTrackIdx == right.pieceTrackIdx) {
-            return mnLeftIdx < right.mnLeftIdx;
-        }
-        return pieceTrackIdx < right.pieceTrackIdx;
-    }
-
-    inline bool operator == (const ShapeOccurence& right) const {
-        return pieceTrackIdx == right.pieceTrackIdx && mnLeftIdx == right.mnLeftIdx;
-    }
-};
-
 struct MultiNote {
-    Shape* shape; // pointed to a shape in dictionary or DEFAULT_SHAPE
+    Shape* pShape; // pointed to a shape in dictionary or DEFAULT_SHAPE
     uint32_t onset;
     uint8_t pitch;
     uint8_t unit; // time unit of shape
     uint8_t vel;
 
-    // neighbors store relative index from this multinote to others
-    // because we only search toward greater index, it should be positive integer
-    vector<unsigned int> neighbors;
+    // neighbor store relative index from this multinote to others
+    // if neighbor > 0, any multinote in (i+1) ~ (i+neighbor) where i is the index of current multinote
+    // is this multinote's neighbor
+    // because we only search toward greater index, it should only be positive integer
+    uint8_t neighbor;
 
-    MultiNote(Note n) {
-        onset = n.onset;
-        if (n.pitch < 0) {
-            pitch = -n.pitch;
-            shape = &DEFAULT_SHAPE_CONT; // (1, 0, 0, 1)
-        }
-        else {
-            pitch = n.pitch;
-            shape = &DEFAULT_SHAPE_END; // (0, 0, 0, 1)
-        }
-        unit = n.dur;
-        vel = n.vel;
-        neighbors.clear();
+    MultiNote(bool isCont, uint32_t o, uint8_t p, uint8_t d, uint8_t v) {
+        if (isCont) 
+            pShape = &DEFAULT_SHAPE_CONT; // (1, 0, 0, 1)
+        else
+            pShape = &DEFAULT_SHAPE_END; // (0, 0, 0, 1)
+        onset = o;
+        pitch = p;
+        unit = d;
+        vel = v;
+        neighbor = 0;
     }
 
-    bool operator < (const MultiNote& right) {
-        if (onset == right.onset) {
-            return pitch < right.pitch;
+    inline bool operator < (const MultiNote& rhs) const {
+        if (onset == rhs.onset) {
+            return pitch < rhs.pitch;
         }
-        return onset < right.onset;
+        return onset < rhs.onset;
     }
 };
 
@@ -211,103 +165,84 @@ string shape2String(const Shape& s) {
 
 void printTrack(const vector<MultiNote>& track, const size_t begin, const size_t length) {
     for (int i = begin; i < begin + length; ++i) {
-        cout << i << " - Shape=" << shape2String(*(track[i].shape));
+        cout << i << " - Shape=" << shape2String(*(track[i].pShape));
         cout << " onset=" << (int) track[i].onset
                 << " basePitch=" << (int) track[i].pitch
                 << " timeUnit=" << (int) track[i].unit
                 << " velocity=" << (int) track[i].vel;
-        cout << " neighbors(" << track[i].neighbors.size() << "):";
-        for (auto n : track[i].neighbors) {
-            cout << n << ','; 
-        }
-        cout << endl;
+        cout << " neighbor=" << (int) track[i].neighbor << endl;
     }
 }
 
-void updateNeighbors(vector<Piece>& corpus, long maxDurationTick) {
+void updateNeighbor(vector<Piece>& corpus, long maxDurationInNth) {
     // for each piece
+    #pragma omp parallel for
     for (int i = 0; i < corpus.size(); ++i) {
         // for each track
+        #pragma omp parallel for
         for (int j = 0; j < corpus[i].size(); ++j) {
             // for each multinote
             for (int k = 0; k < corpus[i][j].size(); ++k) {
                 // printTrack(corpus[i][j], k, 1);
                 uint32_t onsetTime = corpus[i][j][k].onset;
-                RelNote latestRelNote = (*corpus[i][j][k].shape).back();
+                RelNote latestRelNote = (*corpus[i][j][k].pShape).back();
                 uint32_t relOffsetTime = latestRelNote.getRelOnset() + latestRelNote.relDur;
                 uint32_t offsetTime = corpus[i][j][k].onset + relOffsetTime * corpus[i][j][k].unit;
                 uint32_t immdAfterOnset = -1;
                 int n = 1;
-                corpus[i][j][k].neighbors.clear();
+                corpus[i][j][k].neighbor = 0;
                 while (k+n < corpus[i][j].size()) {
-                    // has possibility to make timeUnit > maxDurationTick
-                    if ((corpus[i][j][k+n]).onset > onsetTime + maxDurationTick) {
+                    // not allow this because it has possibility to make timeUnit > maxDurationInNth
+                    if ((corpus[i][j][k+n]).onset > onsetTime + maxDurationInNth) {
                         break;
                     }
-                    // simultaneous
-                    if ((corpus[i][j][k+n]).onset == onsetTime) {
-                        if (corpus[i][j][k].pitch > (corpus[i][j][k+n]).pitch) {
-                            cout << "Pitches are not sorted ascending at:"
-                                 << i << ',' << j << endl;
-                            printTrack(corpus[i][j], k, k+n);
-                            exit(1);
-                        }
-                        if (corpus[i][j][k].vel == (corpus[i][j][k+n]).vel) {
-                            corpus[i][j][k].neighbors.push_back(n);
-                        }
+                    // is overlapping
+                    if ((corpus[i][j][k+n]).onset < offsetTime) { 
+                        n++;
                     }
-                    // overlapping
-                    else if ((corpus[i][j][k+n]).onset < offsetTime) {
-                        if (corpus[i][j][k].vel == (corpus[i][j][k+n]).vel) {
-                            corpus[i][j][k].neighbors.push_back(n);
-                        }
-                    }
-                    // immediately after
+                    // if immediately after
                     else if (immdAfterOnset == -1 || (corpus[i][j][k+n]).onset == immdAfterOnset) {
                         immdAfterOnset = (corpus[i][j][k+n]).onset;
-                        if (corpus[i][j][k].vel == (corpus[i][j][k+n]).vel) {
-                            corpus[i][j][k].neighbors.push_back(n);
-                        }
+                        n++;
                     }
                     else {
                         break;
                     }
-                    n++;
                 }
+                corpus[i][j][k].neighbor = n - 1;
             }
         }
     }
 }
 
 Shape getShapeOfMultiNotePair(const MultiNote& mnleft, const MultiNote& mnright) {
-    int pairSize = mnleft.shape->size() + mnright.shape->size();
+    int leftSize = mnleft.pShape->size(), rightSize = mnright.pShape->size();
+    int pairSize = leftSize + rightSize;
     Shape pairShape;
-    vector<int> onsetTimes, durTimes;
     pairShape.resize(pairSize);
-    onsetTimes.reserve(pairSize);
-    durTimes.reserve(pairSize);
-    for (int i = 0; i < mnleft.shape->size(); ++i) {
-        onsetTimes.push_back((*mnleft.shape)[i].getRelOnset() * mnleft.unit);
-        durTimes.push_back((*mnleft.shape)[i].relDur * mnleft.unit);
+
+    int rightOnsetsDurs[rightSize*2];
+    for (int i = 0; i < rightSize; ++i) {
+        rightOnsetsDurs[i] = (*mnright.pShape)[i].getRelOnset() * mnright.unit + mnright.onset - mnleft.onset;
     }
-    for (int i = 0; i < mnright.shape->size(); ++i) {
-        onsetTimes.push_back((*mnright.shape)[i].getRelOnset() * mnright.unit + mnright.onset - mnleft.onset);
-        durTimes.push_back((*mnright.shape)[i].relDur * mnright.unit);
+     for (int i = 0; i < rightSize; ++i) {
+        rightOnsetsDurs[i+rightSize] = (*mnright.pShape)[i].relDur * mnright.unit;
     }
-    int newUnit = gcd(
-        gcd(onsetTimes.data(), pairSize),
-        gcd(durTimes.data(), pairSize)
-    );
+    int newUnit = gcd(mnleft.unit, gcd(rightOnsetsDurs, rightSize*2));
     // cout << "newUnit:" << newUnit << endl;
     for (int i = 0; i < pairSize; ++i) {
-        pairShape[i].setRelOnset(onsetTimes[i] / newUnit);
-        pairShape[i].relDur = durTimes[i] / newUnit;
-        if (i < mnleft.shape->size()) {
-            pairShape[i].relPitch = (*mnleft.shape)[i].relPitch;
+        if (i < leftSize) {
+            if (i != 0) {
+                pairShape[i].setRelOnset((*mnleft.pShape)[i].getRelOnset() * mnleft.unit / newUnit);
+                pairShape[i].relPitch = (*mnleft.pShape)[i].relPitch;
+            }
+            pairShape[i].relDur = (*mnleft.pShape)[i].relDur * mnleft.unit / newUnit;
         }
         else {
-            int j = i - mnleft.shape->size();
-            pairShape[i].relPitch = (*mnright.shape)[j].relPitch + mnright.pitch - mnleft.pitch; 
+            int j = i - leftSize;
+            pairShape[i].setRelOnset(rightOnsetsDurs[j] / newUnit);
+            pairShape[i].relPitch = (*mnright.pShape)[j].relPitch + mnright.pitch - mnleft.pitch;
+            pairShape[i].relDur = rightOnsetsDurs[j+rightSize] / newUnit;
         }
     }
     sort(pairShape.begin(), pairShape.end());
@@ -317,204 +252,299 @@ Shape getShapeOfMultiNotePair(const MultiNote& mnleft, const MultiNote& mnright)
 
 int main(int argc, char *argv[]) {
     // validate args
-    if (argc != 4) {
-        cout << "Must have 3 arguments: [maxDurationTick] [bpeIter] [inputFilePath]" << endl;
+    if (argc != 5) {
+        cout << "Must have 4 arguments: [nth] [maxDurationInNth] [bpeIter] [corpusFilePath]" << endl;
         return 1;
     }
     char* pEnd;
 
-    long maxDurationTick = strtol(argv[1], &pEnd, 10);
-    if (argv[1]) {
-        cout << "maxDurationTick: " << maxDurationTick << endl;
+    long nth = strtol(argv[1], &pEnd, 10);
+    if (nth) {
+        cout << "nth: " << nth << endl;
     }
     else {
-        cout << "First arguments [maxDurationTick] is not convertable by strtol in base 10: " << endl;
+        cout << "First arguments [nth] is not convertable by strtol in base 10: " << endl;
         return 1;
     }
 
-    long bpeIter = strtol(argv[2], &pEnd, 10);
-    if (argv[2]) {
+
+    long maxDurationInNth = strtol(argv[2], &pEnd, 10);
+    if (maxDurationInNth) {
+        cout << "maxDurationInNth: " << maxDurationInNth << endl;
+    }
+    else {
+        cout << "Second arguments [maxDurationInNth] is not convertable by strtol in base 10: " << endl;
+        return 1;
+    }
+
+    long bpeIter = strtol(argv[3], &pEnd, 10);
+    if (bpeIter) {
         cout << "bpeIter: " << bpeIter << endl;
     }
     else {
-        cout << "Sencond arguments [bpeIter] is not convertable by strtol in base 10: " << endl;
+        cout << "Third arguments [bpeIter] is not convertable by strtol in base 10: " << endl;
         return 1;
     }
 
-    ifstream infile(argv[3], ios::in | ios::binary);
+    ifstream infile(argv[4], ios::in | ios::binary);
     if (!infile.is_open()) {
-        cout << "Failed to open input file: " << argv[3] << endl;
+        cout << "Failed to open corpus file: " << argv[3] << endl;
         return 1;
     }
-    cout << "Input file: " << argv[3] << endl;
+    cout << "Input file: " << argv[4] << endl;
 
-    string vocabOutfileName(argv[3]);
-    vocabOutfileName.append("_vocab");
+    string vocabOutfileName(argv[4]);
+    vocabOutfileName.append("_vocabs");
     ofstream vocabOutfile(vocabOutfileName, ios::out | ios::trunc);
     if (!vocabOutfile.is_open()) {
         cout << "Failed to open vocab output file: " << vocabOutfileName << endl;
         return 1;
     }
 
-    string textOutfileName(argv[3]);
-    textOutfileName.append("_mntext");
+    string textOutfileName(argv[4]);
+    textOutfileName.append("_multinotes");
     ofstream textOutfile(textOutfileName, ios::out | ios::trunc);
     if (!textOutfile.is_open()) {
         cout << "Failed to open text output file: " << textOutfileName << endl;
         return 1;
     }
 
+    time_t begTime = time(0);
+
     // read & construct data
     infile.seekg(0, ios::end);
     streampos filesize = infile.tellg();
     infile.seekg(0, ios::beg);
     cout << "File size: " << filesize << " bytes" << endl;
-    if (filesize % 8 != 0 || filesize == 0) {
-        cout << "Broken file size" << endl;
-        return 1;
-    } 
 
-    Note* noteSeq = new Note[filesize/sizeof(Note)];
-    infile.read((char*) noteSeq, filesize);
+    // read notes from corpus
+    vector<Piece> corpus;
+    corpus.push_back(Piece());
 
-    // for (int i = 0; i < 8; ++i) {
-    //     cout << (int) noteSeq[i].onset << ','
-    //          << (int) noteSeq[i].pitch << ','
-    //          << (int) noteSeq[i].dur << ','
-    //          << (int) noteSeq[i].vel << ','
-    //          << (int) noteSeq[i].trn << endl;
-    // }
+    // ignore yaml head matters
+    string yaml;
+    while (1) {
+        getline(infile, yaml);
+        if (yaml.substr(0, 3) == "---") break;
+    }
+
+    unsigned int curMeasureStart = 0, curMeasureLength = 0, curTime = 0;
+    while (infile.good()) {
+        unsigned char c = infile.get(), i;
+        char a[8];
+        switch (c) {
+            case 'R':
+                corpus.back().push_back(vector<MultiNote>());
+                while (infile.get() != ' ');
+                break;
+            case 'M':
+                curMeasureStart += curMeasureLength;
+                uint8_t numer, denom;
+                for (i = 0; (a[i] = infile.get()) != '/'; ++i);
+                a[i] = '\0';
+                numer = b36strtol(a);
+                // n = strtol(a, &pEnd, 36);
+                for (i = 0; (a[i] = infile.get()) != ' '; ++i);
+                a[i] = '\0';
+                denom = b36strtol(a);
+                // d = strtol(a, &pEnd, 36);
+                curMeasureLength = numer * nth / denom;
+                break;
+            case 'P':
+                uint8_t pos;
+                for (i = 0; (a[i] = infile.get()) != ' '; ++i);
+                a[i] = '\0';
+                pos = b36strtol(a);
+                // p = strtol(a, &pEnd, 36);
+                curTime = curMeasureStart + pos;
+                break;
+            case 'N':
+                uint8_t isCont, p, d, v, t;
+                if (isCont = (infile.get() == '~')) {
+                    infile.get();
+                }
+                for (i = 0; (a[i] = infile.get()) != ':'; ++i);
+                a[i] = '\0';
+                p = b36strtol(a);
+                // p = strtol(a, &pEnd, 36);
+                for (i = 0; (a[i] = infile.get()) != ':'; ++i);
+                a[i] = '\0';
+                d = b36strtol(a);
+                for (i = 0; (a[i] = infile.get()) != ':'; ++i);
+                a[i] = '\0';
+                v = b36strtol(a);
+                for (i = 0; (a[i] = infile.get()) != ' '; ++i);
+                a[i] = '\0';
+                t = b36strtol(a);
+                corpus.back()[t].push_back(MultiNote(isCont, curTime, p, d, v));
+                break;
+            case '\n':
+                corpus.push_back(Piece());
+                curMeasureStart = 0; curMeasureLength = 0; curTime = 0;
+                break;
+            default:
+                break;
+        }
+    }
+    if (corpus.back().size() == 0) {
+        corpus.pop_back();
+    }
+    infile.close();
 
     // use list to store shape vocabs because we dont want the address of each shape changes
     list<Shape> shapeDict;
-    vector<Piece> corpus;
-    int beginPos = 0;
-    uint8_t maxTrn = 0;
-    for (int i = 0; i < filesize/sizeof(Note); ++i) {
-        if (((uint64_t*)noteSeq)[i] == 0) {
-            corpus.push_back(Piece(maxTrn+1, vector<MultiNote>()));
-            for (int j = beginPos; j < i; ++j) {
-                corpus.back()[noteSeq[j].trn].push_back(MultiNote(noteSeq[j]));
-            }
-            beginPos = i + 1;
-            maxTrn = 0;
-        }
-        else {
-            // count tracks
-            maxTrn = max(maxTrn, noteSeq[i].trn);
-        }
-    }
-
     // sort and count notes
+    int maxTrackNum = 0;
     size_t multinoteCount = 0;
+    #pragma omp parallel for
     for (unsigned int i = 0; i < corpus.size(); ++i) {
+        if (maxTrackNum < corpus[i].size()) {
+            maxTrackNum = corpus[i].size();
+        }
         for (unsigned int j = 0; j < corpus[i].size(); ++j) {
             multinoteCount += corpus[i][j].size();
             sort(corpus[i][j].begin(), corpus[i][j].end());
         }
     }
-    cout << "Start multinote count: " << multinoteCount << endl;
+    cout << "Start multinote count: " << multinoteCount << " Time: " << (unsigned int) time(0) - begTime << endl;
+    if (multinoteCount == 0) {
+        cout << "Exit for zero notes" << endl;
+        return 1;
+    }
 
-    // init neighbors
-    updateNeighbors(corpus, maxDurationTick);
-    // printTrack(corpus[0][0], 0, 8);
+    map<Shape, unsigned int> shapeOccurCount;
+    map<Shape, unsigned int> shapeOccurCountParallel[8];
 
-    map<Shape, set<ShapeOccurence>> shapeOccurs;
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
         cout << "iter:" << iterCount << ", ";
+        begTime = time(0);
+
+        updateNeighbor(corpus, maxDurationInNth);
+
         // count shape frequency
-        
         // for each piece
-        for (unsigned int i = 0; i < corpus.size(); ++i) {
+        for (int i = 0; i < corpus.size(); ++i) {
             // for each track
-            for (unsigned int j = 0; j < corpus[i].size(); ++j) {
+            #pragma omp parallel for num_threads(8)
+            for (int j = 0; j < corpus[i].size(); ++j) {
                 // for each multinote
-                for (unsigned int k = 0; k < corpus[i][j].size(); ++k) {
+                int thread_num = omp_get_thread_num();
+                // int thread_num = j % 8;
+                Shape s;
+                for (int k = 0; k < corpus[i][j].size(); ++k) {
                     // for each neighbor
-                    for (auto it = corpus[i][j][k].neighbors.cbegin(); it != corpus[i][j][k].neighbors.cend(); it++) {
-                        // if (DEBUG) cout << i << "," << j << "," << k << "->" << k+(*it);
-                        Shape s = getShapeOfMultiNotePair(corpus[i][j][k], corpus[i][j][k+(*it)]);
-                        // if (DEBUG)  cout << " - " << shape2String(s) << endl;
-                        if (shapeOccurs.count(s) == 0) {
-                            shapeOccurs.insert({s, set<ShapeOccurence>()});
+                    for (int n = 1; n < corpus[i][j][k].neighbor; ++n) {
+                        if (corpus[i][j][k].vel != corpus[i][j][k+n].vel) continue;
+                        // if (DEBUG) cout << i << "," << j << ":" << k << "->" << k+n;
+                        s = getShapeOfMultiNotePair(corpus[i][j][k], corpus[i][j][k+n]);
+
+                        if (shapeOccurCountParallel[thread_num].count(s) == 0) {
+                            // if (DEBUG) cout << " " << shape2String(s) << " not in map" << endl;
+                            pair<Shape, unsigned int> sf = pair<Shape, unsigned int>(s, (unsigned int) 1);
+                            // if (DEBUG) cout << "sf" << shape2String(sf.first) << " " << sf.second << endl;
+                            shapeOccurCountParallel[thread_num].insert(sf);
                         }
-                        shapeOccurs[s].insert(ShapeOccurence(i, j, k, k+(*it)));
+                        else {
+                            // cout << " " << shape2String(s) << " in map" << endl;
+                            shapeOccurCountParallel[thread_num][s]++;
+                        }
                     }
                 }
             }
         }
-        cout << "Find " << shapeOccurs.size() << " unique pairs" << ", ";
+
+        cout << "merging occur count" << endl;
+
+        // merge parrallel maps
+        for (int j = 0; j < 8; ++j) {
+            if (j == 0) {
+                for (auto it = shapeOccurCountParallel[j].begin(); it != shapeOccurCountParallel[j].end(); it++) {
+                    shapeOccurCount.insert(*it);
+                }
+            }
+            else {
+                for (auto it = shapeOccurCountParallel[j].begin(); it != shapeOccurCountParallel[j].end(); it++) {
+                    if (shapeOccurCount.count(it->first)) {
+                        shapeOccurCount[it->first] += it->second;
+                    }
+                    else {
+                        shapeOccurCount.insert(*it);
+                    }
+                }
+            }
+            shapeOccurCountParallel[j].clear();
+        }
+        cout << "Find " << shapeOccurCount.size() << " unique pairs" << ", ";
     
         // add shape with highest frequency into shapeDict
         Shape maxFreqShape;
         unsigned int maxFreq = 0;
-        for (auto it = shapeOccurs.cbegin(); it != shapeOccurs.cend(); it++) {
-            if (maxFreq < (*it).second.size()) {
+        for (auto it = shapeOccurCount.cbegin(); it != shapeOccurCount.cend(); it++) {
+            if (maxFreq < (*it).second) {
                 maxFreqShape = (*it).first;
-                maxFreq = (*it).second.size();
+                maxFreq = (*it).second;
             }
             // cout << shape2String((*it).first) << endl;
         }
+
         shapeDict.push_back(maxFreqShape);
-        cout << "Add new shape: " << shape2String(maxFreqShape) << " with freq=" << maxFreq << endl;
+        cout << "Add new shape: " << shape2String(maxFreqShape) << " freq=" << maxFreq << ", ";
 
         // merge MultiNotes with new added shape
-        Shape* pairShapePtr = &(shapeDict.back());
-        for (auto it = shapeOccurs[maxFreqShape].cbegin(); it != shapeOccurs[maxFreqShape].cend(); it++) {
-            unsigned int p = (*it).getPidx();
-            unsigned int t = (*it).getTidx();
-            unsigned int l = (*it).getLidx();
-            unsigned int r = (*it).getRidx();
+        Shape* pPairShape = &(shapeDict.back());
+        // for each piece
+        #pragma omp parallel for
+        for (int i = 0; i < corpus.size(); ++i) {
+            // for each track
+            #pragma omp parallel for
+            for (int j = 0; j < corpus[i].size(); ++j) {
+                // for each multinote
+                // iterate backward to preseve the index relationship for neighbors as much as possible
+                for (int k = corpus[i][j].size()-1; k >= 0; --k) {
+                    // for each neighbor
+                    for (int n = 1; n < corpus[i][j][k].neighbor; ++n) {
+                        if (k + n >= corpus[i][j].size())
+                            continue;
+                        if (corpus[i][j][k].vel != corpus[i][j][k+n].vel)
+                            continue;
+                        if (corpus[i][j][k].pShape->size() + corpus[i][j][k+n].pShape->size() != pPairShape->size())
+                            continue;
+                        Shape s = getShapeOfMultiNotePair(corpus[i][j][k], corpus[i][j][k+n]);
+                        if (s == *pPairShape) {
+                            // if (DEBUG) {
+                            //     cout << "occur: " << i << ',' << j << ':' << k << '-' << k+n << endl;
+                            //     printTrack(corpus[i][j], k, 1);
+                            //     printTrack(corpus[i][j], k+n, 1);
+                            // }
 
-            if (corpus[p][t][l].neighbors.size() == 0) {
-                throw runtime_error("Left multinote does not have neighbor");
-            }
+                            // change left multinote to merged multinote
+                            corpus[i][j][k].unit = (*(corpus[i][j][k].pShape))[0].relDur * corpus[i][j][k].unit / (*pPairShape)[0].relDur;
+                            corpus[i][j][k].pShape = pPairShape;
 
-            if (DEBUG) {
-                cout << "occur: " << p << ',' << t << ':' << l << '-' << r << endl;
-                printTrack(corpus[p][t], l, 1);
-                printTrack(corpus[p][t], r, 1);
-            }
+                            // if (DEBUG) {
+                            //     cout << "NEW: "; printTrack(corpus[i][j], k, 1);
+                            //     cout << "--------\n";
+                            // }
 
-            // change left multinote to merged multinote
-            corpus[p][t][l].unit = (*(corpus[p][t][l].shape))[0].relDur * corpus[p][t][l].unit / (*pairShapePtr)[0].relDur;
-            corpus[p][t][l].shape = pairShapePtr;
-
-            if (DEBUG) {
-                cout << "NEW: "; printTrack(corpus[p][t], l, 1);
-                cout << "--------\n";
-            }
-            // dont need to delete shape in multinote because all those shapes are either pointed to
-            // global variable DEFAULT_SHAPE_* or a shape object in shapeDict
-        }
-        // remove right multinote after all left node are changed into merged multinote
-        // we erase element in reverse order to make sure index was not changed when erasing
-        for (auto it = shapeOccurs[maxFreqShape].rbegin(); it != shapeOccurs[maxFreqShape].rend(); it++) {
-            unsigned int p = (*it).getPidx();
-            unsigned int t = (*it).getTidx();
-            unsigned int r = (*it).getRidx();
-            // https://stackoverflow.com/questions/3487717/erasing-multiple-objects-from-a-stdvector
-            corpus[p][t][r] = corpus[p][t].back();
-            corpus[p][t].pop_back();
-        }
-
-        // sort effected tracks, which could be all, but nah
-        set<uint32_t> sortedPieceTrackId;
-        for (auto it = shapeOccurs[maxFreqShape].begin(); it != shapeOccurs[maxFreqShape].end(); it++) {
-            uint32_t pt = (*it).pieceTrackIdx;
-            if (!sortedPieceTrackId.count(pt)) {
-                unsigned int p = (*it).getPidx();
-                unsigned int t = (*it).getTidx();
-                sortedPieceTrackId.insert(pt);
-                sort(corpus[p][t].begin(), corpus[p][t].end());
+                            // remove right multinote
+                            // it is ok to do it like this since we'll sort it later
+                            corpus[i][j][k+n] = corpus[i][j].back();
+                            corpus[i][j].pop_back();
+                        }
+                    }
+                }
+                sort(corpus[i][j].begin(), corpus[i][j].end());
             }
         }
-
-        shapeOccurs.clear();
-        updateNeighbors(corpus, maxDurationTick);
+        
+        shapeOccurCount.clear();
+        cout << "Corpus updated. ";
+        cout << "Time: " << (unsigned int) time(0) - begTime;
+        cout << endl;
     }
 
     multinoteCount = 0;
+    #pragma omp parallel for reduction(+:multinoteCount)
     for (int i = 0; i < corpus.size(); ++i) {
         for (int j = 0; j < corpus[i].size(); ++j) {
             multinoteCount += corpus[i][j].size();
@@ -525,12 +555,16 @@ int main(int argc, char *argv[]) {
     cout << "Final non-default shape cout: " << shapeDict.size() << endl;
 
     // write vocab file
-    stringstream shapeDictStr;
+    map<string, int> shapeStrs2Index;
+    unsigned int shapeIndex = 0;
     for (auto it = shapeDict.cbegin(); it != shapeDict.cend(); it++) {
-        shapeDictStr << 'S' << shape2String(*it) << endl;
+        stringstream ss;
+        ss << 'S' << shape2String(*it);
+        shapeStrs2Index.insert({ss.str(), shapeIndex});
+        shapeIndex++;
+        vocabOutfile << ss.str() << endl;
     }
-    vocabOutfile << shapeDictStr.str();
-    cout << "Write vocab file done." << endl;
+    cout << "Write vocabs file done." << endl;
 
     // write notes with onset information into text file
     // Format: onset_time_in_tick '@' (S-format multinote | N-format multinote)
@@ -548,7 +582,7 @@ int main(int argc, char *argv[]) {
                     minOnsetTrack = j;
                 }
             }
-            string shapeStr = shape2String(*(corpus[i][minOnsetTrack][curIndex[minOnsetTrack]].shape));
+            string shapeStr = shape2String(*(corpus[i][minOnsetTrack][curIndex[minOnsetTrack]].pShape));
             if (shapeStr == "0,0,1;") {
                 shapeStr = "N";
             }
@@ -556,7 +590,7 @@ int main(int argc, char *argv[]) {
                 shapeStr = "N~";
             }
             else {
-                shapeStr = 'S' + shapeStr;
+                shapeStr = 'S' + ltob36str(shapeStrs2Index[shapeStr]);
             }
             stringstream s;
             s << ltob36str(corpus[i][minOnsetTrack][curIndex[minOnsetTrack]].onset) << '@'
@@ -581,7 +615,7 @@ int main(int argc, char *argv[]) {
         }
         textOutfile << endl;
     }
-    cout << "Write multinote text file done." << endl;
+    cout << "Write multinotes text file done." << endl;
 
     return 0;
 }
