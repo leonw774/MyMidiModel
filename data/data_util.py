@@ -17,7 +17,7 @@ from .tokens import (
 )
 
 
-def do_bpe(piece_iterator, paras: dict, bpe_iter: int, corpus_file_path: str, result_file_path: str) -> str:
+def process_bpe_output(piece_iterator, paras: dict, corpus_file_path: str, result_file_path: str) -> str:
     # Shape format:
     #     'S' (rel_onset ',' rel_pitch ',' rel_duration (is_coutinuing?'~') ';')+ ':' duration_unit ':' velocity ':' track_num
     #

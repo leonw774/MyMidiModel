@@ -70,7 +70,7 @@ if __name__ == '__main__':
             # prepare parameter yaml for bpe program to append to
             with open(bpe_result_file_path, 'w+', encoding='utf8') as bpe_input_file:
                 bpe_input_file.write(make_para_yaml(paras))
-            bpe_shapes_list = do_bpe(piece_iterator, paras, args.bpe, args.input_file_path, bpe_result_file_path)
+            bpe_shapes_list = process_bpe_output(piece_iterator, paras, args.input_file_path, bpe_result_file_path)
             buildvocab_input_file_path = bpe_result_file_path
 
         else:

@@ -3,5 +3,6 @@
 *.stat
 *.mid
 *.npz
+*.zip
 *.json
 !test_midis/*.mid
