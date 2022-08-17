@@ -20,20 +20,21 @@ if __name__ == '__main__':
         default=4096
     )
     parser.add_argument(
-        '--debug',
-        action='store_true'
-    )
-    parser.add_argument(
         '--bpe',
         type=int,
         default=0,
-        help='The number of iteration the BPE algorithm does. Default is 0.\
+        help='The number of iteration the BPE algorithm did. Default is 0.\
             If the number is integer that greater than 0, it implicated that BPE was performed.'
     )
     parser.add_argument(
         '--log',
         dest='log_file_path',
-        default='./logs/defaultlog.log'
+        default='',
+        help='Path to the log file. Default is empty, which means no logging would be performed.'
+    )
+    parser.add_argument(
+        '--debug',
+        action='store_true'
     )
     parser.add_argument(
         'input_file_path',
@@ -45,49 +46,55 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     loglevel = logging.INFO
-    logging.basicConfig(
-        filename=args.log_file_path,
-        filemode='a',
-        level=loglevel
-    )
-    console = logging.StreamHandler()
-    console.setLevel(loglevel)
-    logging.getLogger().addHandler(console)
-    logging.info(strftime('----make_data.py start at %Y%m%d-%H%M---'))
+    if args.log_file_path:
+        logging.basicConfig(
+            filename=args.log_file_path,
+            filemode='a',
+            level=loglevel,
+            format='%(message)s',
+        )
+        console = logging.StreamHandler()
+        console.setLevel(loglevel)
+        logging.getLogger().addHandler(console)
+    else:
+        logging.basicConfig(
+            level=loglevel,
+            format='%(message)s'
+        )
+    logging.info(strftime('----text_to_dataset.py start at %Y%m%d-%H%M---'))
 
 
     with open(args.input_file_path, 'r', encoding='utf8') as infile:
-        paras, piece_iterator = file_to_paras_and_piece_iterator(infile)
+        paras, piece_iterator = file_to_corpus_paras_and_piece_iterator(infile)
         assert len(piece_iterator) > 0, f'empty corpus {args.input_file_path}'
 
         if not os.path.isdir(args.output_dir_path):
             os.makedirs(args.output_dir_path)
 
+        bpe_shapes_list = []
         if args.bpe > 0:
-            logging.info('Use BPE')
-            root_name, ext = os.path.splitext(args.input_file_path)
-            bpe_result_file_path = root_name + '_bpe' + ext
-            # prepare parameter yaml for bpe program to append to
-            with open(bpe_result_file_path, 'w+', encoding='utf8') as bpe_input_file:
-                bpe_input_file.write(make_para_yaml(paras))
-            bpe_shapes_list = process_bpe_output(piece_iterator, paras, args.input_file_path, bpe_result_file_path)
-            buildvocab_input_file_path = bpe_result_file_path
-
+            logging.info('Used BPE')
+            with open(args.input_file_path + f'_bpeiter{args.bpe}_shape_vocab', 'r', encoding='utf8') as vocabs_file:
+                bpe_shapes_list = vocabs_file.read().splitlines()
+            buildvocab_input_file_path = args.input_file_path + f'_bpeiter{args.bpe}_tokenized'
         else:
-            bpe_shapes_list = []
             buildvocab_input_file_path = args.input_file_path
 
     logging.info('Begin build vocabs')
     with open(buildvocab_input_file_path, 'r', encoding='utf8') as infile:
-        paras, piece_iterator = file_to_paras_and_piece_iterator(infile)
+        corpus_paras, piece_iterator = file_to_corpus_paras_and_piece_iterator(infile)
         assert len(piece_iterator) > 0, f'empty corpus: {buildvocab_input_file_path}'
 
-        vocab_dicts, summary_string = build_vocabs(piece_iterator, paras, args.output_dir_path, args.max_sample_length, bpe_shapes_list)
+        vocab_dicts, summary_string = build_vocabs(piece_iterator, corpus_paras, args.max_sample_length, bpe_shapes_list)
+        vocabs_json_path = os.path.join(args.output_dir_path, 'vocabs.json')
+        with open(vocabs_json_path, 'w+', encoding='utf8') as vocabs_file:
+            json.dump(vocab_dicts, vocabs_file)
         logging.info(summary_string)
 
         start_time = time()
         logging.info('Begin write npy')
 
+        # handle existed files/dirs
         npy_dir_path = os.path.join(args.output_dir_path, 'arrays')
         if os.path.exists(npy_dir_path):
             shutil.rmtree(npy_dir_path)

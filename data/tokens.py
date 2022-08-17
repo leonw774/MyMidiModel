@@ -20,49 +20,50 @@ from collections import namedtuple
 
 _COMMON_FIELD_NAMES = ['onset', 'type_priority']
 TYPE_PRIORITY = {
-    'BeginOfScoreToken' : 0,
-    'TrackToken' : 1,
-    'MeasureToken' : 2,
-    'TempoToken' : 3,
-    'PositionToken' : 4,
-    'NoteToken' : 5,
-    'EndOfScoreToken' : 6,
+    'BeginOfScoreToken': 0,
+    'TrackToken': 1,
+    'MeasureToken': 2,
+    'PositionToken': 3,
+    'TempoToken': 4,
+    'NoteToken': 5,
+    'EndOfScoreToken': 6,
 }
 
 BeginOfScoreToken = namedtuple(
     'BeginOfScoreToken',
     _COMMON_FIELD_NAMES,
-    defaults=[-1, 0]
+    defaults=[-1, TYPE_PRIORITY['BeginOfScoreToken']]
 )
 TrackToken = namedtuple(
     'TrackToken',
     _COMMON_FIELD_NAMES+['track_number', 'instrument'],
-    defaults=[-1, 1, -1, -1]
+    defaults=[-1, TYPE_PRIORITY['TrackToken'], -1, -1]
 )
+
 MeasureToken = namedtuple(
     'MeasureToken',
     _COMMON_FIELD_NAMES+['time_signature', 'bpm'],
-    defaults=[-1, 2, -1, -1]
-)
-TempoToken = namedtuple(
-    'TempoToken',
-    _COMMON_FIELD_NAMES+['bpm'],
-    defaults=[-1, 3, -1]
+    defaults=[-1, TYPE_PRIORITY['MeasureToken'], -1, -1]
 )
 PositionToken = namedtuple(
     'PositionToken',
     _COMMON_FIELD_NAMES+['position', 'bpm'],
-    defaults=[-1, 4, -1, -1]
+    defaults=[-1, TYPE_PRIORITY['PositionToken'], -1, -1]
+)
+TempoToken = namedtuple(
+    'TempoToken',
+    _COMMON_FIELD_NAMES+['bpm'],
+    defaults=[-1, TYPE_PRIORITY['TempoToken'], -1]
 )
 NoteToken = namedtuple(
     'NoteToken',
     _COMMON_FIELD_NAMES+['track_number', 'pitch', 'duration', 'velocity'],
-    defaults=[-1, 5, -1, -1, -1, -1]
+    defaults=[-1, TYPE_PRIORITY['NoteToken'], -1, -1, -1, -1]
 )
 EndOfScoreToken = namedtuple(
     'EndOfScoreToken',
     _COMMON_FIELD_NAMES,
-    defaults=[float('inf'), 6]
+    defaults=[float('inf'), TYPE_PRIORITY['EndOfScoreToken'],]
 )
 
 SUPPORTED_TIME_SIGNATURES = {
@@ -108,30 +109,38 @@ class TokenParseError(Exception):
 def token_to_text(token: namedtuple) -> str:
     # typename = token.__class__.__name__
     type_priority = token.type_priority
-    if type_priority == 6: #TYPE_PRIORITY['EndOfScoreToken']:
-        return 'EOS'
-    elif type_priority == 5: #TYPE_PRIORITY['NoteToken']:
+
+    if type_priority == TYPE_PRIORITY['NoteToken']:
         # event:pitch:duration:velocity:track:instrument
         if token.duration > 0:
             return f'N:{tokenint2str(token.pitch)}:{tokenint2str(token.duration)}:{tokenint2str(token.velocity)}:{tokenint2str(token.track_number)}'
         else:
             return f'N~:{tokenint2str(token.pitch)}:{tokenint2str(-token.duration)}:{tokenint2str(token.velocity)}:{tokenint2str(token.track_number)}'
-    elif type_priority == 4: #TYPE_PRIORITY['PositionToken']:
+    
+    elif type_priority == TYPE_PRIORITY['PositionToken']:
         if token.bpm == -1:
             return f'P{tokenint2str(token.position)}'
         else:
             return f'P{tokenint2str(token.position)}+{tokenint2str(token.bpm)}'
-    elif type_priority == 3: #TYPE_PRIORITY['TempoToken']:
-        return f'T{tokenint2str(token.bpm)}'
-    elif type_priority == 2: #TYPE_PRIORITY['MeasureToken']:
+    
+    elif type_priority == TYPE_PRIORITY['MeasureToken']:
         if token.bpm == -1:
             return f'M{tokenint2str(token.time_signature[0])}/{tokenint2str(token.time_signature[1])}'
         else:
             return f'M{tokenint2str(token.time_signature[0])}/{tokenint2str(token.time_signature[1])}+{tokenint2str(token.bpm)}'
-    elif type_priority == 1: #TYPE_PRIORITY['TrackToken']:
+    
+    elif type_priority == TYPE_PRIORITY['TempoToken']:
+        return f'T{tokenint2str(token.bpm)}'
+
+    elif type_priority == TYPE_PRIORITY['TrackToken']:
         # type-track:instrument
         return f'R{tokenint2str(token.track_number)}:{tokenint2str(token.instrument)}'
+    
     elif type_priority == TYPE_PRIORITY['BeginOfScoreToken']:
         return 'BOS'
+
+    elif type_priority == TYPE_PRIORITY['EndOfScoreToken']:
+        return 'EOS'
+    
     else:
         raise TokenParseError(f'bad token namedtuple: {token}')

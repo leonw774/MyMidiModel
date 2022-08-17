@@ -1,7 +1,6 @@
 import json
 import os
 import random
-import subprocess
 from time import time
 from tqdm import tqdm
 
@@ -16,102 +15,6 @@ from .tokens import (
     SUPPORTED_TIME_SIGNATURES,
 )
 
-
-def process_bpe_output(piece_iterator, paras: dict, corpus_file_path: str, result_file_path: str) -> str:
-    # Shape format:
-    #     'S' (rel_onset ',' rel_pitch ',' rel_duration (is_coutinuing?'~') ';')+ ':' duration_unit ':' velocity ':' track_num
-    #
-    # When shape contain only one note, it must be:
-    #     "S0,0,1;:" base_pitch ':' duration_unit ':' velocity ':' track_num
-    # If the note is "continuing", i.e. not ending, due to duration limit,
-    # we express it with negtive rel_dur "S0,0,1~;"
-    #     "S0,0,1~;:" base_pitch ':' duration_unit ':' velocity ':' track_num
-    # These two basic shape can be simplified into Note format:
-    #     'N' ':' pitch ':' duration ':' velocity ':' track_num
-    # and 'N~' ':' pitch ':' duration ':' velocity ':' track_num
-    # with the substitution of "S0,0,1" to "N" and "S0,0,-1" to "N~"
-
-    nth = paras['nth']
-    shape_vocabs_file_path = corpus_file_path+'_vocabs'
-    multinotes_file_path = corpus_file_path+'_multinotes'
-
-    bpe_program_path = './bpe/bpe'
-
-    # check bpe shape vocab file
-    if not os.path.isfile(shape_vocabs_file_path):
-        raise FileNotFoundError(f'Cannot find vocabs output file: {shape_vocabs_file_path}')
-
-    # get shape_tokens
-    with open(shape_vocabs_file_path, 'r', encoding='utf8') as vocabs_file:
-        bpe_shapes_list = vocabs_file.read().splitlines()
-
-    # check bpe encoded multinote text file
-    if not os.path.isfile(multinotes_file_path):
-        raise FileNotFoundError(f'Cannot find multinotes output file: {multinotes_file_path}')
-
-    # rebuild text midi now with shapes
-    print('Rebuild text corpus now with shape vocabs')
-    token_number_list = []
-    with open(result_file_path, 'a', encoding='utf8') as bpe_result_file:
-        with open(multinotes_file_path, 'r', encoding='utf8') as mn_file:
-            for piece in tqdm(piece_iterator, total=len(piece_iterator)):
-                mnline = next(mn_file)
-                mn_list = mnline.split()
-                piece_time_struct_list = [t for t in piece.split(' ') if t[0] != 'N']
-                token_number_list.append(len(mn_list) + len(piece_time_struct_list))
-
-                result_str = ""
-                piece_cursor = 0
-                piece_cur_onset = 0
-                piece_cur_measure_onset = 0
-                piece_cur_measure_length = 0
-                added_last_type = 'B'
-                mn_cursor = 0
-                mn_cur_onset = int(mn_list[0].split('@')[0], TOKEN_INT2STR_BASE)
-                while (piece_cursor < len(piece_time_struct_list)) or (mn_cursor < len(mn_list)):
-                    if piece_cur_onset <= mn_cur_onset:
-                        if not (added_last_type == 'P' and piece_time_struct_list[piece_cursor][0] == 'P'):
-                            result_str += piece_time_struct_list[piece_cursor] + ' '
-                        else:
-                            token_number_list[-1] -= 1
-                        added_last_type = piece_time_struct_list[piece_cursor][0]
-                        piece_cursor += 1
-                        if piece_cursor >= len(piece_time_struct_list):
-                            continue
-                        # update
-                        text = piece_time_struct_list[piece_cursor]
-                        if text[0] == 'M':
-                            piece_cur_measure_onset += piece_cur_measure_length
-                            piece_cur_onset = piece_cur_measure_onset
-                            n, d = (int(x, TOKEN_INT2STR_BASE) for x in text[1:].split('/'))
-                            piece_cur_measure_length = n * nth // d
-                        elif text[0] == 'P':
-                            piece_cur_onset = piece_cur_measure_onset + int(text[1:], TOKEN_INT2STR_BASE)
-                        elif text[0] == 'E':
-                            piece_cur_onset += piece_cur_measure_length
-                    else:
-                        mn_text = mn_list[mn_cursor].split('@')[1]
-                        if mn_text[0] == 'S':
-                            shape_text = bpe_shapes_list[int(mn_text[1:mn_text.find(':')], TOKEN_INT2STR_BASE)]
-                            mn_text = shape_text + mn_text[mn_text.find(':'):]
-                        result_str += mn_text + ' '
-                        added_last_type = 'N'
-                        mn_cursor += 1
-                        if mn_cursor >= len(mn_list):
-                            mn_cur_onset = float('inf')
-                        else:
-                            mn_cur_onset = int(mn_list[mn_cursor].split('@')[0], TOKEN_INT2STR_BASE)
-
-                bpe_result_file.write(result_str[:-1]+'\n') # replace the last space with newline
-
-    print('End rebuild')
-    print('Avg token per piece:', sum(token_number_list) / len(token_number_list))
-    # os.remove(os.path.join('bpe', shape_vocabs_file_path))
-    # os.remove(os.path.join('bpe', multinotes_file_path))
-    # print(bpe_shapes_list)
-    return bpe_shapes_list
-
-
 def make_token_dict(token_list: list) -> dict:
     token_dict = {
         'size': len(token_list),
@@ -124,14 +27,22 @@ def make_token_dict(token_list: list) -> dict:
 def build_vocabs(
         piece_iterator,
         paras: dict,
-        output_dir_path: str,
         max_sample_length: str,
-        bpe_shapes_list:list):
+        bpe_shapes_list: list):
+    """
+        Event tokens include:
+        - shape
+        - positions in measure
+        - measure and time_signature
+        - tempo change, 
+        - track and instrument
+        - begin-of-score and end-of-score
+        Parameters:
+        - measure number size: max amount of measures that a max_sample_length can fit in
+        - bpe_shapes_list: The multinote shape are learned by bpe algorithms. If bpe is not performed, `bpe_shapes_list` should be zero
+    """
+
     start_time = time()
-    # Event tokens include:
-    #   note (single note), shape (multiple notes), positions in measure, measure/time_signature, tempo change, 
-    #   track info, begin-of-score and end-of-score
-    # measure number size = max amount of measures that a max_sample_length can fit in
 
     # shape vacob
     shape_tokens = ['N', 'N~'] + bpe_shapes_list
@@ -155,17 +66,11 @@ def build_vocabs(
             for position_token in position_tokens
             for tempo_attribute in tempo_attribute_tokens
         ]
-    elif paras['tempo_method'] == 'measure_attribute':
-        measure_tokens = [
-            measure_token+'+'+tempo_attribute
-            for measure_token in measure_tokens
-            for tempo_attribute in tempo_attribute_tokens
-        ]
 
     # place special token in front so that they have same index across all vocabulary
     event_tokens = SPECIAL_TOKENS + ['BOS', 'EOS'] + shape_tokens + track_tokens + measure_tokens + position_tokens
 
-    if paras['tempo_method'].endswith('event'):
+    if paras['tempo_method'] == 'position_event':
         tempo_event_tokens = ['T'+tokenint2str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)]
         event_tokens += tempo_event_tokens
 
@@ -177,6 +82,7 @@ def build_vocabs(
     instrument_tokens = SPECIAL_TOKENS + list(map(tokenint2str, range(129)))
     tempo_attribute_tokens = SPECIAL_TOKENS + tempo_attribute_tokens
 
+    token_count_per_piece = []
     # max measure number in all pieces
     max_measure_length = 0
     # the most number of measures span that can fit in the size of max_sample_length
@@ -185,6 +91,7 @@ def build_vocabs(
     corpus_position_tokens = set()
     for i, piece in enumerate(piece_iterator):
         text_list = piece.split(' ')
+        token_count_per_piece.append(len(text_list))
         measure_indices = [i for i, t in enumerate(text_list) if t[0] == 'M']
         max_measure_length = max(max_measure_length, len(measure_indices))
         cur_fitting_measure_number = 0
@@ -205,7 +112,8 @@ def build_vocabs(
     corpus_position_tokens = list(corpus_position_tokens)
 
     summary_string = (
-        f'Event tokens size: {len(event_tokens)}\n'
+        f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'
+        + f'Event tokens size: {len(event_tokens)}\n'
         + f'Measure tokens size: {len(measure_tokens)}\n'
         + f'- Corpus measure size: {len(corpus_measure_tokens)} ({corpus_measure_tokens})\n'
         + f'Position token size: {len(position_tokens)}\n'
@@ -237,14 +145,10 @@ def build_vocabs(
         'tempos': make_token_dict(tempo_attribute_tokens),
     }
 
-    vocabs_json_path = os.path.join(output_dir_path, 'vocabs.json')
-    with open(vocabs_json_path, 'w+', encoding='utf8') as vocabs_file:
-        json.dump(vocab_dicts, vocabs_file)
-
     return vocab_dicts, summary_string
 
 
-def text_list_to_numpy(text_list: str, vocabs: dict) -> np.ndarray:
+def text_list_to_numpy(text_list: list, vocabs: dict) -> np.ndarray:
     """
         Serialize pieces into of numpy arrays.
         Each token is processed into an 9-dimension vector:
@@ -310,6 +214,8 @@ def text_list_to_numpy(text_list: str, vocabs: dict) -> np.ndarray:
                 event_text2id[text], p_pad_id, d_pad_id, v_pad_id, r_pad_id,
                 i_pad_id, cur_tempo_id, cur_position, cur_measure_number
             ]
+            # because tempo come after position, the first position of tempo change will use previous tempo's id 
+            x[i-1][6] = cur_tempo_id
 
         elif typename == 'P':
             if '+' in text:

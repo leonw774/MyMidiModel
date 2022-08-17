@@ -1,8 +1,10 @@
 .mscbackup
-*.txt*
+corpus
+*.txt
 *.stat
 *.mid
 *.npz
+*.npy
 *.zip
 *.json
 !test_midis/*.mid

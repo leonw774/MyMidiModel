@@ -7,7 +7,7 @@ import zlib
 from argparse import ArgumentParser
 from collections import Counter
 from multiprocessing import Pool
-from time import time, localtime, strftime
+from time import time, strftime
 
 from tqdm import tqdm
 
@@ -18,17 +18,26 @@ def loop_func(
         midi_file_path_list,
         out_file,
         args_dict: dict):
+
+    midi_file_path_list_file = open(args.output_path+'_midi_file_paths_list', 'w+', encoding='utf8')
+
     token_number_list = []
+    bad_count = 0
     for n, file_path in tqdm(enumerate(midi_file_path_list), total=len(midi_file_path_list)):
         logging.debug('%d %s', n, file_path)
         try:
             text_list = midi_to_text_list(file_path, **args_dict)
-        except:
+        except KeyboardInterrupt as e:
+            raise e
+        except Exception as e:
             logging.debug(traceback.format_exc())
             text_list = []
         if len(text_list) > 0:
-            token_number_list.append(len(text_list))
             out_file.write(' '.join(text_list) + '\n')
+            token_number_list.append(len(text_list))
+            midi_file_path_list_file.write(midi_file_path_list[n]+'\n')
+        else:
+            bad_count += 1
     return token_number_list
 
 def mp_worker(args_dict: dict):
@@ -39,6 +48,8 @@ def mp_worker(args_dict: dict):
         # return compressed text because memory usage issue
         piece = ' '.join(text_list)
         return zlib.compress(piece.encode())
+    except KeyboardInterrupt as e:
+        raise e
     except:
         logging.debug('%d %s', n, traceback.format_exc())
         return b''
@@ -50,13 +61,15 @@ def mp_handler(
         mp_work_number: int,
         args_dict: dict):
 
+    midi_file_path_list_file = open(args.output_path+'_midi_file_paths_list', 'w+', encoding='utf8')
+
     args_dict_list = list()
     for n, midi_file_path in enumerate(midi_file_path_list):
         a = args_dict.copy() # shallow copy of args_dict
         a['midi_file_path'] = midi_file_path
         a['n'] = n
         args_dict_list.append(a)
-    logging.info('Start process with %d workers', mp_work_number)
+    logging.info('start process with %d workers', mp_work_number)
 
     bad_count = 0
     token_number_list = []
@@ -66,14 +79,17 @@ def mp_handler(
             total=len(args_dict_list)
         ))
     logging.info('mp end. object size: %d bytes', sum(sys.getsizeof(cp) for cp in compressed_piece_list))
-    for i, compressed_piece in enumerate(compressed_piece_list):
+    for n, compressed_piece in enumerate(compressed_piece_list):
         if len(compressed_piece) > 0:
             piece = zlib.decompress(compressed_piece).decode()
             outfile.write(piece+'\n')
             token_number_list.append(piece.count(' ')+1) # token number = space number + 1
+            midi_file_path_list_file.write(midi_file_path_list[n]+'\n')
         else:
             bad_count += 1
-    logging.info('Bad file: %d', bad_count)
+    logging.info('bad file count: %d', bad_count)
+
+    midi_file_path_list_file.close()
     return token_number_list
 
 
@@ -99,7 +115,7 @@ if __name__ == '__main__':
         '--max-duration',
         dest='max_duration',
         type=int,
-        default=8,
+        default=4,
         help='Max length of duration in unit of quarter note (beat). Default is 4.'
     )
     parser.add_argument(
@@ -114,9 +130,9 @@ if __name__ == '__main__':
         nargs=3,
         dest='tempo_quantization',
         type=int,
-        default=(120-16*6, 120+16*5, 4), # 24, 200, 16
+        default=[120-6*16, 120+5*16, 16], # 24, 200, 16
         metavar=('TEMPO_MIN', 'TEMPO_MAX', 'TEMPO_STEP'),
-        help='Three integers: (min, max, step), where min and max are INCLUSIVE. Default is 24, 200, 16'
+        help='Three integers: (min, max, step), where min and max are INCLUSIVE. Default is 24, 200, 16.'
     )
     parser.add_argument(
         '--tempo-method',
@@ -124,11 +140,11 @@ if __name__ == '__main__':
         type=str,
         choices=['measure_attribute', 'position_attribute', 'measure_event', 'position_event'],
         default='position_event',
-        help='Could be one of four options:\
-            \'measure_attribute\', \'position_attribute\', \'measure_event\' and \'position_event\'. \
-            \'attribute\' means tempo info is part of the measure or position event token \
+        help='Could be \'position_attribute\' or \'position_event\'. \
+            \'attribute\' means tempo info is part of the position token, while \
             \'event\' means tempo will be its own token, and it will be in the sequence where there tempo change occurs. \
-            The token will be placed after the measure token and before position token'
+            The token will be placed after the position token and before the note tokens in the same position. \
+            Default is \'position_event\''
     )
     parser.add_argument(
         '--not-merge-drums',
@@ -141,11 +157,6 @@ if __name__ == '__main__':
         dest='use_merge_sparse'
     )
     parser.add_argument(
-        '--debug',
-        action='store_true',
-        dest='debug'
-    )
-    parser.add_argument(
         '--verbose',
         action='store_true',
         dest='verbose'
@@ -153,7 +164,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '--log',
         dest='log_file_path',
-        default='./logs/defaultlog.log'
+        default='',
+        help='Path to the log file. Default is empty, which means no logging would be performed.'
     )
     parser.add_argument(
         '-r', '--recursive',
@@ -198,22 +210,29 @@ if __name__ == '__main__':
         for k, v in args_vars.items()
         if k not in ['input_path', 'output_path', 'make_stats', 'log_file_path', 'mp_work_number', 'recursive', 'verbose'] and v is not None
     }
-    paras_dict = {
+    corpus_paras_dict = {
         k: v
         for k, v in args_dict.items()
-        if k not in ['debug', 'verbose', 'use_merge_drums', 'use_merge_sparse']
+        if k != 'verbose'
     }
 
     # when not verbose, only info level or higher will be printed to stderr and logged into file
     loglevel = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(
-        filename=args.log_file_path,
-        filemode='a',
-        level=loglevel
-    )
-    console = logging.StreamHandler()
-    console.setLevel(loglevel)
-    logging.getLogger().addHandler(console)
+    if args.log_file_path:
+        logging.basicConfig(
+            filename=args.log_file_path,
+            filemode='a',
+            level=loglevel,
+            format='%(message)s',
+        )
+        console = logging.StreamHandler()
+        console.setLevel(loglevel)
+        logging.getLogger().addHandler(console)
+    else:
+        logging.basicConfig(
+            level=loglevel,
+            format='%(message)s'
+        )
     logging.info(strftime('----midi_to_text.py start at %Y%m%d-%H%M----'))
 
     args_str = '\n'.join([
@@ -226,31 +245,34 @@ if __name__ == '__main__':
     for inpath in args.input_path:
         if args.recursive:
             if not os.path.isdir(inpath):
-                print(f'Path {inpath} is not a directory or doesn\'t exist.')
+                print(f'input path {inpath} is not a directory or doesn\'t exist.')
             file_path_list = glob.glob(inpath+'/**/*.mid', recursive=True)
         else:
             if not os.path.isfile(inpath):
-                print(f'Path {inpath} is not a file or doesn\'t exist.')
+                print(f'input path {inpath} is not a file or doesn\'t exist.')
             file_path_list.append(inpath)
 
     if len(file_path_list) == 0:
-        logging.info('No file to process')
+        logging.info('no file to process')
         exit(1)
     else:
-        logging.info('Find %d files', len(file_path_list))
+        logging.info('find %d files', len(file_path_list))
     file_path_list.sort()
 
     with open(args.output_path, 'w+', encoding='utf8') as out_file:
-        out_file.write(make_para_yaml(paras_dict))
+        out_file.write(make_corpus_paras_yaml(corpus_paras_dict))
         if args.mp_work_number <= 1:
             token_number_list = loop_func(file_path_list, out_file, args_dict)
         else:
             token_number_list = mp_handler(file_path_list, out_file, args.mp_work_number, args_dict)
 
-    logging.info('Processed %d files', len(token_number_list))
+    logging.info('processed %d files', len(token_number_list))
     if len(token_number_list) > 0:
-        logging.info('Average tokens: %.3f per file', sum(token_number_list)/len(token_number_list))
-    logging.info('Process time: %.3f', time()-start_time)
+        logging.info('average tokens: %.3f per file', sum(token_number_list)/len(token_number_list))
+    else:
+        logging.info('no file is processed')
+        exit(1)
+    logging.info('process time: %.3f', time()-start_time)
 
     if args.make_stats:
         start_time = time()
@@ -265,7 +287,7 @@ if __name__ == '__main__':
             'token_number_per_piece': token_number_list
         }
         with open(args.output_path, 'r', encoding='utf8') as outfile:
-            paras, piece_iterator = file_to_paras_and_piece_iterator(outfile)
+            paras, piece_iterator = file_to_corpus_paras_and_piece_iterator(outfile)
             for piece in piece_iterator:
                 text_stats['track_number_distribution'][piece.count(' R')] += 1
                 head_end = piece.find(' M') # find first occurence of measure token
@@ -292,6 +314,6 @@ if __name__ == '__main__':
 
         with open(args.output_path+'_stat.json', 'w+', encoding='utf8') as statfile:
             statfile.write(json.dumps(text_stats))
-        logging.info('Write stats file to %s', args.output_path+'_stat.json')
-        logging.info('Stat time: %.3f', time()-start_time)
+        logging.info('wrote stats file to %s', args.output_path+'_stat.json')
+        logging.info('stat time: %.3f', time()-start_time)
     logging.info('midi_to_text.py exited')
