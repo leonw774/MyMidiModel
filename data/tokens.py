@@ -42,23 +42,23 @@ TrackToken = namedtuple(
 
 MeasureToken = namedtuple(
     'MeasureToken',
-    _COMMON_FIELD_NAMES+['time_signature', 'bpm'],
-    defaults=[-1, TYPE_PRIORITY['MeasureToken'], -1, -1]
+    _COMMON_FIELD_NAMES+['time_signature'],
+    defaults=[-1, TYPE_PRIORITY['MeasureToken'], -1]
 )
 PositionToken = namedtuple(
     'PositionToken',
-    _COMMON_FIELD_NAMES+['position', 'bpm'],
-    defaults=[-1, TYPE_PRIORITY['PositionToken'], -1, -1]
+    _COMMON_FIELD_NAMES+['position'],
+    defaults=[-1, TYPE_PRIORITY['PositionToken'], -1]
 )
 TempoToken = namedtuple(
     'TempoToken',
-    _COMMON_FIELD_NAMES+['bpm'],
-    defaults=[-1, TYPE_PRIORITY['TempoToken'], -1]
+    _COMMON_FIELD_NAMES+['bpm', 'position'],
+    defaults=[-1, TYPE_PRIORITY['TempoToken'], -1, -1]
 )
 NoteToken = namedtuple(
     'NoteToken',
-    _COMMON_FIELD_NAMES+['track_number', 'pitch', 'duration', 'velocity'],
-    defaults=[-1, TYPE_PRIORITY['NoteToken'], -1, -1, -1, -1]
+    _COMMON_FIELD_NAMES+['track_number', 'pitch', 'duration', 'velocity', 'position'],
+    defaults=[-1, TYPE_PRIORITY['NoteToken'], -1, -1, -1, -1, -1]
 )
 EndOfScoreToken = namedtuple(
     'EndOfScoreToken',
@@ -72,6 +72,7 @@ SUPPORTED_TIME_SIGNATURES = {
     for numerator in range(1, denominator*3+1)
 }
 
+
 def get_largest_possible_position(nth: int) -> int:
     return max(
         s[0] * (nth // s[1])
@@ -81,10 +82,11 @@ def get_largest_possible_position(nth: int) -> int:
 def is_supported_time_signature(numerator, denominator):
     return (numerator, denominator) in SUPPORTED_TIME_SIGNATURES
 
+
 # python support up to base=36 in int function
 TOKEN_INT2STR_BASE = 36
 
-def tokenint2str(x: int) -> str:
+def tokint2str(x: int) -> str:
     if 0 <= x < TOKEN_INT2STR_BASE:
         return '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[x]
     isneg = x < 0
@@ -96,11 +98,13 @@ def tokenint2str(x: int) -> str:
         b = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[d] + b
     return ('-' + b) if isneg else b
 
-def tokenstr2int(x: str):
+def tokstr2int(x: str):
     return int(x, TOKEN_INT2STR_BASE)
+
 
 SPECIAL_TOKENS = ['[PAD]', '[MASK]', '[UNK]']
 # SPECIAL_TOKENS = ['[PAD]', '[MASK]', '[UNK]', '[SEP]', '[START]', '[END]']
+
 
 class TokenParseError(Exception):
     pass
@@ -111,36 +115,35 @@ def token_to_text(token: namedtuple) -> str:
     type_priority = token.type_priority
 
     if type_priority == TYPE_PRIORITY['NoteToken']:
-        # event:pitch:duration:velocity:track:instrument
-        if token.duration > 0:
-            return f'N:{tokenint2str(token.pitch)}:{tokenint2str(token.duration)}:{tokenint2str(token.velocity)}:{tokenint2str(token.track_number)}'
-        else:
-            return f'N~:{tokenint2str(token.pitch)}:{tokenint2str(-token.duration)}:{tokenint2str(token.velocity)}:{tokenint2str(token.track_number)}'
-    
+        # event:pitch:duration:velocity:track:instrument(:position)
+        text = 'N' if token.duration > 0 else 'N~'
+        text += ( f':{tokint2str(token.pitch)}'
+                + f':{tokint2str(token.duration)}'
+                + f':{tokint2str(token.velocity)}'
+                + f':{tokint2str(token.track_number)}')
+        if token.position != -1:
+            text += f':{tokint2str(token.position)}'
+        return text
+
     elif type_priority == TYPE_PRIORITY['PositionToken']:
-        if token.bpm == -1:
-            return f'P{tokenint2str(token.position)}'
-        else:
-            return f'P{tokenint2str(token.position)}+{tokenint2str(token.bpm)}'
-    
+        return f'P{tokint2str(token.position)}'
+
     elif type_priority == TYPE_PRIORITY['MeasureToken']:
-        if token.bpm == -1:
-            return f'M{tokenint2str(token.time_signature[0])}/{tokenint2str(token.time_signature[1])}'
-        else:
-            return f'M{tokenint2str(token.time_signature[0])}/{tokenint2str(token.time_signature[1])}+{tokenint2str(token.bpm)}'
-    
+        return f'M{tokint2str(token.time_signature[0])}/{tokint2str(token.time_signature[1])}'
+
+
     elif type_priority == TYPE_PRIORITY['TempoToken']:
-        return f'T{tokenint2str(token.bpm)}'
+        return f'T{tokint2str(token.bpm)}' if token.position == -1 else f'T{tokint2str(token.bpm)}:{tokint2str(token.position)}'
 
     elif type_priority == TYPE_PRIORITY['TrackToken']:
         # type-track:instrument
-        return f'R{tokenint2str(token.track_number)}:{tokenint2str(token.instrument)}'
-    
+        return f'R{tokint2str(token.track_number)}:{tokint2str(token.instrument)}'
+
     elif type_priority == TYPE_PRIORITY['BeginOfScoreToken']:
         return 'BOS'
 
     elif type_priority == TYPE_PRIORITY['EndOfScoreToken']:
         return 'EOS'
-    
+
     else:
         raise TokenParseError(f'bad token namedtuple: {token}')

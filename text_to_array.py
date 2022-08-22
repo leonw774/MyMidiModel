@@ -10,8 +10,7 @@ import numpy as np
 from data import *
 
 
-if __name__ == '__main__':
-
+def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
         '--max-sample-length',
@@ -42,8 +41,11 @@ if __name__ == '__main__':
     parser.add_argument(
         'output_dir_path',
     )
+    return parser.parse_args()
 
-    args = parser.parse_args()
+
+def main():
+    args = parse_args()
 
     loglevel = logging.INFO
     if args.log_file_path:
@@ -63,9 +65,8 @@ if __name__ == '__main__':
         )
     logging.info(strftime('----text_to_dataset.py start at %Y%m%d-%H%M---'))
 
-
     with open(args.input_file_path, 'r', encoding='utf8') as infile:
-        paras, piece_iterator = file_to_corpus_paras_and_piece_iterator(infile)
+        corpus_paras, piece_iterator = file_to_corpus_paras_and_piece_iterator(infile)
         assert len(piece_iterator) > 0, f'empty corpus {args.input_file_path}'
 
         if not os.path.isdir(args.output_dir_path):
@@ -82,7 +83,7 @@ if __name__ == '__main__':
 
     logging.info('Begin build vocabs')
     with open(buildvocab_input_file_path, 'r', encoding='utf8') as infile:
-        corpus_paras, piece_iterator = file_to_corpus_paras_and_piece_iterator(infile)
+        corpus_paras, piece_iterator = get_corpus_paras(infile)
         assert len(piece_iterator) > 0, f'empty corpus: {buildvocab_input_file_path}'
 
         vocab_dicts, summary_string = build_vocabs(piece_iterator, corpus_paras, args.max_sample_length, bpe_shapes_list)
@@ -145,3 +146,6 @@ if __name__ == '__main__':
 
     logging.info('npys write time: %.3f', time()-start_time)
     logging.info('make_data.py exited')
+
+if __name__ == '__main__':
+    main()

@@ -1,8 +1,8 @@
 import glob
 import logging
 import os
+import shutil
 import sys
-import traceback
 import zlib
 from argparse import ArgumentParser
 from collections import Counter
@@ -14,86 +14,7 @@ from tqdm import tqdm
 from data import *
 
 
-def loop_func(
-        midi_file_path_list,
-        out_file,
-        args_dict: dict):
-
-    midi_file_path_list_file = open(args.output_path+'_midi_file_paths_list', 'w+', encoding='utf8')
-
-    token_number_list = []
-    bad_count = 0
-    for n, file_path in tqdm(enumerate(midi_file_path_list), total=len(midi_file_path_list)):
-        logging.debug('%d %s', n, file_path)
-        try:
-            text_list = midi_to_text_list(file_path, **args_dict)
-        except KeyboardInterrupt as e:
-            raise e
-        except Exception as e:
-            logging.debug(traceback.format_exc())
-            text_list = []
-        if len(text_list) > 0:
-            out_file.write(' '.join(text_list) + '\n')
-            token_number_list.append(len(text_list))
-            midi_file_path_list_file.write(midi_file_path_list[n]+'\n')
-        else:
-            bad_count += 1
-    return token_number_list
-
-def mp_worker(args_dict: dict):
-    n = args_dict.pop('n', 0)
-    logging.debug('%d pid: %d file path: %s', n, os.getpid(), args_dict['midi_file_path'])
-    try:
-        text_list = midi_to_text_list(**args_dict)
-        # return compressed text because memory usage issue
-        piece = ' '.join(text_list)
-        return zlib.compress(piece.encode())
-    except KeyboardInterrupt as e:
-        raise e
-    except:
-        logging.debug('%d %s', n, traceback.format_exc())
-        return b''
-
-
-def mp_handler(
-        midi_file_path_list: set,
-        outfile,
-        mp_work_number: int,
-        args_dict: dict):
-
-    midi_file_path_list_file = open(args.output_path+'_midi_file_paths_list', 'w+', encoding='utf8')
-
-    args_dict_list = list()
-    for n, midi_file_path in enumerate(midi_file_path_list):
-        a = args_dict.copy() # shallow copy of args_dict
-        a['midi_file_path'] = midi_file_path
-        a['n'] = n
-        args_dict_list.append(a)
-    logging.info('start process with %d workers', mp_work_number)
-
-    bad_count = 0
-    token_number_list = []
-    with Pool(mp_work_number) as p:
-        compressed_piece_list = list(tqdm(
-            p.imap(mp_worker, args_dict_list),
-            total=len(args_dict_list)
-        ))
-    logging.info('mp end. object size: %d bytes', sum(sys.getsizeof(cp) for cp in compressed_piece_list))
-    for n, compressed_piece in enumerate(compressed_piece_list):
-        if len(compressed_piece) > 0:
-            piece = zlib.decompress(compressed_piece).decode()
-            outfile.write(piece+'\n')
-            token_number_list.append(piece.count(' ')+1) # token number = space number + 1
-            midi_file_path_list_file.write(midi_file_path_list[n]+'\n')
-        else:
-            bad_count += 1
-    logging.info('bad file count: %d', bad_count)
-
-    midi_file_path_list_file.close()
-    return token_number_list
-
-
-if __name__ == '__main__':
+def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
         '--nth',
@@ -135,26 +56,19 @@ if __name__ == '__main__':
         help='Three integers: (min, max, step), where min and max are INCLUSIVE. Default is 24, 200, 16.'
     )
     parser.add_argument(
-        '--tempo-method',
-        dest='tempo_method',
+        '--position-method',
+        dest='position_method',
         type=str,
-        choices=['measure_attribute', 'position_attribute', 'measure_event', 'position_event'],
-        default='position_event',
-        help='Could be \'position_attribute\' or \'position_event\'. \
-            \'attribute\' means tempo info is part of the position token, while \
-            \'event\' means tempo will be its own token, and it will be in the sequence where there tempo change occurs. \
-            The token will be placed after the position token and before the note tokens in the same position. \
-            Default is \'position_event\''
+        choices=['event', 'attribute'],
+        default='attribute',
+        help="Could be 'event' or 'attribute'. \
+            'attribute' means position info is part of the note token. \
+            'event' means position info will be its own event token."
     )
     parser.add_argument(
         '--not-merge-drums',
         action='store_false',
         dest='use_merge_drums'
-    )
-    parser.add_argument(
-        '--not-merge-sparse',
-        action='store_false',
-        dest='use_merge_sparse'
     )
     parser.add_argument(
         '--verbose',
@@ -193,30 +107,104 @@ if __name__ == '__main__':
         '-o', '--output-path',
         dest='output_path',
         type=str,
-        default=os.path.join(os.getcwd(), 'output.txt'),
-        help='The path of the output file of the inputs files/directories. \
-            All output texts will be written into this file, seperated by breaklines. Default is "output.txt".'
+        default=os.getcwd(),
+        help='The path of the directory for the output files. Default is current work directory.'
     )
     parser.add_argument(
         'input_path',
         nargs='+', # store as list and at least one
-        help='The path(s) of input files/dictionaries'
+        help='The path(s) of input files/directodries'
     )
+    return parser.parse_args()
 
-    args = parser.parse_args()
+
+def handler(args_dict: dict) -> bytes:
+    n = args_dict.pop('n', 0)
+    no_compress = args_dict.pop('no_compress', False)
+    logging.debug('%d pid: %d file path: %s', n, os.getpid(), args_dict['midi_file_path'])
+    try:
+        text_list = midi_to_text_list(**args_dict)
+        piece = ' '.join(text_list)
+        # return compressed text if using multiprocess. because memory usage issue
+        return piece if no_compress else zlib.compress(piece.encode())
+    except KeyboardInterrupt as e:
+        raise e
+    except AssertionError:
+        return b''
+
+
+def loop_func(
+        midi_file_path_list,
+        out_file,
+        args_dict: dict):
+
+    token_number_list = []
+    good_midi_file_path_list = []
+    bad_count = 0
+    for n, midi_file_path in tqdm(enumerate(midi_file_path_list), total=len(midi_file_path_list)):
+        n_args_dict = dict(args_dict)
+        n_args_dict['midi_file_path'] = midi_file_path
+        n_args_dict['n'] = n
+        text_piece = handler(n_args_dict)
+        if len(text_piece) > 0:
+            out_file.write(text_piece + '\n')
+            token_number_list.append(text_piece.count(' ')+1)
+            good_midi_file_path_list.append(midi_file_path)
+        else:
+            bad_count += 1
+    return token_number_list, good_midi_file_path_list
+
+
+def mp_func(
+        midi_file_path_list: set,
+        out_file,
+        mp_work_number: int,
+        args_dict: dict):
+
+    args_dict_list = list()
+    for n, midi_file_path in enumerate(midi_file_path_list):
+        a = args_dict.copy() # shallow copy of args_dict
+        a['midi_file_path'] = midi_file_path
+        a['n'] = n
+        args_dict_list.append(a)
+    logging.info('Start pool with %d workers', mp_work_number)
+
+    bad_count = 0
+    token_number_list = []
+    good_midi_file_path_list = []
+    with Pool(mp_work_number) as p:
+        compressed_piece_list = list(tqdm(
+            p.imap(handler, args_dict_list),
+            total=len(args_dict_list)
+        ))
+    logging.info('Multi-processing end. Object size: %d bytes', sum(sys.getsizeof(cp) for cp in compressed_piece_list))
+    for i, compressed_piece in enumerate(compressed_piece_list):
+        if len(compressed_piece) > 0:
+            piece = zlib.decompress(compressed_piece).decode()
+            out_file.write(piece+'\n')
+            token_number_list.append(piece.count(' ')+1) # token number = space number + 1
+            good_midi_file_path_list.append(args_dict_list[i]['midi_file_path'])
+        else:
+            bad_count += 1
+    logging.info('Bad file count: %d', bad_count)
+    return token_number_list, good_midi_file_path_list
+
+
+def main():
+    args = parse_args()
     args_vars = vars(args)
+    meta_args = ['input_path', 'output_path', 'make_stats', 'log_file_path', 'mp_work_number', 'recursive', 'verbose']
     args_dict = {
         k: v
         for k, v in args_vars.items()
-        if k not in ['input_path', 'output_path', 'make_stats', 'log_file_path', 'mp_work_number', 'recursive', 'verbose'] and v is not None
+        if k not in meta_args and v is not None
     }
     corpus_paras_dict = {
         k: v
         for k, v in args_dict.items()
-        if k != 'verbose'
     }
 
-    # when not verbose, only info level or higher will be printed to stderr and logged into file
+    # when not verbose, only info level or higher will be printed to stdout or stderr and logged into file
     loglevel = logging.DEBUG if args.verbose else logging.INFO
     if args.log_file_path:
         logging.basicConfig(
@@ -253,26 +241,42 @@ if __name__ == '__main__':
             file_path_list.append(inpath)
 
     if len(file_path_list) == 0:
-        logging.info('no file to process')
+        logging.info('No file to process')
         exit(1)
     else:
-        logging.info('find %d files', len(file_path_list))
+        logging.info('Find %d files', len(file_path_list))
     file_path_list.sort()
 
-    with open(args.output_path, 'w+', encoding='utf8') as out_file:
-        out_file.write(make_corpus_paras_yaml(corpus_paras_dict))
-        if args.mp_work_number <= 1:
-            token_number_list = loop_func(file_path_list, out_file, args_dict)
-        else:
-            token_number_list = mp_handler(file_path_list, out_file, args.mp_work_number, args_dict)
+    # before write files
+    # check if output_path is a directory
+    if os.path.exists(args.output_path):
+        shutil.rmtree(args.output_path)
+        logging.info('Output path: %s already existed. Removed.', args.output_path)
+    os.makedirs(args.output_path)
 
-    logging.info('processed %d files', len(token_number_list))
+    # write parameter file
+    with open(os.path.join(args.output_path, 'paras'), 'w+', encoding='utf8') as out_paras_file:
+        out_paras_file.write(make_corpus_paras_yaml(corpus_paras_dict))
+
+    # write main corpus file
+    with open(os.path.join(args.output_path, 'corpus'), 'w+', encoding='utf8') as out_corpus_file:
+        
+        if args.mp_work_number <= 1:
+            token_number_list, good_midi_file_path_list = loop_func(file_path_list, out_corpus_file, args_dict)
+        else:
+            token_number_list, good_midi_file_path_list = mp_func(file_path_list, out_corpus_file, args.mp_work_number, args_dict)
+    
+    with open(os.path.join(args.output_path, 'midi_file_path_list'), 'w+', encoding='utf8') as good_midi_file_path_list_file:
+        good_midi_file_path_list_file.write('\n'.join(good_midi_file_path_list))
+        good_midi_file_path_list_file.close()
+
+    logging.info('Processed %d files', len(token_number_list))
     if len(token_number_list) > 0:
-        logging.info('average tokens: %.3f per file', sum(token_number_list)/len(token_number_list))
+        logging.info('Average tokens: %.3f per file', sum(token_number_list)/len(token_number_list))
     else:
-        logging.info('no file is processed')
+        logging.info('No file is processed')
         exit(1)
-    logging.info('process time: %.3f', time()-start_time)
+    logging.info('Process time: %.3f', time()-start_time)
 
     if args.make_stats:
         start_time = time()
@@ -314,6 +318,10 @@ if __name__ == '__main__':
 
         with open(args.output_path+'_stat.json', 'w+', encoding='utf8') as statfile:
             statfile.write(json.dumps(text_stats))
-        logging.info('wrote stats file to %s', args.output_path+'_stat.json')
-        logging.info('stat time: %.3f', time()-start_time)
-    logging.info('midi_to_text.py exited')
+        logging.info('Wrote stats file to %s', args.output_path+'_stat.json')
+        logging.info('Stat time: %.3f', time()-start_time)
+    logging.info('---midi_to_text.py exited---')
+
+
+if __name__ == '__main__':
+    main()

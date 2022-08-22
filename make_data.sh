@@ -18,8 +18,10 @@ echo "log file: $LOG_PATH"
 touch $LOG_PATH
 
 python3 midi_to_text.py --nth $NTH --max-track-number $MAX_TRACK_NUMBER --max-duration $MAX_DURATION --velocity-step $VELOCITY_STEP \
-    --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --tempo-method $TEMPO_METHOD $MIDI_OTHER_ARGUMENTS \
+    --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --position-method $POSITION_METHOD $MIDI_OTHER_ARGUMENTS \
     --log $LOG_PATH -w $PROCESS_WORKERS -r -o data/corpus/$PROC_DATA_NAME $MIDI_DIR_PATH
+
+exit 0
 
 if [ $? -ne 0 ]; then
     echo "midi_to_text.py failed. make_data.sh exit."

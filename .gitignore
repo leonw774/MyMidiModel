@@ -1,6 +1,5 @@
 *env
 *.log
-bpe/bpe
 .vscode
 
 # Byte-compiled / optimized / DLL files
