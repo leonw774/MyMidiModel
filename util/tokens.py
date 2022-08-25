@@ -116,9 +116,10 @@ def token_to_text(token: namedtuple) -> str:
 
     if type_priority == TYPE_PRIORITY['NoteToken']:
         # event:pitch:duration:velocity:track:instrument(:position)
+        # negtive duration means is_cont==True
         text = 'N' if token.duration > 0 else 'N~'
         text += ( f':{tokint2str(token.pitch)}'
-                + f':{tokint2str(token.duration)}'
+                + f':{tokint2str(abs(token.duration))}'
                 + f':{tokint2str(token.velocity)}'
                 + f':{tokint2str(token.track_number)}')
         if token.position != -1:
@@ -131,9 +132,10 @@ def token_to_text(token: namedtuple) -> str:
     elif type_priority == TYPE_PRIORITY['MeasureToken']:
         return f'M{tokint2str(token.time_signature[0])}/{tokint2str(token.time_signature[1])}'
 
-
     elif type_priority == TYPE_PRIORITY['TempoToken']:
-        return f'T{tokint2str(token.bpm)}' if token.position == -1 else f'T{tokint2str(token.bpm)}:{tokint2str(token.position)}'
+        if token.position == -1:
+            return f'T{tokint2str(token.bpm)}'
+        return f'T{tokint2str(token.bpm)}:{tokint2str(token.position)}'
 
     elif type_priority == TYPE_PRIORITY['TrackToken']:
         # type-track:instrument

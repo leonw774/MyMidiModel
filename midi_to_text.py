@@ -8,10 +8,19 @@ from argparse import ArgumentParser
 from collections import Counter
 from multiprocessing import Pool
 from time import time, strftime
+from traceback import format_exc
 
 from tqdm import tqdm
 
-from data import *
+from util import (
+    midi_to_text_list,
+    to_paras_file_path,
+    to_corpus_file_path,
+    to_pathlist_file_path,
+    dump_corpus_paras,
+    CorpusIterator,
+    tokstr2int
+)
 
 
 def parse_args():
@@ -66,9 +75,9 @@ def parse_args():
             'event' means position info will be its own event token."
     )
     parser.add_argument(
-        '--not-merge-drums',
-        action='store_false',
-        dest='use_merge_drums'
+        '--use-merge-drums',
+        dest='use_merge_drums',
+        action='store_true'
     )
     parser.add_argument(
         '--verbose',
@@ -120,16 +129,19 @@ def parse_args():
 
 def handler(args_dict: dict) -> bytes:
     n = args_dict.pop('n', 0)
+    verbose = args_dict.pop('verbose', False)
     no_compress = args_dict.pop('no_compress', False)
     logging.debug('%d pid: %d file path: %s', n, os.getpid(), args_dict['midi_file_path'])
     try:
         text_list = midi_to_text_list(**args_dict)
-        piece = ' '.join(text_list)
+        piece_bytes = ' '.join(text_list).encode()
         # return compressed text if using multiprocess. because memory usage issue
-        return piece if no_compress else zlib.compress(piece.encode())
+        return piece_bytes if no_compress else zlib.compress(piece_bytes)
     except KeyboardInterrupt as e:
         raise e
-    except AssertionError:
+    except Exception:
+        if verbose:
+            logging.debug(format_exc())
         return b''
 
 
@@ -139,20 +151,22 @@ def loop_func(
         args_dict: dict):
 
     token_number_list = []
-    good_midi_file_path_list = []
+    good_path_list = []
     bad_count = 0
     for n, midi_file_path in tqdm(enumerate(midi_file_path_list), total=len(midi_file_path_list)):
         n_args_dict = dict(args_dict)
-        n_args_dict['midi_file_path'] = midi_file_path
         n_args_dict['n'] = n
-        text_piece = handler(n_args_dict)
-        if len(text_piece) > 0:
-            out_file.write(text_piece + '\n')
-            token_number_list.append(text_piece.count(' ')+1)
-            good_midi_file_path_list.append(midi_file_path)
+        n_args_dict['midi_file_path'] = midi_file_path
+        n_args_dict['no_compress'] = True
+        piece_bytes = handler(n_args_dict)
+        if len(piece_bytes) > 0:
+            piece = piece_bytes.decode()
+            out_file.write(piece + '\n')
+            token_number_list.append(piece.count(' ')+1)
+            good_path_list.append(midi_file_path)
         else:
             bad_count += 1
-    return token_number_list, good_midi_file_path_list
+    return token_number_list, good_path_list
 
 
 def mp_func(
@@ -171,7 +185,7 @@ def mp_func(
 
     bad_count = 0
     token_number_list = []
-    good_midi_file_path_list = []
+    good_path_list = []
     with Pool(mp_work_number) as p:
         compressed_piece_list = list(tqdm(
             p.imap(handler, args_dict_list),
@@ -183,17 +197,17 @@ def mp_func(
             piece = zlib.decompress(compressed_piece).decode()
             out_file.write(piece+'\n')
             token_number_list.append(piece.count(' ')+1) # token number = space number + 1
-            good_midi_file_path_list.append(args_dict_list[i]['midi_file_path'])
+            good_path_list.append(args_dict_list[i]['midi_file_path'])
         else:
             bad_count += 1
     logging.info('Bad file count: %d', bad_count)
-    return token_number_list, good_midi_file_path_list
+    return token_number_list, good_path_list
 
 
 def main():
     args = parse_args()
     args_vars = vars(args)
-    meta_args = ['input_path', 'output_path', 'make_stats', 'log_file_path', 'mp_work_number', 'recursive', 'verbose']
+    meta_args = ['input_path', 'output_path', 'make_stats', 'log_file_path', 'mp_work_number', 'recursive']
     args_dict = {
         k: v
         for k, v in args_vars.items()
@@ -202,6 +216,7 @@ def main():
     corpus_paras_dict = {
         k: v
         for k, v in args_dict.items()
+        if k != 'verbose'
     }
 
     # when not verbose, only info level or higher will be printed to stdout or stderr and logged into file
@@ -233,11 +248,11 @@ def main():
     for inpath in args.input_path:
         if args.recursive:
             if not os.path.isdir(inpath):
-                print(f'input path {inpath} is not a directory or doesn\'t exist.')
+                print(f'Input path {inpath} is not a directory or doesn\'t exist.')
             file_path_list = glob.glob(inpath+'/**/*.mid', recursive=True)
         else:
             if not os.path.isfile(inpath):
-                print(f'input path {inpath} is not a file or doesn\'t exist.')
+                print(f'Input path {inpath} is not a file or doesn\'t exist.')
             file_path_list.append(inpath)
 
     if len(file_path_list) == 0:
@@ -255,20 +270,19 @@ def main():
     os.makedirs(args.output_path)
 
     # write parameter file
-    with open(os.path.join(args.output_path, 'paras'), 'w+', encoding='utf8') as out_paras_file:
-        out_paras_file.write(make_corpus_paras_yaml(corpus_paras_dict))
+    with open(to_paras_file_path(args.output_path), 'w+', encoding='utf8') as out_paras_file:
+        out_paras_file.write(dump_corpus_paras(corpus_paras_dict))
 
     # write main corpus file
-    with open(os.path.join(args.output_path, 'corpus'), 'w+', encoding='utf8') as out_corpus_file:
-        
+    with open(to_corpus_file_path(args.output_path), 'w+', encoding='utf8') as out_corpus_file:
         if args.mp_work_number <= 1:
-            token_number_list, good_midi_file_path_list = loop_func(file_path_list, out_corpus_file, args_dict)
+            token_number_list, good_path_list = loop_func(file_path_list, out_corpus_file, args_dict)
         else:
-            token_number_list, good_midi_file_path_list = mp_func(file_path_list, out_corpus_file, args.mp_work_number, args_dict)
-    
-    with open(os.path.join(args.output_path, 'midi_file_path_list'), 'w+', encoding='utf8') as good_midi_file_path_list_file:
-        good_midi_file_path_list_file.write('\n'.join(good_midi_file_path_list))
-        good_midi_file_path_list_file.close()
+            token_number_list, good_path_list = mp_func(file_path_list, out_corpus_file, args.mp_work_number, args_dict)
+
+    with open(to_pathlist_file_path(args.output_path), 'w+', encoding='utf8') as good_path_list_file:
+        good_path_list_file.write('\n'.join(good_path_list))
+        good_path_list_file.close()
 
     logging.info('Processed %d files', len(token_number_list))
     if len(token_number_list) > 0:
@@ -290,15 +304,14 @@ def main():
             'note_number_per_piece' : list(),
             'token_number_per_piece': token_number_list
         }
-        with open(args.output_path, 'r', encoding='utf8') as outfile:
-            paras, piece_iterator = file_to_corpus_paras_and_piece_iterator(outfile)
-            for piece in piece_iterator:
+        with CorpusIterator(args.output_path) as corpus_iterator:
+            for piece in corpus_iterator:
                 text_stats['track_number_distribution'][piece.count(' R')] += 1
                 head_end = piece.find(' M') # find first occurence of measure token
                 tracks_text = piece[4:head_end]
                 track_tokens = tracks_text.split()
                 for track_token in track_tokens:
-                    instrument_id = tokenstr2int(track_token.split(':')[1])
+                    instrument_id = tokstr2int(track_token.split(':')[1])
                     text_stats['instrument_distribution'][instrument_id] += 1
                 note_token_number = piece.count(' N')
                 text_stats['token_type_distribution']['note'] += note_token_number
@@ -316,8 +329,8 @@ def main():
         }
         del text_stats['note_number_per_piece']
 
-        with open(args.output_path+'_stat.json', 'w+', encoding='utf8') as statfile:
-            statfile.write(json.dumps(text_stats))
+        with open(os.path.join(args.output_path, 'stat.json'), 'w+', encoding='utf8') as statfile:
+            json.dump(text_stats, statfile)
         logging.info('Wrote stats file to %s', args.output_path+'_stat.json')
         logging.info('Stat time: %.3f', time()-start_time)
     logging.info('---midi_to_text.py exited---')

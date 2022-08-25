@@ -1,13 +1,22 @@
 import io
+import json
 import logging
 import os
 import shutil
 from argparse import ArgumentParser
-from time import localtime, strftime
+from time import strftime, time
 
 import numpy as np
 
-from data import *
+from util import (
+    to_shape_vocab_file_path,
+    to_vocabs_json_file_path,
+    get_corpus_paras,
+    CorpusIterator,
+    build_vocabs,
+    text_list_to_array,
+    array_to_text_list
+)
 
 
 def parse_args():
@@ -36,10 +45,7 @@ def parse_args():
         action='store_true'
     )
     parser.add_argument(
-        'input_file_path',
-    )
-    parser.add_argument(
-        'output_dir_path',
+        'corpus_dir_path',
     )
     return parser.parse_args()
 
@@ -63,32 +69,26 @@ def main():
             level=loglevel,
             format='%(message)s'
         )
-    logging.info(strftime('----text_to_dataset.py start at %Y%m%d-%H%M---'))
+    logging.info(strftime('----text_to_array.py start at %Y%m%d-%H%M---'))
 
-    with open(args.input_file_path, 'r', encoding='utf8') as infile:
-        corpus_paras, piece_iterator = file_to_corpus_paras_and_piece_iterator(infile)
-        assert len(piece_iterator) > 0, f'empty corpus {args.input_file_path}'
+    if not os.path.isdir(args.corpus_dir_path):
+        logging.info('%s does not exist', args.corpus_dir_path)
+        exit(1)
 
-        if not os.path.isdir(args.output_dir_path):
-            os.makedirs(args.output_dir_path)
+    bpe_shapes_list = []
+    if args.bpe > 0:
+        args.corpus_dir_path = args.corpus_dir_path + f'_bpeiter{args.bpe}'
+        logging.info('Used BPE: %d', args.bpe)
+        with open(to_shape_vocab_file_path(args.corpus_dir_path), 'r', encoding='utf8') as vocabs_file:
+            bpe_shapes_list = vocabs_file.read().splitlines()
 
-        bpe_shapes_list = []
-        if args.bpe > 0:
-            logging.info('Used BPE')
-            with open(args.input_file_path + f'_bpeiter{args.bpe}_shape_vocab', 'r', encoding='utf8') as vocabs_file:
-                bpe_shapes_list = vocabs_file.read().splitlines()
-            buildvocab_input_file_path = args.input_file_path + f'_bpeiter{args.bpe}_tokenized'
-        else:
-            buildvocab_input_file_path = args.input_file_path
+    logging.info('Begin build vocabs for %s', args.corpus_dir_path)
+    corpus_paras = get_corpus_paras(args.corpus_dir_path)
+    with CorpusIterator(args.corpus_dir_path) as corpus_iterator:
+        assert len(corpus_iterator) > 0, f'empty corpus: {args.corpus_dir_path}'
 
-    logging.info('Begin build vocabs')
-    with open(buildvocab_input_file_path, 'r', encoding='utf8') as infile:
-        corpus_paras, piece_iterator = get_corpus_paras(infile)
-        assert len(piece_iterator) > 0, f'empty corpus: {buildvocab_input_file_path}'
-
-        vocab_dicts, summary_string = build_vocabs(piece_iterator, corpus_paras, args.max_sample_length, bpe_shapes_list)
-        vocabs_json_path = os.path.join(args.output_dir_path, 'vocabs.json')
-        with open(vocabs_json_path, 'w+', encoding='utf8') as vocabs_file:
+        vocab_dicts, summary_string = build_vocabs(corpus_iterator, corpus_paras, args.max_sample_length, bpe_shapes_list)
+        with open(to_vocabs_json_file_path(args.corpus_dir_path), 'w+', encoding='utf8') as vocabs_file:
             json.dump(vocab_dicts, vocabs_file)
         logging.info(summary_string)
 
@@ -96,39 +96,41 @@ def main():
         logging.info('Begin write npy')
 
         # handle existed files/dirs
-        npy_dir_path = os.path.join(args.output_dir_path, 'arrays')
+        npy_dir_path = os.path.join(args.corpus_dir_path, 'arrays')
+        npy_zip_path = os.path.join(args.corpus_dir_path, 'arrays.zip')
+        npz_path = os.path.join(args.corpus_dir_path, 'arrays.npz')
         if os.path.exists(npy_dir_path):
             shutil.rmtree(npy_dir_path)
             print(f'Find existing {npy_dir_path}, removed.')
-        if os.path.exists(os.path.join(args.output_dir_path, 'arrays.zip')):
-            os.remove(os.path.join(args.output_dir_path, 'arrays.zip'))
-            print(f'Find existing {os.path.join(args.output_dir_path, "arrays.zip")}, removed.')
-        if os.path.exists(os.path.join(args.output_dir_path, 'arrays.npz')):
-            os.remove(os.path.join(args.output_dir_path, 'arrays.npz'))
-            print(f'Find existing {os.path.join(args.output_dir_path, "arrays.npz")}, removed.')
+        if os.path.exists(npy_zip_path):
+            os.remove(npy_zip_path)
+            print(f'Find existing {npy_zip_path}, removed.')
+        if os.path.exists(npz_path):
+            os.remove(npz_path)
+            print(f'Find existing {npz_path}, removed.')
 
         os.makedirs(npy_dir_path)
-        for i, p in enumerate(piece_iterator):
-            array = text_list_to_numpy(p.split(), vocab_dicts)
+        for i, p in enumerate(corpus_iterator):
+            array = text_list_to_array(p.split(), vocab_dicts)
             np.save(os.path.join(npy_dir_path, str(i)), array)
 
         # zip all the npy files into one file with '.npz' extension
         shutil.make_archive(npy_dir_path, 'zip', root_dir=npy_dir_path)
-        os.rename(os.path.join(args.output_dir_path, 'arrays.zip'), os.path.join(args.output_dir_path, 'arrays.npz'))
+        os.rename(npy_zip_path, npz_path)
         # delete the npys
         shutil.rmtree(npy_dir_path)
 
         # for debugging
         if args.debug:
-            p0 = next(iter(piece_iterator))
-            array_data = text_list_to_numpy(p0.split(), vocab_dicts)
+            p0 = next(iter(corpus_iterator))
+            array_data = text_list_to_array(p0.split(), vocab_dicts)
             array_text_byteio = io.BytesIO()
-            debug_txt_path = os.path.join(args.output_dir_path, 'text_list_to_numpy_debug.txt')
+            debug_txt_path = os.path.join(args.corpus_dir_path, 'text_list_to_array_debug.txt')
             print(f'Write debug file: {debug_txt_path}')
             np.savetxt(array_text_byteio, array_data, fmt='%d')
             array_text_list = array_text_byteio.getvalue().decode().split('\n')
             original_text_list = p0.split()
-            reconst_text_list = numpy_to_text_list(array_data, vocab_dicts)
+            reconst_text_list = array_to_text_list(array_data, vocab_dicts)
             text_data_reconst_text_list = [
                 (t, *d.split(), rt)
                 for t, d, rt in zip(original_text_list, array_text_list, reconst_text_list)

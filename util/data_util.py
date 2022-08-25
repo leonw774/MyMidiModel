@@ -1,7 +1,8 @@
-from io import IOBase
+import json
+import os
 from time import time
+import yaml
 
-from tqdm import tqdm
 import numpy as np
 
 from .tokens import (
@@ -9,64 +10,47 @@ from .tokens import (
     tokint2str,
     get_largest_possible_position,
     SPECIAL_TOKENS,
-    TOKEN_INT2STR_BASE,
     SUPPORTED_TIME_SIGNATURES,
 )
 
-def to_paras_file_path(corpus_dir_path: str):
-    pass
+def to_paras_file_path(corpus_dir_path: str) -> str:
+    return os.path.join(corpus_dir_path, 'paras')
 
-def to_corpus_file_path(corpus_dir_path: str):
-    pass
+def to_corpus_file_path(corpus_dir_path: str) -> str:
+    return os.path.join(corpus_dir_path, 'corpus')
 
-def to_shape_vocab_file_path(corpus_dir_path: str):
-    pass
+def to_pathlist_file_path(corpus_dir_path: str) -> str:
+    # whaaaaat
+    return os.path.join(corpus_dir_path, 'pathlist')
 
+def to_shape_vocab_file_path(corpus_dir_path: str) -> str:
+    return os.path.join(corpus_dir_path, 'shape_vocab')
 
-def make_corpus_paras_yaml(args: dict) -> str:
-    lines = [
-        f'{k}: {v}'
-        for k, v in args.items()
-        if v is not None
-    ]
-    # print(''.join(lines))
-    return '\n'.join(lines)
+def to_vocabs_json_file_path(array_dir_path: str) -> str:
+    return os.path.join(array_dir_path, 'vocabs.json')
 
+def dump_corpus_paras(aras_dict: dict) -> str:
+    return yaml.dump(aras_dict)
 
-def parse_corpus_paras_yaml(yaml: str) -> dict:
-    pairs = yaml.split('\n')
-    args_dict = dict()
-    for p in pairs:
-        q = p.split(': ')
-        if len(q) <= 1:
-            continue
-        k, v = q
-        # tempo_quatization is list
-        if k == 'tempo_quantization':
-            args_dict[k] = list(map(int, v[1:-1].split(', ')))
-        elif k == 'position_method':
-            args_dict[k] = v
-        elif k == 'use_merge_drums':
-            args_dict[k] = (v == 'True')
-        else:
-            args_dict[k] = int(v)
-    return args_dict
-
-
-def get_corpus_paras(paras_file: IOBase):
-    paras_file.seek(0)
-    yaml_string = paras_file.read()
-    corpus_paras = parse_corpus_paras_yaml(yaml_string)
-    return corpus_paras, 
-
-def get_corpus_iterator(corpus_file: IOBase):
-    CorpusIterator(corpus_file)
+def get_corpus_paras(corpus_dir_path: str):
+    with open(to_paras_file_path(corpus_dir_path), 'r', encoding='utf8') as paras_file:
+        corpus_paras_dict = yaml.safe_load(paras_file)
+    return corpus_paras_dict
 
 # use iterator to handle large file
 class CorpusIterator:
-    def __init__(self, corpus_file) -> None:
-        self.file = corpus_file
+    def __init__(self, corpus_dir_path) -> None:
+        self.file_path = os.path.join(corpus_dir_path, 'corpus')
         self.length = None
+        self.file = None
+
+    # context manager
+    def __enter__(self):
+        self.file = open(self.file_path, 'r', encoding='utf8')
+        return self
+    
+    def __exit__(self, value, type, trackback):
+        self.file.close()
 
     def __len__(self) -> int:
         if self.length is None:
@@ -80,13 +64,8 @@ class CorpusIterator:
     def __iter__(self):
         self.file.seek(0)
         for line in self.file:
-            # if line.startswith('BOS'):
-            #     body_start = True
-            #     continue
-            # if body_start:
-            #     yield line[:-1] # remove \n at the end
             if len(line) > 1:
-                yield line[-1] # remove \n at the end
+                yield line[:-1] # remove \n at the end
 
 
 def make_token_dict(token_list: list) -> dict:
@@ -99,11 +78,17 @@ def make_token_dict(token_list: list) -> dict:
 
 
 def build_vocabs(
-        piece_iterator,
+        corpus_iterator,
         paras: dict,
         max_sample_length: str,
         bpe_shapes_list: list):
     """
+        Parameters:
+        - max_sample_length: we calculate the max amount of measures by checking the most amount of measure tokens
+          that can appears within a range of max_sample_length
+        - bpe_shapes_list: The multinote shape are learned by bpe algorithms.
+          If bpe is not performed, `bpe_shapes_list` should be empty
+
         Event tokens include:
         - shape
         - positions in measure
@@ -111,11 +96,6 @@ def build_vocabs(
         - tempo change
         - track and instrument
         - begin-of-score and end-of-score
-        Parameters:
-        - max_sample_length: we calculate the max amount of measures by checking the most amount of measure tokens
-          that can appears within a range of max_sample_length
-        - bpe_shapes_list: The multinote shape are learned by bpe algorithms.
-          If bpe is not performed, `bpe_shapes_list` should be empty
     """
 
     start_time = time()
@@ -129,43 +109,37 @@ def build_vocabs(
     ]
     tempo_min, tempo_max, tempo_step = paras['tempo_quantization']
     # tempo_max is inclusive
-    tempo_attribute_tokens = list(map(tokint2str, range(tempo_min, tempo_max+tempo_step, tempo_step)))
+    tempo_tokens = [
+        'T'+tokint2str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
+    ]
     position_tokens = [
         'P'+tokint2str(i) for i in range(get_largest_possible_position(paras['nth']))
     ]
     measure_tokens = [
         f'M{tokint2str(n)}/{tokint2str(d)}' for n, d in SUPPORTED_TIME_SIGNATURES
     ]
-    if paras['tempo_method'] == 'position_attribute':
-        position_tokens = [
-            position_token+'+'+tempo_attribute
-            for position_token in position_tokens
-            for tempo_attribute in tempo_attribute_tokens
-        ]
 
     # place special token in front so that they have same index across all vocabulary
-    event_tokens = SPECIAL_TOKENS + ['BOS', 'EOS'] + shape_tokens + track_tokens + measure_tokens + position_tokens
-
-    if paras['tempo_method'] == 'position_event':
-        tempo_event_tokens = ['T'+tokint2str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)]
-        event_tokens += tempo_event_tokens
+    event_tokens = (SPECIAL_TOKENS + ['BOS', 'EOS'] + shape_tokens
+             + track_tokens + tempo_tokens + measure_tokens)
 
     max_duration = paras['max_duration'] * (paras['nth'] // 4)
     pitch_tokens = SPECIAL_TOKENS + list(map(tokint2str, range(128)))
-    duration_tokens = SPECIAL_TOKENS + list(map(tokint2str, range(1, max_duration+1))) + [tokint2str(-max_duration)]
+    duration_tokens = SPECIAL_TOKENS + list(map(tokint2str, range(1, max_duration+1)))
     velocity_tokens = SPECIAL_TOKENS + list(map(tokint2str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
     track_number_tokens = SPECIAL_TOKENS + list(map(tokint2str, range(paras['max_track_number'])))
     instrument_tokens = SPECIAL_TOKENS + list(map(tokint2str, range(129)))
-    tempo_attribute_tokens = SPECIAL_TOKENS + tempo_attribute_tokens
+    if paras['position_method'] == 'event':
+        event_tokens += position_tokens
+    else:
+        position_tokens = [p[1:] for p in position_tokens]
 
     token_count_per_piece = []
-    # max measure number in all pieces
-    max_measure_length = 0
-    # the most number of measures span that can fit in the size of max_sample_length
-    max_fitting_measure_number = 0
+    max_measure_length = 0 # max measure number in all pieces
+    max_fitting_measure_number = 0 # the most number of measures span that can fit in the size of max_sample_length
     corpus_measure_tokens = set()
-    corpus_position_tokens = set()
-    for i, piece in enumerate(piece_iterator):
+    corpus_position_tokens = set() # we want to see how sparse measure and position is
+    for piece in corpus_iterator:
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
         measure_indices = [i for i, t in enumerate(text_list) if t[0] == 'M']
@@ -181,34 +155,36 @@ def build_vocabs(
         max_fitting_measure_number = max(cur_fitting_measure_number, max_fitting_measure_number)
 
         measures = {t for t in text_list if t[0] == 'M'}
-        positions = {t for t in text_list if t[0] == 'P'}
         corpus_measure_tokens.update(measures)
+        if paras['position_method'] == 'event':
+            positions = {t[1:] for t in text_list if t[0] == 'P'}
+        else:
+            positions = {t.split(':')[-1] for t in text_list if t[0] == 'N'}
         corpus_position_tokens.update(positions)
     corpus_measure_tokens = list(corpus_measure_tokens)
     corpus_position_tokens = list(corpus_position_tokens)
 
     summary_string = (
-        f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'
-        + f'Event tokens size: {len(event_tokens)}\n'
-        + f'Measure tokens size: {len(measure_tokens)}\n'
-        + f'- Corpus measure size: {len(corpus_measure_tokens)} ({corpus_measure_tokens})\n'
-        + f'Position token size: {len(position_tokens)}\n'
-        + f'- Corpus position tokens size: {len(corpus_position_tokens)}\n'
-        + f'- Max corpus position: {max(int(cptoken[1:].split("+")[0], TOKEN_INT2STR_BASE) for cptoken in corpus_position_tokens)}\n'
-        + f'Max measure number that fits max_sample_length: {max_fitting_measure_number}\n'
-        + f'  (max_sample_length = {max_sample_length}, max measure number in piece = {max_measure_length})\n'
-        + (f'Tempo token size: {len(tempo_event_tokens)}\n' if tempo_event_tokens else '')
-        + f'Duration token size: {len(shape_tokens)}\n'
-        + f'- Largest possible duration: {paras["max_duration"] * paras["nth"] // 4}\n'
-        + f'Velocity token size: {len(velocity_tokens)}\n'
-        + f'Tempo attribute size: {len(tempo_attribute_tokens)}\n'
-        + f'Vocabulary build time: {time()-start_time}'
+        f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
+        f'Event tokens size: {len(event_tokens)}\n'\
+        f'Measure tokens size: {len(measure_tokens)}\n'\
+        f'- Corpus measure size: {len(corpus_measure_tokens)} ({corpus_measure_tokens})\n'\
+        f'Max measure number that fits max_sample_length: {max_fitting_measure_number}\n'\
+        f'  (max_sample_length = {max_sample_length}, max measure number in piece = {max_measure_length})\n'\
+        f'Position token size: {len(position_tokens)}\n'\
+        f'- Corpus position tokens size: {len(corpus_position_tokens)}\n'\
+        f'- Max corpus position: {max(tokstr2int(cpts) for cpts in corpus_position_tokens)}\n'\
+        f'Tempo token size: {len(tempo_tokens)}\n'\
+        f'Duration size: {len(shape_tokens)}\n'\
+        f'- Largest possible duration: {paras["max_duration"] * paras["nth"] // 4}\n'\
+        f'Velocity size: {len(velocity_tokens)}\n'\
+        f'Vocabulary build time: {time()-start_time}'
     )
 
     # build a dictionary for every token list
     vocab_dicts = {
         'paras': paras,
-        'use_bpe': 1 if len(bpe_shapes_list) > 0 else 0,
+        'bpe_iter': len(bpe_shapes_list),
         'max_sample_length': max_sample_length,
         'special_tokens': SPECIAL_TOKENS,
         'max_measure_number': max_fitting_measure_number + 1, # plus 1 for head section
@@ -218,13 +194,14 @@ def build_vocabs(
         'velocities': make_token_dict(velocity_tokens),
         'track_numbers': make_token_dict(track_number_tokens),
         'instruments': make_token_dict(instrument_tokens),
-        'tempos': make_token_dict(tempo_attribute_tokens),
+        'tempos': make_token_dict(tempo_tokens),
+        'positions': dict() if paras['position_method'] == 'event' else make_token_dict(position_tokens)
     }
 
     return vocab_dicts, summary_string
 
 
-def text_list_to_numpy(text_list: list, vocabs: dict) -> np.ndarray:
+def text_list_to_array(text_list: list, vocabs: dict) -> np.ndarray:
     """
         Serialize pieces into of numpy arrays.
         Each token is processed into an 9-dimension vector:
@@ -234,12 +211,13 @@ def text_list_to_numpy(text_list: list, vocabs: dict) -> np.ndarray:
     """
     x = np.full((len(text_list), 9), fill_value=-1, dtype=np.uint16)
 
+    position_method = vocabs['paras']['position_method']
+
     event_text2id = vocabs['events']['text2id']
     # d_pad_id = vocabs['durations']['text2id']['[PAD]']
     # v_pad_id = vocabs['velocities']['text2id']['[PAD]']
     # r_pad_id = vocabs['track_numbers']['text2id']['[PAD]']
     # i_pad_id = vocabs['instruments']['text2id']['[PAD]']
-    # t_pad_id = vocabs['tempos']['text2id']['[PAD]']
 
     # in build_vocabs, [PAD] is made to be 0
     p_pad_id = 0
@@ -276,41 +254,35 @@ def text_list_to_numpy(text_list: list, vocabs: dict) -> np.ndarray:
         elif typename == 'M':
             cur_position = 0
             cur_measure_number += 1
-            if '+' in text:
-                tempo_text = text.split('+')[1]
-                cur_tempo_id = vocabs['tempos']['text2id'][tempo_text]
             x[i] = [
                 event_text2id[text], p_pad_id, d_pad_id, v_pad_id, r_pad_id,
                 i_pad_id, t_pad_id, cur_position, cur_measure_number
             ]
 
         elif typename == 'T':
-            cur_tempo_id = vocabs['tempos']['text2id'][text[1:]]
+            event_text, *attr = text = text.split(':')
+            cur_tempo_id = vocabs['tempos']['text2id'][event_text]
+            x[i] = [
+                event_text2id[event_text], p_pad_id, d_pad_id, v_pad_id, r_pad_id,
+                i_pad_id, cur_tempo_id, cur_position, cur_measure_number
+            ]
+            if position_method == 'attribute':
+                cur_position = tokstr2int(attr[0])
+            else:
+                # because tempo come after position, the first position of tempo change will use previous tempo's id
+                x[i-1][6] = cur_tempo_id
+
+        elif typename == 'P':
+            cur_position = tokstr2int(text[1:])
             x[i] = [
                 event_text2id[text], p_pad_id, d_pad_id, v_pad_id, r_pad_id,
                 i_pad_id, cur_tempo_id, cur_position, cur_measure_number
             ]
-            # because tempo come after position, the first position of tempo change will use previous tempo's id 
-            x[i-1][6] = cur_tempo_id
-
-        elif typename == 'P':
-            if '+' in text:
-                event_text, tempo_text = text.split('+')
-                cur_position = int(event_text[1:], TOKEN_INT2STR_BASE)
-                cur_tempo_id = vocabs['tempos']['text2id'][tempo_text]
-                x[i] = [
-                    event_text2id[text], p_pad_id, d_pad_id, v_pad_id, r_pad_id,
-                    i_pad_id, cur_tempo_id, cur_position, cur_measure_number
-                ]
-            else:
-                cur_position = int(text[1:], TOKEN_INT2STR_BASE)
-                x[i] = [
-                    event_text2id[text], p_pad_id, d_pad_id, v_pad_id, r_pad_id,
-                    i_pad_id, cur_tempo_id, cur_position, cur_measure_number
-                ]
 
         elif typename == 'N' or typename == 'S':
             event_text, *attr = text.split(':')
+            if position_method == 'attribute':
+                cur_position = tokstr2int(attr[4])
             x[i] = [
                 event_text2id[event_text],
                 vocabs['pitches']['text2id'][attr[0]],
@@ -329,7 +301,7 @@ def text_list_to_numpy(text_list: list, vocabs: dict) -> np.ndarray:
     return x
 
 
-def numpy_to_text_list(data: np.ndarray, vocabs: dict):
+def array_to_text_list(data: np.ndarray, vocabs: dict):
     # event, pitch, duration, velocity, track_number, instrument, tempo, position, measure_number
     assert data.shape[0] > 1 and data.shape[1] == 9, f'bad numpy array shape: {data.shape}'
 
