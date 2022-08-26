@@ -32,6 +32,13 @@ def merge_tracks(
 
     if use_merge_drums:
         merge_drums(midi)
+    
+    # remove tracks with no notes
+    midi.instruments = [
+        track
+        for track in midi.instruments
+        if len(track.notes) > 0
+    ]
 
     if len(midi.instruments) > max_track_number:
         tracks = list(midi.instruments) # shallow copy
@@ -377,7 +384,6 @@ def midi_to_token_list(
     assert measure_token_list[0].onset <= note_token_list[0].onset, 'First measure is after first note'
     assert len(note_token_list) * 4 > len(measure_token_list) * len(midi.instruments), 'music too sparse'
     pos_token_list = get_position_infos(note_token_list, measure_token_list, tempo_token_list, position_method)
-    print(tempo_token_list)
     body_token_list = pos_token_list + note_token_list + measure_token_list + tempo_token_list
     body_token_list.sort()
 
@@ -528,7 +534,7 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
             if ':' in text[1:]:
                 tempo, position = (tokstr2int(x) for x in text[1:].split(':'))
                 cur_time = position + cur_measure_onset
-                midi.tempo.append(TempoChange(tempo=tempo, time=cur_time))
+                midi.tempo_changes.append(TempoChange(tempo=tempo, time=cur_time))
             else:
                 midi.tempo_changes.append(TempoChange(tempo=tokstr2int(text[1:]), time=cur_time))
             # print('T', text, cur_time)
@@ -545,7 +551,6 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
             n = handle_note_continuation(is_cont, note_attr, cur_time, pending_cont_notes)
             if n is not None:
                 midi.instruments[note_attr[3]].notes.append(n)
-            # debug_str += text + ' onset' + str(cur_time) + ' ' + str(n) + '\n'
 
         elif typename == 'S':
             shape_string, *puvt = text[1:].split(':')
@@ -558,8 +563,9 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
                     relnote = [tokstr2int(a) for a in s.split(',')]
                 relnote = [is_cont] + relnote
                 relnote_list.append(relnote)
-            base_pitch, time_unit, velocity, track_number = (tokstr2int(x) for x in puvt)
-            # debug_str += text
+            base_pitch, time_unit, velocity, track_number, *position = (tokstr2int(x) for x in puvt)
+            if len(position) == 1:
+                cur_time = position[0] + cur_measure_onset
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
                 note_attr = (base_pitch + rel_pitch, rel_dur * time_unit, velocity, track_number)
                 onset_time_in_tick = cur_time + rel_onset * time_unit

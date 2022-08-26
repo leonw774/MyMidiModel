@@ -4,7 +4,7 @@ import numpy as np
 from torch.utils.data import random_split, DataLoader
 
 from model.dataset import MidiDataset, collate_mididataset
-from data import numpy_to_text_list
+from util import numpy_to_text_list
 
 
 dataset = MidiDataset(

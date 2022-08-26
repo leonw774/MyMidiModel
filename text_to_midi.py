@@ -1,6 +1,6 @@
 import sys
 
-from data import piece_to_midi, CorpusIterator, get_corpus_paras
+from util import piece_to_midi, CorpusIterator, get_corpus_paras
 
 def print_help():
     print('python3 text_to_midi.py corpus_dir_path out_path begin end')

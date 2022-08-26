@@ -3,7 +3,7 @@ import random
 import sys
 from collections import Counter
 
-from data import CorpusIterator, get_corpus_paras, piece_to_midi
+from util import CorpusIterator, get_corpus_paras, piece_to_midi
 
 
 def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size: int) -> bool:
