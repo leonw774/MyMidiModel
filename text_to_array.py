@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 from time import strftime, time
 
 import numpy as np
+from tqdm import tqdm
 
 from util import (
     to_shape_vocab_file_path,
@@ -77,7 +78,6 @@ def main():
 
     bpe_shapes_list = []
     if args.bpe > 0:
-        args.corpus_dir_path = args.corpus_dir_path + f'_bpeiter{args.bpe}'
         logging.info('Used BPE: %d', args.bpe)
         with open(to_shape_vocab_file_path(args.corpus_dir_path), 'r', encoding='utf8') as vocabs_file:
             bpe_shapes_list = vocabs_file.read().splitlines()
@@ -110,7 +110,7 @@ def main():
             print(f'Find existing {npz_path}, removed.')
 
         os.makedirs(npy_dir_path)
-        for i, p in enumerate(corpus_iterator):
+        for i, p in tqdm(enumerate(corpus_iterator), total=len(corpus_iterator)):
             array = text_list_to_array(p.split(), vocab_dicts)
             np.save(os.path.join(npy_dir_path, str(i)), array)
 

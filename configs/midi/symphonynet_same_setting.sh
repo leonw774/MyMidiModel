@@ -1,0 +1,16 @@
+#!/bin/bash
+# midi preprocessing
+USE_EXISTED=true
+NTH=32
+MAX_TRACK_NUMBER=24
+MAX_DURATION=32
+VELOCITY_STEP=128
+CONTINUING_NOTE=false
+TEMPO_MIN=24
+TEMPO_MAX=200
+TEMPO_STEP=16
+POSITION_METHOD="attribute"
+PROCESS_WORKERS=8
+MIDI_DIR_PATH="data/midis/SymphonyNet_Dataset"
+MIDI_TO_TEXT_OTHER_ARGUMENTS="--make-stats"
+DATA_NAME="symphonynet_dataset"

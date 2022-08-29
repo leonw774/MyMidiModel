@@ -75,6 +75,11 @@ def parse_args():
             'event' means position info will be its own event token."
     )
     parser.add_argument(
+        '--use-continuing-note',
+        dest='use_cont_note',
+        action='store_true'
+    )
+    parser.add_argument(
         '--use-merge-drums',
         dest='use_merge_drums',
         action='store_true'
@@ -89,6 +94,12 @@ def parse_args():
         dest='log_file_path',
         default='',
         help='Path to the log file. Default is empty, which means no logging would be performed.'
+    )
+    parser.add_argument(
+        '--use-existed',
+        dest='use_existed',
+        action='store_true',
+        help='If the corpus already existed, then do nothing.'
     )
     parser.add_argument(
         '-r', '--recursive',
@@ -207,7 +218,7 @@ def mp_func(
 def main():
     args = parse_args()
     args_vars = vars(args)
-    meta_args = ['input_path', 'output_path', 'make_stats', 'log_file_path', 'mp_work_number', 'recursive']
+    meta_args = ['input_path', 'output_path', 'make_stats', 'log_file_path', 'mp_work_number', 'recursive', 'use_existed']
     args_dict = {
         k: v
         for k, v in args_vars.items()
@@ -243,6 +254,24 @@ def main():
     ])
     logging.info(args_str)
 
+    # check if output_path is a directory
+    if os.path.exists(args.output_path):
+        if (os.path.exists(to_corpus_file_path(args.output_path)) 
+                and os.path.exists(to_paras_file_path(args.output_path))
+                and os.path.exists(to_pathlist_file_path(args.output_path))):
+            if args.use_existed:
+                logging.info('Output directory: %s already has corpus file.', args.output_path)
+                logging.info('Flag --use-existed is set')
+                logging.info('---midi_to_text.py exited---')
+                return 0
+            else:
+                shutil.rmtree(args.output_path)
+                logging.info('Output directory: %s already has corpus file. Removed.', args.output_path)
+        else:
+            shutil.rmtree(args.output_path)
+            logging.info('Output directory: %s already existed, but no corpus file. Removed.', args.output_path)
+    os.makedirs(args.output_path)
+
     start_time = time()
     file_path_list = list()
     for inpath in args.input_path:
@@ -257,17 +286,11 @@ def main():
 
     if len(file_path_list) == 0:
         logging.info('No file to process')
-        exit(1)
+        logging.info('---midi_to_text.py exited---')
+        return 1
     else:
         logging.info('Find %d files', len(file_path_list))
     file_path_list.sort()
-
-    # before write files
-    # check if output_path is a directory
-    if os.path.exists(args.output_path):
-        shutil.rmtree(args.output_path)
-        logging.info('Output path: %s already existed. Removed.', args.output_path)
-    os.makedirs(args.output_path)
 
     # write parameter file
     with open(to_paras_file_path(args.output_path), 'w+', encoding='utf8') as out_paras_file:
@@ -289,7 +312,7 @@ def main():
         logging.info('Average tokens: %.3f per file', sum(token_number_list)/len(token_number_list))
     else:
         logging.info('No file is processed')
-        exit(1)
+        return 1
     logging.info('Process time: %.3f', time()-start_time)
 
     if args.make_stats:
@@ -337,4 +360,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    exit_code = main()
+    exit(exit_code)

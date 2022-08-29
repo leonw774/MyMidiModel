@@ -105,7 +105,7 @@ def quantize_tempo(tempo, tempo_quantization):
     return t
 
 
-def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int) -> list:
+def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_cont_note: bool) -> list:
     """
         Return all note token in the midi as a list sorted in the ascending orders of
         onset time, track number, pitch, duration, velocity and instrument.
@@ -133,7 +133,7 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int) -> li
             track_number=track_number,
             pitch=note.pitch,
             duration=note.end-note.start,
-            velocity=(note.velocity//velocity_step)*velocity_step+half_vel_step
+            velocity=min(127, (note.velocity//velocity_step)*velocity_step+half_vel_step)
         )
         for track_number, inst in enumerate(midi.instruments)
         for note in inst.notes
@@ -142,7 +142,7 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int) -> li
     # handle too long duration
     # continuing means this note this going to connect to a note after max_duration
     # it is represented as negtive to seperate from notes that's really max_duration long
-    continuing_duration = -max_duration
+    continuing_duration = -max_duration if use_cont_note else max_duration
     note_list_length = len(note_token_list)
     for i in range(note_list_length):
         note_token = note_token_list[i]
@@ -320,7 +320,7 @@ def get_position_infos(note_token_list: list, measure_token_list: list, tempo_to
     cur_measure_onset = 0
     last_added_position_onset = 0
 
-    for i, token in enumerate(nmt_token_list):
+    for token in nmt_token_list:
 
         if token.type_priority == TYPE_PRIORITY['MeasureToken']:
             cur_measure_onset = token.onset
@@ -376,10 +376,11 @@ def midi_to_token_list(
         nth: int,
         max_duration: int,
         velocity_step: int,
+        use_cont_note: bool,
         tempo_quantization: list,
         position_method: str) -> list:
 
-    note_token_list = get_note_tokens(midi, max_duration, velocity_step)
+    note_token_list = get_note_tokens(midi, max_duration, velocity_step, use_cont_note)
     measure_token_list, tempo_token_list = get_time_structure_tokens(midi, note_token_list, nth, tempo_quantization)
     assert measure_token_list[0].onset <= note_token_list[0].onset, 'First measure is after first note'
     assert len(note_token_list) * 4 > len(measure_token_list) * len(midi.instruments), 'music too sparse'
@@ -398,8 +399,9 @@ def midi_to_text_list(
         max_track_number: int,
         max_duration: int,
         velocity_step: int,
-        position_method: str,
+        use_cont_note: bool,
         tempo_quantization: list, # [tempo_min, tempo_max, tempo_step]
+        position_method: str,
         use_merge_drums: bool = True) -> list:
     """
         Parameters:
@@ -409,6 +411,7 @@ def midi_to_text_list(
         'instruments' than this value, some tracks would be merged or discard
         - max_duration: max length of duration in unit of nth note
         - velocity_step: velocity to be quantize as (velocity_step//2, 3*velocity_step//2, 5*velocity_step//2, ...)
+        - use_cont_note: have contiuing notes or not
         - position_method: can be 'attribute' or 'event'
           - 'attribute' means position info is part of the note token
           - 'event' means position info will be its own event token.
@@ -435,7 +438,7 @@ def midi_to_text_list(
         if track.is_drum:
             midi.instruments[i].program = 128
 
-    token_list = midi_to_token_list(midi, nth, max_duration, velocity_step, tempo_quantization, position_method)
+    token_list = midi_to_token_list(midi, nth, max_duration, velocity_step, use_cont_note, tempo_quantization, position_method)
 
     text_list = list(map(token_to_text, token_list))
     # text = ' '.join(map(str, text_list))

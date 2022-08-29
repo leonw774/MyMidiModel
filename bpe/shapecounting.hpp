@@ -3,6 +3,8 @@
 
 #define COUNTING_THREAD_NUM 8
 
+void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict);
+
 Shape getShapeOfMultiNotePair(
     const MultiNote& lmn,
     const MultiNote& rmn,
@@ -10,21 +12,27 @@ Shape getShapeOfMultiNotePair(
     const Shape& rShape
 );
 
-void basicShapeCounting(
+void oursShapeCounting(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::map<Shape, int>& shapeCount,
-    double samplingRate,
-    double alpha
+    std::map<Shape, unsigned int>& shapeScore,
+    double samplingRate
 );
 
-void pseudoRelevanceFeedbackInspiredShapeCounting(
+double calculateAvgMulpiSize(const Corpus& corpus);
+
+void symphonyNetShapeCounting(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::map<Shape, int>& shapeCount,
-    int k,
-    double samplingRate,
-    double alpha
+    std::map<Shape, unsigned int>& shapeScore,
+    double samplingRate
+);
+
+void wordPieceScoreShapeCounting(
+    const Corpus& corpus,
+    const std::vector<Shape>& shapeDict,
+    std::map<Shape, unsigned int>& shapeScore,
+    double samplingRate
 );
 
 #endif

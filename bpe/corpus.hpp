@@ -58,6 +58,8 @@ std::string itob36str(int x);
 
 std::string shape2str(const Shape& s);
 
+unsigned int findMaxRelOffset(const Shape& s);
+
 struct MultiNote {
     // shapeIndex: High 12 bits. The index of shape in the shapeDict. 0: DEFAULT_SHAPE_END, 1: DEFAULT_SHAPE_CONT
     //             This mean bpeIter cannot be greater than 0xfff - 2 = 2045

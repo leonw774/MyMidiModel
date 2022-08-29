@@ -29,6 +29,43 @@ int gcd (int* arr, unsigned int size) {
     return g;
 }
 
+void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict) {
+    // for each piece
+    #pragma omp parallel for
+    for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+        // for each track
+        #pragma omp parallel for
+        for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
+            // ignore drum
+            if (corpus.piecesTN[i][j] == 128) continue;
+            // for each multinote
+            for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
+                // printTrack(corpus.piecesMN[i][j], shapeDict, k, 1);
+                uint32_t onsetTime = corpus.piecesMN[i][j][k].getOnset();
+                uint32_t maxRelOffset = findMaxRelOffset(shapeDict[corpus.piecesMN[i][j][k].getShapeIndex()]);
+                uint32_t offsetTime = corpus.piecesMN[i][j][k].getOnset() + maxRelOffset * corpus.piecesMN[i][j][k].unit;
+                uint32_t immdAfterOnset = -1;
+                int n = 1;
+                while (k+n < corpus.piecesMN[i][j].size()) {
+                    // overlapping
+                    if ((corpus.piecesMN[i][j][k+n]).getOnset() < offsetTime) { 
+                        n++;
+                    }
+                    // immediately after
+                    else if (immdAfterOnset == -1 || (corpus.piecesMN[i][j][k+n]).getOnset() == immdAfterOnset) {
+                        immdAfterOnset = (corpus.piecesMN[i][j][k+n]).getOnset();
+                        n++;
+                    }
+                    else {
+                        break;
+                    }
+                }
+                corpus.piecesMN[i][j][k].neighbor = n - 1;
+            }
+        }
+    }
+}
+
 Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const Shape& lShape, const Shape& rShape) {
     int leftSize = lShape.size(), rightSize = rShape.size();
     int pairSize = leftSize + rightSize;
@@ -63,36 +100,19 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
     return pairShape;
 }
 
-/*
-  Counting Methods
-
-  - basicShapeCounting: count shapes in corpus, if samplingRate < 1, every track would have samplingRate of possibilty
-    to be counted.
-
-  - pseudoRelevanceFeedbackInspiredShapeCounting: count shape in randomly sampled corpus first,
-    find the top-k of the result as candidate, and then count the candidate shapes in whole corpus
-
-  alpha: every occurence of a shape increase the occurence count by (1 − alpha * (n−1)), instead of 1
-  n is the index difference between the two merging multi-notes, and alpha is a adjustment parameter in [0, 1)
-*/
-
-void basicShapeCounting(
+void oursShapeCounting(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::map<Shape, int>& shapeCount,
-    double samplingRate,
-    double alpha
+    std::map<Shape, unsigned int>& shapeScore,
+    double samplingRate
 ) {
-    if (alpha < 0 || 1 <= alpha) {
-        throw std::runtime_error("alpha in counting function not in range [0, 1)");
-    }
     if (samplingRate <= 0 || 1 < samplingRate) {
         throw std::runtime_error("samplingRate in counting function not in range (0, 1]");
     }
-    std::map<Shape, int> shapeCountParallel[COUNTING_THREAD_NUM];
-    std::map<Shape, double> shapeCountParallelDouble[COUNTING_THREAD_NUM];
+    std::map<Shape, unsigned int> shapeScoreParallel[COUNTING_THREAD_NUM];
     #pragma omp parallel for num_threads(COUNTING_THREAD_NUM)
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+        int thread_num = omp_get_thread_num();
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drums
@@ -101,7 +121,6 @@ void basicShapeCounting(
             if (samplingRate != 1.0) {
                 if ((double) rand() / RAND_MAX > samplingRate) continue;
             }
-            int thread_num = omp_get_thread_num();
             // for each multinote
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // for each neighbor
@@ -113,165 +132,163 @@ void basicShapeCounting(
                         shapeDict[corpus.piecesMN[i][j][k].getShapeIndex()],
                         shapeDict[corpus.piecesMN[i][j][k+n].getShapeIndex()]
                     );
-                    if (alpha == 0.0) {
-                        if (shapeCountParallel[thread_num].count(s) == 0) {
-                            shapeCountParallel[thread_num].insert(
-                                std::pair<Shape, int>(s, (int) 1)
-                            );
-                        }
-                        else {
-                            shapeCountParallel[thread_num][s]++;
-                        }
-                    }
-                    else {
-                        double v = 1 - alpha * (n - 1);
-                        if (shapeCountParallelDouble[thread_num].count(s) == 0) {
-                            shapeCountParallelDouble[thread_num].insert(
-                                std::pair<Shape, double>(s, v)
-                            );
-                        }
-                        else {
-                            shapeCountParallelDouble[thread_num][s] += v;
-                        }
-                    }
+                    shapeScoreParallel[thread_num][s] += 1;
                 }
             }
         }
     }
     // merge parrallel maps
     for (int j = 0; j < 8; ++j) {
-        if (alpha == 0.0) {
-            for (auto it = shapeCountParallel[j].begin(); it != shapeCountParallel[j].end(); it++) {
-                if (shapeCount.count(it->first)) {
-                    shapeCount[it->first] += it->second;
-                }
-                else {
-                    shapeCount.insert(*it);
-                }
+        if (j == 0) {
+            for (auto it = shapeScoreParallel[j].begin(); it != shapeScoreParallel[j].end(); it++) {
+                shapeScore.insert(*it);
             }
-            shapeCountParallel[j].clear();
         }
         else {
-            for (auto it = shapeCountParallelDouble[j].begin(); it != shapeCountParallelDouble[j].end(); it++) {
-                if (shapeCount.count(it->first)) {
-                    shapeCount[it->first] += it->second;
-                }
-                else {
-                    shapeCount.insert(*it);
-                }
+            for (auto it = shapeScoreParallel[j].begin(); it != shapeScoreParallel[j].end(); it++) {
+                shapeScore[it->first] += it->second;
             }
-            shapeCountParallelDouble[j].clear();
         }
     }
 }
 
-void pseudoRelevanceFeedbackInspiredShapeCounting(
-    const Corpus& corpus,
-    const std::vector<Shape>& shapeDict,
-    std::map<Shape, int>& shapeCount,
-    int k,
-    double samplingRate,
-    double alpha
-) {
-    if (samplingRate <= 0 || 1 <= samplingRate) {
-        throw std::runtime_error("samplingRate in PRF-inspired counting not in range (0, 1)");
-    }
-    if (k <= 0) {
-        throw std::runtime_error("k in PRF-inspired counting is less than zero.");
-    }
-    // first count
-    std::map<Shape, int> firstShapeCount;
-    if (k > 1) {
-        basicShapeCounting(corpus, shapeDict, firstShapeCount, samplingRate, alpha);
-    }
-    else {
-        // if k == 1, this is the same as basicShapeCounting
-        basicShapeCounting(corpus, shapeDict, shapeCount, samplingRate, alpha);
-        return;
-    }
-    // find top k
-    std::priority_queue<std::pair<int, Shape>> pq;
-    for (auto it = firstShapeCount.cbegin(); it != firstShapeCount.cend(); it++) {
-        pq.push(std::pair<int, Shape>((*it).second, (*it).first));
-    }
-    std::set<Shape> topKShapes;
-    for (int i = 0; i < k; ++i) {
-        topKShapes.insert(pq.top().second);
-        pq.pop();
-    }
-    // second count
-    std::map<Shape, int> shapeCountParallel[COUNTING_THREAD_NUM];
-    std::map<Shape, double> shapeCountParallelDouble[COUNTING_THREAD_NUM];
-    #pragma omp parallel for num_threads(COUNTING_THREAD_NUM)
+double calculateAvgMulpiSize(const Corpus& corpus) {
+    std::vector<uint8_t> multipiSizes;
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drums
             if (corpus.piecesTN[i][j] == 128) continue;
-            int thread_num = omp_get_thread_num();
+            // key: 64 bits, upper 29 unused, 20 for onset, 8 for duration (time_unit), 7 for velocity
+            // value: occurence count
+            std::map< uint64_t, uint8_t > thisTrackMulpiSizes;
+            for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
+                uint64_t key = corpus.piecesMN[i][j][k].vel;
+                key |= ((uint16_t) corpus.piecesMN[i][j][k].unit) << 7;
+                key |= corpus.piecesMN[i][j][k].getOnset() << 15;
+                thisTrackMulpiSizes[key] += 1;
+            }
+            for (auto it = thisTrackMulpiSizes.cbegin(); it != thisTrackMulpiSizes.cend(); ++it) {
+                multipiSizes.push_back(it->second);
+            }
+        }
+    }
+    size_t totalMulpiSize = 0;
+    for (int i = 0; i < multipiSizes.size(); ++i) {
+        totalMulpiSize += multipiSizes[i];
+    }
+    return (double) totalMulpiSize / (double) multipiSizes.size();
+}
+
+void symphonyNetShapeCounting(
+    const Corpus& corpus,
+    const std::vector<Shape>& shapeDict,
+    std::map<Shape, unsigned int>& shapeScore,
+    double samplingRate
+) {
+    if (samplingRate <= 0 || 1 < samplingRate) {
+        throw std::runtime_error("samplingRate in counting function not in range (0, 1]");
+    }
+    std::map<Shape, unsigned int> shapeScoreParallel[COUNTING_THREAD_NUM];
+    #pragma omp parallel for num_threads(COUNTING_THREAD_NUM)
+    for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+        int thread_num = omp_get_thread_num();
+        // for each track
+        for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
+            // ignore drums
+            if (corpus.piecesTN[i][j] == 128) continue;
+            // ignore by random
+            if (samplingRate != 1.0) {
+                if ((double) rand() / RAND_MAX > samplingRate) continue;
+            }
             // for each multinote
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // for each neighbor
                 for (int n = 1; n < corpus.piecesMN[i][j][k].neighbor; ++n) {
+                    if (corpus.piecesMN[i][j][k].getOnset() != corpus.piecesMN[i][j][k+n].getOnset()) break;
                     if (corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel) continue;
+                    if (corpus.piecesMN[i][j][k].unit != corpus.piecesMN[i][j][k+n].unit) continue;
                     Shape s = getShapeOfMultiNotePair(
                         corpus.piecesMN[i][j][k],
                         corpus.piecesMN[i][j][k+n],
                         shapeDict[corpus.piecesMN[i][j][k].getShapeIndex()],
                         shapeDict[corpus.piecesMN[i][j][k+n].getShapeIndex()]
                     );
-                    /********
-                      Limit the counting to the top K shapes
-                    ********/
-                    if (topKShapes.count(s) == 0) continue;
-                    if (alpha == 0.0) {
-                        if (shapeCountParallel[thread_num].count(s) == 0) {
-                            shapeCountParallel[thread_num].insert(
-                                std::pair<Shape, int>(s, (int) 1)
-                            );
-                        }
-                        else {
-                            shapeCountParallel[thread_num][s]++;
-                        }
-                    }
-                    else {
-                        double v = 1 - alpha * (n - 1);
-                        if (shapeCountParallelDouble[thread_num].count(s) == 0) {
-                            shapeCountParallelDouble[thread_num].insert(
-                                std::pair<Shape, double>(s, v)
-                            );
-                        }
-                        else {
-                            shapeCountParallelDouble[thread_num][s] += v;
-                        }
-                    }
+                    shapeScoreParallel[thread_num][s] += 1;
                 }
             }
         }
     }
     // merge parrallel maps
     for (int j = 0; j < 8; ++j) {
-        if (alpha == 0.0) {
-            for (auto it = shapeCountParallel[j].begin(); it != shapeCountParallel[j].end(); it++) {
-                if (shapeCount.count(it->first)) {
-                    shapeCount[it->first] += it->second;
-                }
-                else {
-                    shapeCount.insert(*it);
-                }
+        if (j == 0) {
+            for (auto it = shapeScoreParallel[j].begin(); it != shapeScoreParallel[j].end(); it++) {
+                shapeScore.insert(*it);
             }
-            shapeCountParallel[j].clear();
         }
         else {
-            for (auto it = shapeCountParallelDouble[j].begin(); it != shapeCountParallelDouble[j].end(); it++) {
-                if (shapeCount.count(it->first)) {
-                    shapeCount[it->first] += it->second;
-                }
-                else {
-                    shapeCount.insert(*it);
+            for (auto it = shapeScoreParallel[j].begin(); it != shapeScoreParallel[j].end(); it++) {
+                shapeScore[it->first] += it->second;
+            }
+        }
+    }
+}
+
+void wordPieceScoreShapeCounting(
+    const Corpus& corpus,
+    const std::vector<Shape>& shapeDict,
+    std::map<Shape, unsigned int>& shapeScore,
+    double samplingRate
+) {
+    if (samplingRate <= 0 || 1 <= samplingRate) {
+        throw std::runtime_error("samplingRate in PRF-inspired counting not in range (0, 1)");
+    }
+
+    std::vector<unsigned int> dictShapeCount(shapeDict.size(), 0);
+    for (int i = 0; i < shapeDict.size(); ++i) {
+        for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+            for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
+                for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
+                    dictShapeCount[corpus.piecesMN[i][j][k].getShapeIndex()]++;
                 }
             }
-            shapeCountParallelDouble[j].clear();
         }
+    }
+    std::map<Shape, double> shapeScoreParallel[COUNTING_THREAD_NUM];
+    #pragma omp parallel for num_threads(COUNTING_THREAD_NUM)
+    for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+        // for each track
+        int thread_num = omp_get_thread_num();
+        for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
+            // ignore drums
+            if (corpus.piecesTN[i][j] == 128) continue;
+            // for each multinote
+            for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
+                // for each neighbor
+                for (int n = 1; n < corpus.piecesMN[i][j][k].neighbor; ++n) {
+                    if (corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel) continue;
+                    int lShapeIndex = corpus.piecesMN[i][j][k].getShapeIndex(),
+                        rShapeIndex = corpus.piecesMN[i][j][k+n].getShapeIndex();
+                    Shape s = getShapeOfMultiNotePair(
+                        corpus.piecesMN[i][j][k],
+                        corpus.piecesMN[i][j][k+n],
+                        shapeDict[lShapeIndex],
+                        shapeDict[rShapeIndex]
+                    );
+                    double v = 1 / (dictShapeCount[lShapeIndex] + dictShapeCount[rShapeIndex]);
+                    shapeScoreParallel[thread_num][s] += v;
+                }
+            }
+        }
+    }
+    // merge parrallel maps
+    for (int j = 1; j < 8; ++j) {
+        for (auto it = shapeScoreParallel[j].cbegin(); it != shapeScoreParallel[j].cend(); it++) {
+            shapeScoreParallel[0][it->first] += it->second;
+        }
+    }
+    // 
+    for (auto it = shapeScoreParallel[0].cbegin(); it != shapeScoreParallel[0].cend(); it++) {
+        shapeScore.insert(std::pair<Shape, unsigned int>(it->first, (unsigned int) it->second));
     }
 }

@@ -1,0 +1,17 @@
+#!/bin/bash
+# midi preprocessing
+USE_EXISTED=true
+NTH=96
+MAX_TRACK_NUMBER=32
+MAX_DURATION=96
+CONTINUING_NOTE=true
+VELOCITY_STEP=4
+TEMPO_MIN=24
+TEMPO_MAX=200
+TEMPO_STEP=1
+POSITION_METHOD="attribute"
+PROCESS_WORKERS=1
+MIDI_DIR_PATH="data/test_midis"
+MIDI_TO_TEXT_OTHER_ARGUMENTS="--verbose --make-stats"
+DATA_NAME="test_midis"
+

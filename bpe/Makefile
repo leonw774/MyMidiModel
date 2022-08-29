@@ -6,3 +6,6 @@ shapecounting.o: shapecounting.cpp shapecounting.hpp corpus.hpp ;
 
 corpus.o: corpus.cpp corpus.hpp ;
 	g++ -g -c corpus.cpp -o corpus.o
+
+clean: 
+	rm *.o learn_vocab

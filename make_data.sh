@@ -1,57 +1,81 @@
 #!/bin/bash
-# check if first argument is a file
-if [ -f "$1" ]; then
-    if source $1; then
-        echo "source $1: success"
+
+if [ $# -ne 3 ]; then
+    echo "Expect arguments to be three configuration file name for midi, bpe and model."
+fi
+
+# check if all argument is a file and execute them to get their vars
+FULL_CONFIG_NAME=$1"-"$2"-"$3
+MIDI_CONFIG="configs/midi/"$1".sh"
+BPE_CONFIG="configs/bpe/"$2".sh"
+MODEL_CONFIG="configs/model/"$3".sh"
+
+for CONFIG_PATH in $MIDI_CONFIG $BPE_CONFIG $MODEL_CONFIG
+do
+    if [ -f "$CONFIG_PATH" ]; then
+        if source $CONFIG_PATH; then
+            echo "source $CONFIG_PATH: success"
+        else
+            echo "source $CONFIG_PATH: fail"
+            exit 1
+        fi
     else
-        echo "source $1: fail"
+        echo "'$CONFIG_PATH' file not exists"
         exit 1
     fi
-else
-    echo "'$1' file not exists"
-    exit 1
-fi
+done
 
-echo $PROC_DATA_NAME
-LOG_PATH="./logs/$(date '+%Y%m%d%H%M')_$PROC_DATA_NAME.log"
-echo "log file: $LOG_PATH"
+LOG_PATH="./logs/$(date '+%Y%m%d%H%M')-${FULL_CONFIG_NAME}.log"
+echo "Log file: $LOG_PATH"
 touch $LOG_PATH
 
-if [ "$2" != "--no-m2t" ]; then
-    python3 midi_to_text.py --nth $NTH --max-track-number $MAX_TRACK_NUMBER --max-duration $MAX_DURATION --velocity-step $VELOCITY_STEP \
-        --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --position-method $POSITION_METHOD $MIDI_OTHER_ARGUMENTS \
-        --log $LOG_PATH -w $PROCESS_WORKERS -r -o data/corpus/$PROC_DATA_NAME $MIDI_DIR_PATH
-    test $? -ne 0 && echo "midi_to_text.py failed. make_data.sh exit." && exit 1
-else
-    echo "skipped midi_to_text.py"
+CORPUS_DIR_PATH="data/corpus/${DATA_NAME}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}_v${VELOCITY_STEP}_t${TEMPO_MIN}_${TEMPO_MAX}_${TEMPO_STEP}_pos${POSITION_METHOD}"
+if [ $USE_EXISTED == true ]; then
+    MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --use-existed"
+    echo "Appended --use-existed"
 fi
+if [ $CONTINUING_NOTE == true ]; then
+    MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --use-continuing-note"
+    echo "Appended --use-continuing-note"
+fi
+
+python3 midi_to_text.py --nth $NTH --max-track-number $MAX_TRACK_NUMBER --max-duration $MAX_DURATION --velocity-step $VELOCITY_STEP \
+    --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --position-method $POSITION_METHOD $MIDI_TO_TEXT_OTHER_ARGUMENTS \
+    --log $LOG_PATH -w $PROCESS_WORKERS -r -o $CORPUS_DIR_PATH $MIDI_DIR_PATH
+test $? -ne 0 && { echo "midi_to_text.py failed. make_data.sh exit." | tee -a $LOG_PATH ; } && exit 1
+
 
 if [ $BPE_ITER -ne 0 ]; then
     echo "start learn bpe vocab"
+    CORPUS_DIR_PATH_WITH_BPE="${CORPUS_DIR_PATH}_bpe${BPE_ITER}_${SHAPECOUNT_METHOD}_${SHAPECOUNT_SAMPLERATE}"
 
     # compile
     make -C ./bpe
-    test $? -ne 0 && echo "learn_vocab compile error. make_data.sh exit." && exit 1
+    test $? -ne 0 && { echo "learn_vocab compile error. make_data.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
     # create new dir 
-    if [ -d data/corpus/$PROC_DATA_NAME_WITH_BPE ]; then
-        rm -f data/corpus/${PROC_DATA_NAME_WITH_BPE}/*
+    if [ -d $CORPUS_DIR_PATH_WITH_BPE ]; then
+        rm -f ${CORPUS_DIR_PATH_WITH_BPE}/*
     else
-        mkdir data/corpus/$PROC_DATA_NAME_WITH_BPE
+        mkdir $CORPUS_DIR_PATH_WITH_BPE
     fi
-    # move paras and pathlist
-    cp data/corpus/${PROC_DATA_NAME}/p* data/corpus/${PROC_DATA_NAME_WITH_BPE}
-    # use tee command to copy stdout to log
-    bpe/learn_vocab data/corpus/${PROC_DATA_NAME} $BPE_ITER \
-        $SHAPECOUNT_SAMPLERATE $SHAPECOUNT_ALPHA $SHAPECOUNT_PRFTOPK | tee -a $LOG_PATH
+
+    # copy paras and pathlist
+    cp "./${CORPUS_DIR_PATH}/paras" $CORPUS_DIR_PATH_WITH_BPE
+    cp "./${CORPUS_DIR_PATH}/pathlist" $CORPUS_DIR_PATH_WITH_BPE
+
+    # run learn_vocab and use tee command to copy stdout to log
+    bpe/learn_vocab $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SHAPECOUNT_METHOD $SHAPECOUNT_SAMPLERATE | tee -a $LOG_PATH
     BPE_EXIT_CODE=${PIPESTATUS[0]}
-    test $BPE_EXIT_CODE -ne 0 && echo "learn_vocab failed. exit code:$BPE_EXIT_CODE. make_data.sh exit." && exit 1
+    test $BPE_EXIT_CODE -ne 0 && { echo "learn_vocab failed. exit code: $BPE_EXIT_CODE. make_data.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
     # check if tokenized corpus is equal to original corpus
-    # sample size of 100 seem to be enough
-    python3 verify_corpus_equality.py data/corpus/${PROC_DATA_NAME} data/corpus/${PROC_DATA_NAME}_bpeiter${BPE_ITER} 100
-    test $? -ne 0 && echo "make_data.sh exit." && exit 1
+    # this is buggy so not using it
+    # python3 verify_corpus_equality.py $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE 100 | tee -a $LOG_PATH
+    # test $? -ne 0 && echo "make_data.sh exit." && exit 1
+
+    # replace CORPUS_DIR_PATH to CORPUS_DIR_PATH_WITH_BPE
+    CORPUS_DIR_PATH=$CORPUS_DIR_PATH_WITH_BPE
 fi
 
-python3 text_to_array.py $DATA_OTHER_ARGUMENTS --max-sample-length $MAX_SAMPLE_LENGTH --bpe $BPE_ITER --log $LOG_PATH \
-    data/corpus/$PROC_DATA_NAME
+python3 text_to_array.py --max-sample-length $MAX_SAMPLE_LENGTH --bpe $BPE_ITER --log $LOG_PATH $TEXT_TO_ARRAY_OTHER_ARGUMENTS $CORPUS_DIR_PATH

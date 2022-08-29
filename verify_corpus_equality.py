@@ -5,7 +5,6 @@ from collections import Counter
 
 from util import CorpusIterator, get_corpus_paras, piece_to_midi
 
-
 def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size: int) -> bool:
     """
         This function takes two corpus and check if they are "equal",
@@ -47,22 +46,22 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size: in
                 print(f'exception in piece_to_midi of {b_corpus_dir} piece #{i}')
                 raise e
 
-            if any( o_t.qpm != t_t.qpm or o_t.time != t_t.time
-                    for o_t, t_t in zip(a_midi.tempos, b_midi.tempos) ):
+            if any( o_t.tempo != t_t.tempo or o_t.time != t_t.time
+                    for o_t, t_t in zip(a_midi.tempo_changes, b_midi.tempo_changes) ):
                 return False
 
 
             if any( o_t.numerator != t_t.numerator or o_t.denominator != t_t.denominator or o_t.time != t_t.time
-                    for o_t, t_t in zip(a_midi.time_signatures, b_midi.time_signatures) ):
+                    for o_t, t_t in zip(a_midi.time_signature_changes, b_midi.time_signature_changes) ):
                 return False
 
             a_track_index_mapping = {
                 (track.program, track.is_drum): i
-                for i, track in enumerate(a_midi.tracks)
+                for i, track in enumerate(a_midi.instruments)
             }
             b_track_index_mapping = {
                 (track.program, track.is_drum): i
-                for i, track in enumerate(b_midi.tracks)
+                for i, track in enumerate(b_midi.instruments)
             }
             a_tracks_counter = dict(Counter(a_track_index_mapping.keys()))
             b_tracks_counter = dict(Counter(b_track_index_mapping.keys()))
@@ -70,10 +69,16 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size: in
                 return False
 
             for track_feature in a_track_index_mapping.keys():
-                a_track = a_midi.tracks[a_track_index_mapping[track_feature]]
-                b_track = b_midi.tracks[b_track_index_mapping[track_feature]]
-                a_track_notes = frozenset(a_track.notes)
-                b_track_notes = frozenset(b_track.notes)
+                a_track = a_midi.instruments[a_track_index_mapping[track_feature]]
+                b_track = b_midi.instruments[b_track_index_mapping[track_feature]]
+                a_track_notes = frozenset({
+                    (n.start, n.end, n.pitch, n.velocity)
+                    for n in a_track.notes
+                })
+                b_track_notes = frozenset({
+                    (n.start, n.end, n.pitch, n.velocity)
+                    for n in b_track.notes
+                })
                 if a_track_notes != b_track_notes:
                     # because sometimes there are two or more overlapping notes of same pitch and velocity
                     # if there is a continuing note in them, they will cause ambiguity in note merging
@@ -82,10 +87,11 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size: in
                     a_midi.dump(file=a_bytes_io)
                     b_midi.dump(file=b_bytes_io)
                     if a_bytes_io.getvalue() != b_bytes_io.getvalue():
+                        different_notes = (a_track_notes.union(b_track_notes)).difference(a_track_notes.intersection(b_track_notes))
                         print(
-                            f'notes difference non-empty: {a_track_notes.difference(b_track_notes)}\n'
-                            f'{a_corpus_dir}: piece#{a_piece}, track#{a_track_index_mapping[track_feature]}\n'\
-                            f'{b_corpus_dir}: piece#{b_piece}, track#{b_track_index_mapping[track_feature]}'\
+                            f'notes difference non-empty: {len(different_notes)} / ({len(a_track_notes)} + {len(b_track_notes)})\n'\
+                            f'{a_corpus_dir}: piece#{i}, track#{a_track_index_mapping[track_feature]}\n'\
+                            f'{b_corpus_dir}: piece#{i}, track#{b_track_index_mapping[track_feature]}'\
                         )
                         return False
     return True
