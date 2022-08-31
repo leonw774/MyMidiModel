@@ -19,7 +19,7 @@ from util import (
     to_pathlist_file_path,
     dump_corpus_paras,
     CorpusIterator,
-    tokstr2int
+    b36str2int
 )
 
 
@@ -138,22 +138,21 @@ def parse_args():
     return parser.parse_args()
 
 
-def handler(args_dict: dict) -> bytes:
+def handler(args_dict: dict):
     n = args_dict.pop('n', 0)
     verbose = args_dict.pop('verbose', False)
-    no_compress = args_dict.pop('no_compress', False)
     logging.debug('%d pid: %d file path: %s', n, os.getpid(), args_dict['midi_file_path'])
     try:
         text_list = midi_to_text_list(**args_dict)
         piece_bytes = ' '.join(text_list).encode()
-        # return compressed text if using multiprocess. because memory usage issue
-        return piece_bytes if no_compress else zlib.compress(piece_bytes)
+        # return compressed text because memory usage issue
+        return zlib.compress(piece_bytes)
     except KeyboardInterrupt as e:
         raise e
-    except Exception:
+    except Exception as e:
         if verbose:
             logging.debug(format_exc())
-        return b''
+        return repr(e)
 
 
 def loop_func(
@@ -163,20 +162,20 @@ def loop_func(
 
     token_number_list = []
     good_path_list = []
-    bad_count = 0
+    bad_reasons_counter = Counter()
     for n, midi_file_path in tqdm(enumerate(midi_file_path_list), total=len(midi_file_path_list)):
         n_args_dict = dict(args_dict)
         n_args_dict['n'] = n
         n_args_dict['midi_file_path'] = midi_file_path
-        n_args_dict['no_compress'] = True
-        piece_bytes = handler(n_args_dict)
-        if len(piece_bytes) > 0:
-            piece = piece_bytes.decode()
+        compressed_piece = handler(n_args_dict)
+        if isinstance(compressed_piece, bytes):
+            piece = zlib.decompress(compressed_piece).decode()
             out_file.write(piece + '\n')
             token_number_list.append(piece.count(' ')+1)
             good_path_list.append(midi_file_path)
         else:
-            bad_count += 1
+            bad_reasons_counter[compressed_piece] += 1
+    logging.info('Bad reasons counter: %s', str(dict(bad_reasons_counter)))
     return token_number_list, good_path_list
 
 
@@ -194,9 +193,9 @@ def mp_func(
         args_dict_list.append(a)
     logging.info('Start pool with %d workers', mp_work_number)
 
-    bad_count = 0
     token_number_list = []
     good_path_list = []
+    bad_reasons = Counter()
     with Pool(mp_work_number) as p:
         compressed_piece_list = list(tqdm(
             p.imap(handler, args_dict_list),
@@ -204,14 +203,15 @@ def mp_func(
         ))
     logging.info('Multi-processing end. Object size: %d bytes', sum(sys.getsizeof(cp) for cp in compressed_piece_list))
     for i, compressed_piece in enumerate(compressed_piece_list):
-        if len(compressed_piece) > 0:
+        if isinstance(compressed_piece, bytes):
             piece = zlib.decompress(compressed_piece).decode()
             out_file.write(piece+'\n')
             token_number_list.append(piece.count(' ')+1) # token number = space number + 1
             good_path_list.append(args_dict_list[i]['midi_file_path'])
         else:
-            bad_count += 1
-    logging.info('Bad file count: %d', bad_count)
+            bad_reasons[compressed_piece] += 1
+
+    logging.info('Bad reasons counter: %s', str(dict(bad_reasons)))
     return token_number_list, good_path_list
 
 
@@ -303,17 +303,19 @@ def main():
         else:
             token_number_list, good_path_list = mp_func(file_path_list, out_corpus_file, args.mp_work_number, args_dict)
 
-    with open(to_pathlist_file_path(args.output_path), 'w+', encoding='utf8') as good_path_list_file:
-        good_path_list_file.write('\n'.join(good_path_list))
-        good_path_list_file.close()
-
     logging.info('Processed %d files', len(token_number_list))
     if len(token_number_list) > 0:
         logging.info('Average tokens: %.3f per file', sum(token_number_list)/len(token_number_list))
     else:
-        logging.info('No file is processed')
+        logging.info('No midi file is processed')
+        shutil.rmtree(args.output_path)
+        logging.info('Removed output directory: %s', args.output_path)
         return 1
     logging.info('Process time: %.3f', time()-start_time)
+
+    with open(to_pathlist_file_path(args.output_path), 'w+', encoding='utf8') as good_path_list_file:
+        good_path_list_file.write('\n'.join(good_path_list))
+        good_path_list_file.close()
 
     if args.make_stats:
         start_time = time()
@@ -334,7 +336,7 @@ def main():
                 tracks_text = piece[4:head_end]
                 track_tokens = tracks_text.split()
                 for track_token in track_tokens:
-                    instrument_id = tokstr2int(track_token.split(':')[1])
+                    instrument_id = b36str2int(track_token.split(':')[1])
                     text_stats['instrument_distribution'][instrument_id] += 1
                 note_token_number = piece.count(' N')
                 text_stats['token_type_distribution']['note'] += note_token_number

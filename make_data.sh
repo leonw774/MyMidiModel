@@ -1,5 +1,5 @@
 #!/bin/bash
-
+echo "make_data.sh start."
 if [ $# -ne 3 ]; then
     echo "Expect arguments to be three configuration file name for midi, bpe and model."
 fi
@@ -78,4 +78,6 @@ if [ $BPE_ITER -ne 0 ]; then
     CORPUS_DIR_PATH=$CORPUS_DIR_PATH_WITH_BPE
 fi
 
-python3 text_to_array.py --max-sample-length $MAX_SAMPLE_LENGTH --bpe $BPE_ITER --log $LOG_PATH $TEXT_TO_ARRAY_OTHER_ARGUMENTS $CORPUS_DIR_PATH
+python3 text_to_array.py --max-seq-length $MAX_SEQ_LENGTH --bpe $BPE_ITER --log $LOG_PATH $TEXT_TO_ARRAY_OTHER_ARGUMENTS $CORPUS_DIR_PATH
+
+echo "make_data.sh start."

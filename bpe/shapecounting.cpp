@@ -159,13 +159,27 @@ double calculateAvgMulpiSize(const Corpus& corpus) {
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drums
             if (corpus.piecesTN[i][j] == 128) continue;
+
             // key: 64 bits, upper 29 unused, 20 for onset, 8 for duration (time_unit), 7 for velocity
             // value: occurence count
             std::map< uint64_t, uint8_t > thisTrackMulpiSizes;
+
+            // because in the paper it says 'position' (as in the measure), instead of onset (global time position)
+            unsigned int measureCursor = 0;
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
+                // update measureCursor
+                while (measureCursor < corpus.piecesTS[i].size() - 1) {
+                    if (!corpus.piecesTS[i][measureCursor].getT()) {
+                        if (corpus.piecesMN[i][j][k].getOnset() < corpus.piecesTS[i][measureCursor+1].onset) {
+                            break;
+                        }
+                    }
+                    measureCursor++;
+                }
+
                 uint64_t key = corpus.piecesMN[i][j][k].vel;
                 key |= ((uint16_t) corpus.piecesMN[i][j][k].unit) << 7;
-                key |= corpus.piecesMN[i][j][k].getOnset() << 15;
+                key |= (corpus.piecesMN[i][j][k].getOnset() - corpus.piecesTS[i][measureCursor].onset) << 15;
                 thisTrackMulpiSizes[key] += 1;
             }
             for (auto it = thisTrackMulpiSizes.cbegin(); it != thisTrackMulpiSizes.cend(); ++it) {

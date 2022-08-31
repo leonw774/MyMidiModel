@@ -1,11 +1,15 @@
-from io import IOBase
 import random
-import re
-from time import time
+# from time import time
 
 from miditoolkit import MidiFile, Instrument, TempoChange, TimeSignature, Note
 
-from .tokens import *
+from .tokens import (
+    NoteToken, TempoToken, PositionToken, MeasureToken, TrackToken, BeginOfScoreToken, EndOfScoreToken,
+    TYPE_PRIORITY,
+    is_supported_time_signature,
+    token_to_str,
+    b36str2int,
+)
 
 
 def merge_drums(midi: MidiFile) -> None:
@@ -32,7 +36,7 @@ def merge_tracks(
 
     if use_merge_drums:
         merge_drums(midi)
-    
+
     # remove tracks with no notes
     midi.instruments = [
         track
@@ -77,7 +81,7 @@ def merge_tracks(
             for track in track_list
         ]
         assert len(good_tracks_mapping) <= max_track_number, \
-            f'track number exceed max_track_number after merge: {len(good_tracks_mapping)}'
+            f'Track number exceed max_track_number after merge: {len(good_tracks_mapping)}'
         midi.instruments = good_tracks_mapping
 
 
@@ -119,12 +123,11 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
     clip_mask = bit_clip - 1
     for track in midi.instruments:
         for note in track.notes:
-            assert note.start >= 0 and note.end > 0, f"Invalid note: {(note)}"
+            assert note.start >= 0 and note.end > 0, 'Invalid note: start < 0 or end <= 0'
             if note.start > bit_clip:
                 note.start &= clip_mask
             if note.end > bit_clip:
                 note.end &= clip_mask
-            assert note.end >= note.start, f"Invalid note: {(note)}"
             # dont throw exception at note.start==note.end, we just need to remove them
 
     note_token_list = [
@@ -137,7 +140,7 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
         )
         for track_number, inst in enumerate(midi.instruments)
         for note in inst.notes
-        if note.start != note.end
+        if note.start < note.end
     ]
     # handle too long duration
     # continuing means this note this going to connect to a note after max_duration
@@ -235,7 +238,8 @@ def get_time_structure_tokens(
 
         # check if the difference of starting time between current and next are multiple of current measure's length
         assert (next_timesig_start - cur_timesig_start) % nth_per_measure == 0, \
-            f'Bad starting time of time signatures: ({next_timesig_start}-{cur_timesig_start})%{nth_per_measure}'
+            'Bad starting time of a time signatures'
+            # f'Bad starting time of a time signatures: ({next_timesig_start}-{cur_timesig_start})%{nth_per_measure}'
 
         # find the first measure that at least contain the first note
         while cur_timesig_start + nth_per_measure <= first_note_start:
@@ -383,7 +387,7 @@ def midi_to_token_list(
     note_token_list = get_note_tokens(midi, max_duration, velocity_step, use_cont_note)
     measure_token_list, tempo_token_list = get_time_structure_tokens(midi, note_token_list, nth, tempo_quantization)
     assert measure_token_list[0].onset <= note_token_list[0].onset, 'First measure is after first note'
-    assert len(note_token_list) * 4 > len(measure_token_list) * len(midi.instruments), 'music too sparse'
+    assert len(note_token_list) * 4 > len(measure_token_list) * len(midi.instruments), 'Notes too sparse'
     pos_token_list = get_position_infos(note_token_list, measure_token_list, tempo_token_list, position_method)
     body_token_list = pos_token_list + note_token_list + measure_token_list + tempo_token_list
     body_token_list.sort()
@@ -422,11 +426,11 @@ def midi_to_text_list(
 
     assert nth > 4 and nth % 4 == 0, 'nth is not multiple of 4'
     assert max_track_number <= 255, f'max_track_number is greater than 255: {max_track_number}'
-    assert tempo_quantization[0] <= tempo_quantization[1] and tempo_quantization[2] > 0, 'bad tempo_quantization'
+    assert tempo_quantization[0] <= tempo_quantization[1] and tempo_quantization[2] > 0, 'Bad tempo_quantization'
 
     # start_time = time()
     midi = MidiFile(midi_file_path)
-    assert len(midi.instruments) > 0
+    assert len(midi.instruments) > 0, 'No tracks in MidiFile'
     for i in range(len(midi.instruments)):
         midi.instruments[i].remove_invalid_notes(verbose=False)
     # print('original ticks per beat:', midi.ticks_per_beat)
@@ -440,7 +444,7 @@ def midi_to_text_list(
 
     token_list = midi_to_token_list(midi, nth, max_duration, velocity_step, use_cont_note, tempo_quantization, position_method)
 
-    text_list = list(map(token_to_text, token_list))
+    text_list = list(map(token_to_str, token_list))
     # text = ' '.join(map(str, text_list))
     return text_list
 
@@ -494,7 +498,7 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
     midi = MidiFile(ticks_per_beat=nth//4)
 
     text_list = piece.split(' ')
-    assert text_list[0] == 'BOS' and text_list[-1] == 'EOS'
+    assert text_list[0] == 'BOS' and text_list[-1] == 'EOS', 'No BOS and EOS at start and end'
     assert text_list[1][0] == 'R', 'No track token in head'
 
     # debug_str = ''
@@ -506,19 +510,18 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
     for text in text_list[1:-1]:
         typename = text[0]
         if typename == 'R':
-            track_number, instrument = (tokstr2int(x) for x in text[1:].split(':'))
-            assert len(midi.instruments) == track_number
+            track_number, instrument = (b36str2int(x) for x in text[1:].split(':'))
+            assert len(midi.instruments) == track_number, 'Track token\'s track_number is not ascending'
             midi.instruments.append(
                 Instrument(program=(instrument%128), is_drum=(instrument==128), name=f'Track_{track_number}')
             )
 
         elif typename == 'M':
-            numer, denom = (tokstr2int(x) for x in text[1:].split('/'))
+            numer, denom = (b36str2int(x) for x in text[1:].split('/'))
             if cur_measure_onset == -1: # first measure
                 cur_measure_onset = 0
                 cur_time = 0
             else:
-                assert cur_measure_length > 0
                 cur_measure_onset += cur_measure_length
                 cur_time = cur_measure_onset
 
@@ -529,25 +532,25 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
             # print("M", attr, cur_measure_onset)
 
         elif typename == 'P':
-            position = tokstr2int(text[1:])
+            position = b36str2int(text[1:])
             cur_time = position + cur_measure_onset
             # print('P', attr)
 
         elif typename == 'T':
             if ':' in text[1:]:
-                tempo, position = (tokstr2int(x) for x in text[1:].split(':'))
+                tempo, position = (b36str2int(x) for x in text[1:].split(':'))
                 cur_time = position + cur_measure_onset
                 midi.tempo_changes.append(TempoChange(tempo=tempo, time=cur_time))
             else:
-                midi.tempo_changes.append(TempoChange(tempo=tokstr2int(text[1:]), time=cur_time))
+                midi.tempo_changes.append(TempoChange(tempo=b36str2int(text[1:]), time=cur_time))
             # print('T', text, cur_time)
 
         elif typename == 'N':
             is_cont = (text[1] == '~')
             if is_cont:
-                note_attr = tuple(tokstr2int(x) for x in text[3:].split(':'))
+                note_attr = tuple(b36str2int(x) for x in text[3:].split(':'))
             else:
-                note_attr = tuple(tokstr2int(x) for x in text[2:].split(':'))
+                note_attr = tuple(b36str2int(x) for x in text[2:].split(':'))
             if len(note_attr) == 5:
                 cur_time = note_attr[4] + cur_measure_onset
                 note_attr = note_attr[:4]
@@ -561,12 +564,12 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
             for s in shape_string[:-1].split(';'):
                 is_cont = (s[-1] == '~')
                 if is_cont:
-                    relnote = [tokstr2int(a) for a in s[:-1].split(',')]
+                    relnote = [b36str2int(a) for a in s[:-1].split(',')]
                 else:
-                    relnote = [tokstr2int(a) for a in s.split(',')]
+                    relnote = [b36str2int(a) for a in s.split(',')]
                 relnote = [is_cont] + relnote
                 relnote_list.append(relnote)
-            base_pitch, time_unit, velocity, track_number, *position = (tokstr2int(x) for x in puvt)
+            base_pitch, time_unit, velocity, track_number, *position = (b36str2int(x) for x in puvt)
             if len(position) == 1:
                 cur_time = position[0] + cur_measure_onset
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
@@ -579,7 +582,7 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
                 # debug_str += ' onset' + str(onset_time_in_tick) + ' ' + str(n) + ','
             # debug_str += '\n'
         else:
-            raise TokenParseError(f'bad token string: {text}')
+            raise ValueError(f'bad token string: {text}')
 
     if len(pending_cont_notes) > 0:
         # try to repair

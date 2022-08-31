@@ -11,20 +11,20 @@ from tqdm import tqdm
 
 from util import (
     to_shape_vocab_file_path,
-    to_vocabs_json_file_path,
+    to_vocabs_file_path,
     get_corpus_paras,
     CorpusIterator,
     build_vocabs,
     text_list_to_array,
-    array_to_text_list
+    get_input_array_debug_string
 )
 
 
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
-        '--max-sample-length',
-        dest='max_sample_length',
+        '--max-seq-length',
+        dest='max_seq_length',
         type=int,
         default=4096
     )
@@ -87,9 +87,9 @@ def main():
     with CorpusIterator(args.corpus_dir_path) as corpus_iterator:
         assert len(corpus_iterator) > 0, f'empty corpus: {args.corpus_dir_path}'
 
-        vocab_dicts, summary_string = build_vocabs(corpus_iterator, corpus_paras, args.max_sample_length, bpe_shapes_list)
-        with open(to_vocabs_json_file_path(args.corpus_dir_path), 'w+', encoding='utf8') as vocabs_file:
-            json.dump(vocab_dicts, vocabs_file)
+        vocabs_dict, summary_string = build_vocabs(corpus_iterator, corpus_paras, args.max_seq_length, bpe_shapes_list)
+        with open(to_vocabs_file_path(args.corpus_dir_path), 'w+', encoding='utf8') as vocabs_file:
+            json.dump(vocabs_dict, vocabs_file)
         logging.info(summary_string)
 
         start_time = time()
@@ -111,7 +111,7 @@ def main():
 
         os.makedirs(npy_dir_path)
         for i, p in tqdm(enumerate(corpus_iterator), total=len(corpus_iterator)):
-            array = text_list_to_array(p.split(), vocab_dicts)
+            array = text_list_to_array(p.split(), vocabs_dict)
             np.save(os.path.join(npy_dir_path, str(i)), array)
 
         # zip all the npy files into one file with '.npz' extension
@@ -123,28 +123,22 @@ def main():
         # for debugging
         if args.debug:
             p0 = next(iter(corpus_iterator))
-            array_data = text_list_to_array(p0.split(), vocab_dicts)
-            array_text_byteio = io.BytesIO()
-            debug_txt_path = os.path.join(args.corpus_dir_path, 'text_list_to_array_debug.txt')
-            print(f'Write debug file: {debug_txt_path}')
-            np.savetxt(array_text_byteio, array_data, fmt='%d')
-            array_text_list = array_text_byteio.getvalue().decode().split('\n')
             original_text_list = p0.split()
-            reconst_text_list = array_to_text_list(array_data, vocab_dicts)
-            text_data_reconst_text_list = [
-                (t, *d.split(), rt)
-                for t, d, rt in zip(original_text_list, array_text_list, reconst_text_list)
-            ]
+            array_data = text_list_to_array(p0.split(), vocabs_dict)
+
+            debug_txt_path = os.path.join(args.corpus_dir_path, 'text_to_array_debug.txt')
+            print(f'Write debug file: {debug_txt_path}')
+
+            debug_str = get_input_array_debug_string(array_data, None, vocabs_dict)
+            debug_str_list = debug_str.splitlines()
+            original_text_list = [f'{"original_text":<50} '] + original_text_list
+
             with open(debug_txt_path, 'w+', encoding='utf8') as f:
-                f.write(
-                    f"{'token_text':<50}{'evt':>5}{'pit':>5}{'dur':>5}{'vel':>5}"
-                    + f"{'trn':>5}{'ins':>5}{'tmp':>5}{'pos':>5}{'mea':>5}     {'reconstructed_text'}\n")
-                formated_lines = [
-                    f"{line[0]:<50}{line[1]:>5}{line[2]:>5}{line[3]:>5}{line[4]:>5}{line[5]:>5}"
-                    + f"{line[6]:>5}{line[7]:>5}{line[8]:>5}{line[9]:>5}     {line[10]}"
-                    for line in text_data_reconst_text_list
+                merged_lines = [
+                    f'{origi:<50} {debug}'
+                    for origi, debug in zip(original_text_list, debug_str_list)
                 ]
-                f.write('\n'.join(formated_lines))
+                f.write('\n'.join(merged_lines))
 
     logging.info('npys write time: %.3f', time()-start_time)
     logging.info('make_data.py exited')

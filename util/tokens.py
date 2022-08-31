@@ -1,21 +1,3 @@
-"""
-    Define tokens as collections.namedtuple
-
-    For all tokens:
-    The time unit of onset is absolute timing. The unit is n-th note.
-
-    For position tokens, tempo tokens and measure tokens:
-    Except for onset, position, bpm and time_signature, the other attributes are meaningless and should
-    always be the default value (-1). The onset time of a position token or a measure-related
-    token is the start time of its position or measure in the time unit.
-
-    For track tokens:
-    Except for type_priority, track_number and instrument, other attributes are meaningless.
-
-    For begin-of-score and end-of-score token:
-    Every attributes should be left as default.
-"""
-
 from collections import namedtuple
 
 _COMMON_FIELD_NAMES = ['onset', 'type_priority']
@@ -86,7 +68,7 @@ def is_supported_time_signature(numerator, denominator):
 # python support up to base=36 in int function
 TOKEN_INT2STR_BASE = 36
 
-def tokint2str(x: int) -> str:
+def int2b36str(x: int) -> str:
     if 0 <= x < TOKEN_INT2STR_BASE:
         return '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[x]
     isneg = x < 0
@@ -98,19 +80,17 @@ def tokint2str(x: int) -> str:
         b = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[d] + b
     return ('-' + b) if isneg else b
 
-def tokstr2int(x: str):
+def b36str2int(x: str):
     return int(x, TOKEN_INT2STR_BASE)
 
 
-SPECIAL_TOKENS = ['[PAD]', '[MASK]', '[UNK]']
-# SPECIAL_TOKENS = ['[PAD]', '[MASK]', '[UNK]', '[SEP]', '[START]', '[END]']
+# pad token have to be the "zero-th" token
+# SPECIAL_TOKENS = ['<PAD>', '<UNK>']
+# unknown token may be unessaccery as the whole corpus is preprocessed such that no token would be unknown
+SPECIAL_TOKENS = ['<PAD>']
 
 
-class TokenParseError(Exception):
-    pass
-
-
-def token_to_text(token: namedtuple) -> str:
+def token_to_str(token: namedtuple) -> str:
     # typename = token.__class__.__name__
     type_priority = token.type_priority
 
@@ -118,28 +98,28 @@ def token_to_text(token: namedtuple) -> str:
         # event:pitch:duration:velocity:track:instrument(:position)
         # negtive duration means is_cont==True
         text = 'N' if token.duration > 0 else 'N~'
-        text += ( f':{tokint2str(token.pitch)}'
-                + f':{tokint2str(abs(token.duration))}'
-                + f':{tokint2str(token.velocity)}'
-                + f':{tokint2str(token.track_number)}')
+        text += ( f':{int2b36str(token.pitch)}'
+                + f':{int2b36str(abs(token.duration))}'
+                + f':{int2b36str(token.velocity)}'
+                + f':{int2b36str(token.track_number)}')
         if token.position != -1:
-            text += f':{tokint2str(token.position)}'
+            text += f':{int2b36str(token.position)}'
         return text
 
     elif type_priority == TYPE_PRIORITY['PositionToken']:
-        return f'P{tokint2str(token.position)}'
+        return f'P{int2b36str(token.position)}'
 
     elif type_priority == TYPE_PRIORITY['MeasureToken']:
-        return f'M{tokint2str(token.time_signature[0])}/{tokint2str(token.time_signature[1])}'
+        return f'M{int2b36str(token.time_signature[0])}/{int2b36str(token.time_signature[1])}'
 
     elif type_priority == TYPE_PRIORITY['TempoToken']:
         if token.position == -1:
-            return f'T{tokint2str(token.bpm)}'
-        return f'T{tokint2str(token.bpm)}:{tokint2str(token.position)}'
+            return f'T{int2b36str(token.bpm)}'
+        return f'T{int2b36str(token.bpm)}:{int2b36str(token.position)}'
 
     elif type_priority == TYPE_PRIORITY['TrackToken']:
         # type-track:instrument
-        return f'R{tokint2str(token.track_number)}:{tokint2str(token.instrument)}'
+        return f'R{int2b36str(token.track_number)}:{int2b36str(token.instrument)}'
 
     elif type_priority == TYPE_PRIORITY['BeginOfScoreToken']:
         return 'BOS'
@@ -148,4 +128,4 @@ def token_to_text(token: namedtuple) -> str:
         return 'EOS'
 
     else:
-        raise TokenParseError(f'bad token namedtuple: {token}')
+        raise ValueError(f'bad token namedtuple: {token}')

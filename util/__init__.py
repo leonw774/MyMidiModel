@@ -1,3 +1,3 @@
-from .data_util import *
-from .midi_util import *
+from .corpus import *
+from .midi import *
 from .tokens import *
