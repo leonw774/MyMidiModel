@@ -84,11 +84,9 @@ class MidiDataset(Dataset):
         self._mps_seperators = np.sort(np.array(list(self._mps_seperators)))
 
         # preprocessing
-        self._samples_indices = [] # (pieces_array_index, start_index, end_index)
+        self._filenum_indices = [] # (pieces_array_index, start_index, end_index)
         self._piece_body_start_index = [None] * len(self.piece_files)
-        self._mps_sep_indices = None
-        if use_set_loss:
-            self._mps_sep_indices = [None] * len(self.piece_files)
+        self._mps_sep_indices = [None] * len(self.piece_files) if use_set_loss else None
         for filename in tqdm(self.piece_files, total=len(self.piece_files)):
             filenum = int(filename)
 
@@ -98,28 +96,26 @@ class MidiDataset(Dataset):
             self._piece_body_start_index[filenum] = j
 
             if use_set_loss:
-                # find all split index
+                # find all seperater's index
                 mps_sep_indices = np.flatnonzero(np.isin(self.piece_files[filename][:, 0], self._mps_seperators))
                 self._mps_sep_indices[filenum] = mps_sep_indices
-            else:
-                if self.piece_files[filename].shape[0] > max_seq_length:
-                    for begin_index in range(0, self.piece_files[filename].shape[0] - max_seq_length, sample_stride):
-                        self._samples_indices.append(
-                            (filenum, begin_index, begin_index + max_seq_length)
-                        )
-                else:
-                    self._samples_indices.append(
-                        (filenum, 0, self.piece_files[filename].shape[0])
+
+            if self.piece_files[filename].shape[0] > max_seq_length:
+                for begin_index in range(0, self.piece_files[filename].shape[0] - max_seq_length, sample_stride):
+                    self._filenum_indices.append(
+                        (filenum, begin_index, begin_index + max_seq_length)
                     )
-        # cast self._samples_indices from list of tuples into np array to save space
+            else:
+                self._filenum_indices.append(
+                    (filenum, 0, self.piece_files[filename].shape[0])
+                )
+        # cast self._filenum_indices from list of tuples into np array to save space
         print('self._mps_sep_indices size:', sys.getsizeof(self._mps_sep_indices) / 1024, 'KB')
-        print('self._samples_indices size:', sys.getsizeof(self._samples_indices) / 1024, 'KB')
+        print('self._filenum_indices len:', len(self._filenum_indices))
+        print('self._filenum_indices size:', sys.getsizeof(self._filenum_indices) / 1024, 'KB')
 
     def __getitem__(self, index):
-        if self.use_set_loss:
-            filenum, begin_index, end_index, mps_sep_begin_ptr, mps_sep_end_ptr = self._samples_indices[index]
-        else:
-            filenum, begin_index, end_index = self._samples_indices[index]
+        filenum, begin_index, end_index = self._filenum_indices[index]
         filename = str(filenum)
         sliced_array = np.array(self.piece_files[filename][begin_index:end_index]) # copy
 
@@ -163,10 +159,9 @@ class MidiDataset(Dataset):
         # a numpy array of sequences sep indices would also be returned if self.use_set_loss
         if self.use_set_loss:
             mps_sep_indices = np.array( # make copy
-                self._mps_sep_indices[filenum][mps_sep_begin_ptr:mps_sep_end_ptr]
+                self._mps_sep_indices[filenum]
             )
-            # change to relative indices
-            assert begin_index == mps_sep_indices[0]
+            mps_sep_indices = mps_sep_indices[(mps_sep_indices >= begin_index) & (mps_sep_indices < end_index)]
             mps_sep_indices -= begin_index
             # add begin of note sequence
             note_sequence_begin_indices = np.flatnonzero(np.isin(sliced_array[:, 0], self._position_ids)) + 1
@@ -184,18 +179,20 @@ class MidiDataset(Dataset):
 
 
     def __len__(self):
-        return len(self._samples_indices)
+        return len(self._filenum_indices)
 
 
 def collate_mididataset(data):
     """
-        for batched samples: stack them on batch-first to becom 3-d array and pad them
-        for others, become 1-d object numpy array
+        for batched sequences: stack them on batch-first to becom 3-d array and pad them
+        for others, become 1-d object numpy array if not None
     """
     # print('\n'.join(map(str, [d for d in data])))
-    samples, mps_sep_indices = zip(*data)
-    batched_samples = pad_sequence(samples, batch_first=True, padding_value=0)
-    # could be None and should be passed as numpy object array
-    batched_mps_sep_indices = np.array(mps_sep_indices, dtype=object)
-    return batched_samples, batched_mps_sep_indices
-
+    seqs, mps_sep_indices = zip(*data)
+    batched_seqs = pad_sequence(seqs, batch_first=True, padding_value=0)
+    # mps_sep_indices could be None or numpy object array of tuples
+    if mps_sep_indices[0] is None:
+        batched_mps_sep_indices = None
+    else:
+        batched_mps_sep_indices = np.array(mps_sep_indices, dtype=object)
+    return batched_seqs, batched_mps_sep_indices

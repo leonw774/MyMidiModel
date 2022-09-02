@@ -3,16 +3,16 @@ import io
 import numpy as np
 from torch.utils.data import random_split, DataLoader
 
-from model.dataset import MidiDataset, collate_mididataset
-# from model.model import MidiTransformerDecoder
-from util import get_input_array_debug_string
+from util.corpus import get_input_array_debug_string
+from util.dataset import MidiDataset, collate_mididataset
+# from util.model import MidiTransformerDecoder
 
 
 dataset = MidiDataset(
     data_dir_path='data/corpus/test_midis_nth96_r32_d96_v4_t24_200_1_posattribute',
     max_seq_length=24, # to be printed on screen, so small
     sample_stride=1,
-    use_set_loss=False,
+    use_set_loss=True,
     permute_mps=False,
     permute_track_number=False,
     measure_number_shift_range=0
@@ -49,6 +49,11 @@ train_dataloader = DataLoader(
     collate_fn=collate_mididataset
 )
 batched_samples, batched_mps_sep_indices = next(iter(train_dataloader))
-for i, (s, e) in enumerate(zip(batched_samples, batched_mps_sep_indices)):
-    print(f'BATCHED[{i}]')
-    get_input_array_debug_string(s.numpy(), e, vocabs_dict)
+if batched_mps_sep_indices is not None:
+    for i, (s, e) in enumerate(zip(batched_samples, batched_mps_sep_indices)):
+        print(f'BATCHED[{i}]')
+        print(get_input_array_debug_string(s.numpy(), e, vocabs_dict))
+else:
+    for i, s in enumerate(batched_samples):
+        print(f'BATCHED[{i}]')
+        print(get_input_array_debug_string(s.numpy(), None, vocabs_dict))

@@ -1,14 +1,14 @@
 from argparse import ArgumentParser, Namespace
 import json
 
-from torch import rsqrt
+import torch
 from torch.utils.data import random_split, DataLoader
 from torch.optim import Adam, lr_scheduler
 
 from util import get_input_array_debug_string
-from util.model import MidiTransformerDecoder
+from util.model import MidiTransformerDecoder, get_seq_mask
 from util.dataset import MidiDataset, collate_mididataset
-from util.corpus import to_vocabs_file_path
+from util.corpus import ATTR_NAME_TO_FEATURE_INDEX, to_vocabs_file_path
 # from model.model import MidiTransformerDecoder
 
 
@@ -49,10 +49,16 @@ def parse_args():
         default=12
     )
     model_parser.add_argument(
+        '--attn-heads-number',
+        type=int,
+        default=8
+    )
+    model_parser.add_argument(
         '--d-model',
         type=int,
         default=512
     )
+    
 
     train_parser = ArgumentParser()
     train_parser.add_argument(
@@ -77,9 +83,9 @@ def parse_args():
         type=int,
         default=1000
     )
-
     train_parser.add_argument(
-        '--learning-rate',
+        '--learning-rate', '--lr',
+        dest='learning_rate',
         type=float,
         default=5.0e-3
     )
@@ -91,12 +97,12 @@ def parse_args():
     train_parser.add_argument(
         '--lr-decay-end-ratio',
         type=float,
-        default=0.1
+        default=0.5
     )
     train_parser.add_argument(
         '--lr-decay-end-steps',
         type=int,
-        default=40000
+        default=12000
     )
 
     train_parser.add_argument(
@@ -134,7 +140,7 @@ def parse_args():
 
 
 # def vanilla_lr(step_num: int, warmup_steps: int, d_model: int) -> float:
-#     return rsqrt(d_model) * min(rsqrt(step_num), step_num * warmup_steps ** (-1.5))
+#     return torch.rsqrt(d_model) * min(torch.rsqrt(step_num), step_num * warmup_steps ** (-1.5))
 
 def lr_warmup_and_linear_decay(step_num: int, warmup_steps: int, decay_end_ratio: float, decay_end_steps: int):
     if step_num < warmup_steps:
@@ -142,6 +148,9 @@ def lr_warmup_and_linear_decay(step_num: int, warmup_steps: int, decay_end_ratio
     r = min(1, ((step_num - warmup_steps) / decay_end_steps))
     return 1 - r * (1 - decay_end_ratio)
 
+
+def set_loss():
+    pass
 
 def valid(model, validation_dataset, args):
     pass
@@ -152,13 +161,54 @@ def save_checkpoint(model):
 def check_early_stopping(losses):
     pass
 
-def train(model, complete_dataset, args):
+def train(model, train_dataloader, loss_func, args):
+    model.train()
+    train_dataloader_iter = iter(train_dataloader)
 
+    for step in range(args.train_args.validation_frequency):
+        try:
+            batched_input_seqs, batched_mps_sep_indices = next(train_dataloader_iter)
+        except StopIteration:
+            train_dataloader_iter = iter(train_dataloader)
+            batched_input_seqs, batched_mps_sep_indices = next(train_dataloader_iter)
+
+        batchwed_seq_mask = get_seq_mask(batched_input_seqs.shape[1])
+        print(batched_input_seqs.shape[1])
+        print(batchwed_seq_mask.shape)
+        prediction = model(batched_input_seqs, batchwed_seq_mask)
+
+        if args.data_args.use_set_loss:
+            raise NotImplementedError('Use_set_loss not implemented yet.')
+        else:
+            ground_truth = batched_input_seqs[:, :, args.output_attr_indices]
+            loss = model.calc_loss(prediction, ground_truth)
+            loss.backward()
+
+
+def main():
+    args = parse_args()
+    print(args)
+
+    vocabs_dict = json.load(open(to_vocabs_file_path(args.corpus_dir_path), 'r', encoding='utf8'))
+
+    model = MidiTransformerDecoder(
+        vocabs=vocabs_dict,
+        **vars(args.model_args)
+    )
+
+    # make dataset
+    complete_dataset = None
+    if len(args.corpus_dir_path) == 1:
+        complete_dataset = MidiDataset(
+            data_dir_path=args.corpus_dir_path[0],
+            **args.data_args
+        )
+    else:
+        raise NotImplementedError('ConcatDataset for multiple corpus not implemented yet.')
     train_len, valid_len = (
         len(complete_dataset) * r / sum(args.train_args.split_ratio)
         for r in args.train_args.split_ratio
     )
-
     train_dataset, valid_dataset = random_split(complete_dataset, (train_len, valid_len))
     train_dataloader = DataLoader(
         dataset=train_dataset,
@@ -169,13 +219,19 @@ def train(model, complete_dataset, args):
     valid_dataloader = DataLoader(
         dataset=valid_dataset,
         batch_size=args.train_args.batch_size,
-        shuffle=False,
+        shuffle=True,
         collate_fn=collate_mididataset
     )
-    train_dataloader_iter = iter(train_dataloader)
-    valid_dataloader_iter = iter(valid_dataloader)
+    output_attr_indices = [
+        ATTR_NAME_TO_FEATURE_INDEX[attr_name]
+        for attr_name in ['evt', 'pit', 'dur', 'vel', 'trn', 'ins', 'pos']
+    ]
+    if vocabs_dict['position_method'] == 'event':
+        output_attr_indices.pop()
+    args.output_attr_indices = output_attr_indices
 
-    optimizer = Adam(model.parameters(), args.learning_rate, betas=(0.9, 0.98), eps=1e-9)
+    # make optimizer
+    optimizer = Adam(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-9)
     scheduler = lr_scheduler.LambdaLR(
         optimizer,
         lr_lambda=lambda step: lr_warmup_and_linear_decay(
@@ -186,31 +242,24 @@ def train(model, complete_dataset, args):
         )
     )
 
-    model.train()
-    for step in range(args.train_args.steps):
-        batched_input_array, batched_mps_sep_indices = next(train_dataloader_iter)
-
-
-def main():
-    args = parse_args()
-    print(args)
-
-    vocabs_dict = json.load(open(to_vocabs_file_path(args.corpus_dir_path), 'r', encoding='utf8'))
-    model = MidiTransformerDecoder(
-        vocabs=vocabs_dict,
-        **vars(args.model_args)
-    )
-
-    complete_dataset = None
-    if len(args.corpus_dir_path) == 1:
-        complete_dataset = MidiDataset(
-            data_dir_path=args.corpus_dir_path[0],
-            **args.data_args
-        )
+    # make loss function
+    if args.train_args.use_set_loss:
+        loss_func = set_loss()
     else:
-        raise NotImplementedError('ConcatDataset for multiple corpus not implemented yet.')
+        loss_func = torch.nn.CrossEntropyLoss()
+    
 
-    train(model, complete_dataset, args)
+    # train
+    train_losses_history = []
+    valid_losses_history = []
+    early_stop_counter = 0
+    for valid_epoch in range(args.train_args.steps // args.train_args.validation_frequency):
+        train_losses = train(model, train_dataloader, args)
+        valid_losses = valid(model, valid_dataloader, args)
+        train_losses_history.append(train_losses)
+        valid_losses_history.append(valid_losses)
+        if args.train_args.early_stop:
+            pass
 
     return 0
 

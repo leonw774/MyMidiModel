@@ -126,7 +126,7 @@ def build_vocabs(
     event_tokens = (SPECIAL_TOKENS + ['BOS', 'EOS'] + shape_tokens
              + track_tokens + tempo_tokens + position_tokens + measure_tokens)
 
-    max_duration = paras['max_duration'] * (paras['nth'] // 4)
+    max_duration = paras['max_duration']
     pitch_tokens = SPECIAL_TOKENS + list(map(int2b36str, range(128)))
     duration_tokens = SPECIAL_TOKENS + list(map(int2b36str, range(1, max_duration+1)))
     velocity_tokens = SPECIAL_TOKENS + list(map(int2b36str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
@@ -356,5 +356,5 @@ def get_input_array_debug_string(input_array: np.ndarray, mps_sep_indices, vocab
         ])
     )
     if isinstance(mps_sep_indices, np.ndarray):
-        debug_str += 'mps_sep_indices: ' + str(mps_sep_indices)
+        debug_str += '\nmps_sep_indices: ' + str(mps_sep_indices)
     return debug_str
