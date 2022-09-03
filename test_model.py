@@ -1,14 +1,16 @@
 import json
+from time import time
 
 from torch import randint
 
-from util.corpus import get_input_array_debug_string, to_vocabs_file_path
-from util.model import MidiTransformerDecoder, get_seq_mask
+from util.corpus import to_vocabs_file_path
+from util.model import MidiTransformerDecoder, get_seq_mask, calc_loss
 
 vocabs_dict = json.load(
     open(to_vocabs_file_path('data/corpus/test_midis_nth96_r32_d96_v4_t24_200_1_posattribute'), 'r', encoding='utf8')
 )
 
+start_time = time()
 model = MidiTransformerDecoder(
     layers_number=2,
     attn_heads_number=4,
@@ -17,6 +19,7 @@ model = MidiTransformerDecoder(
 )
 
 print(model)
+print('model construction time:', time()-start_time)
 
 test_seq = randint(0, 16, (4, 8, len(model._embeddings)))
 test_mask = get_seq_mask(test_seq.shape[1])
@@ -24,14 +27,17 @@ test_mask = get_seq_mask(test_seq.shape[1])
 print(test_seq.shape)
 print(test_mask)
 
-out = model(test_seq, test_mask)
+input_seq = test_seq[:-1]
+target_seq = test_seq[1:]
+target_seq = model.to_output_features(test_seq[1:])
 
-print([str(o.shape) for o in out])
+start_time = time()
+pred = model(input_seq, test_mask)
 
-target = randint(0, 16, (4, 8, len(model._logits)))
+print([str(a.shape) for a in pred])
+print(target_seq.shape)
 
-print(target.shape)
-
-loss = model.calc_loss(out, target)
-
+loss = calc_loss(pred, target_seq)
+loss.backward()
 print(loss)
+print('model train step time:', time()-start_time)

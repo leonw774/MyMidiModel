@@ -98,7 +98,7 @@ class MidiDataset(Dataset):
             if use_set_loss:
                 # find all seperater's index
                 mps_sep_indices = np.flatnonzero(np.isin(self.piece_files[filename][:, 0], self._mps_seperators))
-                self._mps_sep_indices[filenum] = mps_sep_indices
+                self._mps_sep_indices[filenum] = mps_sep_indices.astype(np.int16)
 
             if self.piece_files[filename].shape[0] > max_seq_length:
                 for begin_index in range(0, self.piece_files[filename].shape[0] - max_seq_length, sample_stride):

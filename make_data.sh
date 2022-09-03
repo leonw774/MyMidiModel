@@ -25,18 +25,18 @@ do
     fi
 done
 
-LOG_PATH="./logs/$(date '+%Y%m%d%H%M')-${FULL_CONFIG_NAME}.log"
+LOG_PATH="./logs/$(date '+%Y%m%d%H%M')-make_data-${FULL_CONFIG_NAME}.log"
 echo "Log file: $LOG_PATH"
 touch $LOG_PATH
 
 CORPUS_DIR_PATH="data/corpus/${DATA_NAME}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}_v${VELOCITY_STEP}_t${TEMPO_MIN}_${TEMPO_MAX}_${TEMPO_STEP}_pos${POSITION_METHOD}"
 if [ $USE_EXISTED == true ]; then
     MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --use-existed"
-    echo "Appended --use-existed"
+    echo "Appended --use-existed to midi_to_text's argument"
 fi
 if [ $CONTINUING_NOTE == true ]; then
     MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --use-continuing-note"
-    echo "Appended --use-continuing-note"
+    echo "Appended --use-continuing-note to midi_to_text's argument"
 fi
 
 python3 midi_to_text.py --nth $NTH --max-track-number $MAX_TRACK_NUMBER --max-duration $MAX_DURATION --velocity-step $VELOCITY_STEP \
@@ -46,7 +46,7 @@ test $? -ne 0 && { echo "midi_to_text.py failed. make_data.sh exit." | tee -a $L
 
 
 if [ $BPE_ITER -ne 0 ]; then
-    echo "start learn bpe vocab"
+    echo "Start learn bpe vocab"
     CORPUS_DIR_PATH_WITH_BPE="${CORPUS_DIR_PATH}_bpe${BPE_ITER}_${SHAPECOUNT_METHOD}_${SHAPECOUNT_SAMPLERATE}"
 
     # compile
@@ -69,8 +69,8 @@ if [ $BPE_ITER -ne 0 ]; then
     BPE_EXIT_CODE=${PIPESTATUS[0]}
     test $BPE_EXIT_CODE -ne 0 && { echo "learn_vocab failed. exit code: $BPE_EXIT_CODE. make_data.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
-    # check if tokenized corpus is equal to original corpus
     # this is buggy so not using it
+    # check if tokenized corpus is equal to original corpus
     # python3 verify_corpus_equality.py $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE 100 | tee -a $LOG_PATH
     # test $? -ne 0 && echo "make_data.sh exit." && exit 1
 
@@ -80,4 +80,4 @@ fi
 
 python3 text_to_array.py --max-seq-length $MAX_SEQ_LENGTH --bpe $BPE_ITER --log $LOG_PATH $TEXT_TO_ARRAY_OTHER_ARGUMENTS $CORPUS_DIR_PATH
 
-echo "make_data.sh start."
+echo "make_data.sh end."
