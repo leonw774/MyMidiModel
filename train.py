@@ -57,7 +57,7 @@ def parse_args():
         default=8
     )
     model_parser.add_argument(
-        '--d-model',
+        '--embedding-dim',
         type=int,
         default=512
     )
@@ -86,6 +86,11 @@ def parse_args():
         default=1000
     )
     train_parser.add_argument(
+        "--grad-norm-clip",
+        default=1.0,
+        type=float
+    )
+    train_parser.add_argument(
         '--learning-rate', '--lr',
         dest='learning_rate',
         type=float,
@@ -97,45 +102,32 @@ def parse_args():
         default=4000
     )
     train_parser.add_argument(
-        '--lr-decay-end-ratio',
-        type=float,
-        default=0.5
-    )
-    train_parser.add_argument(
         '--lr-decay-end-steps',
         type=int,
-        default=12000
+        default=16000
     )
     train_parser.add_argument(
-        "--grad-norm-clip",
-        default=1.0,
-        type=float
+        '--lr-decay-end-ratio',
+        type=float,
+        default=0.3 # approx. 1 - sqrt(2)^-1
     )
     train_parser.add_argument(
         '--early-stop',
-        action='store_true'
-    )
-    train_parser.add_argument(
-        '--ealry-stop-tolerance',
         type=int,
-        default=10
+        default=10,
+        help='If this value <= 0, no early stoping will perform.'
     )
 
     global_parser = ArgumentParser()
     global_parser.add_argument(
-        'corpus_dir_path',
-        nargs='+', # store as list and at least one
-        type=str
-    )
-    global_parser.add_argument(
-        '--checkpoint-dir-path',
-        type=str,
-        default=''
-    )
-    global_parser.add_argument(
         '--dataloader-worker-number',
         type=int,
-        default=8
+        default=1 # npz file cannot handle multiprocessing, sad
+    )
+    global_parser.add_argument(
+        '--use-device',
+        choices=['cpu', 'cuda'],
+        default='cpu'
     )
     global_parser.add_argument(
         '--log',
@@ -143,20 +135,28 @@ def parse_args():
         default='',
     )
     global_parser.add_argument(
-        '--loss-file-path',
-        default='',
+        '--checkpoint-dir-path',
+        type=str,
+        required=True
     )
     global_parser.add_argument(
-        '--use-device',
-        choices=['cpu', 'gpu'],
-        default='cpu'
+        '--log-head-losses',
+        action='store_true'
     )
-    # make them into dicts
-    global_args = vars(global_parser.parse_known_args()[0])
-    global_args['data_args'] = data_parser.parse_known_args()[0]
-    global_args['model_args'] = model_parser.parse_known_args()[0]
-    global_args['train_args'] = train_parser.parse_known_args()[0]
-    # turnback into Namespace
+    global_parser.add_argument(
+        'corpus_dir_path',
+        type=str
+    )
+    # make them as dicts first
+    global_args = dict()
+    global_args['data_args'], others = data_parser.parse_known_args()
+    # print(others)
+    global_args['model_args'], others = model_parser.parse_known_args(others)
+    # print(others)
+    global_args['train_args'], others = train_parser.parse_known_args(others)
+    # print(others)
+    global_args.update(vars(global_parser.parse_known_args(others)[0]))
+    # then turn into Namespace
     return Namespace(**global_args)
 
 
@@ -170,23 +170,40 @@ def lr_warmup_and_linear_decay(step_num: int, warmup_steps: int, decay_end_ratio
     return 1 - r * (1 - decay_end_ratio)
 
 
-def log(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_logger):
-    avg_train_loss = sum(train_loss_list)/len(train_loss_list)
-    avg_valid_loss = sum(valid_loss_list)/len(valid_loss_list)
-    logging(
-        f'Step: {cur_step}, Time: {time()-start_time}, '\
-        f'Learning rate: {scheduler.get_last_lr()[0]}, '\
-        f'Avg train loss: {avg_train_loss}, '\
-        f'Avg valid loss: {avg_valid_loss}'
-    )
-    if loss_logger:
-        loss_logger.info(f'{avg_train_loss},{avg_valid_loss}')
+def log(
+        cur_step:int,
+        start_time: int,
+        scheduler: lr_scheduler,
+        train_loss_list: list,
+        valid_loss_list: list,
+        log_head_losses: bool,
+        loss_logger):
+    if log_head_losses:
+        avg_train_losses = [ sum(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
+        avg_valid_losses = [ sum(head_loss_tuple)for head_loss_tuple in zip(*valid_loss_list) ]
+        avg_train_losses_str = ','.join([f'{l:.4f}' for l in avg_train_losses])
+        avg_valid_losses_str = ','.join([f'{l:.4f}' for l in avg_valid_losses])
+        logging.info(
+            'Step: %d, Time: %d, Learning rate: %.6f, Avg train loss: %s, Avg valid loss: %s',
+            cur_step, time()-start_time, scheduler.get_last_lr()[0], avg_train_losses_str, avg_valid_losses_str
+        )
+        if loss_logger:
+            loss_logger.debug('%s,%s', avg_train_losses_str, avg_valid_losses_str)
+    else:
+        avg_train_loss = sum(train_loss_list)/len(train_loss_list)
+        avg_valid_loss = sum(valid_loss_list)/len(valid_loss_list)
+        logging.info(
+            'Step: %d, Time: %d, Learning rate: %.6f, Avg train loss: %.4f, Avg valid loss: %.4f',
+            cur_step, time()-start_time, scheduler.get_last_lr()[0], avg_train_loss, avg_valid_loss
+        )
+        if loss_logger:
+            loss_logger.debug('%.4f,%.4f', avg_train_loss, avg_valid_loss)
 
 
 def save_checkpoint(cur_step, model, checkpoint_dir_path):
     model_file_name = os.path.join(checkpoint_dir_path, f'model_{cur_step}.pt')
     torch.save(model.state_dict(), model_file_name)
-    logging.info(f"Saved model at: {model_file_name}")
+    logging.info("Saved model at: %s", model_file_name)
     return model_file_name
 
 
@@ -202,8 +219,11 @@ def valid(model, valid_dataloader, args):
         if args.data_args.use_permutable_subseq_loss:
             loss = calc_permutable_subseq_loss(prediction, batch_target_seqs, batch_mps_sep_indices)
         else:
-            loss = calc_loss(prediction, batch_target_seqs)
-        loss_list.append(float(loss))
+            loss = calc_loss(prediction, batch_target_seqs, args.log_head_losses)
+            if args.log_head_losses:
+                loss_list.append([float(l) for l in loss])
+            else:
+                loss_list.append(float(loss))
     return loss_list
 
 def train(model, train_dataloader, optimizer, scheduler, args):
@@ -225,11 +245,15 @@ def train(model, train_dataloader, optimizer, scheduler, args):
         if args.data_args.use_permutable_subseq_loss:
             loss = calc_permutable_subseq_loss(prediction, batch_target_seqs, batch_mps_sep_indices)
         else:
-            loss = calc_loss(prediction, batch_target_seqs)
-        loss_list.append(float(loss))
+            loss = calc_loss(prediction, batch_target_seqs, args.log_head_losses)
+            if args.log_head_losses:
+                loss_list.append([float(l) for l in loss])
+                loss = sum(loss)
+            else:
+                loss_list.append(float(loss))
         optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_norm_clip)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
         optimizer.step()
         scheduler.step()
     return loss_list
@@ -237,59 +261,70 @@ def train(model, train_dataloader, optimizer, scheduler, args):
 
 def main():
     args = parse_args()
-    print(args)
+
+    if not os.path.isdir(args.checkpoint_dir_path):
+        logging.info('Invalid checkpoint dir path: %s', args.checkpoint_dir_path)
+        return 1
 
     # logging setting
     # root logger
-    loglevel = logging.INFO
     if args.log_file_path:
         logging.basicConfig(
             filename=args.log_file_path,
             filemode='a',
-            level=loglevel,
+            level=logging.INFO,
             format='%(message)s',
         )
         console = logging.StreamHandler()
-        console.setLevel(loglevel)
+        console.setLevel(logging.INFO)
         logging.getLogger().addHandler(console)
     else:
         logging.basicConfig(
-            level=loglevel,
+            level=logging.INFO,
             format='%(message)s'
         )
     logging.info(strftime('----train.py start at %Y%m%d-%H%M---'))
 
-    # loss file logger
-    loss_logger = None
-    if args.loss_file_path:
-        handler = logging.FileHandler(args.loss_file_path)
-        handler.setFormatter('%(message)s')
-        loss_logger = logging.getLogger('loss logger')
-        loss_logger.setLevel(loglevel)
-        loss_logger.addHandler(handler)
-        logging.info('Set loss file: %s', args.loss_file_path)
+    data_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.data_args).items()])
+    model_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.model_args).items()])
+    train_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.train_args).items()])
+    args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args).items() if not isinstance(v, Namespace)])
+    logging.info(data_args_str)
+    logging.info(model_args_str)
+    logging.info(train_args_str)
+    logging.info(args_str)
 
-    if not os.path.isdir(args.checkpoint_dir_path):
-        logging.info('Invalid dir path: %s', args.checkpoint_dir_path)
-        return 1
+    # loss logger
+    # loss file is in the checkpoint directory
+    loss_file_path = os.path.join(args.checkpoint_dir_path, 'loss.csv')
+    loss_handler = logging.FileHandler(loss_file_path, 'w+', encoding='utf8')
+    loss_formatter = logging.Formatter('%(message)s')
+    loss_handler.setFormatter(loss_formatter)
+    loss_logger = logging.getLogger('loss_logger')
+    loss_logger.setLevel(logging.DEBUG)
+    loss_logger.addHandler(loss_handler)
+    logging.info('Created loss.csv file at %s', loss_file_path)
 
     # make model
     vocabs_dict = json.load(open(to_vocabs_file_path(args.corpus_dir_path), 'r', encoding='utf8'))
     model = MidiTransformerDecoder(
         vocabs=vocabs_dict,
+        max_seq_length=args.data_args.max_seq_length,
         **vars(args.model_args)
     )
 
-    # make dataset
-    complete_dataset = None
-    if len(args.corpus_dir_path) == 1:
-        complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path[0], **args.data_args)
+    if args.log_head_losses:
+        loss_csv_head = ','.join(
+            ['train_' + n for n in model.output_features_name] + ['valid_' + n for n in model.output_features_name]
+        )
+        loss_logger.info(loss_csv_head)
     else:
-        raise NotImplementedError('ConcatDataset for multiple corpus not implemented yet.')
-    train_len, valid_len = (
-        len(complete_dataset) * r / sum(args.train_args.split_ratio)
-        for r in args.train_args.split_ratio
-    )
+        loss_logger.info('train,valid')
+
+    # make dataset
+    complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args))
+    train_len = int(len(complete_dataset) * args.train_args.split_ratio[0] / sum(args.train_args.split_ratio))
+    valid_len = len(complete_dataset) - train_len
     train_dataset, valid_dataset = random_split(complete_dataset, (train_len, valid_len))
     train_dataloader = DataLoader(
         dataset=train_dataset,
@@ -331,14 +366,20 @@ def main():
         complete_train_loss_list.extend(train_loss_list)
         complete_valid_loss_list.extend(valid_loss_list)
         cur_step = start_step + args.train_args.validation_interval
-        log(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_logger)
+        log(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, args.log_head_losses, loss_logger)
         model_file_name = save_checkpoint(cur_step, model, args.checkpoint_dir_path)
-        if args.train_args.early_stop:
-            avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
-            if min_avg_valid_loss >= avg_valid_loss:
+        if args.train_args.early_stop > 0:
+            if args.log_head_losses:
+                avg_valid_loss = sum([sum(valid_head_losses) for valid_head_losses in valid_loss_list]) / len(valid_loss_list)
+            else:
+                avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
+            if avg_valid_loss >= min_avg_valid_loss:
                 early_stop_counter += 1
-                if early_stop_counter >= args.early_stop_tolerance:
-                    logging.info('Early stopped at step %d for no improvement in %d validations.', cur_step, args.early_stop_tolerance)
+                if early_stop_counter >= args.train_args.early_stop:
+                    logging.info(
+                        'Early stopped @ step %d: No improvement for %d validations.',
+                        cur_step, args.train_args.early_stop
+                    )
                     break
             else:
                 early_stop_counter = 0

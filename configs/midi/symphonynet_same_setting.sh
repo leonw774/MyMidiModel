@@ -1,6 +1,5 @@
 #!/bin/bash
 # midi preprocessing
-USE_EXISTED=true
 NTH=32
 MAX_TRACK_NUMBER=24
 MAX_DURATION=32

@@ -99,7 +99,7 @@ def parse_args():
         '--use-existed',
         dest='use_existed',
         action='store_true',
-        help='If the corpus already existed, then do nothing.'
+        help='If the corpus already existed, do nothing.'
     )
     parser.add_argument(
         '-r', '--recursive',
@@ -247,10 +247,11 @@ def main():
             level=loglevel,
             format='%(message)s'
         )
-    logging.info(strftime('----midi_to_text.py start at %Y%m%d-%H%M----'))
+    logging.info(strftime('==== midi_to_text.py start at %Y%m%d-%H%M ===='))
 
     args_str = '\n'.join([
         str(k)+':'+str(v) for k, v in args_vars.items()
+        if k not in meta_args
     ])
     logging.info(args_str)
 
@@ -262,7 +263,7 @@ def main():
             if args.use_existed:
                 logging.info('Output directory: %s already has corpus file.', args.output_path)
                 logging.info('Flag --use-existed is set')
-                logging.info('---midi_to_text.py exited---')
+                logging.info('==== midi_to_text.py exited ====')
                 return 0
             else:
                 shutil.rmtree(args.output_path)
@@ -286,7 +287,7 @@ def main():
 
     if len(file_path_list) == 0:
         logging.info('No file to process')
-        logging.info('---midi_to_text.py exited---')
+        logging.info('==== midi_to_text.py exited ====')
         return 1
     else:
         logging.info('Find %d files', len(file_path_list))
@@ -358,7 +359,7 @@ def main():
             json.dump(text_stats, statfile)
         logging.info('Wrote stats file to %s', args.output_path+'_stat.json')
         logging.info('Stat time: %.3f', time()-start_time)
-    logging.info('---midi_to_text.py exited---')
+    logging.info('==== midi_to_text.py exited ====')
 
 
 if __name__ == '__main__':

@@ -23,12 +23,6 @@ from util import (
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
-        '--max-seq-length',
-        dest='max_seq_length',
-        type=int,
-        default=4096
-    )
-    parser.add_argument(
         '--bpe',
         type=int,
         default=0,
@@ -42,11 +36,15 @@ def parse_args():
         help='Path to the log file. Default is empty, which means no logging would be performed.'
     )
     parser.add_argument(
+        '--use-existed',
+        action='store_true'
+    )
+    parser.add_argument(
         '--debug',
         action='store_true'
     )
     parser.add_argument(
-        'corpus_dir_path',
+        'corpus_dir_path'
     )
     return parser.parse_args()
 
@@ -70,7 +68,7 @@ def main():
             level=loglevel,
             format='%(message)s'
         )
-    logging.info(strftime('----text_to_array.py start at %Y%m%d-%H%M---'))
+    logging.info(strftime('==== text_to_array.py start at %Y%m%d-%H%M ===='))
 
     if not os.path.isdir(args.corpus_dir_path):
         logging.info('%s does not exist', args.corpus_dir_path)
@@ -82,12 +80,18 @@ def main():
         with open(to_shape_vocab_file_path(args.corpus_dir_path), 'r', encoding='utf8') as vocabs_file:
             bpe_shapes_list = vocabs_file.read().splitlines()
 
+    if os.path.isfile(to_vocabs_file_path(args.corpus_dir_path)) and os.path.isfile(os.path.join(args.corpus_dir_path, 'arrays.npz')):
+        logging.info('Corpus directory: %s already has vocabs file and array file.', args.corpus_dir_path)
+        logging.info('Flag --use-existed is set')
+        logging.info('==== text_to_array.py exited ====')
+        return 1
+
     logging.info('Begin build vocabs for %s', args.corpus_dir_path)
     corpus_paras = get_corpus_paras(args.corpus_dir_path)
     with CorpusIterator(args.corpus_dir_path) as corpus_iterator:
         assert len(corpus_iterator) > 0, f'empty corpus: {args.corpus_dir_path}'
 
-        vocabs_dict, summary_string = build_vocabs(corpus_iterator, corpus_paras, args.max_seq_length, bpe_shapes_list)
+        vocabs_dict, summary_string = build_vocabs(corpus_iterator, corpus_paras, bpe_shapes_list)
         with open(to_vocabs_file_path(args.corpus_dir_path), 'w+', encoding='utf8') as vocabs_file:
             json.dump(vocabs_dict, vocabs_file)
         logging.info(summary_string)
@@ -141,7 +145,8 @@ def main():
                 f.write('\n'.join(merged_lines))
 
     logging.info('npys write time: %.3f', time()-start_time)
-    logging.info('make_data.py exited')
+    logging.info('==== text_to_array.py exited ====')
+    return 0
 
 if __name__ == '__main__':
     main()

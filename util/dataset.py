@@ -17,7 +17,7 @@ class MidiDataset(Dataset):
             data_dir_path: str,
             max_seq_length: int,
             sample_stride: int,
-            use_set_loss: bool,
+            use_permutable_subseq_loss: bool,
             permute_mps: bool,
             permute_track_number: bool = False,
             measure_number_shift_range: int = 0
@@ -26,7 +26,7 @@ class MidiDataset(Dataset):
             Parameters:
             - data_dir_path: Expected to have 'data.npz' and 'vocabs.json'
             - sample_stride: The moving window moves `sample_stride` to right for the next sample.
-            - use_set_loss: Whether or not we provide a mps_seperator_indices information at __getitem__
+            - use_permutable_subseq_loss: Whether or not we provide a mps_seperator_indices information at __getitem__
             - permute_mps: Whether or not the dataset should permute all the *maximal permutable subsequences*
               in the sequence before returning in `__getitem__`
             - permute_tracks: Permute all the track numbers, as data augmentation
@@ -39,16 +39,16 @@ class MidiDataset(Dataset):
         # event, duration, velocity, track_number, instrument, tempo, position, measure_number
         with open(to_vocabs_file_path(data_dir_path), 'r', encoding='utf8') as vocabs_file:
             self.vocabs = json.load(vocabs_file)
-        self.max_seq_length = self.vocabs['max_seq_length']
+        self.max_seq_length = max_seq_length
         self.sample_stride = sample_stride
-        self.use_set_loss = use_set_loss
+        self.use_permutable_subseq_loss = use_permutable_subseq_loss
         self.permute_mps = permute_mps
         self.permute_track_number = permute_track_number
         self.measure_number_shift_range = measure_number_shift_range
 
         # Seperators are:
         # EOS, BOS, PAD, first track token (R0), measure tokens (M\w+), position tokens (P\w+)
-        # stores thier index in event vocab, empty when `use_set_loss` is not True
+        # stores thier index in event vocab, empty when `use_permutable_subseq_loss` is not True
         self._mps_seperators = set()
         self._bos_id = self.vocabs['events']['text2id']['BOS']
         self._eos_id = self.vocabs['events']['text2id']['EOS']
@@ -69,7 +69,7 @@ class MidiDataset(Dataset):
                 self._measure_ids.add(index)
             elif text[0] == 'T':
                 self._tempo_ids.add(index)
-        if use_set_loss:
+        if use_permutable_subseq_loss:
             self._mps_seperators = set([
                 self._bos_id,
                 self._eos_id,
@@ -86,7 +86,7 @@ class MidiDataset(Dataset):
         # preprocessing
         self._filenum_indices = [] # (pieces_array_index, start_index, end_index)
         self._piece_body_start_index = [None] * len(self.piece_files)
-        self._mps_sep_indices = [None] * len(self.piece_files) if use_set_loss else None
+        self._mps_sep_indices = [None] * len(self.piece_files) if use_permutable_subseq_loss else None
         for filename in tqdm(self.piece_files, total=len(self.piece_files)):
             filenum = int(filename)
 
@@ -95,7 +95,7 @@ class MidiDataset(Dataset):
                 j += 1
             self._piece_body_start_index[filenum] = j
 
-            if use_set_loss:
+            if use_permutable_subseq_loss:
                 # find all seperater's index
                 mps_sep_indices = np.flatnonzero(np.isin(self.piece_files[filename][:, 0], self._mps_seperators))
                 self._mps_sep_indices[filenum] = mps_sep_indices.astype(np.int16)
@@ -118,6 +118,7 @@ class MidiDataset(Dataset):
         filenum, begin_index, end_index = self._filenum_indices[index]
         filename = str(filenum)
         sliced_array = np.array(self.piece_files[filename][begin_index:end_index]) # copy
+        sliced_array = sliced_array.astype(np.int64) # was int16 to save sapce but torch ask for long
 
         # measure number augumentation: move them up in range of self.measure_number_shift_range
         if self.measure_number_shift_range != 0:
@@ -156,8 +157,8 @@ class MidiDataset(Dataset):
                 p = np.random.permutation(end-start) + start
                 sliced_array[start:end] = sliced_array[p]
 
-        # a numpy array of sequences sep indices would also be returned if self.use_set_loss
-        if self.use_set_loss:
+        # a numpy array of sequences sep indices would also be returned if self.use_permutable_subseq_loss
+        if self.use_permutable_subseq_loss:
             mps_sep_indices = np.array( # make copy
                 self._mps_sep_indices[filenum]
             )

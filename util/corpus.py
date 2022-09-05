@@ -80,12 +80,9 @@ def make_token_dict(token_list: list) -> dict:
 def build_vocabs(
         corpus_iterator,
         paras: dict,
-        max_seq_length: str,
         bpe_shapes_list: list):
     """
         Parameters:
-        - max_seq_length: we calculate the max amount of measures by checking the most amount of measure tokens
-          that can appears within a range of max_seq_length
         - bpe_shapes_list: The multinote shape are learned by bpe algorithms.
           If bpe is not performed, `bpe_shapes_list` should be empty
 
@@ -173,7 +170,6 @@ def build_vocabs(
     vocab_dicts = {
         'paras': paras,
         'bpe_iter': len(bpe_shapes_list),
-        'max_seq_length': max_seq_length,
         'special_tokens': SPECIAL_TOKENS,
         'events': make_token_dict(event_tokens),
         'pitchs': make_token_dict(pitch_tokens),

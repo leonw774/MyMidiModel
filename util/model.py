@@ -6,10 +6,11 @@ from .corpus import ATTR_NAME_TO_FEATURE_INDEX
 
 class MidiTransformerDecoder(nn.Module):
     def __init__(self,
+            vocabs: dict,
+            max_seq_length: int,
             layers_number: int,
             attn_heads_number: int,
-            d_model: int,
-            vocabs: dict,
+            embedding_dim: int,
             ) -> None:
         super().__init__()
 
@@ -17,7 +18,7 @@ class MidiTransformerDecoder(nn.Module):
         # self._pad_id = 0
         assert self._pad_id == 0
 
-        self._d_model = d_model
+        self._embedding_dim = embedding_dim
 
         # Input
         # event, pitch, duration, velocity, track_number, instrument, tempo, position, measure_number
@@ -30,12 +31,12 @@ class MidiTransformerDecoder(nn.Module):
             vocabs['instruments']['size'],
             vocabs['tempos']['size'],
             vocabs['positions']['size'],
-            vocabs['max_seq_length']
+           max_seq_length
         ]
         self._embeddings = nn.ModuleList([
             nn.Embedding(
                 num_embeddings=vsize,
-                embedding_dim=d_model,
+                embedding_dim=embedding_dim,
                 padding_idx=self._pad_id # [...] the embedding vector at padding_idx will default to all zeros [...]
             )
             for vsize in embedding_vocabs_size
@@ -51,23 +52,24 @@ class MidiTransformerDecoder(nn.Module):
             vocabs['instruments']['size'], # NOTE: should we predict instrument?
             vocabs['positions']['size'],
         ]
+        self.output_features_name = ['evt', 'pit', 'dur', 'vel', 'trn', 'ins', 'pos']
         self.output_features_indices = [
             ATTR_NAME_TO_FEATURE_INDEX[attr_name]
-            for attr_name in ['evt', 'pit', 'dur', 'vel', 'trn', 'ins', 'pos']
+            for attr_name in self.output_features_name
         ]
         if vocabs['paras']['position_method'] == 'event':
             logit_vocabs_size.pop()
             self.output_features_indices.pop()
         self._logits = nn.ModuleList([
             nn.Linear(
-                in_features=d_model,
+                in_features=embedding_dim,
                 out_features=vsize
             )
             for vsize in logit_vocabs_size[:-1]
         ])
 
         layer = nn.TransformerEncoderLayer( # name's encoder, used as decoder. Cause we don't need memory
-            d_model=d_model,
+            d_model=embedding_dim,
             nhead=attn_heads_number,
             batch_first=True
         )
@@ -83,7 +85,6 @@ class MidiTransformerDecoder(nn.Module):
 
     def forward(self, x, mask):
         # x.shape = (batch_size, seq_size, feature)
-        print(len(self._embeddings))
         x = sum(
             emb(x[:,:,i]) for i, emb in enumerate(self._embeddings)
         )
@@ -97,7 +98,7 @@ class MidiTransformerDecoder(nn.Module):
         return out
 
 
-def calc_loss(pred_logit, target):
+def calc_loss(pred_logit, target, return_head_losses=False):
     """
         pred is a list
         - length=out_feature_num
@@ -113,9 +114,10 @@ def calc_loss(pred_logit, target):
         )
         for i, pred_feature_logit in enumerate(pred_logit)
     ]
+    if return_head_losses:
+        return head_losses
     loss = sum(head_losses)
     return loss
-
 
 def calc_permutable_subseq_loss(pred_logit, target, mps_indices):
     """
