@@ -85,9 +85,9 @@ def b36str2int(x: str):
 
 
 # pad token have to be the "zero-th" token
-# SPECIAL_TOKENS = ['<PAD>', '<UNK>']
-# unknown token may be unessaccery as the whole corpus is preprocessed such that no token would be unknown
-SPECIAL_TOKENS = ['<PAD>']
+PADDING_TOKEN_STR = '<PAD>'
+BEGIN_TOKEN_STR = 'BOS'
+END_TOKEN_STR = 'EOS'
 
 
 def token_to_str(token: namedtuple) -> str:
@@ -122,10 +122,10 @@ def token_to_str(token: namedtuple) -> str:
         return f'R{int2b36str(token.track_number)}:{int2b36str(token.instrument)}'
 
     elif type_priority == TYPE_PRIORITY['BeginOfScoreToken']:
-        return 'BOS'
+        return BEGIN_TOKEN_STR
 
     elif type_priority == TYPE_PRIORITY['EndOfScoreToken']:
-        return 'EOS'
+        return END_TOKEN_STR
 
     else:
         raise ValueError(f'bad token namedtuple: {token}')

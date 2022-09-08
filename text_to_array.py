@@ -80,7 +80,8 @@ def main():
         with open(to_shape_vocab_file_path(args.corpus_dir_path), 'r', encoding='utf8') as vocabs_file:
             bpe_shapes_list = vocabs_file.read().splitlines()
 
-    if os.path.isfile(to_vocabs_file_path(args.corpus_dir_path)) and os.path.isfile(os.path.join(args.corpus_dir_path, 'arrays.npz')):
+    if (    os.path.isfile(to_vocabs_file_path(args.corpus_dir_path))
+        and os.path.isfile(os.path.join(args.corpus_dir_path, 'arrays.npz'))):
         logging.info('Corpus directory: %s already has vocabs file and array file.', args.corpus_dir_path)
         logging.info('Flag --use-existed is set')
         logging.info('==== text_to_array.py exited ====')
@@ -105,13 +106,13 @@ def main():
         npz_path = os.path.join(args.corpus_dir_path, 'arrays.npz')
         if os.path.exists(npy_dir_path):
             shutil.rmtree(npy_dir_path)
-            print(f'Find existing {npy_dir_path}, removed.')
+            print(f'Find existing {npy_dir_path}. Removed.')
         if os.path.exists(npy_zip_path):
             os.remove(npy_zip_path)
-            print(f'Find existing {npy_zip_path}, removed.')
+            print(f'Find existing {npy_zip_path}. Removed.')
         if os.path.exists(npz_path):
             os.remove(npz_path)
-            print(f'Find existing {npz_path}, removed.')
+            print(f'Find existing {npz_path}. Removed.')
 
         os.makedirs(npy_dir_path)
         for i, p in tqdm(enumerate(corpus_iterator), total=len(corpus_iterator)):

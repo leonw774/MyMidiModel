@@ -50,48 +50,56 @@ fi
 python3 midi_to_text.py --nth $NTH --max-track-number $MAX_TRACK_NUMBER --max-duration $MAX_DURATION --velocity-step $VELOCITY_STEP \
     --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --position-method $POSITION_METHOD $MIDI_TO_TEXT_OTHER_ARGUMENTS $USE_EXISTED \
     --log $LOG_PATH -w $PROCESS_WORKERS -r -o $CORPUS_DIR_PATH $MIDI_DIR_PATH
-test $? -ne 0 && { echo "midi_to_text.py failed. make_data.sh exit." | tee -a $LOG_PATH ; } && exit 1
+test $? -ne 0 && { echo "midi_to_text.py failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
 
 if [ $BPE_ITER -ne 0 ]; then
     echo "Start learn bpe vocab" | tee -a $LOG_PATH
     CORPUS_DIR_PATH_WITH_BPE="${CORPUS_DIR_PATH}_bpe${BPE_ITER}_${SHAPECOUNT_METHOD}_${SHAPECOUNT_SAMPLERATE}"
-
-    # compile
-    make -C ./bpe
-    test $? -ne 0 && { echo "learn_vocab compile error. make_data.sh exit." | tee -a $LOG_PATH ; } && exit 1
-
-    # create new dir 
-    if [ -d $CORPUS_DIR_PATH_WITH_BPE ]; then
-        rm -f ${CORPUS_DIR_PATH_WITH_BPE}/*
+    
+    if [ $USE_EXISTED == "--use-existed" ] && [ -d $CORPUS_DIR_PATH_WITH_BPE ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/corpus" ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/shape_vocab" ]; then
+        echo "Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already has corpus and shape_vocab file."
+        echo "Flag --use-existed is set"
+        echo "Learn bpe vocab is skipped"
     else
-        mkdir $CORPUS_DIR_PATH_WITH_BPE
+        # compile
+        make -C ./bpe
+        test $? -ne 0 && { echo "Compile error. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+
+        # create new dir 
+        if [ -d $CORPUS_DIR_PATH_WITH_BPE ]; then
+            echo "Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already existed. Removed."
+            rm -f "${CORPUS_DIR_PATH_WITH_BPE}/*"
+        else
+            mkdir $CORPUS_DIR_PATH_WITH_BPE
+        fi
+
+        # copy paras and pathlist
+        cp "${CORPUS_DIR_PATH}/paras" $CORPUS_DIR_PATH_WITH_BPE
+        cp "${CORPUS_DIR_PATH}/pathlist" $CORPUS_DIR_PATH_WITH_BPE
+
+        # run learn_vocab and use tee command to copy stdout to log
+        bpe/learn_vocab $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SHAPECOUNT_METHOD $SHAPECOUNT_SAMPLERATE | tee -a $LOG_PATH
+        BPE_EXIT_CODE=${PIPESTATUS[0]}
+        test $BPE_EXIT_CODE -ne 0 && { echo "learn_vocab failed. exit code: $BPE_EXIT_CODE. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+
+        # this is buggy so not using it
+        # check if tokenized corpus is equal to original corpus
+        # python3 verify_corpus_equality.py $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE 100 | tee -a $LOG_PATH
+        # test $? -ne 0 && echo "pipeline.sh exit." && exit 1
     fi
-
-    # copy paras and pathlist
-    cp "./${CORPUS_DIR_PATH}/paras" $CORPUS_DIR_PATH_WITH_BPE
-    cp "./${CORPUS_DIR_PATH}/pathlist" $CORPUS_DIR_PATH_WITH_BPE
-
-    # run learn_vocab and use tee command to copy stdout to log
-    bpe/learn_vocab $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SHAPECOUNT_METHOD $SHAPECOUNT_SAMPLERATE | tee -a $LOG_PATH
-    BPE_EXIT_CODE=${PIPESTATUS[0]}
-    test $BPE_EXIT_CODE -ne 0 && { echo "learn_vocab failed. exit code: $BPE_EXIT_CODE. make_data.sh exit." | tee -a $LOG_PATH ; } && exit 1
-
-    # this is buggy so not using it
-    # check if tokenized corpus is equal to original corpus
-    # python3 verify_corpus_equality.py $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE 100 | tee -a $LOG_PATH
-    # test $? -ne 0 && echo "make_data.sh exit." && exit 1
 
     # replace CORPUS_DIR_PATH to CORPUS_DIR_PATH_WITH_BPE
     CORPUS_DIR_PATH=$CORPUS_DIR_PATH_WITH_BPE
 fi
 
 python3 text_to_array.py --bpe $BPE_ITER --log $LOG_PATH --debug $CORPUS_DIR_PATH $USE_EXISTED
+test $? -ne 0 && { echo "text_to_array.py failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
 # test if NO_TRAIN is a set variables
 if [ -n "${NO_TRAIN+x}" ]; then
     echo "Not training" | tee -a $LOG_PATH
-    echo "pipeline.sh end"
+    echo "pipeline.sh exit."
     exit 0
 fi
 
@@ -128,4 +136,4 @@ python3 train.py --max-seq-length $MAX_SEQ_LENGTH --sample-stride $SAMPLE_STRIDE
     --lr $LEARNING_RATE --lr-warmup-steps $LEARNING_RATE_WARMUP_STEPS --lr-decay-end-steps $LEARNING_RATE_DECAY_END_STEPS --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
     --use-device $USE_DEVICE --log $LOG_PATH --checkpoint-dir-path $CHECKPOINT_DIR_PATH $CORPUS_DIR_PATH
 
-echo "pipeline.sh end"
+echo "pipeline.sh done."

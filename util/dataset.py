@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import bisect
 
 import numpy as np
 from torch import from_numpy
@@ -9,6 +10,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
 from util import to_vocabs_file_path, ATTR_NAME_TO_FEATURE_INDEX
+from util.tokens import BEGIN_TOKEN_STR, END_TOKEN_STR
 
 class MidiDataset(Dataset):
 
@@ -35,7 +37,7 @@ class MidiDataset(Dataset):
         """
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
         self.piece_files = np.load(npz_path)
-        print('loaded', npz_path)
+        print('Loaded', npz_path)
         # event, duration, velocity, track_number, instrument, tempo, position, measure_number
         with open(to_vocabs_file_path(data_dir_path), 'r', encoding='utf8') as vocabs_file:
             self.vocabs = json.load(vocabs_file)
@@ -50,25 +52,28 @@ class MidiDataset(Dataset):
         # EOS, BOS, PAD, first track token (R0), measure tokens (M\w+), position tokens (P\w+)
         # stores thier index in event vocab, empty when `use_permutable_subseq_loss` is not True
         self._mps_seperators = set()
-        self._bos_id = self.vocabs['events']['text2id']['BOS']
-        self._eos_id = self.vocabs['events']['text2id']['EOS']
+        self._bos_id = self.vocabs['events']['text2id'][BEGIN_TOKEN_STR]
+        self._eos_id = self.vocabs['events']['text2id'][END_TOKEN_STR]
         # the pad id is the same across all vocabs
         # self._pad_id = self.vocabs['events']['text2id']['[PAD]']
-        self._pad_id = 0
-        self._special_tokens = self.vocabs['special_tokens']
+        self._pad_id = self.vocabs['events']['text2id']['EOS']
+        self._padding_token = self.vocabs['padding_token']
         self._note_ids = set()
         self._measure_ids = set()
         self._position_ids = set()
         self._tempo_ids = set()
+        self._track_ids = set()
         for text, index in self.vocabs['events']['text2id'].items():
             if text[0] == 'N' or text[0] == 'S':
                 self._note_ids.add(index)
             elif text[0] == 'P':
                 self._position_ids.add(index)
-            elif text[0] == 'M':
-                self._measure_ids.add(index)
             elif text[0] == 'T':
                 self._tempo_ids.add(index)
+            elif text[0] == 'M':
+                self._measure_ids.add(index)
+            elif text[0] == 'R':
+                self._track_ids.add(index)
         if use_permutable_subseq_loss:
             self._mps_seperators = set([
                 self._bos_id,
@@ -85,15 +90,11 @@ class MidiDataset(Dataset):
 
         # preprocessing
         self._filenum_indices = [] # (pieces_array_index, start_index, end_index)
-        self._piece_body_start_index = [None] * len(self.piece_files)
-        self._mps_sep_indices = [None] * len(self.piece_files) if use_permutable_subseq_loss else None
+        self._piece_body_start_index = [0] * len(self.piece_files) if self.permute_track_number else None
+        self._mps_sep_indices = [0] * len(self.piece_files) if use_permutable_subseq_loss else None
+        cur_index = 0
         for filename in tqdm(self.piece_files, total=len(self.piece_files)):
             filenum = int(filename)
-
-            j = 0
-            while self.piece_files[filename][j][0] not in self._measure_ids:
-                j += 1
-            self._piece_body_start_index[filenum] = j
 
             if use_permutable_subseq_loss:
                 # find all seperater's index
@@ -101,40 +102,65 @@ class MidiDataset(Dataset):
                 self._mps_sep_indices[filenum] = mps_sep_indices.astype(np.int16)
 
             if self.piece_files[filename].shape[0] > max_seq_length:
-                for begin_index in range(0, self.piece_files[filename].shape[0] - max_seq_length, sample_stride):
-                    self._filenum_indices.append(
-                        (filenum, begin_index, begin_index + max_seq_length)
-                    )
+                cur_index += self.piece_files[filename].shape[0] - max_seq_length
             else:
-                self._filenum_indices.append(
-                    (filenum, 0, self.piece_files[filename].shape[0])
-                )
+                cur_index += 1
+            self._filenum_indices.append(cur_index)
+        self._max_index = cur_index
         # cast self._filenum_indices from list of tuples into np array to save space
-        print('self._mps_sep_indices size:', sys.getsizeof(self._mps_sep_indices) / 1024, 'KB')
-        print('self._filenum_indices len:', len(self._filenum_indices))
-        print('self._filenum_indices size:', sys.getsizeof(self._filenum_indices) / 1024, 'KB')
+        print('self._filenum_indices size:', sys.getsizeof(self._filenum_indices), 'bytes')
 
     def __getitem__(self, index):
-        filenum, begin_index, end_index = self._filenum_indices[index]
+        # while True:
+        #     if index < 0:
+        #         index = self._max_index + index
+        #     else:
+        #         break
+        filenum = bisect.bisect_left(self._filenum_indices, index)
+        begin_index = self._filenum_indices[filenum] - index
         filename = str(filenum)
+        if self.piece_files[filename].shape[0] > self.max_seq_length:
+            end_index = self.piece_files[filename].shape[0]
+        else:
+            end_index = begin_index + self.max_seq_length
         sliced_array = np.array(self.piece_files[filename][begin_index:end_index]) # copy
-        sliced_array = sliced_array.astype(np.int64) # was int16 to save sapce but torch ask for long
+        sliced_array = sliced_array.astype(np.int64) # was int16 to save space but torch ask for long
 
-        # measure number augumentation: move them up in range of self.measure_number_shift_range
+        # shift down measure number so that it didn't exceed max_seq_length
+        shift_value = 0
+        max_measure_num = sliced_array[-1, ATTR_NAME_TO_FEATURE_INDEX['mea']]
+        min_measure_num = sliced_array[0, ATTR_NAME_TO_FEATURE_INDEX['mea']]
+        if max_measure_num > self.max_seq_length:
+            shift_value = max_measure_num - self.max_seq_length
+            assert min_measure_num != 0
+        # measure number augumentation: move them up or down in range of self.measure_number_shift_range
         if self.measure_number_shift_range != 0:
-            max_measure_num = np.max(sliced_array[:, ATTR_NAME_TO_FEATURE_INDEX['mea']])
-            increasable_range = min(self.measure_number_shift_range, self.vocabs['max_seq_length']-max_measure_num)
-            increase_num = np.random.randint(0, increasable_range)
-            sliced_array[:, ATTR_NAME_TO_FEATURE_INDEX['mea']] += increase_num
+            if shift_value != 0:
+                shiftable_range_upper = 0
+            else:
+                shiftable_range_upper = min(self.measure_number_shift_range, self.max_seq_length - max_measure_num)
+            if min_measure_num != 0:
+                shiftable_range_lower = min(self.measure_number_shift_range, min_measure_num - 1)
+            else:
+                shiftable_range_lower = 0
+            shift_value += np.random.randint(-shiftable_range_lower, shiftable_range_upper)
+        sliced_array[:, ATTR_NAME_TO_FEATURE_INDEX['mea']] += shift_value
 
         if self.permute_track_number:
-            # use self.self._piece_body_start_index to know how many tracks there are in this piece
+            # amortize the calculation
+            if self._piece_body_start_index[filenum] == 0:
+                j = 2 # because first token is BOS and second must be track as we excluded all empty midis
+                while self.piece_files[filename][j][0] in self._track_ids:
+                    j += 1
+                self._piece_body_start_index[filenum] = j
+
+            # use self._piece_body_start_index to know how many tracks there are in this piece
             track_count = self._piece_body_start_index[filenum] - 1
-            # trn number as token index starts from len(self._special_tokens)
-            perm_array = np.random.permutation(track_count) + len(self._special_tokens)
+            # add one because there is a padding token at the beginning of the vocab
+            perm_array = np.random.permutation(track_count) + 1
             track_num_column = sliced_array[:, ATTR_NAME_TO_FEATURE_INDEX['trn']] # view
             track_num_column_expand = np.asarray([
-                (track_num_column == i + len(self._special_tokens)) for i in range(track_count)
+                (track_num_column == i + 1) for i in range(track_count)
             ])
             for i in range(perm_array.shape[0]):
                 track_num_column[track_num_column_expand[i]] = perm_array[i]
@@ -180,7 +206,7 @@ class MidiDataset(Dataset):
 
 
     def __len__(self):
-        return len(self._filenum_indices)
+        return self._max_index
 
 
 def collate_mididataset(data):

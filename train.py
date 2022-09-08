@@ -9,10 +9,13 @@ from tqdm import tqdm
 import torch
 from torch.utils.data import random_split, DataLoader
 from torch.optim import Adam, lr_scheduler
+import torchinfo
 
-from util.model import MidiTransformerDecoder, get_seq_mask, calc_loss, calc_permutable_subseq_loss
+from util.model import MidiTransformerDecoder, get_seq_mask, calc_losses, calc_permutable_subseq_losses
 from util.dataset import MidiDataset, collate_mididataset
-from util.corpus import to_vocabs_file_path
+from util.corpus import text_list_to_array, to_vocabs_file_path
+from util.midi import piece_to_midi
+from util.tokens import BEGIN_TOKEN_STR
 
 
 def parse_args():
@@ -176,28 +179,21 @@ def log(
         scheduler: lr_scheduler,
         train_loss_list: list,
         valid_loss_list: list,
-        log_head_losses: bool,
         loss_logger):
-    if log_head_losses:
-        avg_train_losses = [ sum(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
-        avg_valid_losses = [ sum(head_loss_tuple)for head_loss_tuple in zip(*valid_loss_list) ]
-        avg_train_losses_str = ','.join([f'{l:.4f}' for l in avg_train_losses])
-        avg_valid_losses_str = ','.join([f'{l:.4f}' for l in avg_valid_losses])
-        logging.info(
-            'Step: %d, Time: %d, Learning rate: %.6f, Avg train loss: %s, Avg valid loss: %s',
-            cur_step, time()-start_time, scheduler.get_last_lr()[0], avg_train_losses_str, avg_valid_losses_str
-        )
-        if loss_logger:
-            loss_logger.debug('%s,%s', avg_train_losses_str, avg_valid_losses_str)
-    else:
-        avg_train_loss = sum(train_loss_list)/len(train_loss_list)
-        avg_valid_loss = sum(valid_loss_list)/len(valid_loss_list)
-        logging.info(
-            'Step: %d, Time: %d, Learning rate: %.6f, Avg train loss: %.4f, Avg valid loss: %.4f',
-            cur_step, time()-start_time, scheduler.get_last_lr()[0], avg_train_loss, avg_valid_loss
-        )
-        if loss_logger:
-            loss_logger.debug('%.4f,%.4f', avg_train_loss, avg_valid_loss)
+    avg_train_losses = [ sum(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
+    avg_valid_losses = [ sum(head_loss_tuple)for head_loss_tuple in zip(*valid_loss_list) ]
+    avg_train_losses_str = ', '.join([f'{l:.4f}' for l in avg_train_losses])
+    avg_valid_losses_str = ', '.join([f'{l:.4f}' for l in avg_valid_losses])
+    logging.info(
+        'Step: %d, Time: %d, Learning rate: %.6f',
+        cur_step, time()-start_time, scheduler.get_last_lr()[0]
+    )
+    logging.info(
+        'Avg. train losses: %s, Avg. accu. train loss: %.4f, Avg. valid losses: %s Avg. accu. valid loss: %.4f', 
+        avg_train_losses_str, sum(avg_train_losses), avg_valid_losses_str, sum(avg_valid_losses)
+    )
+    if loss_logger:
+        loss_logger.debug('%s,%s', avg_train_losses_str, avg_valid_losses_str)
 
 
 def save_checkpoint(cur_step, model, checkpoint_dir_path):
@@ -217,13 +213,10 @@ def valid(model, valid_dataloader, args):
         prediction = model(batch_input_seqs, batch_input_seq_mask)
 
         if args.data_args.use_permutable_subseq_loss:
-            loss = calc_permutable_subseq_loss(prediction, batch_target_seqs, batch_mps_sep_indices)
+            head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
         else:
-            loss = calc_loss(prediction, batch_target_seqs, args.log_head_losses)
-            if args.log_head_losses:
-                loss_list.append([float(l) for l in loss])
-            else:
-                loss_list.append(float(loss))
+            head_losses = calc_losses(prediction, batch_target_seqs)
+        loss_list.append([float(hl) for hl in head_losses])
     return loss_list
 
 def train(model, train_dataloader, optimizer, scheduler, args):
@@ -243,14 +236,11 @@ def train(model, train_dataloader, optimizer, scheduler, args):
         prediction = model(batch_input_seqs, batch_input_seq_mask)
 
         if args.data_args.use_permutable_subseq_loss:
-            loss = calc_permutable_subseq_loss(prediction, batch_target_seqs, batch_mps_sep_indices)
+            head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
         else:
-            loss = calc_loss(prediction, batch_target_seqs, args.log_head_losses)
-            if args.log_head_losses:
-                loss_list.append([float(l) for l in loss])
-                loss = sum(loss)
-            else:
-                loss_list.append(float(loss))
+            head_losses = calc_losses(prediction, batch_target_seqs)
+        loss_list.append([float(hl) for hl in head_losses])
+        loss = sum(head_losses)
         optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
@@ -301,7 +291,7 @@ def main():
     loss_formatter = logging.Formatter('%(message)s')
     loss_handler.setFormatter(loss_formatter)
     loss_logger = logging.getLogger('loss_logger')
-    loss_logger.setLevel(logging.DEBUG)
+    loss_logger.setLevel(logging.INFO)
     loss_logger.addHandler(loss_handler)
     logging.info('Created loss.csv file at %s', loss_file_path)
 
@@ -312,14 +302,22 @@ def main():
         max_seq_length=args.data_args.max_seq_length,
         **vars(args.model_args)
     )
+    torchinfo.summary(
+        model,
+        input_size=[
+            (args.train_args.batch_size, args.data_args.max_seq_length, len(model.input_features_name)), # x
+            (args.data_args.max_seq_length, args.data_args.max_seq_length) # mask
+        ],
+        dtypes=[torch.long, torch.float64]
+    )
 
-    if args.log_head_losses:
-        loss_csv_head = ','.join(
-            ['train_' + n for n in model.output_features_name] + ['valid_' + n for n in model.output_features_name]
-        )
-        loss_logger.info(loss_csv_head)
-    else:
-        loss_logger.info('train,valid')
+    loss_csv_head = ', '.join(
+        ['train_' + n for n in model.output_features_name]
+            + ['train_sum']
+            + ['valid_' + n for n in model.output_features_name]
+            + ['valid_sum']
+    )
+    loss_logger.debug(loss_csv_head)
 
     # make dataset
     complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args))
@@ -360,19 +358,29 @@ def main():
     min_avg_valid_loss = float('inf')
     early_stop_counter = 0
     start_time = time()
+    # was int16 to save space but torch ask for long
+    uncond_gen_prompt = torch.from_numpy(text_list_to_array([BEGIN_TOKEN_STR], vocabs_dict)).unsqueeze(0).long()
     for start_step in range(0, args.train_args.steps, args.train_args.validation_interval):
         train_loss_list = train(model, train_dataloader, optimizer, scheduler, args)
         valid_loss_list = valid(model, valid_dataloader, args)
+
         complete_train_loss_list.extend(train_loss_list)
         complete_valid_loss_list.extend(valid_loss_list)
         cur_step = start_step + args.train_args.validation_interval
-        log(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, args.log_head_losses, loss_logger)
+        log(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_logger)
+
         model_file_name = save_checkpoint(cur_step, model, args.checkpoint_dir_path)
+
+        print('Generating unconditional generation sample for checkpoint')
+        uncond_gen_text_list = model.generate(uncond_gen_prompt, args.data_args.max_seq_length)
+        uncond_gen_piece = ' '.join(uncond_gen_text_list)
+        open(os.path.join(args.checkpoint_dir_path, f'uncond_gen_{cur_step}'), 'w+', encoding='utf8').write(uncond_gen_piece)
+        piece_to_midi(uncond_gen_piece, vocabs_dict['paras']['nth']).dump(
+            os.path.join(args.checkpoint_dir_path, f'uncond_gen_{cur_step}.mid')
+        )
+
         if args.train_args.early_stop > 0:
-            if args.log_head_losses:
-                avg_valid_loss = sum([sum(valid_head_losses) for valid_head_losses in valid_loss_list]) / len(valid_loss_list)
-            else:
-                avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
+            avg_valid_loss = sum([sum(valid_head_losses) for valid_head_losses in valid_loss_list]) / len(valid_loss_list)
             if avg_valid_loss >= min_avg_valid_loss:
                 early_stop_counter += 1
                 if early_stop_counter >= args.train_args.early_stop:
@@ -385,7 +393,7 @@ def main():
                 early_stop_counter = 0
                 min_avg_valid_loss = avg_valid_loss
                 shutil.copyfile(model_file_name, os.path.join(args.checkpoint_dir_path, 'model_best.pt'))
-                logging('New best model.')
+                logging.info('New best model.')
 
     return 0
 

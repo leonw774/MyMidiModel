@@ -29,6 +29,7 @@ def merge_drums(midi: MidiFile) -> None:
         new_instruments = [track for track in midi.Instruments if not track.is_drum] + [merged_perc_inst]
         midi.instruments = new_instruments
 
+
 def merge_tracks(
         midi: MidiFile,
         max_track_number: int,
@@ -499,10 +500,9 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
 
     text_list = piece.split(' ')
     assert text_list[0] == 'BOS' and text_list[-1] == 'EOS', 'No BOS and EOS at start and end'
-    assert text_list[1][0] == 'R', 'No track token in head'
 
-    # debug_str = ''
     cur_time = 0
+    is_head = True
     cur_measure_length = -1
     cur_measure_onset = -1
     cur_time_signature = None
@@ -510,6 +510,7 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
     for text in text_list[1:-1]:
         typename = text[0]
         if typename == 'R':
+            assert is_head
             track_number, instrument = (b36str2int(x) for x in text[1:].split(':'))
             assert len(midi.instruments) == track_number, 'Track token\'s track_number is not ascending'
             midi.instruments.append(
@@ -517,6 +518,7 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
             )
 
         elif typename == 'M':
+            is_head = False
             numer, denom = (b36str2int(x) for x in text[1:].split('/'))
             if cur_measure_onset == -1: # first measure
                 cur_measure_onset = 0
@@ -529,23 +531,23 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
             if cur_time_signature != (numer, denom):
                 cur_time_signature = (numer, denom)
                 midi.time_signature_changes.append(TimeSignature(numerator=numer, denominator=denom, time=cur_time))
-            # print("M", attr, cur_measure_onset)
 
         elif typename == 'P':
+            assert not is_head
             position = b36str2int(text[1:])
             cur_time = position + cur_measure_onset
-            # print('P', attr)
 
         elif typename == 'T':
+            assert not is_head
             if ':' in text[1:]:
                 tempo, position = (b36str2int(x) for x in text[1:].split(':'))
                 cur_time = position + cur_measure_onset
                 midi.tempo_changes.append(TempoChange(tempo=tempo, time=cur_time))
             else:
                 midi.tempo_changes.append(TempoChange(tempo=b36str2int(text[1:]), time=cur_time))
-            # print('T', text, cur_time)
 
         elif typename == 'N':
+            assert not is_head
             is_cont = (text[1] == '~')
             if is_cont:
                 note_attr = tuple(b36str2int(x) for x in text[3:].split(':'))
@@ -559,6 +561,7 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
                 midi.instruments[note_attr[3]].notes.append(n)
 
         elif typename == 'S':
+            assert not is_head
             shape_string, *puvt = text[1:].split(':')
             relnote_list = []
             for s in shape_string[:-1].split(';'):
@@ -577,10 +580,7 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
                 onset_time_in_tick = cur_time + rel_onset * time_unit
                 n = handle_note_continuation(is_cont, note_attr, onset_time_in_tick, pending_cont_notes)
                 if n is not None:
-                    # print(n)
                     midi.instruments[track_number].notes.append(n)
-                # debug_str += ' onset' + str(onset_time_in_tick) + ' ' + str(n) + ','
-            # debug_str += '\n'
         else:
             raise ValueError(f'bad token string: {text}')
 

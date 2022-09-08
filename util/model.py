@@ -1,8 +1,11 @@
-from torch import nn, triu, ones
-from torch.nn.functional import cross_entropy
+import torch
+from torch import nn
+import torch.nn.functional as F
+from tqdm import tqdm
 
-from .tokens import SPECIAL_TOKENS
-from .corpus import ATTR_NAME_TO_FEATURE_INDEX
+from .corpus import ATTR_NAME_TO_FEATURE_INDEX, array_to_text_list, text_list_to_array
+from .midi import piece_to_midi
+from .tokens import PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR
 
 class MidiTransformerDecoder(nn.Module):
     def __init__(self,
@@ -14,24 +17,23 @@ class MidiTransformerDecoder(nn.Module):
             ) -> None:
         super().__init__()
 
-        self._pad_id = vocabs['events']['text2id'][SPECIAL_TOKENS[0]]
+        self._pad_id = vocabs['events']['text2id'][PADDING_TOKEN_STR]
         # self._pad_id = 0
         assert self._pad_id == 0
 
         self._embedding_dim = embedding_dim
+        self._max_seq_length = max_seq_length
+        self._vocabs = vocabs
+        self._end_token_id = vocabs['events']['text2id'][END_TOKEN_STR]
 
-        # Input
-        # event, pitch, duration, velocity, track_number, instrument, tempo, position, measure_number
+        # Input features
+        self.input_features_name = (
+            'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions',
+            'tempos', 'measure_numbers'
+        )
         embedding_vocabs_size = [
-            vocabs['events']['size'],
-            vocabs['pitchs']['size'],
-            vocabs['durations']['size'],
-            vocabs['velocities']['size'],
-            vocabs['track_numbers']['size'],
-            vocabs['instruments']['size'],
-            vocabs['tempos']['size'],
-            vocabs['positions']['size'],
-           max_seq_length
+            ( vocabs[feature_name]['size'] if feature_name != 'measure_numbers' else max_seq_length )
+            for feature_name in self.input_features_name
         ]
         self._embeddings = nn.ModuleList([
             nn.Embedding(
@@ -41,31 +43,26 @@ class MidiTransformerDecoder(nn.Module):
             )
             for vsize in embedding_vocabs_size
         ])
-        # Output
+        # Output features
         # event, pitch, duration, velocity, track_number, instrument, (position)
-        logit_vocabs_size = [
-            vocabs['events']['size'],
-            vocabs['pitchs']['size'],
-            vocabs['durations']['size'],
-            vocabs['velocities']['size'],
-            vocabs['track_numbers']['size'],
-            vocabs['instruments']['size'], # NOTE: should we predict instrument?
-            vocabs['positions']['size'],
-        ]
-        self.output_features_name = ['evt', 'pit', 'dur', 'vel', 'trn', 'ins', 'pos']
-        self.output_features_indices = [
-            ATTR_NAME_TO_FEATURE_INDEX[attr_name]
-            for attr_name in self.output_features_name
-        ]
+        self.output_features_name = (
+            'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions'
+        )
         if vocabs['paras']['position_method'] == 'event':
-            logit_vocabs_size.pop()
-            self.output_features_indices.pop()
+            self.output_features_name.pop()
+        logit_vocabs_size = [
+            vocabs[feature_name]['size'] for feature_name in self.output_features_name
+        ]
+        self.output_features_indices = [
+            ATTR_NAME_TO_FEATURE_INDEX[feature_name]
+            for feature_name in self.output_features_name
+        ]
         self._logits = nn.ModuleList([
             nn.Linear(
                 in_features=embedding_dim,
                 out_features=vsize
             )
-            for vsize in logit_vocabs_size[:-1]
+            for vsize in logit_vocabs_size
         ])
 
         layer = nn.TransformerEncoderLayer( # name's encoder, used as decoder. Cause we don't need memory
@@ -92,38 +89,104 @@ class MidiTransformerDecoder(nn.Module):
             src=x,
             mask=mask
         )
-        out = [
+        logits = [
             logit(x) for logit in self._logits
         ]
-        return out
+        return logits
+
+    @torch.no_grad()
+    def generate(self, start_seq, steps, temperature=1.0) -> list:
+        """
+            return the text list of generated piece
+        """
+        training_state = self.training
+
+        if len(start_seq.shape) != 3:
+            raise ValueError(f'start_seq\'s shape have to be (1, seq_length, input_feature_num), get {start_seq.shape}')
+        elif start_seq.shape[0] != 1 or start_seq.shape[2] != len(self.input_features_name):
+            raise ValueError(f'start_seq\'s shape have to be (1, seq_length, input_feature_num), get {start_seq.shape}')
+
+        max_length_mask = get_seq_mask(self._max_seq_length)
+
+        input_seq = start_seq
+        output_seq = self.to_output_features(start_seq)
+        output_text_list = []
+        end_with_end_token = False
+        # print(output_seq.shape)
+        for _ in tqdm(range(steps)):
+            clipped_input_seq = input_seq[:, -self._max_seq_length:]
+            mask = max_length_mask[:clipped_input_seq.shape[1], :clipped_input_seq.shape[1]]
+            logits = self.forward(clipped_input_seq, mask)
+            last_logits = [
+                l[:, -1, :] # l has shape (1, sequence, feature_vocab_size)
+                for l in logits
+            ]
+            try_count = 0
+            try_count_limit = 1000
+            while try_count < try_count_limit:
+                sampled_features = [
+                    torch.multinomial(F.softmax(l[0] / temperature, dim=0), 1) 
+                    for l in last_logits # l has shape (1, feature_vocab_size)
+                ]
+                new_token = torch.stack(sampled_features, dim=1) # shape = (1, feature_num)
+                new_token = torch.unsqueeze(new_token, dim=0) # shape = (1, 1, feature_num)
+                new_output_seq = torch.cat((output_seq, new_token), dim=1)
+                new_output_text_list = array_to_text_list(new_output_seq[0].cpu().numpy(), vocabs=self._vocabs, is_input=False)
+
+                try:
+                    # for format checking
+                    piece_to_midi(' '.join(new_output_text_list), self._vocabs['paras']['nth'])
+                    # for format checking and position, tempo, measure_number calculation
+                    input_seq = torch.from_numpy(
+                        text_list_to_array(new_output_text_list, vocabs=self._vocabs)
+                    ).unsqueeze(0).long()
+                except:
+                    try_count += 1
+                    continue # keep sampling until no error
+
+                output_seq = new_output_seq
+                output_text_list = new_output_text_list
+                break
+
+            if try_count == try_count_limit:
+                break
+
+            if sampled_features[ATTR_NAME_TO_FEATURE_INDEX['evt']] == self._end_token_id:
+                end_with_end_token = True
+                break
+
+        if not end_with_end_token:
+            output_text_list.append(END_TOKEN_STR)
+
+        self.train(training_state)
+        return output_text_list
 
 
-def calc_loss(pred_logit, target, return_head_losses=False):
+def calc_losses(pred_logit, target):
     """
         pred is a list
         - length=out_feature_num
-        - elements are tenors with shape=(batch_size, seq_size, vocabs_size_of_feature)
+        - elements are tenors with shape=(batch_size, seq_size, feature_vocab_size)
         target has shape: (batch_size, seq_size, out_feature_num)
     """
     # basically treat seq_size as the K in
     # https://pytorch.org/docs/stable/generated/torch.nn.functional.cross_entropy.html#torch.nn.functional.cross_entropy
     head_losses = [
-        cross_entropy(
-            input=pred_feature_logit.transpose(1, 2), # (batch_size, vocabs_size_of_feature, seq_size)
+        F.cross_entropy(
+            input=pred_feature_logit.transpose(1, 2), # (batch_size, feature_vocab_size, seq_size)
             target=target[..., i] # (batch_size, seq_size)
         )
         for i, pred_feature_logit in enumerate(pred_logit)
     ]
-    if return_head_losses:
-        return head_losses
-    loss = sum(head_losses)
-    return loss
+    return head_losses
+    # loss = sum(head_losses)
+    # return loss
 
-def calc_permutable_subseq_loss(pred_logit, target, mps_indices):
+def calc_permutable_subseq_losses(pred_logit, target, mps_indices):
     """
         pred is a list
         - length: out_feature_num
-        - elements are tenors with shape: (batch_size, seq_size, vocabs_size_of_feature)
+        - elements are tenors with shape: (batch_size, seq_size, feature_vocabs_size)
         target is tensor with shape: (batch_size, seq_size, out_feature_num)
         mps_indices is numpy object array of numpy int16 arrays in varying lengths
     """
@@ -131,4 +194,4 @@ def calc_permutable_subseq_loss(pred_logit, target, mps_indices):
 
 
 def get_seq_mask(size: int):
-    return triu(ones(size, size) * float('-inf'), diagonal=1)
+    return torch.triu(torch.ones(size, size), diagonal=1).bool()
