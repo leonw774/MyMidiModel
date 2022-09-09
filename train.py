@@ -13,7 +13,7 @@ import torchinfo
 
 from util.model import MidiTransformerDecoder, get_seq_mask, calc_losses, calc_permutable_subseq_losses
 from util.dataset import MidiDataset, collate_mididataset
-from util.corpus import text_list_to_array, to_vocabs_file_path
+from util.corpus import INPUT_FEATURE_NAME, OUTPUT_FEATURE_NAME, text_list_to_array, to_vocabs_file_path
 from util.midi import piece_to_midi
 from util.tokens import BEGIN_TOKEN_STR
 
@@ -23,7 +23,7 @@ def parse_args():
     data_parser.add_argument(
         '--max-seq-length',
         type=int,
-        default=1024
+        default=2048
     )
     data_parser.add_argument(
         '--sample-stride',
@@ -41,11 +41,6 @@ def parse_args():
     data_parser.add_argument(
         '--permute-track-number',
         action='store_true'
-    )
-    data_parser.add_argument(
-        '--measure-number-shift-range',
-        type=int,
-        default=0
     )
 
     model_parser = ArgumentParser()
@@ -129,8 +124,9 @@ def parse_args():
     )
     global_parser.add_argument(
         '--use-device',
-        choices=['cpu', 'cuda'],
-        default='cpu'
+        type=str,
+        choices=['cuda', 'cpu'],
+        default='cuda'
     )
     global_parser.add_argument(
         '--log',
@@ -179,7 +175,7 @@ def log(
         scheduler: lr_scheduler,
         train_loss_list: list,
         valid_loss_list: list,
-        loss_logger):
+        loss_file=None):
     avg_train_losses = [ sum(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
     avg_valid_losses = [ sum(head_loss_tuple)for head_loss_tuple in zip(*valid_loss_list) ]
     avg_train_losses_str = ', '.join([f'{l:.4f}' for l in avg_train_losses])
@@ -189,11 +185,11 @@ def log(
         cur_step, time()-start_time, scheduler.get_last_lr()[0]
     )
     logging.info(
-        'Avg. train losses: %s, Avg. accu. train loss: %.4f, Avg. valid losses: %s Avg. accu. valid loss: %.4f', 
+        'Avg. train losses: %s, Avg. accu. train loss: %.4f, Avg. valid losses: %s Avg. accu. valid loss: %.4f',
         avg_train_losses_str, sum(avg_train_losses), avg_valid_losses_str, sum(avg_valid_losses)
     )
-    if loss_logger:
-        loss_logger.debug('%s,%s', avg_train_losses_str, avg_valid_losses_str)
+    if loss_file:
+        loss_file.write(f'{avg_train_losses_str}, {avg_valid_losses_str}')
 
 
 def save_checkpoint(cur_step, model, checkpoint_dir_path):
@@ -205,18 +201,21 @@ def save_checkpoint(cur_step, model, checkpoint_dir_path):
 
 def valid(model, valid_dataloader, args):
     model.eval()
+    print('Validation')
     loss_list = []
-    for batch_seqs, batch_mps_sep_indices in valid_dataloader:
-        batch_input_seqs = batch_seqs[:, :-1]
-        batch_target_seqs = model.to_output_features(batch_seqs[:, 1:])
-        batch_input_seq_mask = get_seq_mask(batch_input_seqs.shape[1])
+    for batch_seqs, batch_mps_sep_indices in tqdm(valid_dataloader):
+        batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
+        batch_target_seqs = (model.to_output_features(batch_seqs[:, 1:])).to(args.use_device)
+        batch_input_seq_mask = get_seq_mask(batch_input_seqs.shape[1]).to(args.use_device)
         prediction = model(batch_input_seqs, batch_input_seq_mask)
 
         if args.data_args.use_permutable_subseq_loss:
             head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
         else:
             head_losses = calc_losses(prediction, batch_target_seqs)
+        # print(torch.cuda.memory_allocated()/1e6, 'MB')
         loss_list.append([float(hl) for hl in head_losses])
+        torch.cuda.empty_cache()
     return loss_list
 
 def train(model, train_dataloader, optimizer, scheduler, args):
@@ -230,9 +229,9 @@ def train(model, train_dataloader, optimizer, scheduler, args):
             train_dataloader_iter = iter(train_dataloader)
             batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
 
-        batch_input_seqs = batch_seqs[:, :-1]
-        batch_target_seqs = model.to_output_features(batch_seqs[:, 1:])
-        batch_input_seq_mask = get_seq_mask(batch_input_seqs.shape[1])
+        batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
+        batch_target_seqs = (model.to_output_features(batch_seqs[:, 1:])).to(args.use_device)
+        batch_input_seq_mask = get_seq_mask(batch_input_seqs.shape[1]).to(args.use_device)
         prediction = model(batch_input_seqs, batch_input_seq_mask)
 
         if args.data_args.use_permutable_subseq_loss:
@@ -243,14 +242,22 @@ def train(model, train_dataloader, optimizer, scheduler, args):
         loss = sum(head_losses)
         optimizer.zero_grad()
         loss.backward()
+        # print(torch.cuda.memory_allocated()/1e6, 'MB')
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
         optimizer.step()
         scheduler.step()
+        torch.cuda.empty_cache()
     return loss_list
 
 
 def main():
     args = parse_args()
+    if args.use_device != 'cuda' and args.use_device != 'cpu':
+        raise ValueError(f'Bad device name {args.use_device}')
+
+    if not torch.cuda.is_available():
+        args.use_device = 'cpu'
+    args.use_device = torch.device(args.use_device)
 
     if not os.path.isdir(args.checkpoint_dir_path):
         logging.info('Invalid checkpoint dir path: %s', args.checkpoint_dir_path)
@@ -287,12 +294,7 @@ def main():
     # loss logger
     # loss file is in the checkpoint directory
     loss_file_path = os.path.join(args.checkpoint_dir_path, 'loss.csv')
-    loss_handler = logging.FileHandler(loss_file_path, 'w+', encoding='utf8')
-    loss_formatter = logging.Formatter('%(message)s')
-    loss_handler.setFormatter(loss_formatter)
-    loss_logger = logging.getLogger('loss_logger')
-    loss_logger.setLevel(logging.INFO)
-    loss_logger.addHandler(loss_handler)
+    loss_file = open(loss_file_path, 'w+', encoding='utf8')
     logging.info('Created loss.csv file at %s', loss_file_path)
 
     # make model
@@ -302,22 +304,28 @@ def main():
         max_seq_length=args.data_args.max_seq_length,
         **vars(args.model_args)
     )
+    logging.info('Embedding size:')
+    logging.info('\n'.join([
+        f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(INPUT_FEATURE_NAME, model.embedding_vocabs_size))
+    ]))
     torchinfo.summary(
         model,
         input_size=[
-            (args.train_args.batch_size, args.data_args.max_seq_length, len(model.input_features_name)), # x
+            (args.train_args.batch_size, args.data_args.max_seq_length, len(INPUT_FEATURE_NAME)), # x
             (args.data_args.max_seq_length, args.data_args.max_seq_length) # mask
         ],
-        dtypes=[torch.long, torch.float64]
+        dtypes=[torch.long, torch.bool],
+        device=args.use_device
     )
+    model = model.to(args.use_device)
 
     loss_csv_head = ', '.join(
-        ['train_' + n for n in model.output_features_name]
-            + ['train_sum']
-            + ['valid_' + n for n in model.output_features_name]
-            + ['valid_sum']
+        ['train_' + n for n in OUTPUT_FEATURE_NAME]
+            + ['train_total']
+            + ['valid_' + n for n in OUTPUT_FEATURE_NAME]
+            + ['valid_total']
     )
-    loss_logger.debug(loss_csv_head)
+    loss_file.write(loss_csv_head+'\n')
 
     # make dataset
     complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args))
@@ -358,8 +366,6 @@ def main():
     min_avg_valid_loss = float('inf')
     early_stop_counter = 0
     start_time = time()
-    # was int16 to save space but torch ask for long
-    uncond_gen_prompt = torch.from_numpy(text_list_to_array([BEGIN_TOKEN_STR], vocabs_dict)).unsqueeze(0).long()
     for start_step in range(0, args.train_args.steps, args.train_args.validation_interval):
         train_loss_list = train(model, train_dataloader, optimizer, scheduler, args)
         valid_loss_list = valid(model, valid_dataloader, args)
@@ -367,12 +373,14 @@ def main():
         complete_train_loss_list.extend(train_loss_list)
         complete_valid_loss_list.extend(valid_loss_list)
         cur_step = start_step + args.train_args.validation_interval
-        log(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_logger)
+        log(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_file)
 
         model_file_name = save_checkpoint(cur_step, model, args.checkpoint_dir_path)
 
         print('Generating unconditional generation sample for checkpoint')
-        uncond_gen_text_list = model.generate(uncond_gen_prompt, args.data_args.max_seq_length)
+        # was int16 to save space but torch ask for int
+        uncond_gen_prompt = torch.from_numpy(text_list_to_array([BEGIN_TOKEN_STR], vocabs_dict)).unsqueeze(0).int()
+        uncond_gen_text_list = model.generate(uncond_gen_prompt.to(args.use_device), args.data_args.max_seq_length-1)
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
         open(os.path.join(args.checkpoint_dir_path, f'uncond_gen_{cur_step}'), 'w+', encoding='utf8').write(uncond_gen_piece)
         piece_to_midi(uncond_gen_piece, vocabs_dict['paras']['nth']).dump(

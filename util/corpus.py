@@ -134,17 +134,21 @@ def build_vocabs(
     position_attr_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(get_largest_possible_position(paras['nth']))))
 
     token_count_per_piece = []
-    max_measure_length = 0 # max measure number in all pieces
+    max_measured_count = 0 # max measure number in all pieces
     corpus_measure_tokens = set()
     corpus_position_tokens = set() # we want to see how sparse measure and position is
     for piece in corpus_iterator:
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
-        measure_indices = [i for i, t in enumerate(text_list) if t[0] == 'M']
-        max_measure_length = max(max_measure_length, len(measure_indices))
+        measures_count = 0
+        measures_set = set()
+        for t in text_list:
+            if t[0] == 'M':
+                measures_set.add(t[0])
+                measures_count += 1
+        max_measured_count = max(max_measured_count, measures_count)
 
-        measures = {t for t in text_list if t[0] == 'M'}
-        corpus_measure_tokens.update(measures)
+        corpus_measure_tokens.update(measures_set)
         if paras['position_method'] == 'event':
             positions = {t[1:] for t in text_list if t[0] == 'P'}
         else:
@@ -186,7 +190,7 @@ def build_vocabs(
     return vocab_dicts, summary_string
 
 
-ATTR_NAME_TO_FEATURE_INDEX = {
+FEATURE_INDEX = {
     'evt': 0, 'events': 0,
     'pit': 1, 'pitchs': 1,
     'dur': 2, 'durations': 2,
@@ -197,6 +201,15 @@ ATTR_NAME_TO_FEATURE_INDEX = {
     'tmp': 7, 'tempos': 7,
     'mea': 8, 'measure_numbers': 8,
 }
+
+INPUT_FEATURE_NAME = [
+    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions',
+    'tempos', 'measure_numbers'
+]
+
+OUTPUT_FEATURE_NAME = [
+    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions'
+]
 
 
 def text_list_to_array(text_list: list, vocabs: dict) -> np.ndarray:
@@ -226,57 +239,57 @@ def text_list_to_array(text_list: list, vocabs: dict) -> np.ndarray:
             continue
 
         if typename == 'B' or typename == 'E':
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['evt']] = event_text2id[text]
+            x[i][FEATURE_INDEX['evt']] = event_text2id[text]
 
         elif typename == 'R':
             event_text, instrument = text.split(':')
             track_number = event_text[1:]
             tracks_count += 1
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['evt']] = event_text2id[event_text]
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['trn']] = vocabs['track_numbers']['text2id'][track_number]
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['ins']] = vocabs['instruments']['text2id'][instrument]
+            x[i][FEATURE_INDEX['evt']] = event_text2id[event_text]
+            x[i][FEATURE_INDEX['trn']] = vocabs['track_numbers']['text2id'][track_number]
+            x[i][FEATURE_INDEX['ins']] = vocabs['instruments']['text2id'][instrument]
 
         elif typename == 'M':
             cur_position_id = vocabs['positions']['text2id']['0']
             cur_measure_number += 1
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['evt']] = event_text2id[text]
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['tmp']] = cur_tempo_id
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['pos']] = cur_position_id
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['mea']] = cur_measure_number
+            x[i][FEATURE_INDEX['evt']] = event_text2id[text]
+            x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
+            x[i][FEATURE_INDEX['pos']] = cur_position_id
+            x[i][FEATURE_INDEX['mea']] = cur_measure_number
 
         elif typename == 'T':
             event_text, *attr = text = text.split(':')
             cur_tempo_id = vocabs['tempos']['text2id'][event_text]
             if position_method == 'attribute':
                 cur_position_id = b36str2int(attr[0])
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['evt']] = event_text2id[event_text]
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['tmp']] = cur_tempo_id
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['pos']] = cur_position_id
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['mea']] = cur_measure_number
+            x[i][FEATURE_INDEX['evt']] = event_text2id[event_text]
+            x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
+            x[i][FEATURE_INDEX['pos']] = cur_position_id
+            x[i][FEATURE_INDEX['mea']] = cur_measure_number
             # because tempo come after a position or measure token, which already assigned previous tempo's id
-            x[i-1][ATTR_NAME_TO_FEATURE_INDEX['tmp']] = cur_tempo_id
+            x[i-1][FEATURE_INDEX['tmp']] = cur_tempo_id
 
         elif typename == 'P':
             cur_position_id = vocabs['positions']['text2id'][text[1:]]
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['evt']] = event_text2id[event_text]
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['tmp']] = cur_tempo_id
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['pos']] = cur_position_id
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['mea']] = cur_measure_number
+            x[i][FEATURE_INDEX['evt']] = event_text2id[event_text]
+            x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
+            x[i][FEATURE_INDEX['pos']] = cur_position_id
+            x[i][FEATURE_INDEX['mea']] = cur_measure_number
 
         elif typename == 'N' or typename == 'S':
             event_text, *attr = text.split(':')
             if position_method == 'attribute':
                 cur_position_id = vocabs['positions']['text2id'][attr[4]]
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['evt']] = event_text2id[event_text]
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['pit']] = vocabs['pitchs']['text2id'][attr[0]]
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['dur']] = vocabs['durations']['text2id'][attr[1]]
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['vel']] = vocabs['velocities']['text2id'][attr[2]]
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['trn']] = vocabs['track_numbers']['text2id'][attr[3]]
+            x[i][FEATURE_INDEX['evt']] = event_text2id[event_text]
+            x[i][FEATURE_INDEX['pit']] = vocabs['pitchs']['text2id'][attr[0]]
+            x[i][FEATURE_INDEX['dur']] = vocabs['durations']['text2id'][attr[1]]
+            x[i][FEATURE_INDEX['vel']] = vocabs['velocities']['text2id'][attr[2]]
+            x[i][FEATURE_INDEX['trn']] = vocabs['track_numbers']['text2id'][attr[3]]
             assert b36str2int(attr[3]) < tracks_count, 'Invalid track number'
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['ins']] = x[b36str2int(attr[3])+1, ATTR_NAME_TO_FEATURE_INDEX['ins']]
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['tmp']] = cur_tempo_id
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['pos']] = cur_position_id
-            x[i][ATTR_NAME_TO_FEATURE_INDEX['mea']] = cur_measure_number
+            x[i][FEATURE_INDEX['ins']] = x[b36str2int(attr[3])+1, FEATURE_INDEX['ins']]
+            x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
+            x[i][FEATURE_INDEX['pos']] = cur_position_id
+            x[i][FEATURE_INDEX['mea']] = cur_measure_number
 
         else:
             raise ValueError('unknown typename')
@@ -300,7 +313,7 @@ def array_to_text_list(data, vocabs: dict, is_input=True):
     text_list = []
     for i in range(data.shape[0]):
         # in json, key can only be string
-        event_text = vocabs['events']['id2text'][str(data[i][ATTR_NAME_TO_FEATURE_INDEX['evt']])]
+        event_text = vocabs['events']['id2text'][str(data[i][FEATURE_INDEX['evt']])]
         typename = event_text[0]
 
         if typename == 'B' or typename == 'E':
@@ -308,7 +321,7 @@ def array_to_text_list(data, vocabs: dict, is_input=True):
 
         elif typename == 'R':
             # track token has instrument attribute
-            token_text = event_text + ':' + vocabs['instruments']['id2text'][str(data[i][ATTR_NAME_TO_FEATURE_INDEX['ins']])]
+            token_text = event_text + ':' + vocabs['instruments']['id2text'][str(data[i][FEATURE_INDEX['ins']])]
             text_list.append(token_text)
 
         elif typename == 'M':
@@ -322,15 +335,15 @@ def array_to_text_list(data, vocabs: dict, is_input=True):
 
         elif typename == 'N' or typename == 'S':
             # subtract one because there is padding token at the beginning of the vocab
-            track_number = data[i][ATTR_NAME_TO_FEATURE_INDEX['trn']] - 1
+            track_number = data[i][FEATURE_INDEX['trn']] - 1
             token_text = (
                 event_text + ':'
-                + vocabs['pitchs']['id2text'][str(data[i][ATTR_NAME_TO_FEATURE_INDEX['pit']])] + ':'
-                + vocabs['durations']['id2text'][str(data[i][ATTR_NAME_TO_FEATURE_INDEX['dur']])] + ':'
-                + vocabs['velocities']['id2text'][str(data[i][ATTR_NAME_TO_FEATURE_INDEX['vel']])] + ':'
+                + vocabs['pitchs']['id2text'][str(data[i][FEATURE_INDEX['pit']])] + ':'
+                + vocabs['durations']['id2text'][str(data[i][FEATURE_INDEX['dur']])] + ':'
+                + vocabs['velocities']['id2text'][str(data[i][FEATURE_INDEX['vel']])] + ':'
                 + int2b36str(track_number))
             if position_method == 'attribute':
-                token_text += ':' + vocabs['positions']['id2text'][str(data[i][ATTR_NAME_TO_FEATURE_INDEX['pos']])]
+                token_text += ':' + vocabs['positions']['id2text'][str(data[i][FEATURE_INDEX['pos']])]
             text_list.append(token_text)
         elif event_text == PADDING_TOKEN_STR:
             pass

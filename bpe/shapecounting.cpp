@@ -107,7 +107,7 @@ void oursShapeCounting(
     double samplingRate
 ) {
     if (samplingRate <= 0 || 1 < samplingRate) {
-        throw std::runtime_error("samplingRate in counting function not in range (0, 1]");
+        throw std::runtime_error("samplingRate in oursShapeCounting not in range (0, 1]");
     }
     std::map<Shape, unsigned int> shapeScoreParallel[COUNTING_THREAD_NUM];
     #pragma omp parallel for num_threads(COUNTING_THREAD_NUM)
@@ -201,7 +201,7 @@ void symphonyNetShapeCounting(
     double samplingRate
 ) {
     if (samplingRate <= 0 || 1 < samplingRate) {
-        throw std::runtime_error("samplingRate in counting function not in range (0, 1]");
+        throw std::runtime_error("samplingRate in symphonyNetShapeCounting not in range (0, 1]");
     }
     std::map<Shape, unsigned int> shapeScoreParallel[COUNTING_THREAD_NUM];
     #pragma omp parallel for num_threads(COUNTING_THREAD_NUM)
@@ -254,8 +254,8 @@ void wordPieceScoreShapeCounting(
     std::map<Shape, unsigned int>& shapeScore,
     double samplingRate
 ) {
-    if (samplingRate <= 0 || 1 <= samplingRate) {
-        throw std::runtime_error("samplingRate in PRF-inspired counting not in range (0, 1)");
+    if (samplingRate <= 0 || 1 < samplingRate) {
+        throw std::runtime_error("samplingRate in wordPieceScoreShapeCounting not in range (0, 1]");
     }
 
     std::vector<unsigned int> dictShapeCount(shapeDict.size(), 0);

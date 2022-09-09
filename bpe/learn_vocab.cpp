@@ -4,101 +4,99 @@
 #include <algorithm>
 #include <ctime>
 
-using namespace std;
-
-void printTrack(const Track& track, const vector<Shape>& shapeDict, const size_t begin, const size_t length) {
+void printTrack(const Track& track, const std::vector<Shape>& shapeDict, const size_t begin, const size_t length) {
     for (int i = begin; i < begin + length; ++i) {
-        cout << i << " - Shape=" << shape2str(shapeDict[track[i].getShapeIndex()]);
-        cout << " onset=" << (int) track[i].getOnset()
+        std::cout << i << " - Shape=" << shape2str(shapeDict[track[i].getShapeIndex()]);
+        std::cout << " onset=" << (int) track[i].getOnset()
                 << " basePitch=" << (int) track[i].pitch
                 << " timeUnit=" << (int) track[i].unit
                 << " velocity=" << (int) track[i].vel;
-        cout << " neighbor=" << (int) track[i].neighbor << endl;
+        std::cout << " neighbor=" << (int) track[i].neighbor << std::endl;
     }
 }
 
 int main(int argc, char *argv[]) {
     // read and validate args
     if (argc != 6) {
-        cout << "Must have 5 arguments: [inCorpusDirPath] [outCorpusDirPath] [bpeIter] [countingMethod] [samplingRate]" << endl;
+        std::cout << "Must have 5 arguments: [inCorpusDirPath] [outCorpusDirPath] [bpeIter] [countingMethod] [samplingRate]" << std::endl;
         return 1;
     }
-    string inCorpusDirPath(argv[1]);
-    string outCorpusDirPath(argv[2]);
+    std::string inCorpusDirPath(argv[1]);
+    std::string outCorpusDirPath(argv[2]);
     int bpeIter = atoi(argv[3]);
-    string countingMethod(argv[4]);
+    std::string countingMethod(argv[4]);
     double samplingRate = atof(argv[5]);
     if (bpeIter <= 0 || 2045 < bpeIter) {
-        cout << "Error: bpeIter <= 0 or > 2045: " << bpeIter << endl;
+        std::cout << "Error: bpeIter <= 0 or > 2045: " << bpeIter << std::endl;
         return 1;
     }
     if (countingMethod != "ours" && countingMethod != "symphonynet" && countingMethod != "wordpiece") {
-        cout << "Error: countingMethod is not ( ours | symphonynet | wordpiece ): " << countingMethod << endl;
+        std::cout << "Error: countingMethod is not ( ours | symphonynet | wordpiece ): " << countingMethod << std::endl;
         return 1;
     }
-    cout << "inCorpusDirPath: " << inCorpusDirPath << endl
-        << "outCorpusDirPath: " << outCorpusDirPath << endl
-        << "bpeIter: " << bpeIter << endl
-        << "countingMethod: " << countingMethod << endl
-        << "samplingRate: " << samplingRate << endl;
+    std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
+        << "outCorpusDirPath: " << outCorpusDirPath << '\n'
+        << "bpeIter: " << bpeIter << '\n'
+        << "countingMethod: " << countingMethod << '\n'
+        << "samplingRate: " << samplingRate << std::endl;
 
     // open files
-    string inCorpusFilePath = inCorpusDirPath + "/corpus";
-    cout << "Input corpus file path: " << inCorpusFilePath << endl;
-    ifstream inCorpusFile(inCorpusFilePath, ios::in | ios::binary);
+    std::string inCorpusFilePath = inCorpusDirPath + "/corpus";
+    std::cout << "Input corpus file path: " << inCorpusFilePath << std::endl;
+    std::ifstream inCorpusFile(inCorpusFilePath, std::ios::in | std::ios::binary);
     if (!inCorpusFile.is_open()) {
-        cout << "Failed to open corpus file: " << inCorpusFilePath << endl;
+        std::cout << "Failed to open corpus file: " << inCorpusFilePath << std::endl;
         return 1;
     }
     
-    string parasFilePath = inCorpusDirPath + "/paras";
-    cout << "Input parameter file path: " << parasFilePath << endl;
-    ifstream parasFile(parasFilePath, ios::in | ios::binary);
+    std::string parasFilePath = inCorpusDirPath + "/paras";
+    std::cout << "Input parameter file path: " << parasFilePath << std::endl;
+    std::ifstream parasFile(parasFilePath, std::ios::in | std::ios::binary);
     if (!parasFile.is_open()) {
-        cout << "Failed to open parameters file: " << parasFilePath << endl;
+        std::cout << "Failed to open parameters file: " << parasFilePath << std::endl;
         return 1;
     }
 
-    string vocabFilePath = outCorpusDirPath + "/shape_vocab";
-    cout << "Output shape vocab file path: " << vocabFilePath << endl;
-    ofstream vocabFile(vocabFilePath, ios::out | ios::trunc);
+    std::string vocabFilePath = outCorpusDirPath + "/shape_vocab";
+    std::cout << "Output shape vocab file path: " << vocabFilePath << std::endl;
+    std::ofstream vocabFile(vocabFilePath, std::ios::out | std::ios::trunc);
     if (!vocabFile.is_open()) {
-        cout << "Failed to open vocab output file: " << vocabFilePath << endl;
+        std::cout << "Failed to open vocab output file: " << vocabFilePath << std::endl;
         return 1;
     }
 
-    string outCorpusFilePath = outCorpusDirPath + "/corpus";
-    cout << "Output merged corpus file path: " << outCorpusFilePath << endl;
-    ofstream outCorpusFile(outCorpusFilePath, ios::out | ios::trunc);
+    std::string outCorpusFilePath = outCorpusDirPath + "/corpus";
+    std::cout << "Output merged corpus file path: " << outCorpusFilePath << std::endl;
+    std::ofstream outCorpusFile(outCorpusFilePath, std::ios::out | std::ios::trunc);
     if (!outCorpusFile.is_open()) {
-        cout << "Failed to open tokenized corpus output file: " << outCorpusFilePath << endl;
+        std::cout << "Failed to open tokenized corpus output file: " << outCorpusFilePath << std::endl;
         return 1;
     }
 
     time_t begTime = time(0);
-    cout << "Reading input files" << endl;
+    std::cout << "Reading input files" << std::endl;
 
     // read parameters
-    map<string, string> paras = readParasFile(parasFile);
+    std::map<std::string, std::string> paras = readParasFile(parasFile);
     int nth, maxDur, maxTrackNum;
-    string positionMethod;
+    std::string positionMethod;
     // stoi, c++11 thing
-    nth = stoi(paras[string("nth")]);
-    // cout << "nth: " << nth << endl;
-    maxDur = stoi(paras[string("max_duration")]);
-    // cout << "maxDur: " << maxDur << endl;
-    maxTrackNum = stoi(paras[string("max_track_number")]);
-    // cout << "maxTrackNum: " << maxTrackNum << endl;
-    positionMethod = paras[string("position_method")];
-    // cout << "positionMethod=" << positionMethod << endl;
+    nth = stoi(paras[std::string("nth")]);
+    // std::cout << "nth: " << nth << std::endl;
+    maxDur = stoi(paras[std::string("max_duration")]);
+    // std::cout << "maxDur: " << maxDur << std::endl;
+    maxTrackNum = stoi(paras[std::string("max_track_number")]);
+    // std::cout << "maxTrackNum: " << maxTrackNum << std::endl;
+    positionMethod = paras[std::string("position_method")];
+    // std::cout << "positionMethod=" << positionMethod << std::endl;
     if (nth <= 0 || maxDur <= 0 || maxDur > 255 || maxTrackNum <= 0 || (positionMethod != "event" && positionMethod != "attribute")) {
-        cout << "Corpus parameter error" << endl;
+        std::cout << "Corpus parameter error" << std::endl;
         return 1;
     }
 
     // read notes from corpus
     Corpus corpus = readCorpusFile(inCorpusFile, nth, positionMethod);
-    vector<Shape> shapeDict;
+    std::vector<Shape> shapeDict;
     shapeDict.reserve(bpeIter + 2);
     shapeDict.push_back({RelNote(0, 0, 0, 1)}); // DEFAULT_SHAPE_END
     shapeDict.push_back({RelNote(1, 0, 0, 1)}); // DEFAULT_SHAPE_CONT
@@ -118,19 +116,19 @@ int main(int argc, char *argv[]) {
     double avgMulpi = calculateAvgMulpiSize(corpus);
     // printTrack(corpus[0][0], shapeDict, 0, 10);
 
-    cout << "Multinote count: " << multinoteCount
+    std::cout << "Multinote count: " << multinoteCount
         << ", Drum's multinote count: " << drumMultinoteCount
         << ", Average mulpi: " << avgMulpi
-        << ", Time: " << (unsigned int) time(0) - begTime << endl;
+        << ", Time: " << (unsigned int) time(0) - begTime << std::endl;
     if (multinoteCount == 0 || multinoteCount == drumMultinoteCount) {
-        cout << "No notes to merge. Exited." << endl;
+        std::cout << "No notes to merge. Exited." << std::endl;
         return 1;
     }
 
     time_t iterTime;
-    map<Shape, unsigned int> shapeScore;
+    std::map<Shape, unsigned int> shapeScore;
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
-        cout << "Iter:" << iterCount << ", ";
+        std::cout << "Iter:" << iterCount << ", ";
         iterTime = time(0);
 
         updateNeighbor(corpus, shapeDict);
@@ -145,9 +143,9 @@ int main(int argc, char *argv[]) {
         else {
             wordPieceScoreShapeCounting(corpus, shapeDict, shapeScore, samplingRate);
         }
-        cout << "Find " << shapeScore.size() << " unique pairs" << ", ";
+        std::cout << "Find " << shapeScore.size() << " unique pairs" << ", ";
         if (shapeScore.size() == 0) {
-            cout << "Early termination: no shapes found" << endl;
+            std::cout << "Early termination: no shapes found" << std::endl;
             break;
         }
     
@@ -159,12 +157,12 @@ int main(int argc, char *argv[]) {
                 maxScoreShape = (*it).first;
                 maxScore = (*it).second;
             }
-            // cout << shape2str((*it).first) << endl;
+            // std::cout << shape2str((*it).first) << std::endl;
         }
 
         unsigned int newShapeIndex = shapeDict.size();
         shapeDict.push_back(maxScoreShape);
-        cout << "New shape: " << shape2str(maxScoreShape) << " Score=" << maxScore;
+        std::cout << "New shape: " << shape2str(maxScoreShape) << " Score=" << maxScore;
 
         // merge MultiNotes with newly added shape
         // for each piece
@@ -234,23 +232,23 @@ int main(int argc, char *argv[]) {
                 multinoteCount += corpus.piecesMN[i][j].size();
             }
         }
-        cout << ". Multinote count: " << multinoteCount << ", ";
+        std::cout << ". Multinote count: " << multinoteCount << ", ";
         
         shapeScore.clear();
         // corpus.shrink();
-        cout << "Time: " << (unsigned int) time(0) - iterTime << endl;
+        std::cout << "Time: " << (unsigned int) time(0) - iterTime << std::endl;
     }
 
     avgMulpi = calculateAvgMulpiSize(corpus);
-    cout << "Average mulpi: " << avgMulpi << endl;
+    std::cout << "Average mulpi: " << avgMulpi << std::endl;
 
     // write vocab file
     writeShapeVocabFile(vocabFile, shapeDict);
     
-    cout << "Write vocabs file done." << endl;
+    std::cout << "Write vocabs file done." << std::endl;
 
     writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum, positionMethod);
 
-    cout << "Write tokenized corpus file done. Total used time: " << time(0)-begTime << endl;
+    std::cout << "Write tokenized corpus file done. Total used time: " << time(0)-begTime << std::endl;
     return 0;
 }

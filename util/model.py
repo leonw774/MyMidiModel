@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 from tqdm import tqdm
 
-from .corpus import ATTR_NAME_TO_FEATURE_INDEX, array_to_text_list, text_list_to_array
+from .corpus import FEATURE_INDEX, INPUT_FEATURE_NAME, OUTPUT_FEATURE_NAME, array_to_text_list, text_list_to_array
 from .midi import piece_to_midi
 from .tokens import PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR
 
@@ -27,42 +27,34 @@ class MidiTransformerDecoder(nn.Module):
         self._end_token_id = vocabs['events']['text2id'][END_TOKEN_STR]
 
         # Input features
-        self.input_features_name = (
-            'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions',
-            'tempos', 'measure_numbers'
-        )
-        embedding_vocabs_size = [
+        self.embedding_vocabs_size = [
             ( vocabs[feature_name]['size'] if feature_name != 'measure_numbers' else max_seq_length )
-            for feature_name in self.input_features_name
+            for feature_name in INPUT_FEATURE_NAME
         ]
-        self._embeddings = nn.ModuleList([
+        self.embeddings = nn.ModuleList([
             nn.Embedding(
                 num_embeddings=vsize,
                 embedding_dim=embedding_dim,
                 padding_idx=self._pad_id # [...] the embedding vector at padding_idx will default to all zeros [...]
             )
-            for vsize in embedding_vocabs_size
+            for vsize in self.embedding_vocabs_size
         ])
         # Output features
-        # event, pitch, duration, velocity, track_number, instrument, (position)
-        self.output_features_name = (
-            'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions'
-        )
+        self.logit_vocabs_size = [
+            vocabs[feature_name]['size'] for feature_name in OUTPUT_FEATURE_NAME
+        ]
         if vocabs['paras']['position_method'] == 'event':
-            self.output_features_name.pop()
-        logit_vocabs_size = [
-            vocabs[feature_name]['size'] for feature_name in self.output_features_name
-        ]
+            self.logit_vocabs_size.pop()
         self.output_features_indices = [
-            ATTR_NAME_TO_FEATURE_INDEX[feature_name]
-            for feature_name in self.output_features_name
+            FEATURE_INDEX[feature_name]
+            for feature_name in OUTPUT_FEATURE_NAME
         ]
-        self._logits = nn.ModuleList([
+        self.logits = nn.ModuleList([
             nn.Linear(
                 in_features=embedding_dim,
                 out_features=vsize
             )
-            for vsize in logit_vocabs_size
+            for vsize in self.logit_vocabs_size
         ])
 
         layer = nn.TransformerEncoderLayer( # name's encoder, used as decoder. Cause we don't need memory
@@ -70,7 +62,7 @@ class MidiTransformerDecoder(nn.Module):
             nhead=attn_heads_number,
             batch_first=True
         )
-        self._transformer_decoder = nn.TransformerEncoder(
+        self.transformer_decoder = nn.TransformerEncoder(
             encoder_layer=layer,
             num_layers=layers_number
         )
@@ -82,15 +74,20 @@ class MidiTransformerDecoder(nn.Module):
 
     def forward(self, x, mask):
         # x.shape = (batch_size, seq_size, feature)
-        x = sum(
-            emb(x[:,:,i]) for i, emb in enumerate(self._embeddings)
-        )
-        x = self._transformer_decoder(
+        try:
+            x = sum(
+                emb(x[:,:,i]) for i, emb in enumerate(self.embeddings)
+            )
+        except:
+            for i, emb_size in enumerate(self.embedding_vocabs_size):
+                print(torch.all(x[:,:,i] < emb_size))
+            exit(1)
+        x = self.transformer_decoder(
             src=x,
             mask=mask
         )
         logits = [
-            logit(x) for logit in self._logits
+            logit(x) for logit in self.logits
         ]
         return logits
 
@@ -106,7 +103,7 @@ class MidiTransformerDecoder(nn.Module):
         elif start_seq.shape[0] != 1 or start_seq.shape[2] != len(self.input_features_name):
             raise ValueError(f'start_seq\'s shape have to be (1, seq_length, input_feature_num), get {start_seq.shape}')
 
-        max_length_mask = get_seq_mask(self._max_seq_length)
+        max_length_mask = get_seq_mask(self._max_seq_length).to(start_seq.device)
 
         input_seq = start_seq
         output_seq = self.to_output_features(start_seq)
@@ -151,7 +148,7 @@ class MidiTransformerDecoder(nn.Module):
             if try_count == try_count_limit:
                 break
 
-            if sampled_features[ATTR_NAME_TO_FEATURE_INDEX['evt']] == self._end_token_id:
+            if sampled_features[FEATURE_INDEX['evt']] == self._end_token_id:
                 end_with_end_token = True
                 break
 
@@ -171,6 +168,8 @@ def calc_losses(pred_logit, target):
     """
     # basically treat seq_size as the K in
     # https://pytorch.org/docs/stable/generated/torch.nn.functional.cross_entropy.html#torch.nn.functional.cross_entropy
+    # target have to be long
+    target = target.long()
     head_losses = [
         F.cross_entropy(
             input=pred_feature_logit.transpose(1, 2), # (batch_size, feature_vocab_size, seq_size)
