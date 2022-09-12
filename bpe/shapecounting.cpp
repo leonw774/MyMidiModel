@@ -37,7 +37,7 @@ void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict) {
         #pragma omp parallel for
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drum
-            if (corpus.piecesTN[i][j] == 128) continue;
+            if (corpus.piecesTP[i][j] == 128) continue;
             // for each multinote
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // printTrack(corpus.piecesMN[i][j], shapeDict, k, 1);
@@ -116,7 +116,7 @@ void oursShapeCounting(
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drums
-            if (corpus.piecesTN[i][j] == 128) continue;
+            if (corpus.piecesTP[i][j] == 128) continue;
             // ignore by random
             if (samplingRate != 1.0) {
                 if ((double) rand() / RAND_MAX > samplingRate) continue;
@@ -158,7 +158,7 @@ double calculateAvgMulpiSize(const Corpus& corpus) {
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drums
-            if (corpus.piecesTN[i][j] == 128) continue;
+            if (corpus.piecesTP[i][j] == 128) continue;
 
             // key: 64 bits, upper 29 unused, 20 for onset, 8 for duration (time_unit), 7 for velocity
             // value: occurence count
@@ -210,7 +210,7 @@ void symphonyNetShapeCounting(
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drums
-            if (corpus.piecesTN[i][j] == 128) continue;
+            if (corpus.piecesTP[i][j] == 128) continue;
             // ignore by random
             if (samplingRate != 1.0) {
                 if ((double) rand() / RAND_MAX > samplingRate) continue;
@@ -275,7 +275,7 @@ void wordPieceScoreShapeCounting(
         int thread_num = omp_get_thread_num();
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drums
-            if (corpus.piecesTN[i][j] == 128) continue;
+            if (corpus.piecesTP[i][j] == 128) continue;
             // for each multinote
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // for each neighbor

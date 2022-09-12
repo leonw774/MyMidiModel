@@ -42,36 +42,36 @@ int main(int argc, char *argv[]) {
 
     // open files
     std::string inCorpusFilePath = inCorpusDirPath + "/corpus";
-    std::cout << "Input corpus file path: " << inCorpusFilePath << std::endl;
     std::ifstream inCorpusFile(inCorpusFilePath, std::ios::in | std::ios::binary);
     if (!inCorpusFile.is_open()) {
         std::cout << "Failed to open corpus file: " << inCorpusFilePath << std::endl;
         return 1;
     }
+    std::cout << "Input corpus file: " << inCorpusFilePath << std::endl;
     
     std::string parasFilePath = inCorpusDirPath + "/paras";
-    std::cout << "Input parameter file path: " << parasFilePath << std::endl;
     std::ifstream parasFile(parasFilePath, std::ios::in | std::ios::binary);
     if (!parasFile.is_open()) {
         std::cout << "Failed to open parameters file: " << parasFilePath << std::endl;
         return 1;
     }
+    std::cout << "Input parameter file: " << parasFilePath << std::endl;
 
     std::string vocabFilePath = outCorpusDirPath + "/shape_vocab";
-    std::cout << "Output shape vocab file path: " << vocabFilePath << std::endl;
     std::ofstream vocabFile(vocabFilePath, std::ios::out | std::ios::trunc);
     if (!vocabFile.is_open()) {
         std::cout << "Failed to open vocab output file: " << vocabFilePath << std::endl;
         return 1;
     }
+    std::cout << "Output shape vocab file: " << vocabFilePath << std::endl;
 
     std::string outCorpusFilePath = outCorpusDirPath + "/corpus";
-    std::cout << "Output merged corpus file path: " << outCorpusFilePath << std::endl;
     std::ofstream outCorpusFile(outCorpusFilePath, std::ios::out | std::ios::trunc);
     if (!outCorpusFile.is_open()) {
-        std::cout << "Failed to open tokenized corpus output file: " << outCorpusFilePath << std::endl;
+        std::cout << "Failed to open merged corpus output file: " << outCorpusFilePath << std::endl;
         return 1;
     }
+    std::cout << "Output merged corpus file: " << outCorpusFilePath << std::endl;
 
     time_t begTime = time(0);
     std::cout << "Reading input files" << std::endl;
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
     size_t drumMultinoteCount = 0;
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-            if (corpus.piecesTN[i][j] == 128) {
+            if (corpus.piecesTP[i][j] == 128) {
                 drumMultinoteCount += corpus.piecesMN[i][j].size();
             }
             multinoteCount += corpus.piecesMN[i][j].size();
@@ -120,6 +120,7 @@ int main(int argc, char *argv[]) {
         << ", Drum's multinote count: " << drumMultinoteCount
         << ", Average mulpi: " << avgMulpi
         << ", Time: " << (unsigned int) time(0) - begTime << std::endl;
+
     if (multinoteCount == 0 || multinoteCount == drumMultinoteCount) {
         std::cout << "No notes to merge. Exited." << std::endl;
         return 1;
@@ -172,7 +173,7 @@ int main(int argc, char *argv[]) {
             #pragma omp parallel for
             for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
                 // ignore drum
-                if (corpus.piecesTN[i][j] == 128) continue;
+                if (corpus.piecesTP[i][j] == 128) continue;
                 // for each multinote
                 // iterate forward
                 for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
@@ -245,10 +246,11 @@ int main(int argc, char *argv[]) {
     // write vocab file
     writeShapeVocabFile(vocabFile, shapeDict);
     
-    std::cout << "Write vocabs file done." << std::endl;
+    std::cout << "Write vocabs file done.\n";
+    std::cout << "Writing merged corpus file..." << std::endl;
 
     writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum, positionMethod);
 
-    std::cout << "Write tokenized corpus file done. Total used time: " << time(0)-begTime << std::endl;
+    std::cout << "Write merged corpus file done. Total used time: " << time(0)-begTime << std::endl;
     return 0;
 }

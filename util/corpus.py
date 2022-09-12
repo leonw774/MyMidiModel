@@ -1,4 +1,5 @@
 import io
+import json
 import os
 from time import time
 import yaml
@@ -14,6 +15,77 @@ from .tokens import (
     PADDING_TOKEN_STR,
     SUPPORTED_TIME_SIGNATURES,
 )
+
+class Vocabs:
+
+    class AttrVocab:
+        size: int
+        id2text: dict
+        text2id: dict
+        def __init__(self, init_obj) -> None:
+            if isinstance(init_obj, list):
+                self.size = len(init_obj)
+                self.id2text = {i:t for i, t in enumerate(init_obj)}
+                self.text2id = {t:i for i, t in enumerate(init_obj)}
+            elif isinstance(init_obj, dict):
+                self.size = init_obj['size']
+                self.id2text = {int(k): v for k, v in init_obj['id2text'].items()} # key are string in json
+                self.text2id = init_obj['text2id']
+            else:
+                raise TypeError(f'AttrVocab\'s init_obj can only be list or dict. Got {init_obj}')
+        def __len__(self) -> int:
+            return self.size
+
+    paras: dict
+    bpe_shapes_list: list
+    padding_token: str
+    events: AttrVocab
+    pitchs: AttrVocab
+    durations: AttrVocab
+    velocities: AttrVocab
+    track_numbers: AttrVocab
+    instruments: AttrVocab
+    positions: AttrVocab
+    tempos: AttrVocab
+
+    def __init__(self, paras: dict, bpe_shapes_list: list, padding_token: str,
+            events, pitchs, durations, velocities, track_numbers, instruments, positions, tempos) -> None:
+        self.paras = paras
+        self.bpe_shapes_list = bpe_shapes_list
+        self.padding_token = padding_token
+        self.events = Vocabs.AttrVocab(events)
+        self.pitchs = Vocabs.AttrVocab(pitchs)
+        self.durations = Vocabs.AttrVocab(durations)
+        self.velocities = Vocabs.AttrVocab(velocities)
+        self.track_numbers = Vocabs.AttrVocab(track_numbers)
+        self.instruments = Vocabs.AttrVocab(instruments)
+        self.positions = Vocabs.AttrVocab(positions)
+        self.tempos = Vocabs.AttrVocab(tempos)
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(
+            d['paras'], d['bpe_shapes_list'], d['padding_token'],
+            d['events'], d['pitchs'], d['durations'],
+            d['velocities'], d['track_numbers'], d['instruments'],
+            d['positions'], d['tempos']
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            'paras': self.paras,
+            'bpe_shapes_list': self.bpe_shapes_list,
+            'padding_token': self.padding_token,
+            'events': vars(self.events),
+            'pitchs': vars(self.pitchs),
+            'durations': vars(self.durations),
+            'velocities': vars(self.velocities),
+            'track_numbers': vars(self.track_numbers),
+            'instruments': vars(self.instruments),
+            'positions': vars(self.positions),
+            'tempos': vars(self.tempos),
+        }
+
 
 def to_paras_file_path(corpus_dir_path: str) -> str:
     return os.path.join(corpus_dir_path, 'paras')
@@ -34,10 +106,16 @@ def to_vocabs_file_path(corpus_dir_path: str) -> str:
 def dump_corpus_paras(aras_dict: dict) -> str:
     return yaml.dump(aras_dict)
 
-def get_corpus_paras(corpus_dir_path: str):
+def get_corpus_paras(corpus_dir_path: str) -> dict:
     with open(to_paras_file_path(corpus_dir_path), 'r', encoding='utf8') as paras_file:
         corpus_paras_dict = yaml.safe_load(paras_file)
     return corpus_paras_dict
+
+def get_corpus_vocabs(corpus_dir_path: str) -> Vocabs:
+    with open(to_vocabs_file_path(corpus_dir_path), 'r', encoding='utf8') as vocabs_file:
+        corpus_vocabs_dict = json.load(vocabs_file)
+    corpus_vocabs = Vocabs.from_dict(corpus_vocabs_dict)
+    return corpus_vocabs
 
 # use iterator to handle large file
 class CorpusIterator:
@@ -69,16 +147,6 @@ class CorpusIterator:
             if len(line) > 1:
                 yield line[:-1] # remove \n at the end
 
-
-def make_token_dict(token_list: list) -> dict:
-    token_dict = {
-        'size': len(token_list),
-        'id2text': {str(i):t for i, t in enumerate(token_list)}, # in json, key can only be string
-        'text2id': {t:i for i, t in enumerate(token_list)},
-    }
-    return token_dict
-
-
 def build_vocabs(
         corpus_iterator,
         paras: dict,
@@ -90,7 +158,7 @@ def build_vocabs(
 
         Event tokens include:
         - shape
-        - positions in measure
+        - positions
         - measure and time_signature
         - tempo change
         - track and instrument
@@ -111,19 +179,20 @@ def build_vocabs(
     tempo_tokens = [
         'T'+int2b36str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
     ]
+    position_tokens = []
     if paras['position_method'] == 'event':
         position_tokens = [
             'P'+int2b36str(i) for i in range(get_largest_possible_position(paras['nth']))
         ]
-    else:
-        position_tokens = []
     measure_tokens = [
         f'M{int2b36str(n)}/{int2b36str(d)}' for n, d in SUPPORTED_TIME_SIGNATURES
     ]
 
     # place padding token in front so that they have same index across all vocabulary
-    event_tokens = ([PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR] + shape_tokens
-             + track_tokens + tempo_tokens + position_tokens + measure_tokens)
+    event_tokens = (
+        [PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR]
+        + shape_tokens + track_tokens + tempo_tokens + position_tokens + measure_tokens
+    )
 
     max_duration = paras['max_duration']
     pitch_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(128)))
@@ -144,7 +213,7 @@ def build_vocabs(
         measures_set = set()
         for t in text_list:
             if t[0] == 'M':
-                measures_set.add(t[0])
+                measures_set.add(t)
                 measures_count += 1
         max_measured_count = max(max_measured_count, measures_count)
 
@@ -173,21 +242,21 @@ def build_vocabs(
     )
 
     # build a dictionary for every token list
-    vocab_dicts = {
-        'paras': paras,
-        'bpe_iter': len(bpe_shapes_list),
-        'padding_token': PADDING_TOKEN_STR,
-        'events': make_token_dict(event_tokens),
-        'pitchs': make_token_dict(pitch_tokens),
-        'durations': make_token_dict(duration_tokens),
-        'velocities': make_token_dict(velocity_tokens),
-        'track_numbers': make_token_dict(track_number_tokens),
-        'instruments': make_token_dict(instrument_tokens),
-        'tempos': make_token_dict(tempo_tokens),
-        'positions': make_token_dict(position_attr_tokens)
-    }
+    vocabs = Vocabs(
+        paras=paras,
+        bpe_shapes_list=bpe_shapes_list,
+        padding_token=PADDING_TOKEN_STR,
+        events=event_tokens,
+        pitchs=pitch_tokens,
+        durations=duration_tokens,
+        velocities=velocity_tokens,
+        track_numbers=track_number_tokens,
+        instruments=instrument_tokens,
+        positions=position_attr_tokens,
+        tempos=tempo_tokens
+    )
 
-    return vocab_dicts, summary_string
+    return vocabs, summary_string
 
 
 FEATURE_INDEX = {
@@ -198,13 +267,13 @@ FEATURE_INDEX = {
     'trn': 4, 'track_numbers': 4,
     'ins': 5, 'instruments': 5,
     'pos': 6, 'positions': 6,
-    'tmp': 7, 'tempos': 7,
-    'mea': 8, 'measure_numbers': 8,
+    'mea': 7, 'measure_numbers': 7,
+    'tmp': 8, 'tempos': 8,
 }
 
 INPUT_FEATURE_NAME = [
     'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions',
-    'tempos', 'measure_numbers'
+    'measure_numbers', 'tempos'
 ]
 
 OUTPUT_FEATURE_NAME = [
@@ -212,7 +281,7 @@ OUTPUT_FEATURE_NAME = [
 ]
 
 
-def text_list_to_array(text_list: list, vocabs: dict) -> np.ndarray:
+def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
     """
         Serialize pieces into numpy array for the model input.
         Each token is processed into an 9-dimension vector:
@@ -220,8 +289,8 @@ def text_list_to_array(text_list: list, vocabs: dict) -> np.ndarray:
         If a token doesn't have an attribute, fill the index of PAD (which should be zero)
         If a token has an attrbute, but it is not in the dictionary, fill the index of UNK.
     """
-    position_method = vocabs['paras']['position_method']
-    event_text2id = vocabs['events']['text2id']
+    position_method = vocabs.paras['position_method']
+    vocabs.events.text2id = vocabs.events.text2id
     # in build_vocabs, padding token is made to be the 0th word
     padding = 0
     x = np.full((len(text_list), 9), fill_value=padding, dtype=np.int16)
@@ -239,30 +308,30 @@ def text_list_to_array(text_list: list, vocabs: dict) -> np.ndarray:
             continue
 
         if typename == 'B' or typename == 'E':
-            x[i][FEATURE_INDEX['evt']] = event_text2id[text]
+            x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[text]
 
         elif typename == 'R':
             event_text, instrument = text.split(':')
             track_number = event_text[1:]
             tracks_count += 1
-            x[i][FEATURE_INDEX['evt']] = event_text2id[event_text]
-            x[i][FEATURE_INDEX['trn']] = vocabs['track_numbers']['text2id'][track_number]
-            x[i][FEATURE_INDEX['ins']] = vocabs['instruments']['text2id'][instrument]
+            x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[event_text]
+            x[i][FEATURE_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
+            x[i][FEATURE_INDEX['ins']] = vocabs.instruments.text2id[instrument]
 
         elif typename == 'M':
-            cur_position_id = vocabs['positions']['text2id']['0']
+            cur_position_id = vocabs.positions.text2id['0']
             cur_measure_number += 1
-            x[i][FEATURE_INDEX['evt']] = event_text2id[text]
+            x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[text]
             x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
             x[i][FEATURE_INDEX['pos']] = cur_position_id
             x[i][FEATURE_INDEX['mea']] = cur_measure_number
 
         elif typename == 'T':
             event_text, *attr = text = text.split(':')
-            cur_tempo_id = vocabs['tempos']['text2id'][event_text]
+            cur_tempo_id = vocabs.tempos.text2id[event_text]
             if position_method == 'attribute':
                 cur_position_id = b36str2int(attr[0])
-            x[i][FEATURE_INDEX['evt']] = event_text2id[event_text]
+            x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
             x[i][FEATURE_INDEX['pos']] = cur_position_id
             x[i][FEATURE_INDEX['mea']] = cur_measure_number
@@ -270,8 +339,8 @@ def text_list_to_array(text_list: list, vocabs: dict) -> np.ndarray:
             x[i-1][FEATURE_INDEX['tmp']] = cur_tempo_id
 
         elif typename == 'P':
-            cur_position_id = vocabs['positions']['text2id'][text[1:]]
-            x[i][FEATURE_INDEX['evt']] = event_text2id[event_text]
+            cur_position_id = vocabs.positions.text2id[text[1:]]
+            x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
             x[i][FEATURE_INDEX['pos']] = cur_position_id
             x[i][FEATURE_INDEX['mea']] = cur_measure_number
@@ -279,12 +348,12 @@ def text_list_to_array(text_list: list, vocabs: dict) -> np.ndarray:
         elif typename == 'N' or typename == 'S':
             event_text, *attr = text.split(':')
             if position_method == 'attribute':
-                cur_position_id = vocabs['positions']['text2id'][attr[4]]
-            x[i][FEATURE_INDEX['evt']] = event_text2id[event_text]
-            x[i][FEATURE_INDEX['pit']] = vocabs['pitchs']['text2id'][attr[0]]
-            x[i][FEATURE_INDEX['dur']] = vocabs['durations']['text2id'][attr[1]]
-            x[i][FEATURE_INDEX['vel']] = vocabs['velocities']['text2id'][attr[2]]
-            x[i][FEATURE_INDEX['trn']] = vocabs['track_numbers']['text2id'][attr[3]]
+                cur_position_id = vocabs.positions.text2id[attr[4]]
+            x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[event_text]
+            x[i][FEATURE_INDEX['pit']] = vocabs.pitchs.text2id[attr[0]]
+            x[i][FEATURE_INDEX['dur']] = vocabs.durations.text2id[attr[1]]
+            x[i][FEATURE_INDEX['vel']] = vocabs.velocities.text2id[attr[2]]
+            x[i][FEATURE_INDEX['trn']] = vocabs.track_numbers.text2id[attr[3]]
             assert b36str2int(attr[3]) < tracks_count, 'Invalid track number'
             x[i][FEATURE_INDEX['ins']] = x[b36str2int(attr[3])+1, FEATURE_INDEX['ins']]
             x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
@@ -296,14 +365,14 @@ def text_list_to_array(text_list: list, vocabs: dict) -> np.ndarray:
     return x
 
 
-def array_to_text_list(data, vocabs: dict, is_input=True):
+def array_to_text_list(data, vocabs: Vocabs, is_input=True):
     """
         Inverse of text_list_to_array.
-        if is_input is True, expect shape of (None, 9)
-        otherwise, expect shape (None, 6) if position_method == 'event' else (None, 7)
+        if is_input is True, expect shape of (seq_size, 9)
+        otherwise, expect shape (seq_size, 6) if position_method == 'event' else (seq_size, 7)
     """
-    position_method = vocabs['paras']['position_method']
-    assert len(data.shape) == 2 and data.shape[0] > 1, f'bad numpy array shape: {data.shape}'
+    position_method = vocabs.paras['position_method']
+    assert len(data.shape) == 2 and data.shape[0] > 0, f'bad numpy array shape: {data.shape}'
     if is_input:
         assert data.shape[1] == 9, f'bad numpy array shape: {data.shape}'
     else:
@@ -313,7 +382,7 @@ def array_to_text_list(data, vocabs: dict, is_input=True):
     text_list = []
     for i in range(data.shape[0]):
         # in json, key can only be string
-        event_text = vocabs['events']['id2text'][str(data[i][FEATURE_INDEX['evt']])]
+        event_text = vocabs.events.id2text[data[i][FEATURE_INDEX['evt']]]
         typename = event_text[0]
 
         if typename == 'B' or typename == 'E':
@@ -321,7 +390,7 @@ def array_to_text_list(data, vocabs: dict, is_input=True):
 
         elif typename == 'R':
             # track token has instrument attribute
-            token_text = event_text + ':' + vocabs['instruments']['id2text'][str(data[i][FEATURE_INDEX['ins']])]
+            token_text = event_text + ':' + vocabs.instruments.id2text[data[i][FEATURE_INDEX['ins']]]
             text_list.append(token_text)
 
         elif typename == 'M':
@@ -338,12 +407,13 @@ def array_to_text_list(data, vocabs: dict, is_input=True):
             track_number = data[i][FEATURE_INDEX['trn']] - 1
             token_text = (
                 event_text + ':'
-                + vocabs['pitchs']['id2text'][str(data[i][FEATURE_INDEX['pit']])] + ':'
-                + vocabs['durations']['id2text'][str(data[i][FEATURE_INDEX['dur']])] + ':'
-                + vocabs['velocities']['id2text'][str(data[i][FEATURE_INDEX['vel']])] + ':'
-                + int2b36str(track_number))
+                + vocabs.pitchs.id2text[data[i][FEATURE_INDEX['pit']]] + ':'
+                + vocabs.durations.id2text[data[i][FEATURE_INDEX['dur']]] + ':'
+                + vocabs.velocities.id2text[data[i][FEATURE_INDEX['vel']]] + ':'
+                + int2b36str(track_number)
+            )
             if position_method == 'attribute':
-                token_text += ':' + vocabs['positions']['id2text'][str(data[i][FEATURE_INDEX['pos']])]
+                token_text += ':' + vocabs.positions.id2text[data[i][FEATURE_INDEX['pos']]]
             text_list.append(token_text)
         elif event_text == PADDING_TOKEN_STR:
             pass
@@ -359,7 +429,7 @@ def get_input_array_debug_string(input_array: np.ndarray, mps_sep_indices, vocab
     reconstructed_text_list = array_to_text_list(input_array, vocabs=vocabs)
     if mps_sep_indices is None:
         mps_sep_indices = []
-    debug_str = 'evt  pit  dur  vel  trn  ins  tmp  pos  mea  reconstructed_text\n'
+    debug_str = 'evt  pit  dur  vel  trn  ins  pos  mea  tmp  reconstructed_text\n'
     debug_str += (
         '\n'.join([
             ' '.join([f'{s:>4}' for s in a.split()])

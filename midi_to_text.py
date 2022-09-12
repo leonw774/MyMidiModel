@@ -321,7 +321,10 @@ def main():
     if args.make_stats:
         start_time = time()
         logging.info('Making statistics')
+        logging.getLogger('matplotlib.font_manager').disabled = True
+        logging.getLogger('matplotlib.pyplot').disabled = True
         import json
+        from matplotlib import pyplot as plt
         from pandas import Series
         text_stats = {
             'track_number_distribution': Counter(),
@@ -347,18 +350,47 @@ def main():
                 text_stats['token_type_distribution']['track'] += piece.count(' R')
                 text_stats['note_number_per_piece'].append(note_token_number)
 
-        text_stats['track_number_distribution'] = dict(text_stats['track_number_distribution'])
-        text_stats['instrument_distribution'] = dict(text_stats['instrument_distribution'])
-        text_stats['token_type_distribution'] = dict(text_stats['token_type_distribution'])
         text_stats['note_number_per_piece_describe'] = {
             k:float(v) for k, v in dict(Series(text_stats['note_number_per_piece']).describe()).items()
         }
-        del text_stats['note_number_per_piece']
+        text_stats['token_number_per_piece_describe'] = {
+            k:float(v) for k, v in dict(Series(text_stats['token_number_per_piece']).describe()).items()
+        }
 
-        with open(os.path.join(args.output_path, 'stat.json'), 'w+', encoding='utf8') as statfile:
+        stats_dir_path = os.path.join(args.output_path, 'stats')
+        if not os.path.exists(stats_dir_path):
+            os.mkdir(stats_dir_path)
+
+        # draw graph for each value
+        for k, v in text_stats.items():
+            plt.figure(figsize=(12.8, 4.8))
+            if isinstance(v, Counter):
+                plt.title(k)
+                plt.bar(v.keys(), v.values())
+            elif isinstance(v, list):
+                # note_number_per_piece and token_number_per_piece
+                k_describle = k + '_describe'
+                plt.title(k)
+                plt.text(
+                    x=0.01,
+                    y=0.5,
+                    s='\n'.join([f'{k}={round(v, 3)}' for k, v in text_stats[k_describle].items()]),
+                    transform=plt.gcf().transFigure
+                )
+                plt.subplots_adjust(left=0.15)
+                plt.hist(v, 10)
+            else:
+                continue
+            plt.savefig(os.path.join(stats_dir_path, f'{k}.png'))
+            plt.clf()
+
+        text_stats['track_number_distribution'] = dict(text_stats['track_number_distribution'])
+        text_stats['instrument_distribution'] = dict(text_stats['instrument_distribution'])
+        text_stats['token_type_distribution'] = dict(text_stats['token_type_distribution'])
+        with open(os.path.join(stats_dir_path, 'stats.json'), 'w+', encoding='utf8') as statfile:
             json.dump(text_stats, statfile)
-        logging.info('Wrote stats file to %s', args.output_path+'_stat.json')
-        logging.info('Stat time: %.3f', time()-start_time)
+        logging.info('Wrote stats.json at %s', os.path.join(stats_dir_path, 'stats.json'))
+        logging.info('Make statistics time: %.3f', time()-start_time)
     logging.info('==== midi_to_text.py exited ====')
 
 

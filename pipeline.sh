@@ -37,7 +37,7 @@ do
 done
 
 LOG_PATH="logs/$(date '+%Y%m%d%H%M')-${FULL_CONFIG_NAME}.log"
-echo "Corpus log file: $LOG_PATH"
+echo "Log file: $LOG_PATH"
 touch $LOG_PATH
 
 CORPUS_DIR_PATH="data/corpus/${DATA_NAME}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}_v${VELOCITY_STEP}_t${TEMPO_MIN}_${TEMPO_MAX}_${TEMPO_STEP}_pos${POSITION_METHOD}"
@@ -46,6 +46,8 @@ if [ $CONTINUING_NOTE == true ]; then
     MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --use-continuing-note"
     echo "Appended --use-continuing-note to midi_to_text's argument" | tee -a $LOG_PATH
 fi
+
+echo "Corpus dir: ${CORPUS_DIR_PATH}"
 
 python3 midi_to_text.py --nth $NTH --max-track-number $MAX_TRACK_NUMBER --max-duration $MAX_DURATION --velocity-step $VELOCITY_STEP \
     --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --position-method $POSITION_METHOD $MIDI_TO_TEXT_OTHER_ARGUMENTS $USE_EXISTED \

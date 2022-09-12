@@ -48,6 +48,10 @@ int b36strtoi(const char* s) {
     return (isNeg ? -r : r);
 }
 
+int b36strtoi(const std::string& s) {
+    return b36strtoi(s.c_str());
+}
+
 std::string itob36str(int x) {
     if (0 <= x && x < 36) return std::string(1, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[x]);
     bool isNeg = x < 0;
@@ -152,7 +156,7 @@ int TimeStructToken::getN() const {
 void Corpus::pushNewPiece() {
     piecesMN.push_back(std::vector<Track>());
     piecesTS.push_back(std::vector<TimeStructToken>());
-    piecesTN.push_back(std::vector<uint8_t>());
+    piecesTP.push_back(std::vector<uint8_t>());
 }
 
 void Corpus::shrink() {
@@ -167,10 +171,10 @@ void Corpus::shrink() {
         piecesTS[i].shrink_to_fit();
     }
     piecesTS.shrink_to_fit();
-    for (int i = 0; i < piecesTN.size(); ++i) {
-        piecesTN[i].shrink_to_fit();
+    for (int i = 0; i < piecesTP.size(); ++i) {
+        piecesTP[i].shrink_to_fit();
     }
-    piecesTN.shrink_to_fit();
+    piecesTP.shrink_to_fit();
 }
 
 std::map<std::string, std::string> readParasFile(std::ifstream& parasFile) {
@@ -204,7 +208,6 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth, std::string position
     inCorpusFile.seekg(0, std::ios::beg);
 
     Corpus corpus;
-    corpus.pushNewPiece();
 
     // inCorpusFile.seekg(0, std::ios::end);
     // std::streampos filesize = inCorpusFile.tellg();
@@ -216,11 +219,21 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth, std::string position
         unsigned char c = inCorpusFile.get(), i;
         char a[8];
         switch (c) {
+            case 'B': // BOS
+                while (inCorpusFile.get() != ' ');
+                corpus.pushNewPiece();
+                curMeasureStart = curMeasureLength = curTime = 0;
+                break;
+
+            case 'E': // EOS
+                while (inCorpusFile.get() != '\n');
+                break;
+
             case 'R':
                 corpus.piecesMN.back().push_back(Track());
                 while (inCorpusFile.get() != ':');
                 for (i = 0; (a[i] = inCorpusFile.get()) != ' '; ++i); a[i] = '\0';
-                corpus.piecesTN.back().push_back((uint8_t) b36strtoi(a));
+                corpus.piecesTP.back().push_back((uint8_t) b36strtoi(a));
                 break;
 
             case 'M':
@@ -279,11 +292,14 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth, std::string position
                 }
                 corpus.piecesMN.back()[t].push_back(MultiNote(isCont, curTime, p, d, v));
                 break;
-
-            case '\n':
-                corpus.pushNewPiece();
-                curMeasureStart = curMeasureLength = curTime = 0;
+            
+            case 255: // is -1, means EOF
                 break;
+
+            default:
+                std::cout << "Corpus format error: Token starts with " << (int) c << "\n";
+                throw std::runtime_error("Corpus format error");
+                
         }
     }
     if (corpus.piecesMN.back().size() == 0) {
@@ -292,8 +308,8 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth, std::string position
     if (corpus.piecesTS.back().size() == 0) {
         corpus.piecesTS.pop_back();
     }
-    if (corpus.piecesTN.back().size() == 0) {
-        corpus.piecesTN.pop_back();
+    if (corpus.piecesTP.back().size() == 0) {
+        corpus.piecesTP.pop_back();
     }
     corpus.shrink();
     return corpus;
@@ -324,9 +340,9 @@ void writeOutputCorpusFile(
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         outCorpusFile << "BOS ";
 
-        for (int j = 0; j < corpus.piecesTN[i].size(); ++j) {
+        for (int j = 0; j < corpus.piecesTP[i].size(); ++j) {
             outCorpusFile << "R" << itob36str(j)
-                << ":" << itob36str(corpus.piecesTN[i][j]) << " ";
+                << ":" << itob36str(corpus.piecesTP[i][j]) << " ";
         }
 
         unsigned int curPieceTrackNum = corpus.piecesMN[i].size();

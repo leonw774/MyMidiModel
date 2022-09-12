@@ -13,9 +13,7 @@ from .tokens import (
 
 
 def merge_drums(midi: MidiFile) -> None:
-    """
-        merge all drums into one instruments
-    """
+    # merge all drum tracks into one
     merged_perc_notes = []
     for track in midi.instruments:
         if len(track.notes) > 0 and track.is_drum:
@@ -186,8 +184,8 @@ def get_time_structure_tokens(
         nth: int,
         tempo_quantization: list) -> list:
     """
-        This return measure and tempo  The first measure have to contain the
-        first note and the last note must end at the last measure
+        This return measure and tempo. The first measure have to contain the
+        first note and the last note must end in the last measure
     """
     nth_per_beat = nth // 4
     # note_token_list is sorted
@@ -407,7 +405,7 @@ def midi_to_text_list(
         use_cont_note: bool,
         tempo_quantization: list, # [tempo_min, tempo_max, tempo_step]
         position_method: str,
-        use_merge_drums: bool = True) -> list:
+        use_merge_drums: bool) -> list:
     """
         Parameters:
         - midi_file_path: midi file path
@@ -430,7 +428,10 @@ def midi_to_text_list(
     assert tempo_quantization[0] <= tempo_quantization[1] and tempo_quantization[2] > 0, 'Bad tempo_quantization'
 
     # start_time = time()
-    midi = MidiFile(midi_file_path)
+    try:
+        midi = MidiFile(midi_file_path)
+    except Exception as e:
+        raise RuntimeError('miditoolkit failed to parse thr file')
     assert len(midi.instruments) > 0, 'No tracks in MidiFile'
     for i in range(len(midi.instruments)):
         midi.instruments[i].remove_invalid_notes(verbose=False)
@@ -507,18 +508,28 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
     cur_measure_onset = -1
     cur_time_signature = None
     pending_cont_notes = dict()
+    track_program_mapping = dict()
     for text in text_list[1:-1]:
         typename = text[0]
         if typename == 'R':
             assert is_head
             track_number, instrument = (b36str2int(x) for x in text[1:].split(':'))
-            assert len(midi.instruments) == track_number, 'Track token\'s track_number is not ascending'
-            midi.instruments.append(
-                Instrument(program=(instrument%128), is_drum=(instrument==128), name=f'Track_{track_number}')
-            )
+            assert track_number not in track_program_mapping
+            track_program_mapping[track_number] = instrument
 
         elif typename == 'M':
-            is_head = False
+            # if this is the first measure
+            if is_head:
+                assert len(track_program_mapping) > 0
+                track_numbers_list = list(track_program_mapping.keys()).sort()
+                assert track_numbers_list == list(range(len(track_numbers_list)))
+                for track_number in track_numbers_list:
+                    program = track_program_mapping[track_number]
+                    midi.instruments.append(
+                        Instrument(program=(program%128), is_drum=(program==128), name=f'Track_{track_number}')
+                    )
+                is_head = False
+
             numer, denom = (b36str2int(x) for x in text[1:].split('/'))
             if cur_measure_onset == -1: # first measure
                 cur_measure_onset = 0

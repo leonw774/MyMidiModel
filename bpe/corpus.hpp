@@ -126,12 +126,12 @@ struct TimeStructToken {
 };
 
 struct Corpus {
-    // TimeStructures
+    // Time structures
     std::vector<std::vector<TimeStructToken>> piecesTS;
     // Multi-notes
     std::vector<std::vector<Track>> piecesMN;
-    // Track numbers
-    std::vector<std::vector<uint8_t>> piecesTN;
+    // Track-program mapping
+    std::vector<std::vector<uint8_t>> piecesTP;
 
     void pushNewPiece();
     void shrink();

@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
-from util import to_vocabs_file_path, FEATURE_INDEX
+from util import get_corpus_vocabs, FEATURE_INDEX
 from util.tokens import BEGIN_TOKEN_STR, END_TOKEN_STR
 
 class MidiDataset(Dataset):
@@ -35,9 +35,7 @@ class MidiDataset(Dataset):
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
         self.piece_files = np.load(npz_path)
         print('Loaded', npz_path)
-        # event, duration, velocity, track_number, instrument, tempo, position, measure_number
-        with open(to_vocabs_file_path(data_dir_path), 'r', encoding='utf8') as vocabs_file:
-            self.vocabs = json.load(vocabs_file)
+        self.vocabs = get_corpus_vocabs(data_dir_path)
         self.max_seq_length = max_seq_length
         self.sample_stride = sample_stride
         self.use_permutable_subseq_loss = use_permutable_subseq_loss
@@ -45,21 +43,19 @@ class MidiDataset(Dataset):
         self.permute_track_number = permute_track_number
 
         # Seperators are:
-        # EOS, BOS, PAD, first track token (R0), measure tokens (M\w+), position tokens (P\w+)
-        # stores thier index in event vocab, empty when `use_permutable_subseq_loss` is not True
+        # EOS, BOS, PADDING, first track token (R0), measure tokens (M\w+), position tokens (P\w+)
+        # stores their index in event vocab, empty when `use_permutable_subseq_loss` is not True
         self._mps_seperators = set()
-        self._bos_id = self.vocabs['events']['text2id'][BEGIN_TOKEN_STR]
-        self._eos_id = self.vocabs['events']['text2id'][END_TOKEN_STR]
-        # the pad id is the same across all vocabs
-        # self._pad_id = self.vocabs['events']['text2id']['[PAD]']
-        self._pad_id = self.vocabs['events']['text2id']['EOS']
-        self._padding_token = self.vocabs['padding_token']
+        self._bos_id = self.vocabs.events.text2id[BEGIN_TOKEN_STR]
+        self._eos_id = self.vocabs.events.text2id[END_TOKEN_STR]
+        # the pad id should be the same across all vocabs
+        self._pad_id = self.vocabs.events.text2id[self.vocabs.padding_token]
         self._note_ids = set()
         self._measure_ids = set()
         self._position_ids = set()
         self._tempo_ids = set()
         self._track_ids = set()
-        for text, index in self.vocabs['events']['text2id'].items():
+        for text, index in self.vocabs.events.text2id.items():
             if text[0] == 'N' or text[0] == 'S':
                 self._note_ids.add(index)
             elif text[0] == 'P':
@@ -74,7 +70,7 @@ class MidiDataset(Dataset):
             self._mps_seperators = set([
                 self._bos_id,
                 self._eos_id,
-                self.vocabs['events']['text2id']['R0'],
+                self.vocabs.events.text2id['R0'],
                 self._pad_id,
             ])
             self._mps_seperators.update(self._measure_ids)
@@ -88,7 +84,7 @@ class MidiDataset(Dataset):
         self._filenum_indices = [0] * len(self.piece_files)
         self._piece_files_length = [0] * len(self.piece_files)
         self._piece_body_start_index = [0] * len(self.piece_files) if self.permute_track_number else None
-        self._mps_sep_indices = [0] * len(self.piece_files) if use_permutable_subseq_loss else None
+        self._file_mps_sep_indices = [None] * len(self.piece_files) if use_permutable_subseq_loss else None
         cur_index = 0
         for filenum in tqdm(range(len(self.piece_files))):
             filename = str(filenum)
@@ -96,7 +92,11 @@ class MidiDataset(Dataset):
             if use_permutable_subseq_loss:
                 # find all seperater's index
                 mps_sep_indices = np.flatnonzero(np.isin(self.piece_files[filename][:, 0], self._mps_seperators))
-                self._mps_sep_indices[filenum] = mps_sep_indices.astype(np.int16)
+                self._file_mps_sep_indices[filenum] = []
+                for i in range(mps_sep_indices.shape[0] - 1):
+                    self._file_mps_sep_indices.append(mps_sep_indices[i])
+                    if mps_sep_indices[i+1] != mps_sep_indices[i] + 1:
+                        self._file_mps_sep_indices.append(mps_sep_indices[i] + 1)
 
             cur_piece_files_length = self.piece_files[filename].shape[0]
             self._piece_files_length[filenum] = cur_piece_files_length
@@ -129,6 +129,10 @@ class MidiDataset(Dataset):
         min_measure_num = sliced_array[0, FEATURE_INDEX['mea']]
         if min_measure_num > 1:
             sliced_array[:, FEATURE_INDEX['mea']] -= (min_measure_num - 1)
+        # because EOS also has measure_number = 0
+        if sliced_array[-1, FEATURE_INDEX['mea']] < 0:
+            # set EOS measure number back to zero
+            sliced_array[-1, FEATURE_INDEX['mea']] = 0
 
         if self.permute_track_number:
             # amortize the calculation
@@ -169,14 +173,12 @@ class MidiDataset(Dataset):
 
         # a numpy array of sequences sep indices would also be returned if self.use_permutable_subseq_loss
         if self.use_permutable_subseq_loss:
-            mps_sep_indices = np.array( # make copy
-                self._mps_sep_indices[filenum]
+            mps_sep_indices = np.array(
+                self._file_mps_sep_indices[filenum],
+                dtype=np.int16
             )
             mps_sep_indices = mps_sep_indices[(mps_sep_indices >= begin_index) & (mps_sep_indices < end_index)]
             mps_sep_indices -= begin_index
-            # add begin of note sequence
-            note_sequence_begin_indices = np.flatnonzero(np.isin(sliced_array[:, 0], self._position_ids)) + 1
-            mps_sep_indices = np.sort(np.concatenate((mps_sep_indices, note_sequence_begin_indices)))
             return from_numpy(sliced_array), mps_sep_indices
 
         return from_numpy(sliced_array), None
