@@ -5,6 +5,7 @@
 #include <fstream>
 #include <vector>
 #include <map>
+#include <queue>
 #include <set>
 #include <string>
 #include <cstring>
@@ -60,6 +61,8 @@ std::string shape2str(const Shape& s);
 
 unsigned int findMaxRelOffset(const Shape& s);
 
+std::vector<Shape> getDefaultShapeDict();
+
 struct MultiNote {
     // shapeIndex: High 12 bits. The index of shape in the shapeDict. 0: DEFAULT_SHAPE_END, 1: DEFAULT_SHAPE_CONT
     //             This mean bpeIter cannot be greater than 0xfff - 2 = 2045
@@ -109,9 +112,11 @@ inline void MultiNote::setOnset(unsigned int o) {
 
 typedef std::vector<MultiNote> Track;
 
+void printTrack(const Track& track, const std::vector<Shape>& shapeDict, const size_t begin, const size_t length);
+
 struct TimeStructToken {
 
-    uint16_t onset;
+    uint32_t onset;
 
     // MSB ---------> LSB
     // T DDD NNNNNNNNNNNN
@@ -119,7 +124,7 @@ struct TimeStructToken {
     // When T is 0, this is a measure token, the denominator is 2 to the power of D and the numerator is N
     uint16_t data;
 
-    TimeStructToken(uint16_t o, bool t, uint16_t n, uint16_t d);
+    TimeStructToken(uint32_t o, bool t, uint16_t n, uint16_t d);
     bool getT() const;
     int getD() const;
     int getN() const;

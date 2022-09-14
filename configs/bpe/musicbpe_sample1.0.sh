@@ -1,6 +1,6 @@
 #!/bin/bash
 # bpe parameters
-BPE_ITER=4
+BPE_ITER=1000
 SCORING="default"
-MERGE_CONDITION="ours"
+MERGE_CONDITION="musicbpe"
 SAMPLE_RATE=1.0

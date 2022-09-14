@@ -115,7 +115,11 @@ def main():
 
         os.makedirs(npy_dir_path)
         for i, p in tqdm(enumerate(corpus_iterator), total=len(corpus_iterator)):
-            array = text_list_to_array(p.split(), vocabs)
+            try:
+                array = text_list_to_array(p.split(), vocabs)
+            except Exception as e:
+                print(f'piece #{i}')
+                raise e
             np.save(os.path.join(npy_dir_path, str(i)), array)
 
         # zip all the npy files into one file with '.npz' extension

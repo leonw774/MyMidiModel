@@ -1,6 +1,6 @@
 #!/bin/bash
 # bpe parameters
-BPE_ITER=4
+BPE_ITER=1000
 SCORING="default"
 MERGE_CONDITION="ours"
-SAMPLE_RATE=1.0
+SAMPLE_RATE=0.1

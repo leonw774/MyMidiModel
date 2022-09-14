@@ -76,6 +76,13 @@ std::string shape2str(const Shape& s) {
     return ss.str();
 }
 
+std::vector<Shape> getDefaultShapeDict() {
+    return {
+        {RelNote(0, 0, 0, 1)}, // DEFAULT_SHAPE_END
+        {RelNote(1, 0, 0, 1)}  // DEFAULT_SHAPE_CONT
+    };
+} 
+
 unsigned int findMaxRelOffset(const Shape& s) {
     unsigned int maxRelOffset = s[0].getRelOnset() + s[0].relDur;
     for (int i = 1; i < s.size(); ++i) {
@@ -91,6 +98,9 @@ unsigned int findMaxRelOffset(const Shape& s) {
 ********/
 
 MultiNote::MultiNote(bool isCont, uint32_t o, uint8_t p, uint8_t d, uint8_t v) {
+    if (o > 0x0fffffu) {
+        throw std::runtime_error("MultiNote onset exceed 0x0fffffu limit.");
+    }
     if (isCont) {
         // shape index = 1 -> {RelNote(1, 0, 0, 1)}
         shapeIndexAndOnset = 0x100000u | (o & 0x0fffffu);
@@ -112,11 +122,22 @@ bool MultiNote::operator < (const MultiNote& rhs) const {
     return (shapeIndexAndOnset & 0x0fffffu) < rhs.getOnset();
 }
 
+void printTrack(const Track& track, const std::vector<Shape>& shapeDict, const size_t begin, const size_t length) {
+    for (int i = begin; i < begin + length; ++i) {
+        std::cout << i << " - Shape=" << shape2str(shapeDict[track[i].getShapeIndex()]);
+        std::cout << " onset=" << (int) track[i].getOnset()
+                << " basePitch=" << (int) track[i].pitch
+                << " timeUnit=" << (int) track[i].unit
+                << " velocity=" << (int) track[i].vel;
+        std::cout << " neighbor=" << (int) track[i].neighbor << std::endl;
+    }
+}
+
 /********
   TimeStructToken
 ********/
 
-TimeStructToken::TimeStructToken(uint16_t o, bool t, uint16_t n, uint16_t d) {
+TimeStructToken::TimeStructToken(uint32_t o, bool t, uint16_t n, uint16_t d) {
     onset = o;
     if (t) {
         data = n;
@@ -131,7 +152,7 @@ TimeStructToken::TimeStructToken(uint16_t o, bool t, uint16_t n, uint16_t d) {
             case 16: data |= (4 << 12); break;
             case 32: data |= (5 << 12); break;
             case 64: data |= (6 << 12); break;
-            // case 128: data &= (7 << 12); break; // won't happen
+            // case 128: data |= (7 << 12); break; // won't happen
         }
     }
 }
@@ -214,7 +235,7 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth, std::string position
     // inCorpusFile.seekg(0, std::ios::beg);
     // std::cout << "File size: " << filesize << " bytes" << std::endl;
 
-    int curMeasureStart = 0, curMeasureLength = 0, curTime = 0;
+    uint32_t curMeasureStart = 0, curMeasureLength = 0, curTime = 0;
     while (inCorpusFile.good()) {
         unsigned char c = inCorpusFile.get(), i;
         char a[8];
@@ -368,7 +389,7 @@ void writeOutputCorpusFile(
             }
             // if ts's onset == mn's onset, ts first
             if (!tsEnd && corpus.piecesTS[i][tsCurIdx].onset <= minTrackOnset) {
-                // std::cout << "TS " << i << "," << tsCurIdx << std::endl;
+                // std::cout << "TS " << i << "," << tsCurIdx << ", onset=" << corpus.piecesTS[i][tsCurIdx].onset << std::endl;
                 if (corpus.piecesTS[i][tsCurIdx].getT()) {
                     if (positionMethod == "event") {
                         if (prevPosEventOnset < corpus.piecesTS[i][tsCurIdx].onset) {
@@ -394,8 +415,8 @@ void writeOutputCorpusFile(
                 }
             }
             else {
-                // std::cout << "MN " << i << "," << minTrackIdx << "," << trackCurIdx[minTrackIdx] << std::endl;
                 const MultiNote& curMN = corpus.piecesMN[i][minTrackIdx][trackCurIdx[minTrackIdx]];
+                // std::cout << "MN " << i << "," << minTrackIdx << "," << trackCurIdx[minTrackIdx] << ", onset=" << curMN.getOnset() << std::endl;
                 if (positionMethod == "event") {
                     if (prevPosEventOnset < minTrackOnset) {
                         outCorpusFile << "P"

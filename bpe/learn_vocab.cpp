@@ -1,43 +1,38 @@
 #include "corpus.hpp"
-#include "shapecounting.hpp"
+#include "shapescore.hpp"
 #include <string>
 #include <algorithm>
 #include <ctime>
 
-void printTrack(const Track& track, const std::vector<Shape>& shapeDict, const size_t begin, const size_t length) {
-    for (int i = begin; i < begin + length; ++i) {
-        std::cout << i << " - Shape=" << shape2str(shapeDict[track[i].getShapeIndex()]);
-        std::cout << " onset=" << (int) track[i].getOnset()
-                << " basePitch=" << (int) track[i].pitch
-                << " timeUnit=" << (int) track[i].unit
-                << " velocity=" << (int) track[i].vel;
-        std::cout << " neighbor=" << (int) track[i].neighbor << std::endl;
-    }
-}
-
 int main(int argc, char *argv[]) {
     // read and validate args
-    if (argc != 6) {
-        std::cout << "Must have 5 arguments: [inCorpusDirPath] [outCorpusDirPath] [bpeIter] [countingMethod] [samplingRate]" << std::endl;
+    if (argc != 7) {
+        std::cout << "Must have 6 arguments: [inCorpusDirPath] [outCorpusDirPath] [bpeIter] [scoring] [mergeCondition] [samplingRate]" << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[1]);
     std::string outCorpusDirPath(argv[2]);
     int bpeIter = atoi(argv[3]);
-    std::string countingMethod(argv[4]);
-    double samplingRate = atof(argv[5]);
+    std::string scoring(argv[4]);
+    std::string mergeCondition(argv[5]);
+    double samplingRate = atof(argv[6]);
     if (bpeIter <= 0 || 2045 < bpeIter) {
         std::cout << "Error: bpeIter <= 0 or > 2045: " << bpeIter << std::endl;
         return 1;
     }
-    if (countingMethod != "ours" && countingMethod != "symphonynet" && countingMethod != "wordpiece") {
-        std::cout << "Error: countingMethod is not ( ours | symphonynet | wordpiece ): " << countingMethod << std::endl;
+    if (scoring != "default" && scoring != "wplike") {
+        std::cout << "Error: scoring is not ( default | wplike ): " << scoring << std::endl;
+        return 1;
+    }
+    if (mergeCondition != "ours" && mergeCondition != "musicbpe") {
+        std::cout << "Error: mergeCondition is not ( ours | musicbpe ): " << mergeCondition << std::endl;
         return 1;
     }
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
         << "outCorpusDirPath: " << outCorpusDirPath << '\n'
         << "bpeIter: " << bpeIter << '\n'
-        << "countingMethod: " << countingMethod << '\n'
+        << "scoring: " << scoring << '\n'
+        << "mergeCondition: " << mergeCondition << '\n'
         << "samplingRate: " << samplingRate << std::endl;
 
     // open files
@@ -96,10 +91,7 @@ int main(int argc, char *argv[]) {
 
     // read notes from corpus
     Corpus corpus = readCorpusFile(inCorpusFile, nth, positionMethod);
-    std::vector<Shape> shapeDict;
-    shapeDict.reserve(bpeIter + 2);
-    shapeDict.push_back({RelNote(0, 0, 0, 1)}); // DEFAULT_SHAPE_END
-    shapeDict.push_back({RelNote(1, 0, 0, 1)}); // DEFAULT_SHAPE_CONT
+    std::vector<Shape> shapeDict = getDefaultShapeDict();
 
     // sort and count notes
     size_t multinoteCount = 0;
@@ -127,43 +119,46 @@ int main(int argc, char *argv[]) {
     }
 
     time_t iterTime;
-    std::map<Shape, unsigned int> shapeScore;
+    
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
         std::cout << "Iter:" << iterCount << ", ";
         iterTime = time(0);
 
         updateNeighbor(corpus, shapeDict);
 
-        // count shape frequency
-        if (countingMethod == "ours") {
-            oursShapeCounting(corpus, shapeDict, shapeScore, samplingRate);
-        }
-        else if (countingMethod == "symphonynet") {
-            symphonyNetShapeCounting(corpus, shapeDict, shapeScore, samplingRate);
+        std::cout << "\n" << (unsigned int) time(0) - iterTime << std::endl;
+
+        // clac shape scores
+        Shape maxScoreShape;
+        double maxScore;
+        if (scoring == "default") {
+            std::priority_queue<std::pair<unsigned int, Shape>> shapeScore;
+            defaultShapeScoring(corpus, shapeDict, shapeScore, mergeCondition, samplingRate);
+            if (shapeScore.size() == 0) {
+                std::cout << "Error: no shapes found" << std::endl;
+                return 1;
+            }
+            std::cout << "Find " << shapeScore.size() << " unique pairs" << ", ";
+            maxScore = shapeScore.top().first;
+            maxScoreShape = shapeScore.top().second;
         }
         else {
-            wordPieceScoreShapeCounting(corpus, shapeDict, shapeScore, samplingRate);
-        }
-        std::cout << "Find " << shapeScore.size() << " unique pairs" << ", ";
-        if (shapeScore.size() == 0) {
-            std::cout << "Early termination: no shapes found" << std::endl;
-            break;
-        }
-    
-        // add shape with highest frequency into shapeDict
-        Shape maxScoreShape;
-        int maxScore = 0;
-        for (auto it = shapeScore.cbegin(); it != shapeScore.cend(); it++) {
-            if (maxScore < (*it).second) {
-                maxScoreShape = (*it).first;
-                maxScore = (*it).second;
+            std::priority_queue<std::pair<double, Shape>> shapeScore;
+            wplikeShapeScoring(corpus, shapeDict, shapeScore, mergeCondition, samplingRate);
+            if (shapeScore.size() == 0) {
+                std::cout << "Error: no shapes found" << std::endl;
+                return 1;
             }
-            // std::cout << shape2str((*it).first) << std::endl;
+            std::cout << "Find " << shapeScore.size() << " unique pairs" << ", ";
+            maxScore = shapeScore.top().first;
+            maxScoreShape = shapeScore.top().second;
         }
 
         unsigned int newShapeIndex = shapeDict.size();
         shapeDict.push_back(maxScoreShape);
         std::cout << "New shape: " << shape2str(maxScoreShape) << " Score=" << maxScore;
+
+        std::cout << (unsigned int) time(0) - iterTime << std::endl;
 
         // merge MultiNotes with newly added shape
         // for each piece
@@ -175,7 +170,6 @@ int main(int argc, char *argv[]) {
                 // ignore drum
                 if (corpus.piecesTP[i][j] == 128) continue;
                 // for each multinote
-                // iterate forward
                 for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                     // for each neighbor
                     for (int n = 1; n < corpus.piecesMN[i][j][k].neighbor; ++n) {
@@ -226,6 +220,8 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        std::cout << "\n" << (unsigned int) time(0) - iterTime << std::endl;
+
         multinoteCount = 0;
         #pragma omp parallel for reduction(+:multinoteCount)
         for (int i = 0; i < corpus.piecesMN.size(); ++i) {
@@ -234,8 +230,7 @@ int main(int argc, char *argv[]) {
             }
         }
         std::cout << ". Multinote count: " << multinoteCount << ", ";
-        
-        shapeScore.clear();
+
         // corpus.shrink();
         std::cout << "Time: " << (unsigned int) time(0) - iterTime << std::endl;
     }

@@ -57,7 +57,7 @@ test $? -ne 0 && { echo "midi_to_text.py failed. pipeline.sh exit." | tee -a $LO
 
 if [ $BPE_ITER -ne 0 ]; then
     echo "Start learn bpe vocab" | tee -a $LOG_PATH
-    CORPUS_DIR_PATH_WITH_BPE="${CORPUS_DIR_PATH}_bpe${BPE_ITER}_${SHAPECOUNT_METHOD}_${SHAPECOUNT_SAMPLERATE}"
+    CORPUS_DIR_PATH_WITH_BPE="${CORPUS_DIR_PATH}_bpe${BPE_ITER}_${SCORING}_${MERGE_CONDITION}_${SAMPLE_RATE}"
     
     if [ $USE_EXISTED == "--use-existed" ] && [ -d $CORPUS_DIR_PATH_WITH_BPE ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/corpus" ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/shape_vocab" ]; then
         echo "Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already has corpus and shape_vocab file."
@@ -81,9 +81,13 @@ if [ $BPE_ITER -ne 0 ]; then
         cp "${CORPUS_DIR_PATH}/pathlist" $CORPUS_DIR_PATH_WITH_BPE
 
         # run learn_vocab and use tee command to copy stdout to log
-        bpe/learn_vocab $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SHAPECOUNT_METHOD $SHAPECOUNT_SAMPLERATE | tee -a $LOG_PATH
+        bpe/learn_vocab $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SCORING $MERGE_CONDITION $SAMPLE_RATE | tee -a $LOG_PATH
         BPE_EXIT_CODE=${PIPESTATUS[0]}
-        test $BPE_EXIT_CODE -ne 0 && { echo "learn_vocab failed. exit code: $BPE_EXIT_CODE. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+        if [ $BPE_EXIT_CODE -ne 0 ]; then
+            echo "learn_vocab failed. exit code: $BPE_EXIT_CODE. pipeline.sh exit." | tee -a $LOG_PATH
+            rm "${CORPUS_DIR_PATH_WITH_BPE}/*"
+            exit 1
+        fi
 
         # this is buggy so not using it
         # check if tokenized corpus is equal to original corpus

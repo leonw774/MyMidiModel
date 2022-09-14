@@ -2,5 +2,5 @@
 # bpe parameters
 BPE_ITER=1000
 SCORING="default"
-MERGE_CONDITION="ours"
-SAMPLE_RATE=1.0
+MERGE_CONDITION="musicbpe"
+SAMPLE_RATE=0.1

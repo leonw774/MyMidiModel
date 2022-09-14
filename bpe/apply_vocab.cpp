@@ -1,5 +1,5 @@
 #include "corpus.hpp"
-#include "shapecounting.hpp"
+#include "shapescore.hpp"
 #include <string>
 #include <algorithm>
 #include <ctime>
@@ -74,9 +74,8 @@ int main(int argc, char *argv[]) {
     Corpus corpus = readCorpusFile(inCorpusFile, nth, positionMethod);
 
     // read shapes from vocab file
-    std::vector<Shape> shapeDict;
-    shapeDict.push_back({RelNote(0, 0, 0, 1)}); // DEFAULT_SHAPE_END
-    shapeDict.push_back({RelNote(1, 0, 0, 1)}); // DEFAULT_SHAPE_CONT
+    std::vector<Shape> shapeDict = getDefaultShapeDict();
+
     vocabFile.seekg(0, std::ios::beg);
     std::string line;
     while (vocabFile.good()) {
@@ -164,7 +163,6 @@ int main(int argc, char *argv[]) {
                 // ignore drum
                 if (corpus.piecesTP[i][j] == 128) continue;
                 // for each multinote
-                // iterate forward
                 for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                     // for each neighbor
                     for (int n = 1; n < corpus.piecesMN[i][j][k].neighbor; ++n) {

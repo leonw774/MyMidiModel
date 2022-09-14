@@ -12,26 +12,21 @@ Shape getShapeOfMultiNotePair(
     const Shape& rShape
 );
 
-void oursShapeCounting(
-    const Corpus& corpus,
-    const std::vector<Shape>& shapeDict,
-    std::map<Shape, unsigned int>& shapeScore,
-    double samplingRate
-);
-
 double calculateAvgMulpiSize(const Corpus& corpus);
 
-void symphonyNetShapeCounting(
+void defaultShapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::map<Shape, unsigned int>& shapeScore,
+    std::priority_queue<std::pair<unsigned int, Shape>>& shapeScore,
+    const std::string& mergeCoundition,
     double samplingRate
 );
 
-void wordPieceScoreShapeCounting(
+void wplikeShapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::map<Shape, unsigned int>& shapeScore,
+    std::priority_queue<std::pair<double, Shape>>& shapeScore,
+    const std::string& mergeCoundition,
     double samplingRate
 );
 

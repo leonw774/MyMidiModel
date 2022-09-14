@@ -1,14 +1,14 @@
 all: apply_vocab learn_vocab ;
 	rm *.o
 
-apply_vocab: apply_vocab.cpp corpus.o shapecounting.o ;
-	g++ -g -fopenmp corpus.o shapecounting.o apply_vocab.cpp -o apply_vocab
+apply_vocab: apply_vocab.cpp corpus.o shapescore.o ;
+	g++ -g -fopenmp corpus.o shapescore.o apply_vocab.cpp -o apply_vocab
 
-learn_vocab: learn_vocab.cpp corpus.o shapecounting.o ;
-	g++ -g -fopenmp corpus.o shapecounting.o learn_vocab.cpp -o learn_vocab
+learn_vocab: learn_vocab.cpp corpus.o shapescore.o ;
+	g++ -g -fopenmp corpus.o shapescore.o learn_vocab.cpp -o learn_vocab
 
-shapecounting.o: shapecounting.cpp shapecounting.hpp corpus.hpp ;
-	g++ -g -c -fopenmp shapecounting.cpp -o shapecounting.o
+shapescore.o: shapescore.cpp shapescore.hpp corpus.hpp ;
+	g++ -g -c -fopenmp shapescore.cpp -o shapescore.o
 
 corpus.o: corpus.cpp corpus.hpp ;
 	g++ -g -c corpus.cpp -o corpus.o
