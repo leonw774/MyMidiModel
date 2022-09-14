@@ -85,7 +85,7 @@ if [ $BPE_ITER -ne 0 ]; then
         BPE_EXIT_CODE=${PIPESTATUS[0]}
         if [ $BPE_EXIT_CODE -ne 0 ]; then
             echo "learn_vocab failed. exit code: $BPE_EXIT_CODE. pipeline.sh exit." | tee -a $LOG_PATH
-            rm "${CORPUS_DIR_PATH_WITH_BPE}/*"
+            rm -r "${CORPUS_DIR_PATH_WITH_BPE}"
             exit 1
         fi
 

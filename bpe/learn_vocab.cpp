@@ -6,8 +6,8 @@
 
 int main(int argc, char *argv[]) {
     // read and validate args
-    if (argc != 7) {
-        std::cout << "Must have 6 arguments: [inCorpusDirPath] [outCorpusDirPath] [bpeIter] [scoring] [mergeCondition] [samplingRate]" << std::endl;
+    if (argc != 7 && argc != 8) {
+        std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate (--verbose)" << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[1]);
@@ -16,6 +16,15 @@ int main(int argc, char *argv[]) {
     std::string scoring(argv[4]);
     std::string mergeCondition(argv[5]);
     double samplingRate = atof(argv[6]);
+    bool verbose = false;
+    if (argc == 8) {
+        std::string v(argv[8]);
+        if (v != "--verbose") {
+            std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate (--verbose)" << std::endl;
+            return 1;
+        }
+        verbose = true;
+    }
     if (bpeIter <= 0 || 2045 < bpeIter) {
         std::cout << "Error: bpeIter <= 0 or > 2045: " << bpeIter << std::endl;
         return 1;
@@ -94,7 +103,7 @@ int main(int argc, char *argv[]) {
     std::vector<Shape> shapeDict = getDefaultShapeDict();
 
     // sort and count notes
-    size_t multinoteCount = 0;
+    size_t startMultinoteCount = 0, multinoteCount = 0;
     size_t drumMultinoteCount = 0;
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
@@ -105,13 +114,14 @@ int main(int argc, char *argv[]) {
             sort(corpus.piecesMN[i][j].begin(), corpus.piecesMN[i][j].end());
         }
     }
-    double avgMulpi = calculateAvgMulpiSize(corpus);
-    // printTrack(corpus[0][0], shapeDict, 0, 10);
+    startMultinoteCount = multinoteCount;
+    double startAvgMulpi = calculateAvgMulpiSize(corpus);
+    double avgMulpi = startAvgMulpi;
 
-    std::cout << "Multinote count: " << multinoteCount
+    std::cout << "Start Multinote count: " << multinoteCount
         << ", Drum's multinote count: " << drumMultinoteCount
-        << ", Average mulpi: " << avgMulpi
-        << ", Time: " << (unsigned int) time(0) - begTime << std::endl;
+        << ", Start Average mulpi: " << avgMulpi
+        << ", Read corpus time: " << (unsigned int) time(0) - begTime << std::endl;
 
     if (multinoteCount == 0 || multinoteCount == drumMultinoteCount) {
         std::cout << "No notes to merge. Exited." << std::endl;
@@ -121,16 +131,14 @@ int main(int argc, char *argv[]) {
     time_t iterTime;
     
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
-        std::cout << "Iter:" << iterCount << ", ";
+        if (verbose) std::cout << "Iter: " << iterCount << " ";
+        else         std::cout << "\rIter: " << iterCount << '/' << bpeIter - 1 << " ";
         iterTime = time(0);
 
         updateNeighbor(corpus, shapeDict);
 
-        std::cout << "\n" << (unsigned int) time(0) - iterTime << std::endl;
-
         // clac shape scores
         Shape maxScoreShape;
-        double maxScore;
         if (scoring == "default") {
             std::priority_queue<std::pair<unsigned int, Shape>> shapeScore;
             defaultShapeScoring(corpus, shapeDict, shapeScore, mergeCondition, samplingRate);
@@ -138,9 +146,10 @@ int main(int argc, char *argv[]) {
                 std::cout << "Error: no shapes found" << std::endl;
                 return 1;
             }
-            std::cout << "Find " << shapeScore.size() << " unique pairs" << ", ";
-            maxScore = shapeScore.top().first;
+            std::cout << "Find " << shapeScore.size() << " unique pairs" << " ";
+            int maxScore = shapeScore.top().first;
             maxScoreShape = shapeScore.top().second;
+            std::cout << "New shape: " << shape2str(maxScoreShape) << " Score: " << maxScore << " ";
         }
         else {
             std::priority_queue<std::pair<double, Shape>> shapeScore;
@@ -149,16 +158,14 @@ int main(int argc, char *argv[]) {
                 std::cout << "Error: no shapes found" << std::endl;
                 return 1;
             }
-            std::cout << "Find " << shapeScore.size() << " unique pairs" << ", ";
-            maxScore = shapeScore.top().first;
+            std::cout << "Find " << shapeScore.size() << " unique pairs" << " ";
+            double maxScore = shapeScore.top().first;
             maxScoreShape = shapeScore.top().second;
+            std::cout << "New shape: " << shape2str(maxScoreShape) << " Score: " << maxScore << " ";
         }
 
         unsigned int newShapeIndex = shapeDict.size();
         shapeDict.push_back(maxScoreShape);
-        std::cout << "New shape: " << shape2str(maxScoreShape) << " Score=" << maxScore;
-
-        std::cout << (unsigned int) time(0) - iterTime << std::endl;
 
         // merge MultiNotes with newly added shape
         // for each piece
@@ -220,8 +227,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        std::cout << "\n" << (unsigned int) time(0) - iterTime << std::endl;
-
+        
         multinoteCount = 0;
         #pragma omp parallel for reduction(+:multinoteCount)
         for (int i = 0; i < corpus.piecesMN.size(); ++i) {
@@ -229,20 +235,32 @@ int main(int argc, char *argv[]) {
                 multinoteCount += corpus.piecesMN[i][j].size();
             }
         }
-        std::cout << ". Multinote count: " << multinoteCount << ", ";
+        std::cout << "Multinote count: " << multinoteCount << " ";
+        std::cout << "Time: " << (unsigned int) time(0) - iterTime;
+        if (verbose) std::cout << std::endl;
+        else         std::cout.flush();
 
         // corpus.shrink();
-        std::cout << "Time: " << (unsigned int) time(0) - iterTime << std::endl;
     }
+    if (!verbose) std::cout << '\n';
 
+    multinoteCount = 0;
+    #pragma omp parallel for reduction(+:multinoteCount)
+    for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+        for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
+            multinoteCount += corpus.piecesMN[i][j].size();
+        }
+    }
     avgMulpi = calculateAvgMulpiSize(corpus);
-    std::cout << "Average mulpi: " << avgMulpi << std::endl;
+    std::cout << "Ending multinote count: " << multinoteCount
+        << ", Ending average mulpi: " << avgMulpi
+        << ", Non-drum multinote reduce rate: " << 1 - (double) (multinoteCount - drumMultinoteCount) / (startMultinoteCount - drumMultinoteCount)
+        << ", Average mulpi reduce rate: " << 1 - avgMulpi / startAvgMulpi << std::endl;
 
     // write vocab file
     writeShapeVocabFile(vocabFile, shapeDict);
-    
-    std::cout << "Write vocabs file done.\n";
-    std::cout << "Writing merged corpus file..." << std::endl;
+
+    std::cout << "Writing merged corpus file" << std::endl;
 
     writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum, positionMethod);
 

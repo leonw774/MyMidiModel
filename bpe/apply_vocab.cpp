@@ -6,13 +6,22 @@
 
 int main(int argc, char *argv[]) {
     // read and validate args
-    if (argc != 4) {
-        std::cout << "Must have 3 arguments: [inCorpusDirPath] [outCorpusDirPath] [shapeVocabularyFilePath]" << std::endl;
+    if (argc != 4 && argc != 5) {
+        std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath shapeVocabularyFilePath (--verbose)" << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[1]);
     std::string outCorpusDirPath(argv[2]);
     std::string vocabFilePath(argv[3]);
+    bool verbose = false;
+    if (argc == 5) {
+        std::string v(argv[4]);
+        if (v != "--verbose") {
+            std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath shapeVocabularyFilePath (--verbose)" << std::endl;
+            return 1;
+        }
+        verbose = true;
+    }
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
         << "outCorpusDirPath: " << outCorpusDirPath << '\n'
         << "vocabFilePath: " << vocabFilePath << std::endl;
@@ -119,7 +128,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Shape vocab size: " << shapeDict.size() << std::endl;
 
     // sort and count notes
-    size_t multinoteCount = 0;
+    size_t startMultinoteCount = 0, multinoteCount = 0;
     size_t drumMultinoteCount = 0;
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
@@ -130,7 +139,9 @@ int main(int argc, char *argv[]) {
             sort(corpus.piecesMN[i][j].begin(), corpus.piecesMN[i][j].end());
         }
     }
-    double avgMulpi = calculateAvgMulpiSize(corpus);
+    startMultinoteCount = multinoteCount;
+    double startAvgMulpi = calculateAvgMulpiSize(corpus);
+    double avgMulpi = startAvgMulpi;
 
     std::cout << "Multinote count: " << multinoteCount
         << ", Drum's multinote count: " << drumMultinoteCount
@@ -145,13 +156,14 @@ int main(int argc, char *argv[]) {
     time_t iterTime;
     // start from 2 because index 0, 1 are default shapes
     for (int shapeIndex = 2; shapeIndex < shapeDict.size(); ++shapeIndex) {
-        std::cout << "Index:" << shapeIndex << ", ";
+        if (verbose) std::cout << "Index: " << shapeIndex << " ";
+        else         std::cout << "\rIndex: " << shapeIndex << '/' << shapeDict.size() - 1 << " ";
         iterTime = time(0);
 
         updateNeighbor(corpus, shapeDict);
 
         Shape mergingShape = shapeDict[shapeIndex];
-        std::cout << "Merging shape: " << shape2str(mergingShape);
+        if (verbose) std::cout << "Merging shape: " << shape2str(mergingShape);
 
         // merge MultiNotes with newly added shape
         // for each piece
@@ -220,13 +232,26 @@ int main(int argc, char *argv[]) {
                 multinoteCount += corpus.piecesMN[i][j].size();
             }
         }
-        std::cout << ". Multinote count: " << multinoteCount << ", ";
-
-        // corpus.shrink();
-        std::cout << "Time: " << (unsigned int) time(0) - iterTime << std::endl;
+        std::cout << "Multinote count: " << multinoteCount << " ";
+        std::cout << "Time: " << (unsigned int) time(0) - iterTime;
+        if (verbose) std::cout << std::endl;
+        else         std::cout.flush();
     }
 
-    std::cout << "Writing merged corpus file..." << std::endl;
+    multinoteCount = 0;
+    #pragma omp parallel for reduction(+:multinoteCount)
+    for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+        for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
+            multinoteCount += corpus.piecesMN[i][j].size();
+        }
+    }
+    avgMulpi = calculateAvgMulpiSize(corpus);
+    std::cout << "Ending multinote count: " << multinoteCount
+        << ", Ending average mulpi: " << avgMulpi
+        << ", Non-drum multinote reduce rate: " << 1 - (double) (multinoteCount - drumMultinoteCount) / (startMultinoteCount - drumMultinoteCount)
+        << ", Average mulpi reduce rate: " << 1 - avgMulpi / startAvgMulpi << std::endl;
+
+    std::cout << "Writing merged corpus file" << std::endl;
 
     writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum, positionMethod);
 
