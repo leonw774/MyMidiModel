@@ -154,16 +154,18 @@ int main(int argc, char *argv[]) {
     }
 
     time_t iterTime;
+    std::cout << "Index, Shape, Score, Multinote count, Time" << std::endl;
     // start from 2 because index 0, 1 are default shapes
     for (int shapeIndex = 2; shapeIndex < shapeDict.size(); ++shapeIndex) {
-        if (verbose) std::cout << "Index: " << shapeIndex << " ";
-        else         std::cout << "\rIndex: " << shapeIndex << '/' << shapeDict.size() - 1 << " ";
+        if (!verbose && shapeIndex != 0) 
+            std::cout << "\r";
+        std::cout << shapeIndex << ", ";
         iterTime = time(0);
 
         updateNeighbor(corpus, shapeDict);
 
         Shape mergingShape = shapeDict[shapeIndex];
-        if (verbose) std::cout << "Merging shape: " << shape2str(mergingShape);
+        if (verbose) std::cout << "\"" << shape2str(mergingShape) << "\", ";
 
         // merge MultiNotes with newly added shape
         // for each piece
@@ -232,10 +234,10 @@ int main(int argc, char *argv[]) {
                 multinoteCount += corpus.piecesMN[i][j].size();
             }
         }
-        std::cout << "Multinote count: " << multinoteCount << " ";
-        std::cout << "Time: " << (unsigned int) time(0) - iterTime;
+        std::cout << multinoteCount << ", ";
+        std::cout << (unsigned int) time(0) - iterTime;
         if (verbose) std::cout << std::endl;
-        else         std::cout.flush();
+        else         std::cout << "  "; std::cout.flush();
     }
 
     multinoteCount = 0;

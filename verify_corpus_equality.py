@@ -3,16 +3,17 @@ import random
 import sys
 from collections import Counter
 
+from tqdm import tqdm
+
 from util import CorpusIterator, get_corpus_paras, piece_to_midi
 
-def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size: int) -> bool:
+def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size) -> bool:
     """
         This function takes two corpus and check if they are "equal",
-        namely all the pieces in the same order are representing the same midi information,
+        that is, all the pieces at the same index are representing the same midi information,
         regardless of any token, shape or order differences.
     """
 
-    assert sample_size > 0
     paras = get_corpus_paras(a_corpus_dir)
     if paras != get_corpus_paras(b_corpus_dir):
         return False
@@ -20,17 +21,22 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size: in
     with CorpusIterator(a_corpus_dir) as a_corpus_iterator, CorpusIterator(b_corpus_dir) as b_corpus_iterator:
         nth = paras['nth']
 
-        if sample_size > len(a_corpus_iterator):
+        if sample_size is None:
             sample_size = len(a_corpus_iterator)
-        sample_indices = random.sample(
-            list(range(len(a_corpus_iterator))),
-            sample_size
-        )
-        sample_indices = set(sample_indices)
-        for i, (op, tp) in enumerate(zip(a_corpus_iterator, b_corpus_iterator)):
+            sample_indices = list(range(sample_size))
+        elif sample_size > len(a_corpus_iterator):
+            sample_size = len(a_corpus_iterator)
+            assert sample_size > 0
+            sample_indices = random.sample(
+                list(range(len(a_corpus_iterator))),
+                sample_size
+            )
+            sample_indices = set(sample_indices)
+
+        for i, (a, b) in tqdm(enumerate(zip(a_corpus_iterator, b_corpus_iterator)), total=len(a_corpus_iterator)):
             if i in sample_indices:
-                a_piece = op
-                b_piece = tp
+                a_piece = a
+                b_piece = b
             else:
                 continue
 
@@ -71,15 +77,23 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size: in
             for track_feature in a_track_index_mapping.keys():
                 a_track = a_midi.instruments[a_track_index_mapping[track_feature]]
                 b_track = b_midi.instruments[b_track_index_mapping[track_feature]]
-                a_track_notes = frozenset({
-                    (n.start, n.end, n.pitch, n.velocity)
+                a_track_note_starts = frozenset({
+                    (n.start, n.pitch, n.velocity)
                     for n in a_track.notes
                 })
-                b_track_notes = frozenset({
-                    (n.start, n.end, n.pitch, n.velocity)
+                a_track_note_ends = frozenset({
+                    (n.end, n.pitch, n.velocity)
+                    for n in a_track.notes
+                })
+                b_track_note_starts = frozenset({
+                    (n.start, n.pitch, n.velocity)
                     for n in b_track.notes
                 })
-                if a_track_notes != b_track_notes:
+                b_track_note_ends = frozenset({
+                    (n.end, n.pitch, n.velocity)
+                    for n in b_track.notes
+                })
+                if (a_track_note_starts != b_track_note_starts) or (a_track_note_ends != b_track_note_ends):
                     # because sometimes there are two or more overlapping notes of same pitch and velocity
                     # if there is a continuing note in them, they will cause ambiguity in note merging
                     a_bytes_io = io.BytesIO()
@@ -87,19 +101,30 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size: in
                     a_midi.dump(file=a_bytes_io)
                     b_midi.dump(file=b_bytes_io)
                     if a_bytes_io.getvalue() != b_bytes_io.getvalue():
-                        different_notes = (a_track_notes.union(b_track_notes)).difference(a_track_notes.intersection(b_track_notes))
+                        diff_note_starts = (a_track_note_starts.union(b_track_note_starts)).difference(a_track_note_starts.intersection(b_track_note_starts))
+                        diff_note_ends = (a_track_note_ends.union(b_track_note_ends)).difference(a_track_note_ends.intersection(b_track_note_ends))
                         print(
-                            f'notes difference non-empty: {len(different_notes)} / ({len(a_track_notes)} + {len(b_track_notes)})\n'\
-                            f'{a_corpus_dir}: piece#{i}, track#{a_track_index_mapping[track_feature]}\n'\
-                            f'{b_corpus_dir}: piece#{i}, track#{b_track_index_mapping[track_feature]}'\
+                            f'notes starts difference non-empty: {len(diff_note_starts)} / ({len(a_track_note_starts)} + {len(b_track_note_starts)})\n'\
+                            f'notes end difference non-empty: {len(diff_note_ends)} / ({len(a_track_note_ends)} + {len(b_track_note_ends)})\n'\
+                            f'piece#{i}, track#{a_track_index_mapping[track_feature]}'\
                         )
+                        print('diff_note_starts')
+                        print(diff_note_starts)
+                        print('diff_note_ends')
+                        print(diff_note_ends)
+                        print("---")
                         return False
     return True
 
 if __name__ == '__main__':
-    a_corpus_dir = sys.argv[1]
-    b_corpus_dir = sys.argv[2]
-    sample_size = int(sys.argv[3])
+    if len(sys.argv) == 3:
+        a_corpus_dir = sys.argv[1]
+        b_corpus_dir = sys.argv[2]
+        sample_size = None
+    elif len(sys.argv) == 4:
+        a_corpus_dir = sys.argv[1]
+        b_corpus_dir = sys.argv[2]
+        sample_size = int(sys.argv[3])
     if verify_corpus_equality(a_corpus_dir, b_corpus_dir, sample_size):
         print("equality verification success")
         exit(0)

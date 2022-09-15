@@ -100,6 +100,8 @@ int main(int argc, char *argv[]) {
 
     // read notes from corpus
     Corpus corpus = readCorpusFile(inCorpusFile, nth, positionMethod);
+    std::cout << "Reading done. There are " << corpus.piecesTP.size() << " pieces" << std::endl;
+
     std::vector<Shape> shapeDict = getDefaultShapeDict();
 
     // sort and count notes
@@ -129,10 +131,11 @@ int main(int argc, char *argv[]) {
     }
 
     time_t iterTime;
-    
+    std::cout << "Iter, Found shapes count, Shape, Score, Multinote count, Time" << std::endl;
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
-        if (verbose) std::cout << "Iter: " << iterCount << " ";
-        else         std::cout << "\rIter: " << iterCount << '/' << bpeIter - 1 << " ";
+        if (!verbose && iterCount != 0) 
+            std::cout << "\r";
+        std::cout << iterCount << ", ";
         iterTime = time(0);
 
         updateNeighbor(corpus, shapeDict);
@@ -146,10 +149,10 @@ int main(int argc, char *argv[]) {
                 std::cout << "Error: no shapes found" << std::endl;
                 return 1;
             }
-            std::cout << "Find " << shapeScore.size() << " unique pairs" << " ";
+            std::cout << shapeScore.size() << ", ";
             int maxScore = shapeScore.top().first;
             maxScoreShape = shapeScore.top().second;
-            std::cout << "New shape: " << shape2str(maxScoreShape) << " Score: " << maxScore << " ";
+            std::cout << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
         }
         else {
             std::priority_queue<std::pair<double, Shape>> shapeScore;
@@ -158,10 +161,10 @@ int main(int argc, char *argv[]) {
                 std::cout << "Error: no shapes found" << std::endl;
                 return 1;
             }
-            std::cout << "Find " << shapeScore.size() << " unique pairs" << " ";
+            std::cout << shapeScore.size() << ", ";
             double maxScore = shapeScore.top().first;
             maxScoreShape = shapeScore.top().second;
-            std::cout << "New shape: " << shape2str(maxScoreShape) << " Score: " << maxScore << " ";
+            std::cout << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
         }
 
         unsigned int newShapeIndex = shapeDict.size();
@@ -183,9 +186,9 @@ int main(int argc, char *argv[]) {
                         if (k + n >= corpus.piecesMN[i][j].size()) {
                             continue;
                         }
-                        if (corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel
-                                || corpus.piecesMN[i][j][k].vel == 0
-                                || corpus.piecesMN[i][j][k+n].vel == 0) {
+                        if (corpus.piecesMN[i][j][k].vel == 0
+                            || corpus.piecesMN[i][j][k+n].vel == 0
+                            || corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel) {
                             continue;
                         }
                         // if (shapeDict[corpus.piecesMN[i][j][k].getShapeIndex()].size()
@@ -235,10 +238,10 @@ int main(int argc, char *argv[]) {
                 multinoteCount += corpus.piecesMN[i][j].size();
             }
         }
-        std::cout << "Multinote count: " << multinoteCount << " ";
-        std::cout << "Time: " << (unsigned int) time(0) - iterTime;
+        std::cout << multinoteCount << ", ";
+        std::cout << (unsigned int) time(0) - iterTime;
         if (verbose) std::cout << std::endl;
-        else         std::cout.flush();
+        else         std::cout << "  "; std::cout.flush();
 
         // corpus.shrink();
     }

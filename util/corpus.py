@@ -49,7 +49,7 @@ class Vocabs:
     tempos: AttrVocab
 
     def __init__(self, paras: dict, bpe_shapes_list: list, padding_token: str,
-            events, pitchs, durations, velocities, track_numbers, instruments, positions, tempos) -> None:
+            events, pitchs, durations, velocities, track_numbers, instruments, positions, tempos, time_signatures) -> None:
         self.paras = paras
         self.bpe_shapes_list = bpe_shapes_list
         self.padding_token = padding_token
@@ -61,6 +61,7 @@ class Vocabs:
         self.instruments = Vocabs.AttrVocab(instruments)
         self.positions = Vocabs.AttrVocab(positions)
         self.tempos = Vocabs.AttrVocab(tempos)
+        self.time_signatures = Vocabs.AttrVocab(time_signatures)
 
     @classmethod
     def from_dict(cls, d):
@@ -68,7 +69,7 @@ class Vocabs:
             d['paras'], d['bpe_shapes_list'], d['padding_token'],
             d['events'], d['pitchs'], d['durations'],
             d['velocities'], d['track_numbers'], d['instruments'],
-            d['positions'], d['tempos']
+            d['positions'], d['tempos'], d['time_signatures']
         )
 
     def to_dict(self) -> dict:
@@ -84,6 +85,7 @@ class Vocabs:
             'instruments': vars(self.instruments),
             'positions': vars(self.positions),
             'tempos': vars(self.tempos),
+            'time_signatures': vars(self.time_signatures),
         }
 
 
@@ -155,43 +157,39 @@ def build_vocabs(
         Parameters:
         - bpe_shapes_list: The multinote shape are learned by bpe algorithms.
           If bpe is not performed, `bpe_shapes_list` should be empty
-
-        Event tokens include:
-        - shape
-        - positions
-        - measure and time_signature
-        - tempo change
-        - track and instrument
-        - begin-of-score and end-of-score
     """
-
     start_time = time()
 
-    # shape vacob
-    shape_tokens = ['N', 'N~'] + bpe_shapes_list
+    # Event tokens include:
+    # - begin-of-score and end-of-score
+    # - shape
+    # - track and instrument
+    # - positions
+    # - measure and time_signature
+    # - tempo change
 
-    # other tokens vocabs
-    track_tokens = [
+    event_shape_tokens = ['N', 'N~'] + bpe_shapes_list
+
+    event_track_tokens = [
         'R'+int2b36str(i) for i in range(paras['max_track_number'])
     ]
-    tempo_min, tempo_max, tempo_step = paras['tempo_quantization']
-    # tempo_max is inclusive
-    tempo_tokens = [
-        'T'+int2b36str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
-    ]
-    position_tokens = []
-    if paras['position_method'] == 'event':
-        position_tokens = [
-            'P'+int2b36str(i) for i in range(get_largest_possible_position(paras['nth']))
-        ]
-    measure_tokens = [
+    event_position_tokens = (
+        []
+        if paras['position_method'] == 'event' else
+        ['P'+int2b36str(i) for i in range(get_largest_possible_position(paras['nth']))]
+    )
+    event_measure_time_sig_tokens = [
         f'M{int2b36str(n)}/{int2b36str(d)}' for n, d in SUPPORTED_TIME_SIGNATURES
+    ]
+    tempo_min, tempo_max, tempo_step = paras['tempo_quantization']
+    event_tempo_tokens = [
+        'T'+int2b36str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
     ]
 
     # place padding token in front so that they have same index across all vocabulary
     event_tokens = (
         [PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR]
-        + shape_tokens + track_tokens + tempo_tokens + position_tokens + measure_tokens
+        + event_shape_tokens + event_track_tokens + event_position_tokens + event_measure_time_sig_tokens + event_tempo_tokens
     )
 
     max_duration = paras['max_duration']
@@ -200,11 +198,12 @@ def build_vocabs(
     velocity_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
     track_number_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(paras['max_track_number'])))
     instrument_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(129)))
-    position_attr_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(get_largest_possible_position(paras['nth']))))
+    position_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(get_largest_possible_position(paras['nth']))))
+
 
     token_count_per_piece = []
     max_measured_count = 0 # max measure number in all pieces
-    corpus_measure_tokens = set()
+    corpus_measure_time_sig_tokens = set()
     corpus_position_tokens = set() # we want to see how sparse measure and position is
     for piece in corpus_iterator:
         text_list = piece.split(' ')
@@ -217,27 +216,26 @@ def build_vocabs(
                 measures_count += 1
         max_measured_count = max(max_measured_count, measures_count)
 
-        corpus_measure_tokens.update(measures_set)
+        corpus_measure_time_sig_tokens.update(measures_set)
         if paras['position_method'] == 'event':
             positions = {t[1:] for t in text_list if t[0] == 'P'}
         else:
             positions = {t.split(':')[-1] for t in text_list if t[0] == 'N'}
         corpus_position_tokens.update(positions)
-    corpus_measure_tokens = list(corpus_measure_tokens)
+    corpus_measure_time_sig_tokens = list(corpus_measure_time_sig_tokens)
     corpus_position_tokens = list(corpus_position_tokens)
 
     summary_string = (
         f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
-        f'Event tokens size: {len(event_tokens)}\n'\
-        f'Measure tokens size: {len(measure_tokens)}\n'\
-        f'- Corpus measure size: {len(corpus_measure_tokens)} ({corpus_measure_tokens})\n'\
-        f'Position token size: {len(position_attr_tokens)}\n'\
-        f'- Corpus position tokens size: {len(corpus_position_tokens)}\n'\
+        f'Event vocab size: {len(event_tokens)}\n'\
+        f'- Measure_time_sig event count: {len(event_measure_time_sig_tokens)}\n'\
+        f'- Corpus Measure_time_sig: {len(corpus_measure_time_sig_tokens)} ({corpus_measure_time_sig_tokens})\n'\
+        f'- Position event count: {len(position_tokens)}\n'\
+        f'- Corpus position tokens count: {len(corpus_position_tokens)}\n'\
         f'- Max corpus position: {max(b36str2int(cpts) for cpts in corpus_position_tokens)}\n'\
-        f'Tempo token size: {len(tempo_tokens)}\n'\
-        f'Duration size: {len(shape_tokens)}\n'\
-        f'- Largest possible duration: {paras["max_duration"] * paras["nth"] // 4}\n'\
-        f'Velocity size: {len(velocity_tokens)}\n'\
+        f'Largest possible duration: {paras["max_duration"] * paras["nth"] // 4}\n'\
+        f'Velocity vocab: {velocity_tokens}\n'\
+        f'Tempo vocab: {len(event_tempo_tokens)} ({event_tempo_tokens})\n'\
         f'Vocabulary build time: {time()-start_time}'
     )
 
@@ -252,8 +250,9 @@ def build_vocabs(
         velocities=velocity_tokens,
         track_numbers=track_number_tokens,
         instruments=instrument_tokens,
-        positions=position_attr_tokens,
-        tempos=tempo_tokens
+        positions=position_tokens,
+        tempos=event_tempo_tokens,
+        time_signatures=event_measure_time_sig_tokens
     )
 
     return vocabs, summary_string
@@ -269,11 +268,12 @@ FEATURE_INDEX = {
     'pos': 6, 'positions': 6,
     'mea': 7, 'measure_numbers': 7,
     'tmp': 8, 'tempos': 8,
+    'tis': 9, 'time_signatures': 9,
 }
 
-INPUT_FEATURE_NAME = [
+COMPLETE_FEATURE_NAME = [
     'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions',
-    'measure_numbers', 'tempos'
+    'measure_numbers', 'tempos', 'time_signatures'
 ]
 
 OUTPUT_FEATURE_NAME = [
@@ -291,16 +291,18 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
     """
     position_method = vocabs.paras['position_method']
     vocabs.events.text2id = vocabs.events.text2id
-    # in build_vocabs, padding token is made to be the 0th word
+    # in build_vocabs, padding token is made to be the 0th element
     padding = 0
-    x = np.full((len(text_list), 9), fill_value=padding, dtype=np.int16)
+    x = np.full((len(text_list), len(COMPLETE_FEATURE_NAME)), fill_value=padding, dtype=np.int16)
 
     tracks_count = 0
 
     cur_position_id = 0
     cur_measure_number = 0 # measure_number starts at 1, 0 is padding
     cur_tempo_id = padding
-    # cur_timesig_id = -1
+    cur_time_sig_id = padding
+    cur_measure_cursor = 0
+    cur_position_cursor = 0
     for i, text in enumerate(text_list):
         if len(text) > 0:
             typename = text[0]
@@ -320,30 +322,37 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
 
         elif typename == 'M':
             cur_position_id = vocabs.positions.text2id['0']
+            cur_time_sig_id = vocabs.time_signatures.text2id[text]
             cur_measure_number += 1
+            cur_measure_cursor = i
             x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[text]
             x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
             x[i][FEATURE_INDEX['pos']] = cur_position_id
             x[i][FEATURE_INDEX['mea']] = cur_measure_number
+            x[i][FEATURE_INDEX['tis']] = cur_time_sig_id
 
         elif typename == 'T':
             event_text, *attr = text = text.split(':')
             cur_tempo_id = vocabs.tempos.text2id[event_text]
             if position_method == 'attribute':
                 cur_position_id = b36str2int(attr[0])
+            else:
+                x[cur_position_cursor][FEATURE_INDEX['tmp']] = cur_tempo_id
+            # because tempo come after position and/or measure token, which are assigned to previous tempo's id
+            x[cur_measure_cursor][FEATURE_INDEX['tmp']] = cur_tempo_id
             x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
             x[i][FEATURE_INDEX['pos']] = cur_position_id
             x[i][FEATURE_INDEX['mea']] = cur_measure_number
-            # because tempo come after a position or measure token, which already assigned previous tempo's id
-            x[i-1][FEATURE_INDEX['tmp']] = cur_tempo_id
 
         elif typename == 'P':
             cur_position_id = vocabs.positions.text2id[text[1:]]
+            cur_position_cursor = i
             x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[event_text]
-            x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
             x[i][FEATURE_INDEX['pos']] = cur_position_id
             x[i][FEATURE_INDEX['mea']] = cur_measure_number
+            x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
+            x[i][FEATURE_INDEX['tis']] = cur_time_sig_id
 
         elif typename == 'N' or typename == 'S':
             event_text, *attr = text.split(':')
@@ -356,27 +365,29 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
             x[i][FEATURE_INDEX['trn']] = vocabs.track_numbers.text2id[attr[3]]
             assert b36str2int(attr[3]) < tracks_count, 'Invalid track number'
             x[i][FEATURE_INDEX['ins']] = x[b36str2int(attr[3])+1, FEATURE_INDEX['ins']]
-            x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
             x[i][FEATURE_INDEX['pos']] = cur_position_id
             x[i][FEATURE_INDEX['mea']] = cur_measure_number
+            x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
+            x[i][FEATURE_INDEX['tis']] = cur_time_sig_id
 
         else:
             raise ValueError('unknown typename')
     return x
 
 
-def array_to_text_list(data, vocabs: Vocabs, is_input=True):
+def array_to_text_list(data, vocabs: Vocabs, is_output=False):
     """
         Inverse of text_list_to_array.
-        if is_input is True, expect shape of (seq_size, 9)
-        otherwise, expect shape (seq_size, 6) if position_method == 'event' else (seq_size, 7)
     """
     position_method = vocabs.paras['position_method']
     assert len(data.shape) == 2 and data.shape[0] > 0, f'bad numpy array shape: {data.shape}'
-    if is_input:
-        assert data.shape[1] == 9, f'bad numpy array shape: {data.shape}'
+    if is_output:
+        if position_method == 'event':
+            assert data.shape[1] == len(OUTPUT_FEATURE_NAME) - 1, f'bad numpy array shape: {data.shape}'
+        else:
+            assert data.shape[1] == len(OUTPUT_FEATURE_NAME), f'bad numpy array shape: {data.shape}'
     else:
-        assert data.shape[1] == 6 if position_method == 'event' else 7, f'bad numpy array shape: {data.shape}'
+        assert data.shape[1] == len(COMPLETE_FEATURE_NAME), f'bad numpy array shape: {data.shape}'
 
 
     text_list = []
@@ -429,7 +440,7 @@ def get_input_array_debug_string(input_array: np.ndarray, mps_sep_indices, vocab
     reconstructed_text_list = array_to_text_list(input_array, vocabs=vocabs)
     if mps_sep_indices is None:
         mps_sep_indices = []
-    debug_str = 'evt  pit  dur  vel  trn  ins  pos  mea  tmp  reconstructed_text\n'
+    debug_str = 'evt  pit  dur  vel  trn  ins  pos  mea  tmp  tis  reconstructed_text\n'
     debug_str += (
         '\n'.join([
             ' '.join([f'{s:>4}' for s in a.split()])

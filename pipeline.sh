@@ -118,22 +118,13 @@ if [ -d $CHECKPOINT_DIR_PATH ]; then
 echo "Checkpoint dir: $CHECKPOINT_DIR_PATH"
 
 TRAIN_OTHER_ARGUMENTS=""
-if [ $USE_PERMUTABL_SUBSEQ_LOSS == true ]; then
-    TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-permutable-subseq-loss"
-    echo "Appended --use-permutable-subseq-loss to train's argument" | tee -a $LOG_PATH
-fi
-if [ $PERMUTE_MPS == true ]; then
-    TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-mps"
-    echo "Appended --permute-mps to train's argument" | tee -a $LOG_PATH
-fi
-if [ $PERMUTE_TRACK_NUMBER == true ]; then
-    TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-track-number"
-    echo "Appended --permute-track-number to train's argument" | tee -a $LOG_PATH
-fi
-if [ $LOG_HEAD_LOSSES == true ]; then
-    TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --log-head-losses"
-    echo "Appended --log-head-losses to train's argument" | tee -a $LOG_PATH
-fi
+test $USE_PERMUTABL_SUBSEQ_LOSS == true && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-permutable-subseq-loss"
+test $PERMUTE_MPS == true               && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-mps"
+test $PERMUTE_TRACK_NUMBER == true      && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-track-number"
+test $INPUT_NO_TEMPO == true            && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-tempo"
+test $INPUT_NO_TIME_SIGNATURE == true   && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-time-signatrue"
+test $LOG_HEAD_LOSSES == true           && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --log-head-losses"
+test -z $TRAIN_OTHER_ARGUMENTS && { echo "Appended ${TRAIN_OTHER_ARGUMENTS} to train.py's argument" | tee -a $LOG_PATH ; }
 
 # change CUDA_VISIABLE_DEVICES according to the machine it runs on
 CUDA_VISIABLE_DEVICES=0,1 python3 train.py --max-seq-length $MAX_SEQ_LENGTH --sample-stride $SAMPLE_STRIDE \

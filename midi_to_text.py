@@ -327,6 +327,7 @@ def main():
         from matplotlib import pyplot as plt
         from pandas import Series
         text_stats = {
+            'number_of_pieces': len(good_path_list),
             'track_number_distribution': Counter(),
             'instrument_distribution': Counter(),
             'token_type_distribution': Counter(),

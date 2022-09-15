@@ -4,7 +4,7 @@
 #include <random>
 #include "omp.h"
 
-int gcd (int a, int b) {
+int gcd (unsigned int a, unsigned int b) {
     if (a == b) return a;
     if (a == 0 || b == 0) return ((a > b) ? a : b);
     if (a == 1 || b == 1) return 1;
@@ -17,7 +17,7 @@ int gcd (int a, int b) {
     return a;
 }
 
-int gcd (int* arr, unsigned int size) {
+int gcd (unsigned int* arr, unsigned int size) {
     int g = arr[0];
     for (int i = 1; i < size; ++i) {
         if (arr[i] != 0) {
@@ -70,32 +70,40 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
     int pairSize = leftSize + rightSize;
     Shape pairShape;
     pairShape.resize(pairSize);
+    bool badShape = false;
 
-    int rightRelOnsets[rightSize];
+    unsigned int rightOnsetDiffs[rightSize];
     for (int i = 0; i < rightSize; ++i) {
-        rightRelOnsets[i] = rShape[i].getRelOnset() * rmn.unit + rmn.getOnset() - lmn.getOnset();
+        rightOnsetDiffs[i] = rShape[i].getRelOnset() * rmn.unit + rmn.getOnset() - lmn.getOnset();
     }
-    int newUnit = gcd(gcd(lmn.unit, rmn.unit), gcd(rightRelOnsets, rightSize));
-    // cout << "newUnit:" << newUnit << endl;
-    for (int i = 0; i < pairSize; ++i) {
-        if (i < leftSize) {
-            if (i != 0) {
-                pairShape[i].setRelOnset(lShape[i].getRelOnset() * lmn.unit / newUnit);
-                pairShape[i].relPitch = lShape[i].relPitch;
+    unsigned int newUnit = gcd(gcd(lmn.unit, rmn.unit), gcd(rightOnsetDiffs, rightSize));
+    // checking to prevent overflow, because RelNote's onset has value limit
+     for (int i = 0; i < rightSize; ++i) {
+        if (rightOnsetDiffs[i] / newUnit > RelNote::onsetLimit) {
+            badShape = true;
+        }
+    }
+    if (!badShape) {
+        for (int i = 0; i < pairSize; ++i) {
+            if (i < leftSize) {
+                if (i != 0) {
+                    pairShape[i].setRelOnset(lShape[i].getRelOnset() * lmn.unit / newUnit);
+                    pairShape[i].relPitch = lShape[i].relPitch;
+                }
+                pairShape[i].relDur = lShape[i].relDur * lmn.unit / newUnit;
+                pairShape[i].setCont(lShape[i].isCont());
             }
-            pairShape[i].relDur = lShape[i].relDur * lmn.unit / newUnit;
-            pairShape[i].setCont(lShape[i].isCont());
+            else {
+                int j = i - leftSize;
+                pairShape[i].setRelOnset(rightOnsetDiffs[j] / newUnit);
+                pairShape[i].relPitch = rShape[j].relPitch + rmn.pitch - lmn.pitch;
+                pairShape[i].relDur = rShape[j].relDur * rmn.unit / newUnit;
+                pairShape[i].setCont(rShape[j].isCont());
+            }
         }
-        else {
-            int j = i - leftSize;
-            pairShape[i].setRelOnset(rightRelOnsets[j] / newUnit);
-            pairShape[i].relPitch = rShape[j].relPitch + rmn.pitch - lmn.pitch;
-            pairShape[i].relDur = rShape[j].relDur * rmn.unit / newUnit;
-            pairShape[i].setCont(rShape[j].isCont());
-        }
+        std::sort(pairShape.begin(), pairShape.end());
+        pairShape.shrink_to_fit();
     }
-    std::sort(pairShape.begin(), pairShape.end());
-    pairShape.shrink_to_fit();
     return pairShape;
 }
 

@@ -19,7 +19,7 @@ from util.model import (
     get_seq_mask,
 )
 from util.dataset import MidiDataset, collate_mididataset
-from util.corpus import INPUT_FEATURE_NAME, OUTPUT_FEATURE_NAME, get_corpus_vocabs
+from util.corpus import COMPLETE_FEATURE_NAME, OUTPUT_FEATURE_NAME, get_corpus_vocabs
 from util.midi import piece_to_midi
 
 
@@ -63,6 +63,14 @@ def parse_args():
         '--embedding-dim',
         type=int,
         default=512
+    )
+    model_parser.add_argument(
+        '--input-no-tempo',
+        action='store_true',
+    )
+    model_parser.add_argument(
+        '--input-no-time-signature',
+        action='store_true',
     )
 
     train_parser = ArgumentParser()
@@ -278,12 +286,12 @@ def main():
     )
     logging.info('Embedding size:')
     logging.info('\n'.join([
-        f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(INPUT_FEATURE_NAME, model.embedding_vocabs_size))
+        f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(COMPLETE_FEATURE_NAME, model.embedding_vocabs_size))
     ]))
     summary_str = str(torchinfo.summary(
         model,
         input_size=[
-            (args.train_args.batch_size, args.data_args.max_seq_length, len(INPUT_FEATURE_NAME)), # x
+            (args.train_args.batch_size, args.data_args.max_seq_length, len(model.input_features_indices)), # x
             (args.data_args.max_seq_length, args.data_args.max_seq_length) # mask
         ],
         dtypes=[torch.long, torch.bool],

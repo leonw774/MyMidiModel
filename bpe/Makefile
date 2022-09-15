@@ -1,5 +1,4 @@
 all: apply_vocab learn_vocab ;
-	rm *.o
 
 apply_vocab: apply_vocab.cpp corpus.o shapescore.o ;
 	g++ -g -fopenmp corpus.o shapescore.o apply_vocab.cpp -o apply_vocab

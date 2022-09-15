@@ -15,6 +15,7 @@ struct RelNote {
     uint8_t isContAndRelOnset;
     int8_t relPitch;
     uint8_t relDur;
+    static const uint8_t onsetLimit = 0x7f;
 
     RelNote();
 

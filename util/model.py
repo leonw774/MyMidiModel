@@ -1,9 +1,8 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-from tqdm import tqdm
 
-from .corpus import FEATURE_INDEX, INPUT_FEATURE_NAME, OUTPUT_FEATURE_NAME, Vocabs, array_to_text_list, text_list_to_array
+from .corpus import FEATURE_INDEX, COMPLETE_FEATURE_NAME, OUTPUT_FEATURE_NAME, Vocabs, array_to_text_list, text_list_to_array
 from .midi import piece_to_midi
 from .tokens import PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR
 
@@ -14,6 +13,8 @@ class MidiTransformerDecoder(nn.Module):
             layers_number: int,
             attn_heads_number: int,
             embedding_dim: int,
+            input_no_tempo: bool,
+            input_no_time_signature: bool
             ) -> None:
         super().__init__()
 
@@ -24,11 +25,21 @@ class MidiTransformerDecoder(nn.Module):
         self.layers_number = layers_number
         self.attn_heads_number = attn_heads_number
         self.embedding_dim = embedding_dim
+        self.input_no_tempo = input_no_tempo
+        self.input_no_time_signature = input_no_time_signature
 
         # Input features
+
+        # the indices of input features in complete feature list
+        self.input_features_indices = [
+            FEATURE_INDEX[fname]
+            for fname in COMPLETE_FEATURE_NAME
+            if not (input_no_tempo and fname=='tempos') or not (input_no_time_signature and fname=='time_signatures')
+        ]
         self.embedding_vocabs_size = [
-            ( getattr(vocabs, feature_name).size if feature_name != 'measure_numbers' else max_seq_length )
-            for feature_name in INPUT_FEATURE_NAME
+            ( getattr(vocabs, fname).size if fname != 'measure_numbers' else max_seq_length )
+            for fname in COMPLETE_FEATURE_NAME
+            if not (input_no_tempo and fname=='tempos') or not (input_no_time_signature and fname=='time_signatures')
         ]
         self.embeddings = nn.ModuleList([
             nn.Embedding(
@@ -39,15 +50,18 @@ class MidiTransformerDecoder(nn.Module):
             )
             for vsize in self.embedding_vocabs_size
         ])
+
         # Output features
-        self.logit_vocabs_size = [
-            getattr(vocabs, feature_name).size for feature_name in OUTPUT_FEATURE_NAME
-        ]
-        if vocabs.paras['position_method'] == 'event':
-            self.logit_vocabs_size.pop()
         self.output_features_indices = [
-            FEATURE_INDEX[feature_name]
-            for feature_name in OUTPUT_FEATURE_NAME
+            FEATURE_INDEX[fname]
+            for fname in OUTPUT_FEATURE_NAME
+        ]
+        # because position is the last feature in OUTPUT_FEATURE_NAME
+        if vocabs.paras['position_method'] == 'event':
+            self.output_features_indices.pop()
+        self.logit_vocabs_size = [
+            getattr(vocabs, OUTPUT_FEATURE_NAME[i]).size
+            for i in self.output_features_indices
         ]
         self.logits = nn.ModuleList([
             nn.Linear(
@@ -57,7 +71,7 @@ class MidiTransformerDecoder(nn.Module):
             for vsize in self.logit_vocabs_size
         ])
 
-        layer = nn.TransformerEncoderLayer( # name's encoder, used as decoder. Cause we don't need memory
+        layer = nn.TransformerEncoderLayer( # name's encoder, used as decoder.
             d_model=embedding_dim,
             nhead=attn_heads_number,
             batch_first=True
@@ -67,28 +81,32 @@ class MidiTransformerDecoder(nn.Module):
             num_layers=layers_number
         )
 
-    def to_output_features(self, input_seq_features):
-        # input_seq_features.shape = (batch, sequence, in_feature_num)
-        # return (batch, sequence, out_feature_num)
-        return input_seq_features[..., self.output_features_indices]
+    # batched_seq_complete_features has shape: (batch_size, seq_size, complete_feature_num)
+    def to_input_features(self, batched_seq_complete_features):
+        return batched_seq_complete_features[..., self.input_features_indices]
+
+    def to_output_features(self, batched_seq_complete_features):
+        return batched_seq_complete_features[..., self.output_features_indices]
 
     def forward(self, x, mask):
-        # x.shape = (batch_size, seq_size, feature)
-        try:
-            x = sum(
-                emb(x[:,:,i]) for i, emb in enumerate(self.embeddings)
-            )
-        except Exception as e:
-            for i, vsize in enumerate(self.embedding_vocabs_size):
-                if torch.all(0 <= x[:,:,i]) and torch.all(x[:,:,i] < vsize):
-                    print(i, True)
-                else:
-                    print(i)
-                    for b in range(x.shape[0]):
-                        if not torch.all(0 <= x[b,:,i]) and torch.all(x[b,:,i] < vsize):
-                            print(x[b,:,i])
-            raise e
-
+        # x has shape: (batch_size, seq_size, in_feature_number)
+        x = sum(
+            emb(x[:,:,i]) for i, emb in enumerate(self.embeddings)
+        )
+        # try:
+        #     x = sum(
+        #         emb(x[:,:,i]) for i, emb in enumerate(self.embeddings)
+        #     )
+        # except Exception as e:
+        #     for i, vsize in enumerate(self.embedding_vocabs_size):
+        #         if torch.all(0 <= x[:,:,i]) and torch.all(x[:,:,i] < vsize):
+        #             print(i, True)
+        #         else:
+        #             print(i)
+        #             for b in range(x.shape[0]):
+        #                 if not torch.all(0 <= x[b,:,i]) and torch.all(x[b,:,i] < vsize):
+        #                     print(x[b,:,i])
+        #     raise e
         x = self.transformer_decoder(
             src=x,
             mask=mask
@@ -98,17 +116,17 @@ class MidiTransformerDecoder(nn.Module):
         ]
         return logits
 
-def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq: torch.Tensor = None, temperature=1.0) -> list:
+def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq, temperature=1.0) -> list:
     """
-        start_seq is Tensor with shape: (1, seq_size, in_feature_number)
+        Expect start_seq is Tensor with shape: (1, seq_size, complete_feature_number) or None
         - if start_seq is None, will use `text_list_to_array([BEGIN_TOKEN_STR])` as start_seq
         return the text list of the generated piece
     """
     if start_seq is not None:
         if len(start_seq.shape) != 3:
-            raise ValueError(f'start_seq\'s shape have to be (1, seq_length, input_feature_num), get {start_seq.shape}')
-        elif start_seq.shape[0] != 1 or start_seq.shape[2] != len(INPUT_FEATURE_NAME):
-            raise ValueError(f'start_seq\'s shape have to be (1, seq_length, input_feature_num), get {start_seq.shape}')
+            raise AssertionError(f'start_seq\'s shape have to be (1, seq_length, complete_feature_number), get {start_seq.shape}')
+        elif start_seq.shape[0] != 1 or start_seq.shape[2] != len(COMPLETE_FEATURE_NAME):
+            raise AssertionError(f'start_seq\'s shape have to be (1, seq_length, complete_feature_number), get {start_seq.shape}')
     else:
         start_seq = torch.from_numpy(text_list_to_array([BEGIN_TOKEN_STR], model.vocabs)).unsqueeze(0).int()
     max_length_mask = get_seq_mask(model.max_seq_length).to(start_seq.device)
@@ -119,7 +137,7 @@ def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq: torch.
     training_state = model.training
     model.eval()
 
-    output_text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_input=True)
+    output_text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
 
     input_seq = start_seq
     output_seq = model.to_output_features(start_seq)
@@ -144,7 +162,7 @@ def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq: torch.
             new_token = torch.stack(sampled_features, dim=1) # shape = (1, feature_num)
             new_token = torch.unsqueeze(new_token, dim=0) # shape = (1, 1, feature_num)
             new_output_seq = torch.cat((output_seq, new_token), dim=1)
-            new_output_text_list = array_to_text_list(new_output_seq[0].cpu().numpy(), vocabs=model.vocabs, is_input=False)
+            new_output_text_list = array_to_text_list(new_output_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=True)
             # print(new_output_text_list)
 
             try:
@@ -232,17 +250,3 @@ def calc_permutable_subseq_losses(pred_logit, target_logit, batched_mps_indices)
 def get_seq_mask(size: int):
     return torch.triu(torch.ones(size, size), diagonal=1).bool()
 
-
-# def save_model_meta_info(model: MidiTransformerDecoder, save_dir_path: str):
-#     meta_info_dict = {
-#         'vocabs': model.vocabs.to_dict(),
-#         'max_seq_length': model.max_seq_length,
-#         'layers_number': model.layers_number,
-#         'attn_heads_number': model.attn_heads_number,
-#         'embedding_dim': model.embedding_dim
-#     }
-#     with open(os.path.join(save_dir_path, 'model_meta_info.json'), 'w+', encoding='utf8') as meta_info_file:
-#         json.dump(meta_info_dict, meta_info_file)
-
-
-# def load_model_meta_info()
