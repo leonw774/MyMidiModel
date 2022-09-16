@@ -141,7 +141,7 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
     ]
 
     # handle too long duration
-    # continuing means this note does not have NOTE_OFF and is going to connect to a note after max_duration
+    # continuing means this note does not have NOTE_OFF and is going to be continued by another note after max_duration
     # it is represented with negtive duration to seperate from notes that's really max_duration long
     continuing_duration = -max_duration if use_cont_note else max_duration
     note_list_length = len(note_token_list)
@@ -172,34 +172,8 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
         n for n in note_token_list
         if n.duration <= max_duration
     ]
+    note_token_list = list(set(note_token_list))
     note_token_list.sort()
-
-    # remove notes to prevent ambiguity
-    # example: note A starts at t1 and ends at t2, note B starts at t3 and ends at t4
-    # A and B are on the same track and have the same velocity
-    # if t1 == t3 and t4 <= t2, then note B is dominated by note A
-    # we remove note B for disambiguation
-    # pre_onset = -1
-    # trn_vel_mapping = dict()
-    # notes_to_remove = set()
-    # for n in note_token_list:
-    #     if n.onset > pre_onset:
-    #         pre_onset = n.onset
-    #         trn_vel_mapping.clear()
-
-    #     key = (n.track_number, n.velocity)
-    #     if key in trn_vel_mapping:
-    #         cur_max_dur_note = trn_vel_mapping[key]
-    #         if n.duration > cur_max_dur_note.duration:
-    #             notes_to_remove.add(cur_max_dur_note)
-    #             trn_vel_mapping[key] = n
-    #         else:
-    #             notes_to_remove.add(n)
-    #     else:
-    #         trn_vel_mapping[key] = n
-
-    # for n in notes_to_remove:
-    #     note_token_list.remove(n)
 
     return note_token_list
 

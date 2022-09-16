@@ -408,7 +408,7 @@ def main():
     # training end
 
     # evaluation
-    best_model = torch.load(os.path.join(args.checkpoint_dir_path, 'model_best.pt'))
+    # best_model = torch.load(os.path.join(args.checkpoint_dir_path, 'model_best.pt'))
     # evaluate(model=best_model, corpus_dir_path=args.corpus_dir_path, sample_size=args.eval_sample_size)
 
     return 0

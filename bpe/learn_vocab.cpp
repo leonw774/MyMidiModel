@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
     double samplingRate = atof(argv[6]);
     bool verbose = false;
     if (argc == 8) {
-        std::string v(argv[8]);
+        std::string v(argv[7]);
         if (v != "--verbose") {
             std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate (--verbose)" << std::endl;
             return 1;
