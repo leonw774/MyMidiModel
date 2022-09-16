@@ -206,7 +206,7 @@ template<typename T> void shapeScoring(
                         shapeDict[corpus.piecesMN[i][j][k+n].getShapeIndex()]
                     );
                     // empty shape is bad shape
-                    if (s.size() > 0) continue;
+                    if (s.size() == 0) continue;
                     if (isDefaultScoring) {
                         shapeScoreParallel[thread_num][s] += 1;
                     }
