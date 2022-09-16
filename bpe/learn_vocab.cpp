@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
         Shape maxScoreShape;
         if (scoring == "default") {
             std::priority_queue<std::pair<unsigned int, Shape>> shapeScore;
-            defaultShapeScoring(corpus, shapeDict, shapeScore, mergeCondition, samplingRate);
+            shapeScoring<unsigned int>(corpus, shapeDict, shapeScore, scoring, mergeCondition, samplingRate);
             if (shapeScore.size() == 0) {
                 std::cout << "Error: no shapes found" << std::endl;
                 return 1;
@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
         }
         else {
             std::priority_queue<std::pair<double, Shape>> shapeScore;
-            wplikeShapeScoring(corpus, shapeDict, shapeScore, mergeCondition, samplingRate);
+            shapeScoring<double>(corpus, shapeDict, shapeScore, scoring, mergeCondition, samplingRate);
             if (shapeScore.size() == 0) {
                 std::cout << "Error: no shapes found" << std::endl;
                 return 1;
