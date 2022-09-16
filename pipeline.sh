@@ -81,7 +81,7 @@ if [ $BPE_ITER -ne 0 ]; then
         cp "${CORPUS_DIR_PATH}/pathlist" $CORPUS_DIR_PATH_WITH_BPE
 
         # run learn_vocab and use tee command to copy stdout to log
-        bpe/learn_vocab $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SCORING $MERGE_CONDITION $SAMPLE_RATE --verbose | tee -a $LOG_PATH
+        bpe/learn_vocab $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SCORING $MERGE_CONDITION $SAMPLE_RATE | tee -a $LOG_PATH
         BPE_EXIT_CODE=${PIPESTATUS[0]}
         if [ $BPE_EXIT_CODE -ne 0 ]; then
             echo "learn_vocab failed. exit code: $BPE_EXIT_CODE. pipeline.sh exit." | tee -a $LOG_PATH

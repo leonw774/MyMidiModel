@@ -69,7 +69,6 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
     int leftSize = lShape.size(), rightSize = rShape.size();
     int pairSize = leftSize + rightSize;
     Shape pairShape;
-    pairShape.resize(pairSize);
     bool badShape = false;
 
     unsigned int rightOnsetDiffs[rightSize];
@@ -84,6 +83,7 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
         }
     }
     if (!badShape) {
+        pairShape.resize(pairSize);
         for (int i = 0; i < pairSize; ++i) {
             if (i < leftSize) {
                 if (i != 0) {
