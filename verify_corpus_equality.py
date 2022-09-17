@@ -23,15 +23,18 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size) ->
 
         if sample_size is None:
             sample_size = len(a_corpus_iterator)
-            sample_indices = list(range(sample_size))
-        elif sample_size > len(a_corpus_iterator):
-            sample_size = len(a_corpus_iterator)
-            assert sample_size > 0
-            sample_indices = random.sample(
-                list(range(len(a_corpus_iterator))),
-                sample_size
-            )
-            sample_indices = set(sample_indices)
+            sample_indices = set(range(sample_size))
+        else:
+            if sample_size >= len(a_corpus_iterator):
+                sample_size = len(a_corpus_iterator)
+                assert sample_size > 0
+                sample_indices = set(range(sample_size))
+            else:
+                sample_indices = random.sample(
+                    list(range(len(a_corpus_iterator))),
+                    sample_size
+                )
+                sample_indices = set(sample_indices)
 
         for i, (a, b) in tqdm(enumerate(zip(a_corpus_iterator, b_corpus_iterator)), total=len(a_corpus_iterator)):
             if i in sample_indices:
@@ -52,21 +55,25 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size) ->
                 print(f'exception in piece_to_midi of {b_corpus_dir} piece #{i}')
                 raise e
 
-            if any( o_t.tempo != t_t.tempo or o_t.time != t_t.time
-                    for o_t, t_t in zip(a_midi.tempo_changes, b_midi.tempo_changes) ):
+            if any(
+                    o_t.tempo != t_t.tempo or o_t.time != t_t.time
+                    for o_t, t_t in zip(a_midi.tempo_changes, b_midi.tempo_changes)
+                ):
                 return False
 
 
-            if any( o_t.numerator != t_t.numerator or o_t.denominator != t_t.denominator or o_t.time != t_t.time
-                    for o_t, t_t in zip(a_midi.time_signature_changes, b_midi.time_signature_changes) ):
+            if any(
+                    o_t.numerator != t_t.numerator or o_t.denominator != t_t.denominator or o_t.time != t_t.time
+                    for o_t, t_t in zip(a_midi.time_signature_changes, b_midi.time_signature_changes)
+                ):
                 return False
 
             a_track_index_mapping = {
-                (track.program, track.is_drum): i
+                (track.program, track.is_drum, len(track.notes)): i
                 for i, track in enumerate(a_midi.instruments)
             }
             b_track_index_mapping = {
-                (track.program, track.is_drum): i
+                (track.program, track.is_drum, len(track.notes)): i
                 for i, track in enumerate(b_midi.instruments)
             }
             a_tracks_counter = dict(Counter(a_track_index_mapping.keys()))
@@ -101,18 +108,18 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size) ->
                     a_midi.dump(file=a_bytes_io)
                     b_midi.dump(file=b_bytes_io)
                     if a_bytes_io.getvalue() != b_bytes_io.getvalue():
-                        diff_note_starts = (a_track_note_starts.union(b_track_note_starts)).difference(a_track_note_starts.intersection(b_track_note_starts))
-                        diff_note_ends = (a_track_note_ends.union(b_track_note_ends)).difference(a_track_note_ends.intersection(b_track_note_ends))
-                        print(
-                            f'notes starts difference non-empty: {len(diff_note_starts)} / ({len(a_track_note_starts)} + {len(b_track_note_starts)})\n'\
-                            f'notes end difference non-empty: {len(diff_note_ends)} / ({len(a_track_note_ends)} + {len(b_track_note_ends)})\n'\
-                            f'piece#{i}, track#{a_track_index_mapping[track_feature]}'\
-                        )
-                        print('diff_note_starts')
-                        print(diff_note_starts)
-                        print('diff_note_ends')
-                        print(diff_note_ends)
-                        print("---")
+                        # diff_note_starts = (a_track_note_starts.union(b_track_note_starts)).difference(a_track_note_starts.intersection(b_track_note_starts))
+                        # diff_note_ends = (a_track_note_ends.union(b_track_note_ends)).difference(a_track_note_ends.intersection(b_track_note_ends))
+                        # print(
+                        #     f'notes starts difference non-empty: {len(diff_note_starts)} / ({len(a_track_note_starts)} + {len(b_track_note_starts)})\n'\
+                        #     f'notes end difference non-empty: {len(diff_note_ends)} / ({len(a_track_note_ends)} + {len(b_track_note_ends)})\n'\
+                        #     f'piece#{i}, track#{a_track_index_mapping[track_feature]}'\
+                        # )
+                        # print('diff_note_starts')
+                        # print(diff_note_starts)
+                        # print('diff_note_ends')
+                        # print(diff_note_ends)
+                        # print("---")
                         return False
     return True
 

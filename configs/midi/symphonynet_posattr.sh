@@ -11,5 +11,4 @@ TEMPO_STEP=16
 POSITION_METHOD="attribute"
 PROCESS_WORKERS=8
 MIDI_DIR_PATH="data/midis/SymphonyNet_Dataset"
-MIDI_TO_TEXT_OTHER_ARGUMENTS="--make-stats"
 DATA_NAME="symphonynet_dataset"

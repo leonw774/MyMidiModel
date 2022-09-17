@@ -40,10 +40,10 @@ void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict) {
             // for each multinote
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // printTrack(corpus.piecesMN[i][j], shapeDict, k, 1);
-                uint32_t onsetTime = corpus.piecesMN[i][j][k].getOnset();
-                uint32_t maxRelOffset = findMaxRelOffset(shapeDict[corpus.piecesMN[i][j][k].getShapeIndex()]);
-                uint32_t offsetTime = corpus.piecesMN[i][j][k].getOnset() + maxRelOffset * corpus.piecesMN[i][j][k].unit;
-                uint32_t immdAfterOnset = -1;
+                unsigned int onsetTime = corpus.piecesMN[i][j][k].getOnset();
+                unsigned int maxRelOffset = findMaxRelOffset(shapeDict[corpus.piecesMN[i][j][k].getShapeIndex()]);
+                unsigned int offsetTime = corpus.piecesMN[i][j][k].getOnset() + maxRelOffset * corpus.piecesMN[i][j][k].unit;
+                unsigned int immdAfterOnset = -1;
                 int n = 1;
                 while (k+n < corpus.piecesMN[i][j].size()) {
                     // overlapping
@@ -77,9 +77,10 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
     }
     unsigned int newUnit = gcd(gcd(lmn.unit, rmn.unit), gcd(rightOnsetDiffs, rightSize));
     // checking to prevent overflow, because RelNote's onset has value limit
-     for (int i = 0; i < rightSize; ++i) {
+    for (int i = 0; i < rightSize; ++i) {
         if (rightOnsetDiffs[i] / newUnit > RelNote::onsetLimit) {
             badShape = true;
+            break;
         }
     }
     if (!badShape) {
@@ -116,7 +117,7 @@ double calculateAvgMulpiSize(const Corpus& corpus) {
             // ignore drums
             if (corpus.piecesTP[i][j] == 128) continue;
 
-            // key: 64 bits, upper 29 unused, 20 for onset, 8 for duration (time_unit), 7 for velocity
+            // key: 64 bits: upper 17 unused, 7 for velocity, 8 for duration (time_unit), 32 for onset
             // value: occurence count
             std::map< uint64_t, uint8_t > thisTrackMulpiSizes;
 
@@ -133,9 +134,9 @@ double calculateAvgMulpiSize(const Corpus& corpus) {
                     measureCursor++;
                 }
 
-                uint64_t key = corpus.piecesMN[i][j][k].vel;
-                key |= ((uint16_t) corpus.piecesMN[i][j][k].unit) << 7;
-                key |= (corpus.piecesMN[i][j][k].getOnset() - corpus.piecesTS[i][measureCursor].onset) << 15;
+                uint64_t key = corpus.piecesMN[i][j][k].getOnset() - corpus.piecesTS[i][measureCursor].onset;
+                key |= ((uint64_t) corpus.piecesMN[i][j][k].unit) << 32;
+                key |= ((uint64_t) corpus.piecesMN[i][j][k].vel) << 40;
                 thisTrackMulpiSizes[key] += 1;
             }
             for (auto it = thisTrackMulpiSizes.cbegin(); it != thisTrackMulpiSizes.cend(); ++it) {
@@ -150,10 +151,11 @@ double calculateAvgMulpiSize(const Corpus& corpus) {
     return (double) totalMulpiSize / (double) multipiSizes.size();
 }
 
-template<typename T> void shapeScoring(
+template<typename T>
+unsigned int shapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::priority_queue<std::pair<T, Shape>>& shapeScore,
+    std::map<T, Shape>& scoreShape,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate
@@ -165,7 +167,7 @@ template<typename T> void shapeScoring(
     bool isOursMerge = (mergeCoundition == "ours");
 
     std::vector<unsigned int> dictShapeCount(shapeDict.size(), 0);
-    if (isDefaultScoring) {
+    if (!isDefaultScoring) {
         for (int i = 0; i < corpus.piecesMN.size(); ++i) {
             for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
                 for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
@@ -175,7 +177,7 @@ template<typename T> void shapeScoring(
         }
     }
 
-    std::map<Shape, unsigned int> shapeScoreParallel[COUNTING_THREAD_NUM];
+    std::map<Shape, T> shapeScoreParallel[COUNTING_THREAD_NUM];
     #pragma omp parallel for num_threads(COUNTING_THREAD_NUM)
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         int thread_num = omp_get_thread_num();
@@ -220,30 +222,37 @@ template<typename T> void shapeScoring(
             }
         }
     }
+    std::set<Shape> foundShapes;
     // merge parrallel maps
-    for (int j = 1; j < 8; ++j) {
+    for (int j = 1; j < COUNTING_THREAD_NUM; ++j) {
         for (auto it = shapeScoreParallel[j].cbegin(); it != shapeScoreParallel[j].cend(); it++) {
+            foundShapes.insert(it->first);
             shapeScoreParallel[0][it->first] += it->second;
         }
     }
     for (auto it = shapeScoreParallel[0].cbegin(); it != shapeScoreParallel[0].cend(); it++) {
-        shapeScore.push(std::pair<T, Shape>(it->second, it->first));
+        scoreShape[it->second] = it->first;
     }
+    return foundShapes.size();
 }
 
+// instantiate function
+// use std::priority_queue<std::pair<unsigned int, Shape>> for scoreShape when scoringMethod is "default"
+// use std::priority_queue<std::pair<double, Shape>> for scoreShape when scoringMethod is "wplike"
+
 template
-void shapeScoring<unsigned int>(const Corpus& corpus,
+unsigned int shapeScoring<unsigned int>(const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::priority_queue<std::pair<unsigned int, Shape>>& shapeScore,
+    std::map<unsigned int, Shape>& scoreShape,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate
 );
 
 template
-void shapeScoring<double>(const Corpus& corpus,
+unsigned int shapeScoring<double>(const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::priority_queue<std::pair<double, Shape>>& shapeScore,
+    std::map<double, Shape>& scoreShape,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate

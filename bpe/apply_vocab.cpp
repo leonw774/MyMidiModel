@@ -7,23 +7,23 @@
 int main(int argc, char *argv[]) {
     // read and validate args
     if (argc != 4 && argc != 5) {
-        std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath shapeVocabularyFilePath (--verbose)" << std::endl;
+        std::cout << "./learn_vocab inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath (--verbose)" << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[1]);
-    std::string outCorpusDirPath(argv[2]);
+    std::string outCorpusFilePath(argv[2]);
     std::string vocabFilePath(argv[3]);
     bool verbose = false;
     if (argc == 5) {
         std::string v(argv[4]);
         if (v != "--verbose") {
-            std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath shapeVocabularyFilePath (--verbose)" << std::endl;
+            std::cout << "./learn_vocab inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath (--verbose)" << std::endl;
             return 1;
         }
         verbose = true;
     }
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
-        << "outCorpusDirPath: " << outCorpusDirPath << '\n'
+        << "outCorpusFilePath: " << outCorpusFilePath << '\n'
         << "vocabFilePath: " << vocabFilePath << std::endl;
 
     // open files
@@ -50,7 +50,6 @@ int main(int argc, char *argv[]) {
     }
     std::cout << "Input shape vocab path: " << vocabFilePath << std::endl;
 
-    std::string outCorpusFilePath = outCorpusDirPath + "/corpus";
     std::ofstream outCorpusFile(outCorpusFilePath, std::ios::out | std::ios::trunc);
     if (!outCorpusFile.is_open()) {
         std::cout << "Failed to open merged corpus output file: " << outCorpusFilePath << std::endl;
@@ -65,15 +64,11 @@ int main(int argc, char *argv[]) {
     std::map<std::string, std::string> paras = readParasFile(parasFile);
     int nth, maxDur, maxTrackNum;
     std::string positionMethod;
-    // stoi, c++11 thing
+    // stoi: c++11 thing
     nth = stoi(paras[std::string("nth")]);
-    // std::cout << "nth: " << nth << std::endl;
     maxDur = stoi(paras[std::string("max_duration")]);
-    // std::cout << "maxDur: " << maxDur << std::endl;
     maxTrackNum = stoi(paras[std::string("max_track_number")]);
-    // std::cout << "maxTrackNum: " << maxTrackNum << std::endl;
     positionMethod = paras[std::string("position_method")];
-    // std::cout << "positionMethod=" << positionMethod << std::endl;
     if (nth <= 0 || maxDur <= 0 || maxDur > 255 || maxTrackNum <= 0 || (positionMethod != "event" && positionMethod != "attribute")) {
         std::cout << "Corpus parameter error" << std::endl;
         return 1;
@@ -158,7 +153,7 @@ int main(int argc, char *argv[]) {
     // start from 2 because index 0, 1 are default shapes
     for (int shapeIndex = 2; shapeIndex < shapeDict.size(); ++shapeIndex) {
         if (!verbose && shapeIndex != 0) 
-            std::cout << "\r";
+            std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
         std::cout << shapeIndex << ", ";
         iterTime = time(0);
 
@@ -237,7 +232,7 @@ int main(int argc, char *argv[]) {
         std::cout << multinoteCount << ", ";
         std::cout << (unsigned int) time(0) - iterTime;
         if (verbose) std::cout << std::endl;
-        else         std::cout << "  "; std::cout.flush();
+        else         std::cout.flush();
     }
 
     multinoteCount = 0;

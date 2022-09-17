@@ -50,7 +50,7 @@ fi
 echo "Corpus dir: ${CORPUS_DIR_PATH}"
 
 python3 midi_to_text.py --nth $NTH --max-track-number $MAX_TRACK_NUMBER --max-duration $MAX_DURATION --velocity-step $VELOCITY_STEP \
-    --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --position-method $POSITION_METHOD $MIDI_TO_TEXT_OTHER_ARGUMENTS $USE_EXISTED \
+    --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --position-method $POSITION_METHOD $MIDI_TO_TEXT_VERBOSE $MIDI_TO_TEXT_OTHER_ARGUMENTS $USE_EXISTED \
     --log $LOG_PATH -w $PROCESS_WORKERS -r -o $CORPUS_DIR_PATH $MIDI_DIR_PATH
 test $? -ne 0 && { echo "midi_to_text.py failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
@@ -60,9 +60,9 @@ if [ $BPE_ITER -ne 0 ]; then
     CORPUS_DIR_PATH_WITH_BPE="${CORPUS_DIR_PATH}_bpe${BPE_ITER}_${SCORING}_${MERGE_CONDITION}_${SAMPLE_RATE}"
     
     if [ $USE_EXISTED == "--use-existed" ] && [ -d $CORPUS_DIR_PATH_WITH_BPE ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/corpus" ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/shape_vocab" ]; then
-        echo "Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already has corpus and shape_vocab file."
-        echo "Flag --use-existed is set"
-        echo "Learn bpe vocab is skipped"
+        echo "Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already has corpus and shape_vocab file." | tee -a $LOG_PATH
+        echo "Flag --use-existed is set" | tee -a $LOG_PATH
+        echo "Learn bpe vocab is skipped" | tee -a $LOG_PATH
     else
         # compile
         make -C ./bpe

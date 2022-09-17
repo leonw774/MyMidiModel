@@ -14,40 +14,15 @@ Shape getShapeOfMultiNotePair(
 
 double calculateAvgMulpiSize(const Corpus& corpus);
 
+// return the number of found unique shapes
 template<typename T>
-void shapeScoring(
+unsigned int shapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::priority_queue<std::pair<T, Shape>>& shapeScore,
+    std::map<T, Shape>& shapeScore,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate
 );
-
-// #define SHAPE_SCORING_TEMP_IMPL
-// #include "shapescore.tcc"
-
-// use std::priority_queue<std::pair<unsigned int, Shape>> for shapeScore when scoringMethod is "default"
-// use std::priority_queue<std::pair<double, Shape>> for shapeScore when scoringMethod is "wplike"
-// template<>
-// void shapeScoring<unsigned int>(
-//     const Corpus& corpus,
-//     const std::vector<Shape>& shapeDict,
-//     std::priority_queue<std::pair<unsigned int, Shape>>& shapeScore,
-//     const std::string& scoringMethod,
-//     const std::string& mergeCoundition,
-//     double samplingRate
-// );
-
-// template<>
-// void shapeScoring<double>(
-//     const Corpus& corpus,
-//     const std::vector<Shape>& shapeDict,
-//     std::priority_queue<std::pair<double, Shape>>& shapeScore,
-//     const std::string& scoringMethod,
-//     const std::string& mergeCoundition,
-//     double samplingRate
-// );
-
 
 #endif

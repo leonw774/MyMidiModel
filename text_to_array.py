@@ -1,3 +1,4 @@
+from collections import Counter
 import json
 import logging
 import os
@@ -15,7 +16,8 @@ from util import (
     CorpusIterator,
     build_vocabs,
     text_list_to_array,
-    get_input_array_debug_string
+    get_input_array_debug_string,
+    b36str2int
 )
 
 
@@ -127,6 +129,7 @@ def main():
         os.rename(npy_zip_path, npz_path)
         # delete the npys
         shutil.rmtree(npy_dir_path)
+        logging.info('write npys end. time: %.3f', time()-start_time)
 
         # for debugging
         if args.debug:
@@ -147,8 +150,81 @@ def main():
                     for origi, debug in zip(original_text_list, debug_str_list)
                 ]
                 f.write('\n'.join(merged_lines))
+    # with CorpusIterator exit
 
-    logging.info('npys write time: %.3f', time()-start_time)
+    start_time = time()
+    logging.info('Making statistics')
+    logging.getLogger('matplotlib.font_manager').disabled = True
+    logging.getLogger('matplotlib.pyplot').disabled = True
+    from matplotlib import pyplot as plt
+    from pandas import Series
+    text_stats = {
+        'track_number_distribution': Counter(),
+        'instrument_distribution': Counter(),
+        'token_type_distribution': Counter(),
+        'note_number_per_piece' : list(),
+        'token_number_per_piece': list()
+    }
+    with CorpusIterator(args.corpus_dir_path) as corpus_iterator:
+        for piece in corpus_iterator:
+            text_stats['track_number_distribution'][piece.count(' R')] += 1
+            head_end = piece.find(' M') # find first occurence of measure token
+            tracks_text = piece[4:head_end]
+            track_tokens = tracks_text.split()
+            for track_token in track_tokens:
+                instrument_id = b36str2int(track_token.split(':')[1])
+                text_stats['instrument_distribution'][instrument_id] += 1
+            note_token_number = piece.count(' N')
+            text_stats['token_type_distribution']['note'] += note_token_number
+            text_stats['token_type_distribution']['position'] += piece.count(' P')
+            text_stats['token_type_distribution']['tempo'] += piece.count(' T')
+            text_stats['token_type_distribution']['measure'] += piece.count(' M')
+            text_stats['token_type_distribution']['track'] += piece.count(' R')
+            text_stats['note_number_per_piece'].append(note_token_number)
+            text_stats['token_number_per_piece'].append(piece.count(" ") + 1)
+
+    text_stats['note_number_per_piece_describe'] = {
+        k:float(v) for k, v in dict(Series(text_stats['note_number_per_piece']).describe()).items()
+    }
+    text_stats['token_number_per_piece_describe'] = {
+        k:float(v) for k, v in dict(Series(text_stats['token_number_per_piece']).describe()).items()
+    }
+
+    stats_dir_path = os.path.join(args.corpus_dir_path, 'stats')
+    if not os.path.exists(stats_dir_path):
+        os.mkdir(stats_dir_path)
+
+    # draw graph for each value
+    for k, v in text_stats.items():
+        plt.figure(figsize=(12.8, 4.8))
+        if isinstance(v, Counter):
+            plt.title(k)
+            plt.bar(v.keys(), v.values())
+        elif isinstance(v, list):
+            # note_number_per_piece and token_number_per_piece
+            k_describle = k + '_describe'
+            plt.title(k)
+            plt.text(
+                x=0.01,
+                y=0.5,
+                s='\n'.join([f'{k}={round(v, 3)}' for k, v in text_stats[k_describle].items()]),
+                transform=plt.gcf().transFigure
+            )
+            plt.subplots_adjust(left=0.15)
+            plt.hist(v, 10)
+        else:
+            continue
+        plt.savefig(os.path.join(stats_dir_path, f'{k}.png'))
+        plt.clf()
+
+    text_stats['track_number_distribution'] = dict(text_stats['track_number_distribution'])
+    text_stats['instrument_distribution'] = dict(text_stats['instrument_distribution'])
+    text_stats['token_type_distribution'] = dict(text_stats['token_type_distribution'])
+    with open(os.path.join(stats_dir_path, 'stats.json'), 'w+', encoding='utf8') as statfile:
+        json.dump(text_stats, statfile)
+    logging.info('Dumped stats.json at %s', os.path.join(stats_dir_path, 'stats.json'))
+    logging.info('Make statistics time: %.3f', time()-start_time)
+    
     logging.info('==== text_to_array.py exited ====')
     return 0
 

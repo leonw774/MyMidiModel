@@ -219,6 +219,11 @@ def get_time_structure_tokens(
     for i, time_sig in enumerate(time_sig_list):
         nth_per_measure = round(nth_per_beat * time_sig.numerator * (4 / time_sig.denominator))
         cur_timesig_start = time_sig.time
+
+        # if note already end
+        if cur_timesig_start > last_note_end:
+            break
+
         # find end
         if i < len(time_sig_list) - 1:
             next_timesig_start = time_sig_list[i+1].time
@@ -227,10 +232,7 @@ def get_time_structure_tokens(
             time_to_last_note_end = last_note_end - cur_timesig_start
             num_of_measures = (time_to_last_note_end // nth_per_measure) + 1
             next_timesig_start = cur_timesig_start + num_of_measures * nth_per_measure
-
-        # if note already end
-        if cur_timesig_start > last_note_end:
-            break
+        
         # if note not started yet
         if next_timesig_start <= first_note_start:
             continue
@@ -251,6 +253,8 @@ def get_time_structure_tokens(
         # print(f'TimeSig {i}:', cur_timesig_start, next_timesig_start, nth_per_measure)
 
         for cur_measure_start_time in range(cur_timesig_start, next_timesig_start, nth_per_measure):
+            if cur_measure_start_time > last_note_end:
+                break
             measure_token_list.append(
                 MeasureToken(
                     onset=cur_measure_start_time,

@@ -167,7 +167,9 @@ def parse_args():
     # print(others)
     global_args['train_args'], others = train_parser.parse_known_args(others)
     # print(others)
-    global_args.update(vars(global_parser.parse_known_args(others)[0]))
+    global_args.update(
+        vars(global_parser.parse_known_args(others)[0])
+    )
     # then turn into Namespace
     return Namespace(**global_args)
 

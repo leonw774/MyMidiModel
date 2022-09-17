@@ -84,15 +84,11 @@ int main(int argc, char *argv[]) {
     std::map<std::string, std::string> paras = readParasFile(parasFile);
     int nth, maxDur, maxTrackNum;
     std::string positionMethod;
-    // stoi, c++11 thing
+    // stoi: c++11 thing
     nth = stoi(paras[std::string("nth")]);
-    // std::cout << "nth: " << nth << std::endl;
     maxDur = stoi(paras[std::string("max_duration")]);
-    // std::cout << "maxDur: " << maxDur << std::endl;
     maxTrackNum = stoi(paras[std::string("max_track_number")]);
-    // std::cout << "maxTrackNum: " << maxTrackNum << std::endl;
     positionMethod = paras[std::string("position_method")];
-    // std::cout << "positionMethod=" << positionMethod << std::endl;
     if (nth <= 0 || maxDur <= 0 || maxDur > 255 || maxTrackNum <= 0 || (positionMethod != "event" && positionMethod != "attribute")) {
         std::cout << "Corpus parameter error" << std::endl;
         return 1;
@@ -134,7 +130,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Iter, Found shapes count, Shape, Score, Multinote count, Time" << std::endl;
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
         if (!verbose && iterCount != 0) 
-            std::cout << "\r";
+            std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
         std::cout << iterCount << ", ";
         iterTime = time(0);
 
@@ -142,28 +138,29 @@ int main(int argc, char *argv[]) {
 
         // clac shape scores
         Shape maxScoreShape;
+        // the largest key of map is the last element because map is a binary tree
         if (scoring == "default") {
-            std::priority_queue<std::pair<unsigned int, Shape>> shapeScore;
-            shapeScoring<unsigned int>(corpus, shapeDict, shapeScore, scoring, mergeCondition, samplingRate);
-            if (shapeScore.size() == 0) {
+            std::map<unsigned int, Shape> scoreShape;
+            unsigned int foundShapesSize = shapeScoring<unsigned int>(corpus, shapeDict, scoreShape, scoring, mergeCondition, samplingRate);
+            if (foundShapesSize == 0) {
                 std::cout << "Error: no shapes found" << std::endl;
                 return 1;
             }
-            std::cout << shapeScore.size() << ", ";
-            int maxScore = shapeScore.top().first;
-            maxScoreShape = shapeScore.top().second;
+            std::cout << foundShapesSize << ", ";
+            unsigned int maxScore = scoreShape.rbegin()->first;
+            maxScoreShape = scoreShape.rbegin()->second;
             std::cout << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
         }
         else {
-            std::priority_queue<std::pair<double, Shape>> shapeScore;
-            shapeScoring<double>(corpus, shapeDict, shapeScore, scoring, mergeCondition, samplingRate);
-            if (shapeScore.size() == 0) {
+            std::map<double, Shape> scoreShape;
+            unsigned int foundShapesSize = shapeScoring<double>(corpus, shapeDict, scoreShape, scoring, mergeCondition, samplingRate);
+            if (foundShapesSize == 0) {
                 std::cout << "Error: no shapes found" << std::endl;
                 return 1;
             }
-            std::cout << shapeScore.size() << ", ";
-            double maxScore = shapeScore.top().first;
-            maxScoreShape = shapeScore.top().second;
+            std::cout << foundShapesSize << ", ";
+            double maxScore = scoreShape.rbegin()->first;
+            maxScoreShape = scoreShape.rbegin()->second;
             std::cout << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
         }
 
@@ -241,7 +238,7 @@ int main(int argc, char *argv[]) {
         std::cout << multinoteCount << ", ";
         std::cout << (unsigned int) time(0) - iterTime;
         if (verbose) std::cout << std::endl;
-        else         std::cout << "  "; std::cout.flush();
+        else         std::cout.flush();
 
         // corpus.shrink();
     }

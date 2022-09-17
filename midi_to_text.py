@@ -4,7 +4,7 @@ import os
 import shutil
 import sys
 import zlib
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from collections import Counter
 from multiprocessing import Pool
 from time import time, strftime
@@ -17,15 +17,13 @@ from util import (
     to_paras_file_path,
     to_corpus_file_path,
     to_pathlist_file_path,
-    dump_corpus_paras,
-    CorpusIterator,
-    b36str2int
+    dump_corpus_paras
 )
 
 
 def parse_args():
-    parser = ArgumentParser()
-    parser.add_argument(
+    handler_args_parser = ArgumentParser()
+    handler_args_parser.add_argument(
         '--nth',
         dest='nth',
         type=int,
@@ -33,7 +31,7 @@ def parse_args():
         help='The time unit length would be the length of a n-th note. Must be multiples of 4. \
             Default is 96.'
     )
-    parser.add_argument(
+    handler_args_parser.add_argument(
         '--max-track-number',
         dest='max_track_number',
         type=int,
@@ -41,21 +39,21 @@ def parse_args():
         help='The maximum tracks nubmer to keep in text, if the input midi has more "instruments" than this value, \
             some tracks would be merged or discard. Default is 24.'
     )
-    parser.add_argument(
+    handler_args_parser.add_argument(
         '--max-duration',
         dest='max_duration',
         type=int,
         default=4,
         help='Max length of duration in unit of quarter note (beat). Default is 4.'
     )
-    parser.add_argument(
+    handler_args_parser.add_argument(
         '--velocity-step',
         dest='velocity_step',
         type=int,
         default=16,
         help='Snap the value of velocities to multiple of this number. Default is 16.'
     )
-    parser.add_argument(
+    handler_args_parser.add_argument(
         '--tempo-quantization',
         nargs=3,
         dest='tempo_quantization',
@@ -64,7 +62,7 @@ def parse_args():
         metavar=('TEMPO_MIN', 'TEMPO_MAX', 'TEMPO_STEP'),
         help='Three integers: (min, max, step), where min and max are INCLUSIVE. Default is 24, 200, 16.'
     )
-    parser.add_argument(
+    handler_args_parser.add_argument(
         '--position-method',
         dest='position_method',
         type=str,
@@ -74,41 +72,44 @@ def parse_args():
             'attribute' means position info is part of the note token. \
             'event' means position info will be its own event token."
     )
-    parser.add_argument(
+    handler_args_parser.add_argument(
         '--use-continuing-note',
         dest='use_cont_note',
         action='store_true'
     )
-    parser.add_argument(
+    handler_args_parser.add_argument(
         '--use-merge-drums',
         dest='use_merge_drums',
         action='store_true'
     )
-    parser.add_argument(
+
+    main_parser = ArgumentParser()
+    main_parser.add_argument(
         '--verbose',
         action='store_true',
         dest='verbose'
     )
-    parser.add_argument(
+
+    main_parser.add_argument(
         '--log',
         dest='log_file_path',
         default='',
         help='Path to the log file. Default is empty, which means no logging would be performed.'
     )
-    parser.add_argument(
+    main_parser.add_argument(
         '--use-existed',
         dest='use_existed',
         action='store_true',
         help='If the corpus already existed, do nothing.'
     )
-    parser.add_argument(
+    main_parser.add_argument(
         '-r', '--recursive',
         action='store_true',
         dest='recursive',
         help='If set, the input path will have to be directory path(s). \
             And all ".mid" files under them will be processed recursively.'
     )
-    parser.add_argument(
+    main_parser.add_argument(
         '-w', '--workers',
         dest='mp_work_number',
         type=int,
@@ -116,31 +117,28 @@ def parse_args():
         help='The number of worker for multiprocessing. Default is 1. \
             If this number is 1 or below, multiprocessing would not be used.'
     )
-    parser.add_argument(
-        '-s', '--make-stats',
-        action='store_true',
-        dest='make_stats',
-        help='Record statics of the processed midi files. \
-            The output file path is [OUTPUT_PATH] appended by a suffix \"_stat.json\"'
-    )
-    parser.add_argument(
+    main_parser.add_argument(
         '-o', '--output-path',
         dest='output_path',
         type=str,
         default=os.getcwd(),
         help='The path of the directory for the output files. Default is current work directory.'
     )
-    parser.add_argument(
+    main_parser.add_argument(
         'input_path',
         nargs='+', # store as list and at least one
         help='The path(s) of input files/directodries'
     )
-    return parser.parse_args()
+    args = dict()
+    args['handler_args'], others = handler_args_parser.parse_known_args()
+    args.update(vars(
+        main_parser.parse_known_args(others)[0]
+    ))
+    return Namespace(**args)
 
 
 def handler(args_dict: dict):
     n = args_dict.pop('n', 0)
-    verbose = args_dict.pop('verbose', False)
     logging.debug('%d pid: %d file path: %s', n, os.getpid(), args_dict['midi_file_path'])
     try:
         text_list = midi_to_text_list(**args_dict)
@@ -150,8 +148,7 @@ def handler(args_dict: dict):
     except KeyboardInterrupt as e:
         raise e
     except Exception as e:
-        if verbose:
-            logging.debug(format_exc())
+        logging.debug(format_exc())
         return repr(e)
 
 
@@ -217,18 +214,8 @@ def mp_func(
 
 def main():
     args = parse_args()
-    args_vars = vars(args)
-    meta_args = ['input_path', 'output_path', 'make_stats', 'log_file_path', 'mp_work_number', 'recursive', 'use_existed']
-    args_dict = {
-        k: v
-        for k, v in args_vars.items()
-        if k not in meta_args and v is not None
-    }
-    corpus_paras_dict = {
-        k: v
-        for k, v in args_dict.items()
-        if k != 'verbose'
-    }
+    print(vars(args.handler_args))
+    corpus_paras_dict = vars(args.handler_args)
 
     # when not verbose, only info level or higher will be printed to stdout or stderr and logged into file
     loglevel = logging.DEBUG if args.verbose else logging.INFO
@@ -249,11 +236,10 @@ def main():
         )
     logging.info(strftime('==== midi_to_text.py start at %Y%m%d-%H%M ===='))
 
-    args_str = '\n'.join([
-        str(k)+':'+str(v) for k, v in args_vars.items()
-        if k not in meta_args
+    corpus_paras_str = '\n'.join([
+        str(k)+':'+str(v) for k, v in corpus_paras_dict.items()
     ])
-    logging.info(args_str)
+    logging.info(corpus_paras_str)
 
     # check if output_path is a directory
     if os.path.exists(args.output_path):
@@ -300,9 +286,9 @@ def main():
     # write main corpus file
     with open(to_corpus_file_path(args.output_path), 'w+', encoding='utf8') as out_corpus_file:
         if args.mp_work_number <= 1:
-            token_number_list, good_path_list = loop_func(file_path_list, out_corpus_file, args_dict)
+            token_number_list, good_path_list = loop_func(file_path_list, out_corpus_file, vars(args.handler_args))
         else:
-            token_number_list, good_path_list = mp_func(file_path_list, out_corpus_file, args.mp_work_number, args_dict)
+            token_number_list, good_path_list = mp_func(file_path_list, out_corpus_file, args.mp_work_number, vars(args.handler_args))
 
     logging.info('Processed %d files', len(token_number_list))
     if len(token_number_list) > 0:
@@ -318,80 +304,6 @@ def main():
         good_path_list_file.write('\n'.join(good_path_list))
         good_path_list_file.close()
 
-    if args.make_stats:
-        start_time = time()
-        logging.info('Making statistics')
-        logging.getLogger('matplotlib.font_manager').disabled = True
-        logging.getLogger('matplotlib.pyplot').disabled = True
-        import json
-        from matplotlib import pyplot as plt
-        from pandas import Series
-        text_stats = {
-            'number_of_pieces': len(good_path_list),
-            'track_number_distribution': Counter(),
-            'instrument_distribution': Counter(),
-            'token_type_distribution': Counter(),
-            'note_number_per_piece' : list(),
-            'token_number_per_piece': token_number_list
-        }
-        with CorpusIterator(args.output_path) as corpus_iterator:
-            for piece in corpus_iterator:
-                text_stats['track_number_distribution'][piece.count(' R')] += 1
-                head_end = piece.find(' M') # find first occurence of measure token
-                tracks_text = piece[4:head_end]
-                track_tokens = tracks_text.split()
-                for track_token in track_tokens:
-                    instrument_id = b36str2int(track_token.split(':')[1])
-                    text_stats['instrument_distribution'][instrument_id] += 1
-                note_token_number = piece.count(' N')
-                text_stats['token_type_distribution']['note'] += note_token_number
-                text_stats['token_type_distribution']['position'] += piece.count(' P')
-                text_stats['token_type_distribution']['tempo'] += piece.count(' T')
-                text_stats['token_type_distribution']['measure'] += piece.count(' M')
-                text_stats['token_type_distribution']['track'] += piece.count(' R')
-                text_stats['note_number_per_piece'].append(note_token_number)
-
-        text_stats['note_number_per_piece_describe'] = {
-            k:float(v) for k, v in dict(Series(text_stats['note_number_per_piece']).describe()).items()
-        }
-        text_stats['token_number_per_piece_describe'] = {
-            k:float(v) for k, v in dict(Series(text_stats['token_number_per_piece']).describe()).items()
-        }
-
-        stats_dir_path = os.path.join(args.output_path, 'stats')
-        if not os.path.exists(stats_dir_path):
-            os.mkdir(stats_dir_path)
-
-        # draw graph for each value
-        for k, v in text_stats.items():
-            plt.figure(figsize=(12.8, 4.8))
-            if isinstance(v, Counter):
-                plt.title(k)
-                plt.bar(v.keys(), v.values())
-            elif isinstance(v, list):
-                # note_number_per_piece and token_number_per_piece
-                k_describle = k + '_describe'
-                plt.title(k)
-                plt.text(
-                    x=0.01,
-                    y=0.5,
-                    s='\n'.join([f'{k}={round(v, 3)}' for k, v in text_stats[k_describle].items()]),
-                    transform=plt.gcf().transFigure
-                )
-                plt.subplots_adjust(left=0.15)
-                plt.hist(v, 10)
-            else:
-                continue
-            plt.savefig(os.path.join(stats_dir_path, f'{k}.png'))
-            plt.clf()
-
-        text_stats['track_number_distribution'] = dict(text_stats['track_number_distribution'])
-        text_stats['instrument_distribution'] = dict(text_stats['instrument_distribution'])
-        text_stats['token_type_distribution'] = dict(text_stats['token_type_distribution'])
-        with open(os.path.join(stats_dir_path, 'stats.json'), 'w+', encoding='utf8') as statfile:
-            json.dump(text_stats, statfile)
-        logging.info('Wrote stats.json at %s', os.path.join(stats_dir_path, 'stats.json'))
-        logging.info('Make statistics time: %.3f', time()-start_time)
     logging.info('==== midi_to_text.py exited ====')
 
 

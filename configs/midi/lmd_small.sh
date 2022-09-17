@@ -11,5 +11,4 @@ TEMPO_STEP=16
 POSITION_METHOD="attribute"
 PROCESS_WORKERS=8
 MIDI_DIR_PATH="data/midis/lmd_full/0"
-MIDI_TO_TEXT_OTHER_ARGUMENTS="--make-stats"
 DATA_NAME="lmd_small"
