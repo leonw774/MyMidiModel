@@ -89,7 +89,6 @@ def parse_args():
         action='store_true',
         dest='verbose'
     )
-
     main_parser.add_argument(
         '--log',
         dest='log_file_path',

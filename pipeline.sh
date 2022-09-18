@@ -42,15 +42,15 @@ touch $LOG_PATH
 
 CORPUS_DIR_PATH="data/corpus/${DATA_NAME}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}_v${VELOCITY_STEP}_t${TEMPO_MIN}_${TEMPO_MAX}_${TEMPO_STEP}_pos${POSITION_METHOD}"
 
-if [ $CONTINUING_NOTE == true ]; then
-    MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --use-continuing-note"
-    echo "Appended --use-continuing-note to midi_to_text's argument" | tee -a $LOG_PATH
-fi
+MIDI_TO_TEXT_OTHER_ARGUMENTS=""
+test $CONTINUING_NOTE == true && MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --use-continuing-note"
+test $MIDI_TO_TEXT_VERBOSE == true && MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --verbose"
+echo "Appended ${MIDI_TO_TEXT_OTHER_ARGUMENTS} to midi_to_text's argument" | tee -a $LOG_PATH
 
 echo "Corpus dir: ${CORPUS_DIR_PATH}"
 
 python3 midi_to_text.py --nth $NTH --max-track-number $MAX_TRACK_NUMBER --max-duration $MAX_DURATION --velocity-step $VELOCITY_STEP \
-    --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --position-method $POSITION_METHOD $MIDI_TO_TEXT_VERBOSE $MIDI_TO_TEXT_OTHER_ARGUMENTS $USE_EXISTED \
+    --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --position-method $POSITION_METHOD $MIDI_TO_TEXT_OTHER_ARGUMENTS $USE_EXISTED \
     --log $LOG_PATH -w $PROCESS_WORKERS -r -o $CORPUS_DIR_PATH $MIDI_DIR_PATH
 test $? -ne 0 && { echo "midi_to_text.py failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
@@ -59,7 +59,7 @@ if [ $BPE_ITER -ne 0 ]; then
     echo "Start learn bpe vocab" | tee -a $LOG_PATH
     CORPUS_DIR_PATH_WITH_BPE="${CORPUS_DIR_PATH}_bpe${BPE_ITER}_${SCORING}_${MERGE_CONDITION}_${SAMPLE_RATE}"
     
-    if [ $USE_EXISTED == "--use-existed" ] && [ -d $CORPUS_DIR_PATH_WITH_BPE ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/corpus" ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/shape_vocab" ]; then
+    if [ -n "${USE_EXISTED}" ] && [ -d $CORPUS_DIR_PATH_WITH_BPE ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/corpus" ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/shape_vocab" ]; then
         echo "Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already has corpus and shape_vocab file." | tee -a $LOG_PATH
         echo "Flag --use-existed is set" | tee -a $LOG_PATH
         echo "Learn bpe vocab is skipped" | tee -a $LOG_PATH
@@ -82,6 +82,9 @@ if [ $BPE_ITER -ne 0 ]; then
 
         # run learn_vocab and use tee command to copy stdout to log
         bpe/learn_vocab $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SCORING $MERGE_CONDITION $SAMPLE_RATE | tee -a $LOG_PATH
+
+        ./logs/remove_esc_and_return_chars.sh $LOG_PATH
+
         BPE_EXIT_CODE=${PIPESTATUS[0]}
         if [ $BPE_EXIT_CODE -ne 0 ]; then
             echo "learn_vocab failed. exit code: $BPE_EXIT_CODE. pipeline.sh exit." | tee -a $LOG_PATH
