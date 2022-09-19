@@ -124,12 +124,14 @@ def main():
                 raise e
             np.save(os.path.join(npy_dir_path, str(i)), array)
 
+        logging.info('Write npys end. time: %.3f', time()-start_time)
         # zip all the npy files into one file with '.npz' extension
+        logging.info('Begin zipping npys')
         shutil.make_archive(npy_dir_path, 'zip', root_dir=npy_dir_path)
         os.rename(npy_zip_path, npz_path)
         # delete the npys
         shutil.rmtree(npy_dir_path)
-        logging.info('write npys end. time: %.3f', time()-start_time)
+        logging.info('Zipping npys end. time: %.3f', time()-start_time)
 
         # for debugging
         if args.debug:

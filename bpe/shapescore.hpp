@@ -12,7 +12,7 @@ Shape getShapeOfMultiNotePair(
     const Shape& rShape
 );
 
-double calculateAvgMulpiSize(const Corpus& corpus);
+double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton=false);
 
 // return the number of found unique shapes
 template<typename T>

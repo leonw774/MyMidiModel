@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
         }
     }
     startMultinoteCount = multinoteCount;
-    double startAvgMulpi = calculateAvgMulpiSize(corpus);
+    double startAvgMulpi = calculateAvgMulpiSize(corpus, false);
     double avgMulpi = startAvgMulpi;
 
     std::cout << "Start Multinote count: " << multinoteCount

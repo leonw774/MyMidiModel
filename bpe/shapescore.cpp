@@ -109,7 +109,7 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
 }
 
 
-double calculateAvgMulpiSize(const Corpus& corpus) {
+double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton) {
     std::vector<uint8_t> multipiSizes;
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         // for each track
@@ -134,13 +134,15 @@ double calculateAvgMulpiSize(const Corpus& corpus) {
                     measureCursor++;
                 }
 
-                uint64_t key = corpus.piecesMN[i][j][k].getOnset() - corpus.piecesTS[i][measureCursor].onset;
+                uint64_t key = corpus.piecesMN[i][j][k].getOnset();
                 key |= ((uint64_t) corpus.piecesMN[i][j][k].unit) << 32;
                 key |= ((uint64_t) corpus.piecesMN[i][j][k].vel) << 40;
                 thisTrackMulpiSizes[key] += 1;
             }
             for (auto it = thisTrackMulpiSizes.cbegin(); it != thisTrackMulpiSizes.cend(); ++it) {
-                multipiSizes.push_back(it->second);
+                if (it->second > 1 or !ignoreSingleton) {
+                    multipiSizes.push_back(it->second);
+                } 
             }
         }
     }
