@@ -6,8 +6,8 @@
 
 int main(int argc, char *argv[]) {
     // read and validate args
-    if (argc != 7 && argc != 8) {
-        std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate (--verbose)" << std::endl;
+    if (argc != 8 && argc != 9) {
+        std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit (--verbose)" << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[1]);
@@ -16,11 +16,12 @@ int main(int argc, char *argv[]) {
     std::string scoring(argv[4]);
     std::string mergeCondition(argv[5]);
     double samplingRate = atof(argv[6]);
+    double minScoreLimit = atof(argv[7]);
     bool verbose = false;
-    if (argc == 8) {
+    if (argc == 9) {
         std::string v(argv[7]);
         if (v != "--verbose") {
-            std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate (--verbose)" << std::endl;
+            std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit (--verbose)" << std::endl;
             return 1;
         }
         verbose = true;
@@ -146,10 +147,14 @@ int main(int argc, char *argv[]) {
                 std::cout << "Error: no shapes found" << std::endl;
                 return 1;
             }
-            std::cout << foundShapesSize << ", ";
             unsigned int maxScore = scoreShape.rbegin()->first;
+            if (maxScore < minScoreLimit) {
+                if (!verbose) std::cout << '\n';
+                std::cout << "End iterations because found best score < minScoreLimit\n";
+                break;
+            }
             maxScoreShape = scoreShape.rbegin()->second;
-            std::cout << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
+            std::cout << foundShapesSize << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
         }
         else {
             std::map<double, Shape> scoreShape;
@@ -158,10 +163,14 @@ int main(int argc, char *argv[]) {
                 std::cout << "Error: no shapes found" << std::endl;
                 return 1;
             }
-            std::cout << foundShapesSize << ", ";
             double maxScore = scoreShape.rbegin()->first;
+            if (maxScore < minScoreLimit) {
+                if (!verbose) std::cout << '\n';
+                std::cout << "End iterations because found best score < minScoreLimit\n";
+                break;
+            }
             maxScoreShape = scoreShape.rbegin()->second;
-            std::cout << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
+            std::cout << foundShapesSize << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
         }
 
         unsigned int newShapeIndex = shapeDict.size();

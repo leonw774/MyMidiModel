@@ -81,7 +81,7 @@ if [ $BPE_ITER -ne 0 ]; then
         cp "${CORPUS_DIR_PATH}/pathlist" $CORPUS_DIR_PATH_WITH_BPE
 
         # run learn_vocab and use tee command to copy stdout to log
-        bpe/learn_vocab $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SCORING $MERGE_CONDITION $SAMPLE_RATE | tee -a $LOG_PATH
+        bpe/learn_vocab $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SCORING $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT | tee -a $LOG_PATH
 
         ./logs/remove_esc_and_return_chars.sh $LOG_PATH
 
