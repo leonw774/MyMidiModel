@@ -142,58 +142,37 @@ int main(int argc, char *argv[]) {
 
         // clac shape scores
         Shape maxScoreShape;
-        unsigned int foundShapeNum = 0;
-        // the largest key of map is the last element because map is a binary tree
         if (scoring == "default") {
             unsigned int maxScore = 0;
             shapeScoring<unsigned int>(corpus, shapeDict, shapeScoreFreq, scoring, mergeCondition, samplingRate);
             for (auto it = shapeScoreFreq.begin(); it != shapeScoreFreq.end(); ++it) {
-                if (it->second != 0) {
-                    if (it->second > maxScore) {
-                        maxScore = it->second;
-                        maxScoreShape = it->first;
-                    }
-                    it->second = 0; // set to zero as we "took out" the value
-                    foundShapeNum++;
+                if (it->second > maxScore) {
+                    maxScore = it->second;
+                    maxScoreShape = it->first;
                 }
-                else {
-
-                }
-            }
-            if (foundShapeNum == 0) {
-                std::cout << "Error: no shapes found" << std::endl;
-                return 1;
             }
             if (maxScore < minScoreLimit) {
-                if (!verbose) std::cout << '\n';
-                std::cout << "End iterations because found best score < minScoreLimit\n";
+                std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
                 break;
             }
-            std::cout << foundShapeNum << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
+            std::cout << shapeScoreFreq.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
+            shapeScoreFreq.clear();
         }
         else {
             double maxScore = 0;
             shapeScoring<double>(corpus, shapeDict, shapeScoreWPlike, scoring, mergeCondition, samplingRate);
             for (auto it = shapeScoreWPlike.begin(); it != shapeScoreWPlike.end(); ++it) {
-                if (it->second != 0) {
-                    if (it->second > maxScore) {
-                        maxScore = it->second;
-                        maxScoreShape = it->first;
-                    }
-                    it->second = 0; // set to zero as we "took out" the value
-                    foundShapeNum++;
+                if (it->second > maxScore) {
+                    maxScore = it->second;
+                    maxScoreShape = it->first;
                 }
             }
-            if (foundShapeNum == 0) {
-                std::cout << "Error: no shapes found" << std::endl;
-                return 1;
-            }
             if (maxScore < minScoreLimit) {
-                if (!verbose) std::cout << '\n';
-                std::cout << "End iterations because found best score < minScoreLimit\n";
+                std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
                 break;
             }
-            std::cout << foundShapeNum << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
+            std::cout << shapeScoreFreq.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
+            shapeScoreWPlike.clear();
         }
 
         unsigned int newShapeIndex = shapeDict.size();

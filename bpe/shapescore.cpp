@@ -73,14 +73,14 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
     bool badShape = false;
 
     unsigned int unitAndOnsets[rightSize+2];
-    unitAndOnsets[0] = lmn.unit;
-    unitAndOnsets[1] = rmn.unit;
-    for (int i = 2; i < rightSize+2; ++i) {
+    for (int i = 0; i < rightSize; ++i) {
         unitAndOnsets[i] = rShape[i].getRelOnset() * rmn.unit + rmn.getOnset() - lmn.getOnset();
     }
+    unitAndOnsets[rightSize] = lmn.unit;
+    unitAndOnsets[rightSize+1] = rmn.unit;
     unsigned int newUnit = gcd(unitAndOnsets, rightSize+2);
     // checking to prevent overflow, because RelNote's onset has value limit
-    for (int i = 2; i < rightSize+2; ++i) {
+    for (int i = 0; i < rightSize; ++i) {
         if (unitAndOnsets[i] / newUnit > RelNote::onsetLimit) {
             badShape = true;
             break;
@@ -98,7 +98,7 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
                 pairShape[i].setCont(lShape[i].isCont());
             }
             else {
-                int j = i - leftSize + 2;
+                int j = i - leftSize;
                 pairShape[i].setRelOnset(unitAndOnsets[j] / newUnit);
                 pairShape[i].relPitch = rShape[j].relPitch + rmn.pitch - lmn.pitch;
                 pairShape[i].relDur = rShape[j].relDur * rmn.unit / newUnit;
@@ -123,7 +123,6 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton) {
             // value: occurence count
             std::map< uint64_t, uint8_t > thisTrackMulpiSizes;
 
-            // because in the paper it says 'position' (as in the measure), instead of onset (global time position)
             unsigned int measureCursor = 0;
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // update measureCursor
