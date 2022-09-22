@@ -80,10 +80,10 @@ def main():
 
     # plot iteration_log_dict
     iter_num = list(range(len(iteration_log_lines)))
-    plt.figure(figsize=(12.8, 4.8))
-    plt.xticks(iter_num)
     for col_name, col_list in iteration_log_dict.items():
         if col_name != 'Shape':
+            plt.figure(figsize=(16.8, 6.4))
+            plt.xticks(iter_num)
             plt.title(col_name)
             if col_name == 'Multinote count':
                 left_texts = (f'total_piece_number\n  ={piece_number}\n'
@@ -93,14 +93,13 @@ def main():
                 )
                 plt.text(
                     x=0.01,
-                    y=0.25,
+                    y=0.5,
                     s=left_texts,
                     transform=plt.gcf().transFigure
                 )
-                plt.subplots_adjust(left=0.25)
+                plt.subplots_adjust(left=0.2)
                 plt.plot(iter_num, col_list, label=col_name)
             else:
-                plt.subplots_adjust(left=0.125)
                 plt.plot(iter_num, col_list, label=col_name)
             plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}.png'))
             plt.clf()

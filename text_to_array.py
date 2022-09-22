@@ -9,7 +9,7 @@ from time import strftime, time
 import numpy as np
 from tqdm import tqdm
 
-from util import (
+from util.corpus import (
     to_shape_vocab_file_path,
     to_vocabs_file_path,
     get_corpus_paras,
@@ -17,8 +17,8 @@ from util import (
     build_vocabs,
     text_list_to_array,
     get_input_array_debug_string,
-    b36str2int
 )
+from util.tokens import b36str2int, INSTRUMENT_NAMES
 
 
 def parse_args():
@@ -199,10 +199,20 @@ def main():
 
     # draw graph for each value
     for k, v in text_stats.items():
-        plt.figure(figsize=(12.8, 4.8))
+        plt.figure(figsize=(16.8, 6.4))
         if isinstance(v, Counter):
             plt.title(k)
-            plt.bar(v.keys(), v.values())
+            if k == 'instrument_distribution':
+                instrument_count = [0] * 129
+                for p in v:
+                    instrument_count[p] = v[p]
+                plt.xticks(rotation=90, fontsize='small')
+                plt.subplots_adjust(left=0.025, right=1-0.025, bottom=0.25)
+                plt.bar(INSTRUMENT_NAMES, instrument_count)
+            elif k == 'token_type_distribution':
+                plt.barh(list(v.keys()), list(v.values()))
+            else:
+                plt.bar(list(v.keys()), list(v.values()))
         elif isinstance(v, list):
             # note_number_per_piece and token_number_per_piece
             k_describle = k + '_describe'
@@ -213,7 +223,7 @@ def main():
                 s='\n'.join([f'{k}={round(v, 3)}' for k, v in text_stats[k_describle].items()]),
                 transform=plt.gcf().transFigure
             )
-            plt.subplots_adjust(left=0.15)
+            plt.subplots_adjust(left=0.125)
             plt.hist(v, 100)
         else:
             continue
