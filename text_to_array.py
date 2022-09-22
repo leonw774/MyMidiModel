@@ -126,6 +126,7 @@ def main():
 
         logging.info('Write npys end. time: %.3f', time()-start_time)
         # zip all the npy files into one file with '.npz' extension
+        start_time = time()
         logging.info('Begin zipping npys')
         shutil.make_archive(npy_dir_path, 'zip', root_dir=npy_dir_path)
         os.rename(npy_zip_path, npz_path)
@@ -213,7 +214,7 @@ def main():
                 transform=plt.gcf().transFigure
             )
             plt.subplots_adjust(left=0.15)
-            plt.hist(v, 10)
+            plt.hist(v, 100)
         else:
             continue
         plt.savefig(os.path.join(stats_dir_path, f'{k}.png'))

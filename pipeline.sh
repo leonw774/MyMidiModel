@@ -80,17 +80,19 @@ if [ $BPE_ITER -ne 0 ]; then
         cp "${CORPUS_DIR_PATH}/paras" $CORPUS_DIR_PATH_WITH_BPE
         cp "${CORPUS_DIR_PATH}/pathlist" $CORPUS_DIR_PATH_WITH_BPE
 
-        # run learn_vocab and use tee command to copy stdout to log
-        bpe/learn_vocab $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SCORING $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT | tee -a $LOG_PATH
-
-        ./logs/remove_esc_and_return_chars.sh $LOG_PATH
-
+        # run learn_vocab
+        bpe/learn_vocab $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SCORING $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_VERBOSE | tee -a $LOG_PATH
+        
         BPE_EXIT_CODE=${PIPESTATUS[0]}
         if [ $BPE_EXIT_CODE -ne 0 ]; then
             echo "learn_vocab failed. exit code: $BPE_EXIT_CODE. pipeline.sh exit." | tee -a $LOG_PATH
             rm -r "${CORPUS_DIR_PATH_WITH_BPE}"
             exit 1
         fi
+
+        # process bpe log
+        ./logs/remove_esc_and_return_chars.sh $LOG_PATH
+        python3 plot_bpe_log.py $CORPUS_DIR_PATH_WITH_BPE $LOG_PATH
 
         # check if tokenized corpus is equal to original corpus
         python3 verify_corpus_equality.py $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE 100 | tee -a $LOG_PATH

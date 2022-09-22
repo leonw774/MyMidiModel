@@ -1,5 +1,4 @@
 #!/bin/bash
 # bpe parameters
 BPE_ITER=0
-SHAPECOUNT_METHOD="ours"
-SHAPECOUNT_SAMPLERATE=1.0
+

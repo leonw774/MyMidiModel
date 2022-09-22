@@ -93,6 +93,7 @@ unsigned int findMaxRelOffset(const Shape& s) {
     return maxRelOffset;
 }
 
+
 /********
   MultiNote
 ********/
@@ -396,7 +397,7 @@ void writeOutputCorpusFile(
                             outCorpusFile << "P"
                                 << itob36str(corpus.piecesTS[i][tsCurIdx].onset - curMeasureStart) << " ";
                         }
-                        outCorpusFile << "T" << itob36str(corpus.piecesTS[i][tsCurIdx].getN());
+                        outCorpusFile << "T" << itob36str(corpus.piecesTS[i][tsCurIdx].getN()) << " ";
                     }
                     else {
                         outCorpusFile << "T" << itob36str(corpus.piecesTS[i][tsCurIdx].getN())

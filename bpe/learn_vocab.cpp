@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
     double minScoreLimit = atof(argv[7]);
     bool verbose = false;
     if (argc == 9) {
-        std::string v(argv[7]);
+        std::string v(argv[8]);
         if (v != "--verbose") {
             std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit (--verbose)" << std::endl;
             return 1;
@@ -43,7 +43,8 @@ int main(int argc, char *argv[]) {
         << "bpeIter: " << bpeIter << '\n'
         << "scoring: " << scoring << '\n'
         << "mergeCondition: " << mergeCondition << '\n'
-        << "samplingRate: " << samplingRate << std::endl;
+        << "samplingRate: " << samplingRate << '\n'
+        << "minScoreLimit: " << minScoreLimit << std::endl;
 
     // open files
     std::string inCorpusFilePath = inCorpusDirPath + "/corpus";
@@ -127,6 +128,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    std::map<Shape, unsigned int> shapeScoreFreq;
+    std::map<Shape, double> shapeScoreWPlike;
     time_t iterTime;
     std::cout << "Iter, Found shapes count, Shape, Score, Multinote count, Time" << std::endl;
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
@@ -139,38 +142,58 @@ int main(int argc, char *argv[]) {
 
         // clac shape scores
         Shape maxScoreShape;
+        unsigned int foundShapeNum = 0;
         // the largest key of map is the last element because map is a binary tree
         if (scoring == "default") {
-            std::map<unsigned int, Shape> scoreShape;
-            unsigned int foundShapesSize = shapeScoring<unsigned int>(corpus, shapeDict, scoreShape, scoring, mergeCondition, samplingRate);
-            if (foundShapesSize == 0) {
+            unsigned int maxScore = 0;
+            shapeScoring<unsigned int>(corpus, shapeDict, shapeScoreFreq, scoring, mergeCondition, samplingRate);
+            for (auto it = shapeScoreFreq.begin(); it != shapeScoreFreq.end(); ++it) {
+                if (it->second != 0) {
+                    if (it->second > maxScore) {
+                        maxScore = it->second;
+                        maxScoreShape = it->first;
+                    }
+                    it->second = 0; // set to zero as we "took out" the value
+                    foundShapeNum++;
+                }
+                else {
+
+                }
+            }
+            if (foundShapeNum == 0) {
                 std::cout << "Error: no shapes found" << std::endl;
                 return 1;
             }
-            unsigned int maxScore = scoreShape.rbegin()->first;
             if (maxScore < minScoreLimit) {
                 if (!verbose) std::cout << '\n';
                 std::cout << "End iterations because found best score < minScoreLimit\n";
                 break;
             }
-            maxScoreShape = scoreShape.rbegin()->second;
-            std::cout << foundShapesSize << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
+            std::cout << foundShapeNum << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
         }
         else {
-            std::map<double, Shape> scoreShape;
-            unsigned int foundShapesSize = shapeScoring<double>(corpus, shapeDict, scoreShape, scoring, mergeCondition, samplingRate);
-            if (foundShapesSize == 0) {
+            double maxScore = 0;
+            shapeScoring<double>(corpus, shapeDict, shapeScoreWPlike, scoring, mergeCondition, samplingRate);
+            for (auto it = shapeScoreWPlike.begin(); it != shapeScoreWPlike.end(); ++it) {
+                if (it->second != 0) {
+                    if (it->second > maxScore) {
+                        maxScore = it->second;
+                        maxScoreShape = it->first;
+                    }
+                    it->second = 0; // set to zero as we "took out" the value
+                    foundShapeNum++;
+                }
+            }
+            if (foundShapeNum == 0) {
                 std::cout << "Error: no shapes found" << std::endl;
                 return 1;
             }
-            double maxScore = scoreShape.rbegin()->first;
             if (maxScore < minScoreLimit) {
                 if (!verbose) std::cout << '\n';
                 std::cout << "End iterations because found best score < minScoreLimit\n";
                 break;
             }
-            maxScoreShape = scoreShape.rbegin()->second;
-            std::cout << foundShapesSize << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
+            std::cout << foundShapeNum << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
         }
 
         unsigned int newShapeIndex = shapeDict.size();
@@ -235,7 +258,6 @@ int main(int argc, char *argv[]) {
                 sort(corpus.piecesMN[i][j].begin(), corpus.piecesMN[i][j].end());
             }
         }
-
         
         multinoteCount = 0;
         #pragma omp parallel for reduction(+:multinoteCount)

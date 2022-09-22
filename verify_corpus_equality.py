@@ -132,6 +132,7 @@ if __name__ == '__main__':
         a_corpus_dir = sys.argv[1]
         b_corpus_dir = sys.argv[2]
         sample_size = int(sys.argv[3])
+    print("begin equality verification")
     if verify_corpus_equality(a_corpus_dir, b_corpus_dir, sample_size):
         print("equality verification success")
         exit(0)

@@ -213,7 +213,6 @@ def mp_func(
 
 def main():
     args = parse_args()
-    print(vars(args.handler_args))
     corpus_paras_dict = vars(args.handler_args)
 
     # when not verbose, only info level or higher will be printed to stdout or stderr and logged into file

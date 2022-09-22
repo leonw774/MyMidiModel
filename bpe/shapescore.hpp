@@ -14,12 +14,11 @@ Shape getShapeOfMultiNotePair(
 
 double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton=false);
 
-// return the number of found unique shapes
 template<typename T>
-unsigned int shapeScoring(
+void shapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::map<T, Shape>& shapeScore,
+    std::map<Shape, T>& shapeScore,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate

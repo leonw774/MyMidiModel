@@ -3,13 +3,15 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <vector>
-#include <map>
 #include <queue>
-#include <set>
 #include <string>
 #include <cstring>
-#include <sstream>
+#include <map>
+#include <unordered_map>
+#include <set>
+#include <ctime>
 
 struct RelNote {
     uint8_t isContAndRelOnset;
@@ -64,6 +66,7 @@ unsigned int findMaxRelOffset(const Shape& s);
 
 std::vector<Shape> getDefaultShapeDict();
 
+
 struct MultiNote {
     // shapeIndex: High 12 bits. The index of shape in the shapeDict. 0: DEFAULT_SHAPE_END, 1: DEFAULT_SHAPE_CONT
     //             This mean bpeIter cannot be greater than 0xfff - 2 = 2045
@@ -114,6 +117,7 @@ inline void MultiNote::setOnset(unsigned int o) {
 typedef std::vector<MultiNote> Track;
 
 void printTrack(const Track& track, const std::vector<Shape>& shapeDict, const size_t begin, const size_t length);
+
 
 struct TimeStructToken {
 
