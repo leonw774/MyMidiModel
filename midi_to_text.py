@@ -264,6 +264,8 @@ def main():
             if not os.path.isdir(inpath):
                 print(f'Input path {inpath} is not a directory or doesn\'t exist.')
             file_path_list = glob.glob(inpath+'/**/*.mid', recursive=True)
+            file_path_list += glob.glob(inpath+'/**/*.midi', recursive=True)
+            file_path_list += glob.glob(inpath+'/**/*.MID', recursive=True)
         else:
             if not os.path.isfile(inpath):
                 print(f'Input path {inpath} is not a file or doesn\'t exist.')

@@ -515,8 +515,8 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
 
     cur_time = 0
     is_head = True
-    cur_measure_length = -1
-    cur_measure_onset = -1
+    cur_measure_length = 0
+    cur_measure_onset = 0
     cur_time_signature = None
     pending_cont_notes = dict()
     track_program_mapping = dict()
@@ -543,12 +543,8 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
                 is_head = False
 
             numer, denom = (b36str2int(x) for x in text[1:].split('/'))
-            if cur_measure_onset == -1: # first measure
-                cur_measure_onset = 0
-                cur_time = 0
-            else:
-                cur_measure_onset += cur_measure_length
-                cur_time = cur_measure_onset
+            cur_measure_onset += cur_measure_length
+            cur_time = cur_measure_onset
 
             cur_measure_length = round(nth * numer / denom)
             if cur_time_signature != (numer, denom):

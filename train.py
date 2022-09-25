@@ -5,6 +5,7 @@ import os
 import shutil
 from time import strftime, time
 
+from pandas import Series
 from tqdm import tqdm
 import torch
 from torch.utils.data import random_split, DataLoader
@@ -18,10 +19,10 @@ from util.model import (
     calc_permutable_subseq_losses,
     get_seq_mask,
 )
-from util.dataset import MidiDataset, collate_mididataset
-from util.corpus import COMPLETE_FEATURE_NAME, OUTPUT_FEATURE_NAME, get_corpus_vocabs
 from util.midi import piece_to_midi
-
+from util.corpus import COMPLETE_FEATURE_NAME, OUTPUT_FEATURE_NAME, get_corpus_vocabs
+from util.dataset import MidiDataset, collate_mididataset
+from util.evaluations import FEATURE_NAMES, piece_to_features
 
 def parse_args():
     data_parser = ArgumentParser()
@@ -147,7 +148,7 @@ def parse_args():
         default='',
     )
     global_parser.add_argument(
-        '--checkpoint-dir-path',
+        '--model-dir-path',
         type=str,
         required=True
     )
@@ -158,6 +159,11 @@ def parse_args():
     global_parser.add_argument(
         'corpus_dir_path',
         type=str
+    )
+    global_parser.add_argument(
+        '--eval-sample-number',
+        type=int,
+        default=64
     )
     # make them as dicts first
     global_args = dict()
@@ -235,8 +241,16 @@ def main():
         args.use_device = 'cpu'
     args.use_device = torch.device(args.use_device)
 
-    if not os.path.isdir(args.checkpoint_dir_path):
-        logging.info('Invalid checkpoint dir path: %s', args.checkpoint_dir_path)
+    if not os.path.isdir(args.model_dir_path):
+        logging.info('Invalid model dir path: %s', args.model_dir_path)
+        return 1
+    ckpt_dir_path = os.path(args.model_dir_path, 'ckpt')
+    if not os.path.isdir(ckpt_dir_path):
+        logging.info('Invalid model ckpt dir path: %s', ckpt_dir_path)
+        return 1
+    eval_dir_path = os.path(args.model_dir_path, 'eval_samples')
+    if not os.path.isdir(eval_dir_path):
+        logging.info('Invalid model eval samples dir path: %s', eval_dir_path)
         return 1
 
     # logging setting
@@ -268,7 +282,7 @@ def main():
     logging.info(args_str)
 
     # loss csv file is in the checkpoint directory
-    loss_file_path = os.path.join(args.checkpoint_dir_path, 'loss.csv')
+    loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
     loss_file = open(loss_file_path, 'w+', encoding='utf8')
     loss_csv_head = ', '.join(
         ['train_' + n for n in OUTPUT_FEATURE_NAME]
@@ -301,7 +315,6 @@ def main():
         verbose=0
     ))
     logging.info(summary_str)
-    # save_model_meta_info(model, os.path.join(args.checkpoint_dir_path, 'model_meta_info.json'))
     model = model.to(args.use_device)
 
     # make dataset
@@ -381,15 +394,15 @@ def main():
         cur_step = start_step + args.train_args.validation_interval
         log(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_file)
 
-        model_file_path = os.path.join(args.checkpoint_dir_path, f'model_{cur_step}.pt')
-        torch.save(model, model_file_path)
+        ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}_model.pt')
+        torch.save(model, ckpt_model_file_path)
 
         print('Generating unconditional generation sample for checkpoint')
         uncond_gen_text_list = generate_sample(model, args.data_args.max_seq_length)
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
-        open(os.path.join(args.checkpoint_dir_path, f'uncond_gen_{cur_step}'), 'w+', encoding='utf8').write(uncond_gen_piece)
+        open(os.path.join(ckpt_dir_path, f'{cur_step}_uncondgen'), 'w+', encoding='utf8').write(uncond_gen_piece)
         piece_to_midi(uncond_gen_piece, vocabs.paras['nth']).dump(
-            os.path.join(args.checkpoint_dir_path, f'uncond_gen_{cur_step}.mid')
+            os.path.join(ckpt_dir_path, f'{cur_step}_uncondgen.mid')
         )
 
         if args.train_args.early_stop > 0:
@@ -405,13 +418,37 @@ def main():
             else:
                 early_stop_counter = 0
                 min_avg_valid_loss = avg_valid_loss
-                shutil.copyfile(model_file_path, os.path.join(args.checkpoint_dir_path, 'model_best.pt'))
+                shutil.copyfile(ckpt_model_file_path, os.path.join(args.model_dir_path, 'best_model.pt'))
                 logging.info('New best model.')
     # training end
 
     # evaluation
-    # best_model = torch.load(os.path.join(args.checkpoint_dir_path, 'model_best.pt'))
-    # evaluate(model=best_model, corpus_dir_path=args.corpus_dir_path, sample_size=args.eval_sample_size)
+    print('Generating unconditional generation sample for evluation')
+    best_model = torch.load(os.path.join(args.model_dir_path, 'best_model.pt'))
+    eval_sample_features_per_piece = []
+    for i in range(args.eval_sample_number):
+        uncond_gen_text_list = generate_sample(best_model, args.data_args.max_seq_length)
+        uncond_gen_piece = ' '.join(uncond_gen_text_list)
+        eval_sample_features_per_piece.append(piece_to_features(uncond_gen_piece))
+        open(os.path.join(eval_dir_path, f'{i}'), 'w+', encoding='utf8').write(uncond_gen_piece)
+        piece_to_midi(uncond_gen_piece, vocabs.paras['nth']).dump(
+            os.path.join(eval_dir_path, f'{i}.mid')
+        )
+
+    eval_sample_features = {
+        fname: [
+            fs[fname]
+            for fs in eval_sample_features_per_piece
+        ]
+        for fname in FEATURE_NAMES
+    }
+    eval_sample_features_stats = dict()
+    for fname in FEATURE_NAMES:
+        eval_sample_features_stats[fname] = {
+            k : float(v) for k, v in dict(Series(eval_sample_features[fname]).describe()).items()
+        }
+    with open(op.path.join(args.model_dir_path, 'eval_sample_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
+        json.dump(eval_sample_features_stats, eval_stat_file)
 
     return 0
 

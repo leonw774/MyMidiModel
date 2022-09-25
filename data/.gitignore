@@ -1,7 +1,6 @@
 .mscbackup
 corpus
 *.txt
-*.stat
 *.mid
 *.npz
 *.npy

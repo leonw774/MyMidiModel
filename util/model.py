@@ -118,7 +118,7 @@ class MidiTransformerDecoder(nn.Module):
 
 def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq, temperature=1.0) -> list:
     """
-        Expect start_seq is Tensor with shape: (1, seq_size, complete_feature_number) or None
+        Expect start_seq to be Tensor with shape: (1, seq_size, complete_feature_number) or None
         - if start_seq is None, will use `text_list_to_array([BEGIN_TOKEN_STR])` as start_seq
         return the text list of the generated piece
     """
