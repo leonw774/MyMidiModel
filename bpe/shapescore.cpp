@@ -158,7 +158,7 @@ template<typename T>
 void shapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::map<Shape, T>& shapeScore,
+    std::vector<std::pair<Shape, T>>& shapeScore,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate
@@ -227,11 +227,31 @@ void shapeScoring(
         }
     }
     // merge parrallel maps
-    for (int j = 0; j < max_thread_num; ++j) {
+    for (int j = 1; j < max_thread_num; ++j) {
         for (auto it = shapeScoreParallel[j].cbegin(); it != shapeScoreParallel[j].cend(); it++) {
-            shapeScore[it->first] += it->second;
+            shapeScoreParallel[0][it->first] += it->second;
         }
     }
+    for (auto it = shapeScoreParallel[0].cbegin(); it != shapeScoreParallel[0].cend(); it++) {
+        shapeScore.push_back(std::make_pair(it->first, it->second));
+    }
+}
+
+// #pragma omp reduction(maxsecond : std::pair<Shape, double> : omp_out = omp_in.second > omp_out.second ? omp_in : omp_out)
+
+template<typename T>
+std::pair<Shape, T> findMaxValPair(const std::vector<std::pair<Shape, T>>& shapeScore) {
+    #pragma omp declare reduction(maxsecond : std::pair<Shape, T> : omp_out = omp_in.second > omp_out.second ? omp_in : omp_out)
+    std::pair<Shape, T> maxSecondPair;
+    maxSecondPair.second = 0;
+    #pragma omp parallel for reduction(maxsecond : maxSecondPair)
+    for (int i = 0; i < shapeScore.size(); ++i) {
+        if (shapeScore[i].second > maxSecondPair.second) {
+            maxSecondPair.second = shapeScore[i].second;
+            maxSecondPair.first = shapeScore[i].first;
+        }
+    }
+    return maxSecondPair;
 }
 
 // instantiate function
@@ -241,7 +261,7 @@ void shapeScoring(
 template
 void shapeScoring<unsigned int>(const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::map<Shape, unsigned int>& shapeScore,
+    std::vector<std::pair<Shape, unsigned int>>& shapeScore,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate
@@ -250,8 +270,14 @@ void shapeScoring<unsigned int>(const Corpus& corpus,
 template
 void shapeScoring<double>(const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::map<Shape, double>& shapeScore,
+    std::vector<std::pair<Shape, double>>& shapeScore,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate
 );
+
+template
+std::pair<Shape, unsigned int> findMaxValPair(const std::vector<std::pair<Shape, unsigned int>>& shapeScore);
+
+template
+std::pair<Shape, double> findMaxValPair(const std::vector<std::pair<Shape, double>>& shapeScore);

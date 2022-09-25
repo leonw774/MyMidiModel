@@ -18,10 +18,13 @@ template<typename T>
 void shapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::map<Shape, T>& shapeScore,
+    std::vector<std::pair<Shape, T>>& shapeScore,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate
 );
+
+template<typename T>
+std::pair<Shape, T> findMaxValPair(const std::vector<std::pair<Shape, T>>& shapeScore);
 
 #endif

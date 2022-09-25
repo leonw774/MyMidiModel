@@ -105,6 +105,7 @@ int main(int argc, char *argv[]) {
     // sort and count notes
     size_t startMultinoteCount = 0, multinoteCount = 0;
     size_t drumMultinoteCount = 0;
+    #pragma omp parallel for reduction(+: multinoteCount)
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             if (corpus.piecesTP[i][j] == 128) {
@@ -128,8 +129,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    std::map<Shape, unsigned int> shapeScoreFreq;
-    std::map<Shape, double> shapeScoreWPlike;
+    std::vector<std::pair<Shape, unsigned int>> shapeScoreFreq;
+    std::vector<std::pair<Shape, double>> shapeScoreWPlike;
     time_t iterTime;
     std::cout << "Iter, Found shapes count, Shape, Score, Multinote count, Time" << std::endl;
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
@@ -143,35 +144,25 @@ int main(int argc, char *argv[]) {
         // clac shape scores
         Shape maxScoreShape;
         if (scoring == "default") {
-            unsigned int maxScore = 0;
             shapeScoring<unsigned int>(corpus, shapeDict, shapeScoreFreq, scoring, mergeCondition, samplingRate);
-            for (auto it = shapeScoreFreq.begin(); it != shapeScoreFreq.end(); ++it) {
-                if (it->second > maxScore) {
-                    maxScore = it->second;
-                    maxScoreShape = it->first;
-                }
-            }
-            if (maxScore < minScoreLimit) {
+            std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScoreFreq);
+            if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
                 break;
             }
-            std::cout << shapeScoreFreq.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
+            maxScoreShape = maxValPair.first;
+            std::cout << shapeScoreFreq.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
             shapeScoreFreq.clear();
         }
         else {
-            double maxScore = 0;
             shapeScoring<double>(corpus, shapeDict, shapeScoreWPlike, scoring, mergeCondition, samplingRate);
-            for (auto it = shapeScoreWPlike.begin(); it != shapeScoreWPlike.end(); ++it) {
-                if (it->second > maxScore) {
-                    maxScore = it->second;
-                    maxScoreShape = it->first;
-                }
-            }
-            if (maxScore < minScoreLimit) {
+            std::pair<Shape, double> maxValPair = findMaxValPair(shapeScoreWPlike);
+            if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
                 break;
             }
-            std::cout << shapeScoreFreq.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxScore << ", ";
+            maxScoreShape = maxValPair.first;
+            std::cout << shapeScoreFreq.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
             shapeScoreWPlike.clear();
         }
 
@@ -239,7 +230,7 @@ int main(int argc, char *argv[]) {
         }
         
         multinoteCount = 0;
-        #pragma omp parallel for reduction(+:multinoteCount)
+        #pragma omp parallel for reduction(+: multinoteCount)
         for (int i = 0; i < corpus.piecesMN.size(); ++i) {
             for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
                 multinoteCount += corpus.piecesMN[i][j].size();
