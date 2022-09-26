@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Start Multinote count: " << multinoteCount
         << ", Drum's multinote count: " << drumMultinoteCount
-        << ", Start Average mulpi: " << avgMulpi
+        << ", Start average mulpi: " << avgMulpi
         << ", Time used: " << (unsigned int) time(0) - begTime << std::endl;
 
     if (multinoteCount == 0 || multinoteCount == drumMultinoteCount) {

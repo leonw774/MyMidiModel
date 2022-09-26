@@ -91,13 +91,14 @@ if [ $BPE_ITER -ne 0 ]; then
         fi
 
         # process bpe log
-        ./logs/remove_esc_and_return_chars.sh $LOG_PATH
+        echo "sed -i 's/\r/\n/g ; s/\x1B\[2K//g' ${LOG_PATH}"
+        sed -i 's/\r/\n/g ; s/\x1B\[2K//g' $LOG_PATH
         python3 plot_bpe_log.py $CORPUS_DIR_PATH_WITH_BPE $LOG_PATH
 
         # check if tokenized corpus is equal to original corpus
-        python3 verify_corpus_equality.py $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE 100 | tee -a $LOG_PATH
+        python3 verify_corpus_equality.py $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE | tee -a $LOG_PATH
         VERIFY_EXIT_CODE=${PIPESTATUS[0]}
-        test $VERIFY_EXIT_CODE -ne 0 && echo "pipeline.sh exit." && exit 1
+        test $VERIFY_EXIT_CODE -ne 0 && echo "Corpus equality verification failed. pipeline.sh exit." && exit 1
     fi
 
     # replace CORPUS_DIR_PATH to CORPUS_DIR_PATH_WITH_BPE

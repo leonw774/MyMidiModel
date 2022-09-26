@@ -74,7 +74,7 @@ def main():
         'total_used_time': total_used_time,
         'iteration_log_dict': iteration_log_dict
     }
-    print(os.path.join(corpus_stats_dir_path, 'bpe_learn_stats.json'))
+    print('Written', os.path.join(corpus_stats_dir_path, 'bpe_learn_stats.json'))
     with open(os.path.join(corpus_stats_dir_path, 'bpe_learn_stats.json'), 'w+', encoding='utf8') as statsfile:
         json.dump(bpe_stats_dict, statsfile)
 

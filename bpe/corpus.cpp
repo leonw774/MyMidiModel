@@ -285,10 +285,8 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth, std::string position
                 break;
 
             case 'P':
-                uint8_t pos;
                 for (i = 0; (a[i] = inCorpusFile.get()) != ' '; ++i); a[i] = '\0';
-                pos = b36strtoi(a);
-                curTime = curMeasureStart + pos;
+                curTime = curMeasureStart + b36strtoi(a);
                 break;
 
             case 'N':
@@ -357,8 +355,6 @@ void writeOutputCorpusFile(
     bool trackEnd[maxTrackNum];
     int tsCurIdx;
     bool tsEnd;
-    int curMeasureStart = 0;
-    int prevPosEventOnset = -1;
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         outCorpusFile << "BOS ";
 
@@ -367,6 +363,8 @@ void writeOutputCorpusFile(
                 << ":" << itob36str(corpus.piecesTP[i][j]) << " ";
         }
 
+        int curMeasureStart = 0;
+        int prevPosEventOnset = -1;
         unsigned int curPieceTrackNum = corpus.piecesMN[i].size();
         memset(trackCurIdx, 0, sizeof(trackCurIdx));
         memset(trackEnd, 0, sizeof(trackEnd));
@@ -378,8 +376,8 @@ void writeOutputCorpusFile(
         }
         while (1) {
             // find what token to put
-            unsigned int minTrackOnset = UINT32_MAX;
-            unsigned int minTrackIdx = 0;
+            int minTrackOnset = INT32_MAX;
+            int minTrackIdx = 0;
             for (int j = 0; j < curPieceTrackNum; ++j) {
                 if (trackEnd[j]) continue;
                 uint8_t tmp = corpus.piecesMN[i][j][trackCurIdx[j]].pitch;
@@ -393,9 +391,9 @@ void writeOutputCorpusFile(
                 // std::cout << "TS " << i << "," << tsCurIdx << ", onset=" << corpus.piecesTS[i][tsCurIdx].onset << std::endl;
                 if (corpus.piecesTS[i][tsCurIdx].getT()) {
                     if (positionMethod == "event") {
-                        if (prevPosEventOnset < corpus.piecesTS[i][tsCurIdx].onset) {
-                            outCorpusFile << "P"
-                                << itob36str(corpus.piecesTS[i][tsCurIdx].onset - curMeasureStart) << " ";
+                        if (prevPosEventOnset < (int) corpus.piecesTS[i][tsCurIdx].onset) {
+                            outCorpusFile << "P" << itob36str(corpus.piecesTS[i][tsCurIdx].onset - curMeasureStart) << " ";
+                            prevPosEventOnset = corpus.piecesTS[i][tsCurIdx].onset;
                         }
                         outCorpusFile << "T" << itob36str(corpus.piecesTS[i][tsCurIdx].getN()) << " ";
                     }
@@ -419,9 +417,9 @@ void writeOutputCorpusFile(
                 const MultiNote& curMN = corpus.piecesMN[i][minTrackIdx][trackCurIdx[minTrackIdx]];
                 // std::cout << "MN " << i << "," << minTrackIdx << "," << trackCurIdx[minTrackIdx] << ", onset=" << curMN.getOnset() << std::endl;
                 if (positionMethod == "event") {
-                    if (prevPosEventOnset < minTrackOnset) {
-                        outCorpusFile << "P"
-                                << itob36str(minTrackOnset - curMeasureStart) << " ";
+                    if (prevPosEventOnset < (int) minTrackOnset) {
+                        outCorpusFile << "P" << itob36str(minTrackOnset - curMeasureStart) << " ";
+                        prevPosEventOnset = minTrackOnset;
                     }
                 }
                 std::string shapeStr;

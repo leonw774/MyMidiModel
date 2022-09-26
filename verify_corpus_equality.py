@@ -59,14 +59,13 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size) ->
                     o_t.tempo != t_t.tempo or o_t.time != t_t.time
                     for o_t, t_t in zip(a_midi.tempo_changes, b_midi.tempo_changes)
                 ):
-                return False
-
+                raise AssertionError(f'tempo difference at piece#{i}')
 
             if any(
                     o_t.numerator != t_t.numerator or o_t.denominator != t_t.denominator or o_t.time != t_t.time
                     for o_t, t_t in zip(a_midi.time_signature_changes, b_midi.time_signature_changes)
                 ):
-                return False
+                raise AssertionError(f'time signature difference at piece#{i}')
 
             a_track_index_mapping = {
                 (track.program, track.is_drum, len(track.notes)): i
@@ -79,7 +78,7 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size) ->
             a_tracks_counter = dict(Counter(a_track_index_mapping.keys()))
             b_tracks_counter = dict(Counter(b_track_index_mapping.keys()))
             if a_tracks_counter != b_tracks_counter:
-                return False
+                raise AssertionError(f'track mapping difference at piece#{i}')
 
             for track_feature in a_track_index_mapping.keys():
                 a_track = a_midi.instruments[a_track_index_mapping[track_feature]]
@@ -108,19 +107,16 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size) ->
                     a_midi.dump(file=a_bytes_io)
                     b_midi.dump(file=b_bytes_io)
                     if a_bytes_io.getvalue() != b_bytes_io.getvalue():
-                        # diff_note_starts = (a_track_note_starts.union(b_track_note_starts)).difference(a_track_note_starts.intersection(b_track_note_starts))
-                        # diff_note_ends = (a_track_note_ends.union(b_track_note_ends)).difference(a_track_note_ends.intersection(b_track_note_ends))
-                        # print(
-                        #     f'notes starts difference non-empty: {len(diff_note_starts)} / ({len(a_track_note_starts)} + {len(b_track_note_starts)})\n'\
-                        #     f'notes end difference non-empty: {len(diff_note_ends)} / ({len(a_track_note_ends)} + {len(b_track_note_ends)})\n'\
-                        #     f'piece#{i}, track#{a_track_index_mapping[track_feature]}'\
-                        # )
-                        # print('diff_note_starts')
-                        # print(diff_note_starts)
-                        # print('diff_note_ends')
-                        # print(diff_note_ends)
-                        # print("---")
-                        return False
+                        diff_note_starts = (a_track_note_starts.union(b_track_note_starts)).difference(a_track_note_starts.intersection(b_track_note_starts))
+                        diff_note_ends = (a_track_note_ends.union(b_track_note_ends)).difference(a_track_note_ends.intersection(b_track_note_ends))
+                        print(
+                            f'notes starts difference: {len(diff_note_starts)} / ({len(a_track_note_starts)} + {len(b_track_note_starts)})\n'\
+                            f'notes end difference: {len(diff_note_ends)} / ({len(a_track_note_ends)} + {len(b_track_note_ends)})\n'\
+                        )
+                        print(f'diff_note_starts\n{diff_note_starts}')
+                        print(f'diff_note_ends\n{diff_note_ends}', )
+                        print("---")
+                        raise AssertionError(f'notes difference at piece#{i}, track#{a_track_index_mapping[track_feature]}')
     return True
 
 if __name__ == '__main__':
