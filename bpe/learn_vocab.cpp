@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
     // sort and count notes
     size_t startMultinoteCount = 0, multinoteCount = 0;
     size_t drumMultinoteCount = 0;
-    #pragma omp parallel for reduction(+: multinoteCount)
+    #pragma omp parallel for reduction(+: multinoteCount, drumMultinoteCount)
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             if (corpus.piecesTP[i][j] == 128) {
