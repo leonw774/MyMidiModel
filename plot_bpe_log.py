@@ -3,10 +3,9 @@ import os
 import sys
 
 from matplotlib import pyplot as plt
+from pandas import Series
 
-def main():
-    corpus_dir_path = sys.argv[1]
-    log_file_path = sys.argv[2]
+def main(corpus_dir_path, log_file_path):
     with open(log_file_path, 'r', encoding='utf8') as logfile:
         log_texts = logfile.read()
     # raise ValueError if not found
@@ -97,13 +96,19 @@ def main():
                     s=left_texts,
                     transform=plt.gcf().transFigure
                 )
-                plt.subplots_adjust(left=0.2)
-                plt.plot(iter_num, col_list, label=col_name)
             else:
-                plt.plot(iter_num, col_list, label=col_name)
+                left_texts = '\n'.join(
+                    [f'{k}={float(v)}' for k, v in dict(Series(col_list).describe())]
+                )
+            plt.subplots_adjust(left=0.2)
+            plt.plot(iter_num, col_list, label=col_name)
             plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}.png'))
+            plt.set_yscale('log')
+            plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}_logscale.png'))
             plt.clf()
     print('Write bpe_stats json and png')
 
 if __name__ == '__main__':
-    main()
+    corpus_dir_path = sys.argv[1]
+    log_file_path = sys.argv[2]
+    main(corpus_dir_path, log_file_path)
