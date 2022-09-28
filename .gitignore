@@ -2,7 +2,7 @@
 *.o
 *.log
 .vscode
-ckpt/**/*
+models/**/*
 bpe/learn_vocab
 bpe/apply_vocab
 

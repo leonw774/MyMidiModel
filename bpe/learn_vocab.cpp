@@ -79,7 +79,8 @@ int main(int argc, char *argv[]) {
     }
     std::cout << "Output merged corpus file: " << outCorpusFilePath << std::endl;
 
-    time_t begTime = time(0);
+    double totalUsedTime = 0;
+    time_t ioBegTime = time(0);
     std::cout << "Reading input files" << std::endl;
 
     // read parameters
@@ -122,7 +123,8 @@ int main(int argc, char *argv[]) {
     std::cout << "Start Multinote count: " << multinoteCount
         << ", Drum's multinote count: " << drumMultinoteCount
         << ", Start average mulpi: " << avgMulpi
-        << ", Time used: " << (unsigned int) time(0) - begTime << std::endl;
+        << ", Reading used time: " << (unsigned int) time(0) - ioBegTime << std::endl;
+    totalUsedTime += (unsigned int) time(0) - ioBegTime;
 
     if (multinoteCount == 0 || multinoteCount == drumMultinoteCount) {
         std::cout << "No notes to merge. Exited." << std::endl;
@@ -131,20 +133,24 @@ int main(int argc, char *argv[]) {
 
     std::vector<std::pair<Shape, unsigned int>> shapeScoreFreq;
     std::vector<std::pair<Shape, double>> shapeScoreWPlike;
-    time_t iterTime;
-    std::cout << "Iter, Found shapes count, Shape, Score, Multinote count, Time" << std::endl;
+    clock_t iterBegTime, partBegTime;
+    double updateNeighborTime, shapeScoringTime, findMaxTime, mergeTime;
+    std::cout << "Iter, Found shapes count, Shape, Score, Multinote count, iterTime, updateNeighborTime, shapeScoringTime, findMaxTime, mergeTime" << std::endl;
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
         if (!verbose && iterCount != 0) 
             std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
         std::cout << iterCount << ", ";
-        iterTime = time(0);
-
+        iterBegTime = partBegTime = clock();
         updateNeighbor(corpus, shapeDict);
+        updateNeighborTime = (double) (clock() - partBegTime) / CLOCKS_PER_SEC;
 
         // clac shape scores
         Shape maxScoreShape;
         if (scoring == "default") {
+            partBegTime = clock();
             shapeScoring<unsigned int>(corpus, shapeDict, shapeScoreFreq, scoring, mergeCondition, samplingRate);
+            shapeScoringTime = (double) (clock() - partBegTime) / CLOCKS_PER_SEC;
+            partBegTime = clock();
             std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScoreFreq);
             if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
@@ -153,9 +159,13 @@ int main(int argc, char *argv[]) {
             maxScoreShape = maxValPair.first;
             std::cout << shapeScoreFreq.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
             shapeScoreFreq.clear();
+            findMaxTime = (double) (clock() - partBegTime) / CLOCKS_PER_SEC;
         }
         else {
+            partBegTime = clock();
             shapeScoring<double>(corpus, shapeDict, shapeScoreWPlike, scoring, mergeCondition, samplingRate);
+            shapeScoringTime = (double) (clock() - partBegTime) / CLOCKS_PER_SEC;
+            partBegTime = clock();
             std::pair<Shape, double> maxValPair = findMaxValPair(shapeScoreWPlike);
             if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
@@ -164,11 +174,13 @@ int main(int argc, char *argv[]) {
             maxScoreShape = maxValPair.first;
             std::cout << shapeScoreFreq.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
             shapeScoreWPlike.clear();
+            findMaxTime = (double) (clock() - partBegTime) / CLOCKS_PER_SEC;
         }
 
         unsigned int newShapeIndex = shapeDict.size();
         shapeDict.push_back(maxScoreShape);
 
+        partBegTime = clock();
         // merge MultiNotes with newly added shape
         // for each piece
         #pragma omp parallel for
@@ -236,8 +248,15 @@ int main(int argc, char *argv[]) {
                 multinoteCount += corpus.piecesMN[i][j].size();
             }
         }
+        mergeTime = (double) (clock() - partBegTime) / CLOCKS_PER_SEC;
+
         std::cout << multinoteCount << ", ";
-        std::cout << (unsigned int) time(0) - iterTime;
+        std::cout << (double) (clock() - iterBegTime) / CLOCKS_PER_SEC << ", "
+            << updateNeighborTime << ", "
+            << shapeScoringTime << ", "
+            << findMaxTime << ", "
+            << mergeTime;
+        totalUsedTime += (double) (clock() - iterBegTime) / CLOCKS_PER_SEC;
         if (verbose) std::cout << std::endl;
         else         std::cout.flush();
 
@@ -258,13 +277,13 @@ int main(int argc, char *argv[]) {
         << ", Non-drum multinote reduce rate: " << 1 - (double) (multinoteCount - drumMultinoteCount) / (startMultinoteCount - drumMultinoteCount)
         << ", Average mulpi reduce rate: " << 1 - avgMulpi / startAvgMulpi << std::endl;
 
-    // write vocab file
+    // Write files
+    ioBegTime = time(0);
     writeShapeVocabFile(vocabFile, shapeDict);
-
     std::cout << "Writing merged corpus file" << std::endl;
-
     writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum, positionMethod);
-
-    std::cout << "Write merged corpus file done. Total used time: " << time(0)-begTime << std::endl;
+    totalUsedTime += time(0) - ioBegTime;
+    std::cout << "Writing done. Writing used time: " << time(0)-ioBegTime << "\n"
+        << "Total used time:" << totalUsedTime << std::endl;
     return 0;
 }

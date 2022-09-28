@@ -116,7 +116,7 @@ class MidiTransformerDecoder(nn.Module):
         ]
         return logits
 
-def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq, temperature=1.0) -> list:
+def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq = None, temperature=1.0) -> list:
     """
         Expect start_seq to be Tensor with shape: (1, seq_size, complete_feature_number) or None
         - if start_seq is None, will use `text_list_to_array([BEGIN_TOKEN_STR])` as start_seq

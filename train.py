@@ -197,13 +197,13 @@ def log(
         train_loss_list: list,
         valid_loss_list: list,
         loss_file):
-    avg_train_losses = [ sum(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
-    avg_valid_losses = [ sum(head_loss_tuple)for head_loss_tuple in zip(*valid_loss_list) ]
+    avg_train_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
+    avg_valid_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*valid_loss_list) ]
     avg_train_losses_str = ', '.join([f'{l:.4f}' for l in avg_train_losses])
     avg_valid_losses_str = ', '.join([f'{l:.4f}' for l in avg_valid_losses])
     logging.info(
-        'Step: %d, Time: %d, Learning rate: %.6f',
-        cur_step, time()-start_time, scheduler.get_last_lr()[0]
+        'Time: %d, Learning rate: %.6f',
+        time()-start_time, scheduler.get_last_lr()[0]
     )
     logging.info(
         'Avg. train losses: %s, Avg. accum. train loss: %.4f, Avg. valid losses: %s Avg. accum. valid loss: %.4f',
@@ -215,7 +215,6 @@ def log(
 
 def valid(model, valid_dataloader, args):
     model.eval()
-    print('Validation')
     loss_list = []
     for batch_seqs, batch_mps_sep_indices in tqdm(valid_dataloader):
         batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
@@ -244,11 +243,11 @@ def main():
     if not os.path.isdir(args.model_dir_path):
         logging.info('Invalid model dir path: %s', args.model_dir_path)
         return 1
-    ckpt_dir_path = os.path(args.model_dir_path, 'ckpt')
+    ckpt_dir_path = os.path.join(args.model_dir_path, 'ckpt')
     if not os.path.isdir(ckpt_dir_path):
         logging.info('Invalid model ckpt dir path: %s', ckpt_dir_path)
         return 1
-    eval_dir_path = os.path(args.model_dir_path, 'eval_samples')
+    eval_dir_path = os.path.join(args.model_dir_path, 'eval_samples')
     if not os.path.isdir(eval_dir_path):
         logging.info('Invalid model eval samples dir path: %s', eval_dir_path)
         return 1
@@ -270,7 +269,7 @@ def main():
             level=logging.INFO,
             format='%(message)s'
         )
-    logging.info(strftime('----train.py start at %Y%m%d-%H%M---'))
+    logging.info(strftime('=== train.py start at %Y%m%d-%H%M%S ==='))
 
     data_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.data_args).items()])
     model_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.model_args).items()])
@@ -358,7 +357,7 @@ def main():
     early_stop_counter = 0
     start_time = time()
     for start_step in range(0, args.train_args.steps, args.train_args.validation_interval):
-        logging.info('Training: %d', start_step)
+        logging.info('Training: %d/%d', start_step, args.train_args.steps)
         model.train()
         train_loss_list = []
         for _ in tqdm(range(args.train_args.validation_interval)):
@@ -387,6 +386,7 @@ def main():
             scheduler.step()
             torch.cuda.empty_cache()
 
+        print('Validation')
         valid_loss_list = valid(model, valid_dataloader, args)
 
         complete_train_loss_list.extend(train_loss_list)
@@ -410,16 +410,13 @@ def main():
             if avg_valid_loss >= min_avg_valid_loss:
                 early_stop_counter += 1
                 if early_stop_counter >= args.train_args.early_stop:
-                    logging.info(
-                        'Early stopped @ step %d: No improvement for %d validations.',
-                        cur_step, args.train_args.early_stop
-                    )
+                    logging.info('Early stopped: No improvement for %d validations.', args.train_args.early_stop)
                     break
             else:
                 early_stop_counter = 0
                 min_avg_valid_loss = avg_valid_loss
                 shutil.copyfile(ckpt_model_file_path, os.path.join(args.model_dir_path, 'best_model.pt'))
-                logging.info('New best model.')
+                print('New best model.')
     # training end
 
     # evaluation
@@ -429,7 +426,7 @@ def main():
     for i in range(args.eval_sample_number):
         uncond_gen_text_list = generate_sample(best_model, args.data_args.max_seq_length)
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
-        eval_sample_features_per_piece.append(piece_to_features(uncond_gen_piece))
+        eval_sample_features_per_piece.append(piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=10e6))
         open(os.path.join(eval_dir_path, f'{i}'), 'w+', encoding='utf8').write(uncond_gen_piece)
         piece_to_midi(uncond_gen_piece, vocabs.paras['nth']).dump(
             os.path.join(eval_dir_path, f'{i}.mid')
@@ -445,9 +442,9 @@ def main():
     eval_sample_features_stats = dict()
     for fname in FEATURE_NAMES:
         eval_sample_features_stats[fname] = {
-            k : float(v) for k, v in dict(Series(eval_sample_features[fname]).describe()).items()
+            k : float(v) for k, v in dict(Series(eval_sample_features[fname]).dropna().describe()).items()
         }
-    with open(op.path.join(args.model_dir_path, 'eval_sample_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
+    with open(os.path.join(args.model_dir_path, 'eval_sample_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
         json.dump(eval_sample_features_stats, eval_stat_file)
 
     return 0

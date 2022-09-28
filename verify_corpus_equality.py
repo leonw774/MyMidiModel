@@ -107,8 +107,9 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, sample_size) ->
                     a_midi.dump(file=a_bytes_io)
                     b_midi.dump(file=b_bytes_io)
                     if a_bytes_io.getvalue() != b_bytes_io.getvalue():
-                        diff_note_starts = (a_track_note_starts.union(b_track_note_starts)).difference(a_track_note_starts.intersection(b_track_note_starts))
-                        diff_note_ends = (a_track_note_ends.union(b_track_note_ends)).difference(a_track_note_ends.intersection(b_track_note_ends))
+                        ab_note_start_union = a_track_note_starts.union(b_track_note_starts)
+                        diff_note_starts = ab_note_start_union.difference(a_track_note_starts.intersection(b_track_note_starts))
+                        diff_note_ends = ab_note_start_union.difference(a_track_note_ends.intersection(b_track_note_ends))
                         print(
                             f'notes starts difference: {len(diff_note_starts)} / ({len(a_track_note_starts)} + {len(b_track_note_starts)})\n'\
                             f'notes end difference: {len(diff_note_ends)} / ({len(a_track_note_ends)} + {len(b_track_note_ends)})\n'\

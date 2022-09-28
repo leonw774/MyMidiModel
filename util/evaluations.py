@@ -8,24 +8,27 @@ from .tokens import get_largest_possible_position, b36str2int
 from .midi import piece_to_midi
 
 
-def _entropy(x):
-    if isinstance(x, list):
-        sum_x = sum(x)
-        norm_x = [i / sum_x for i in x]
-        entropy = -sum([
-            i * log(i)
-            for i in norm_x
-        ])
-        return entropy
-    else:
-        raise TypeError('x should be a list')
+def _entropy(x: list) -> float:
+    if len(x) == 0:
+        raise ValueError()
+    sum_x = sum(x)
+    if sum_x == 0:
+        raise ValueError()
+    norm_x = [i / sum_x for i in x]
+    entropy = -sum([
+        i * log(i)
+        for i in norm_x
+    ])
+    return entropy
 
 
 def _kl_divergence(true, pred):
     if isinstance(true, list) and isinstance(pred, list):
-        assert len(true) == len(pred)
+        assert len(true) == len(pred) and len(true) > 0
         sum_true = sum(true)
         sum_pred = sum(pred)
+        if sum_true == 0 or sum_pred == 0:
+            raise ValueError()
         norm_true = [x / sum_true for x in true]
         norm_pred = [x / sum_pred for x in pred]
         entropy = -sum([
@@ -34,9 +37,12 @@ def _kl_divergence(true, pred):
         ])
         return entropy
     elif isinstance(true, dict) and isinstance(pred, dict):
+        assert len(true) > 0
         assert all((x in true) for x in pred), 'true(x) = 0 does not imply pred(x) = 0'
         sum_true = sum(true.values())
         sum_pred = sum(pred.values())
+        if sum_true == 0 or sum_pred == 0:
+            raise ValueError()
         norm_true = {k: true[k]/sum_true for k in true}
         norm_pred = {k: pred[k]/sum_pred for k in pred}
         entropy = -sum([
@@ -48,7 +54,7 @@ def _kl_divergence(true, pred):
         raise TypeError('pred and true should be both list or dict')
 
 
-def _overlapping_area(x, y):
+def _overlapping_area(true, pred):
     pass
 
 
@@ -96,7 +102,10 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int):
             durations.append(note.end - note.start)
             velocities.append(note.velocity)
 
-    pitch_histogram_entropy = _entropy(pitch_histogram)
+    try:
+        pitch_histogram_entropy = _entropy(pitch_histogram)
+    except ValueError:
+        pitch_histogram_entropy = float('nan')
     durations_mean = np.mean(durations)
     durations_var = np.var(durations)
     velocities_mean = np.mean(velocities)
@@ -110,7 +119,7 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int):
             numer, denom = (b36str2int(x) for x in text[1:].split('/'))
             cur_measure_length = round(nth * numer / denom)
 
-    max_position = get_largest_possible_position()
+    max_position = get_largest_possible_position(nth)
     instrumentation_per_bar = np.zeros(shape=(len(measure_onsets), 129), dtype=np.bool8)
     grooving_per_bar = np.zeros(shape=(len(measure_onsets), max_position), dtype=np.int32)
     for track in midi.instruments:

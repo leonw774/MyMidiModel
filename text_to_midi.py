@@ -36,7 +36,7 @@ def text_to_midi(corpus_dir_path, out_path, begin, end):
         corpus_paras = get_corpus_paras(corpus_dir_path)
         print(corpus_paras)
         if len(corpus_paras) == 0:
-            print('Error: no head matters in input file')
+            print('Error: no piece in input file')
             exit(1)
         if end == -1:
             end = len(corpus_iterator)

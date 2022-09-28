@@ -232,7 +232,7 @@ def main():
             level=loglevel,
             format='%(message)s'
         )
-    logging.info(strftime('==== midi_to_text.py start at %Y%m%d-%H%M ===='))
+    logging.info(strftime('==== midi_to_text.py start at %Y%m%d-%H%M%SS ===='))
 
     corpus_paras_str = '\n'.join([
         str(k)+':'+str(v) for k, v in corpus_paras_dict.items()

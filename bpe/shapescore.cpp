@@ -228,13 +228,11 @@ void shapeScoring(
     }
     // merge parrallel maps
     for (int j = 1; j < max_thread_num; ++j) {
-        for (auto it = shapeScoreParallel[j].cbegin(); it != shapeScoreParallel[j].cend(); it++) {
+        for (auto it = shapeScoreParallel[j].begin(); it != shapeScoreParallel[j].end(); it++) {
             shapeScoreParallel[0][it->first] += it->second;
         }
     }
-    for (auto it = shapeScoreParallel[0].cbegin(); it != shapeScoreParallel[0].cend(); it++) {
-        shapeScore.push_back(std::make_pair(it->first, it->second));
-    }
+    shapeScore.assign(shapeScoreParallel[0].begin(), shapeScoreParallel[0].end());
 }
 
 // #pragma omp reduction(maxsecond : std::pair<Shape, double> : omp_out = omp_in.second > omp_out.second ? omp_in : omp_out)
@@ -247,8 +245,7 @@ std::pair<Shape, T> findMaxValPair(const std::vector<std::pair<Shape, T>>& shape
     #pragma omp parallel for reduction(maxsecond : maxSecondPair)
     for (int i = 0; i < shapeScore.size(); ++i) {
         if (shapeScore[i].second > maxSecondPair.second) {
-            maxSecondPair.second = shapeScore[i].second;
-            maxSecondPair.first = shapeScore[i].first;
+            maxSecondPair = shapeScore[i];
         }
     }
     return maxSecondPair;
