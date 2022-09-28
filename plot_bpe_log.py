@@ -29,7 +29,6 @@ def main(corpus_dir_path, log_file_path):
     start_stats = {
         sstext.split(': ')[0] : sstext.split(': ')[1]
         for sstext in start_stats_texts
-        if not sstext.startswith('Time')
     }
     end_stats_texts = log_lines[-1].split(', ')
     end_stats = {
@@ -37,12 +36,12 @@ def main(corpus_dir_path, log_file_path):
         for estext in end_stats_texts
     }
 
-    iteration_log_column_name =  log_lines[2].split(', ')[1:]
+    iteration_log_column_name =  log_lines[2].split(', ')[1:] # start from 1 because index 0 is iter number
     iteration_log_lines = log_lines[3:-1]
     iteration_log_lists = [[] for _ in range(len(iteration_log_column_name))]
     for iter_log_line in iteration_log_lines:
         for i, row_text in enumerate(iter_log_line.split(', ')[1:]):
-            if i == 0 or i == 3 or i == 4: # found unique shapes, multinote count, time
+            if i == 0 or i >= 3: # found unique shapes, multinote count, times
                 iteration_log_lists[i].append(int(row_text))
             elif i == 1: # shape text
                 iteration_log_lists[i].append(row_text)

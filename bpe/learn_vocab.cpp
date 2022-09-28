@@ -284,6 +284,6 @@ int main(int argc, char *argv[]) {
     writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum, positionMethod);
     totalUsedTime += time(0) - ioBegTime;
     std::cout << "Writing done. Writing used time: " << time(0)-ioBegTime << "\n"
-        << "Total used time:" << totalUsedTime << std::endl;
+        << "Total used time: " << totalUsedTime << std::endl;
     return 0;
 }
