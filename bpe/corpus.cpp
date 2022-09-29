@@ -16,6 +16,9 @@ bool RelNote::operator < (const RelNote& rhs) const {
     // sort on onset first, and then pitch, finally duration.
     if (getRelOnset() == rhs.getRelOnset()) {
         if (relPitch == rhs.relPitch) {
+            if (relDur == rhs.relDur) {
+                return isCont() > rhs.isCont();
+            }
             return relDur < rhs.relDur;
         }
         return relPitch < rhs.relPitch;

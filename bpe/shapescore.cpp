@@ -235,8 +235,6 @@ void shapeScoring(
     shapeScore.assign(shapeScoreParallel[0].begin(), shapeScoreParallel[0].end());
 }
 
-// #pragma omp reduction(maxsecond : std::pair<Shape, double> : omp_out = omp_in.second > omp_out.second ? omp_in : omp_out)
-
 template<typename T>
 std::pair<Shape, T> findMaxValPair(const std::vector<std::pair<Shape, T>>& shapeScore) {
     #pragma omp declare reduction(maxsecond : std::pair<Shape, T> : omp_out = omp_in.second > omp_out.second ? omp_in : omp_out)
@@ -252,8 +250,8 @@ std::pair<Shape, T> findMaxValPair(const std::vector<std::pair<Shape, T>>& shape
 }
 
 // instantiate function
-// use std::priority_queue<std::pair<unsigned int, Shape>> for scoreShape when scoringMethod is "default"
-// use std::priority_queue<std::pair<double, Shape>> for scoreShape when scoringMethod is "wplike"
+// use <unsigned int> when scoringMethod is "default"
+// use <double> when scoringMethod is "wplike"
 
 template
 void shapeScoring<unsigned int>(const Corpus& corpus,
