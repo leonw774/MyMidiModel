@@ -106,17 +106,19 @@ def main(corpus_dir_path, log_file_path):
 
             plt.plot(iter_nums, col_list, label=col_name)
             plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}.png'))
-            plt.yscale('log')
-            plt.title(col_name+' log scale')
-            plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}_logscale.png'))
-            plt.clf()
-        
+
         # draw shape size distribution
         if col_name == 'Shape size':
+            plt.clf()
             plt.figure(figsize=(16.8, 6.4))
             plt.title(col_name+' histogram')
             plt.hist(col_list)
             plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}_hist.png'))
+            plt.clf()
+        else:
+            plt.yscale('log')
+            plt.title(col_name+' log scale')
+            plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}_logscale.png'))
             plt.clf()
 
     print('Write bpe_stats json and png done.')
