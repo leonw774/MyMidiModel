@@ -48,7 +48,7 @@ def text_to_midi(corpus_dir_path, out_path, begin, end):
                 with open(f'{out_path}_{i}', 'w+', encoding='utf8') as tmp_file:
                     tmp_file.write(piece)
                     tmp_file.write('\n')
-                midi = piece_to_midi(piece, corpus_paras['nth'])
+                midi = piece_to_midi(piece, corpus_paras['nth'], ignore_panding_note_error=False)
                 midi.dump(f'{out_path}_{i}.mid')
                 print(f'dumped {out_path}_{i}.mid')
             elif i >= end:

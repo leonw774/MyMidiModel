@@ -2,7 +2,7 @@
 
 ## Overall
 
-1. Make a python 3.7 or higher virtual environment, then run `pip3 install -r requirements.txt`.
+1. Make a python 3.8 or higher virtual environment, then run `pip3 install -r requirements.txt`.
 2. Make you own copy of config files (e.g.: `./config/midi/my_setting.sh`) if you want to make some changes to the settings.
 3. Run `./pipeline.sh {midi_preprocess_config_filename} {bpe_config_filename} {training_config_filename}` to do everything for model training at once.
    - You need to add `--use-existed` at the end of the command to tell `pipeline.sh` not to overwrite existing data.

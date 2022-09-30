@@ -506,7 +506,7 @@ def handle_note_continuation(
     return None
 
 
-def piece_to_midi(piece: str, nth: int) -> MidiFile:
+def piece_to_midi(piece: str, nth: int, ignore_panding_note_error=False) -> MidiFile:
     # tick time == nth time
     midi = MidiFile(ticks_per_beat=nth//4)
 
@@ -610,32 +610,39 @@ def piece_to_midi(piece: str, nth: int) -> MidiFile:
             raise ValueError(f'bad token string: {text}')
 
     if len(pending_cont_notes) > 0:
-        # try to repair
-        for track_number, inst in enumerate(midi.instruments):
-            notes_to_remove = []
-            notes_to_add = []
-            for n in inst.notes:
-                if n.start in pending_cont_notes:
-                    info = (n.pitch, n.velocity, track_number)
-                    if info in pending_cont_notes[n.start]:
-                        notes_to_remove.append(n)
-                        new_note = handle_note_continuation(
-                            False,
-                            (n.pitch, n.end-n.start, n.velocity, track_number),
-                            n.start,
-                            pending_cont_notes)
-                        notes_to_add.append(new_note)
-            for n in notes_to_remove:
-                inst.notes.remove(n)
-            for n in notes_to_add:
-                inst.notes.append(n)
+        # because with bpe, sometimes a note will appears earlier than the continuing note it is going to be appending to
+        while True:
+            adding_note_count = 0
+            for track_number, inst in enumerate(midi.instruments):
+                notes_to_remove = []
+                notes_to_add = []
+                for n in inst.notes:
+                    if n.start in pending_cont_notes:
+                        info = (n.pitch, n.velocity, track_number)
+                        if info in pending_cont_notes[n.start]:
+                            notes_to_remove.append(n)
+                            new_note = handle_note_continuation(
+                                False,
+                                (n.pitch, n.end-n.start, n.velocity, track_number),
+                                n.start,
+                                pending_cont_notes)
+                            notes_to_add.append(new_note)
+                adding_note_count += len(notes_to_add)
+                for n in notes_to_remove:
+                    inst.notes.remove(n)
+                for n in notes_to_add:
+                    inst.notes.append(n)
+            if adding_note_count == 0:
+                break
 
-    assert len(pending_cont_notes) == 0, f'There are unclosed continuing notes: {pending_cont_notes}'
+    if not ignore_panding_note_error:
+        assert len(pending_cont_notes) == 0, f'There are unclosed continuing notes: {pending_cont_notes}'
+    else:
     # handle unclosed continuing notes
-    # for offset, info_onsets_dict in pending_cont_notes:
-    #     for info, onset_list in info_onsets_dict:
-    #         pitch, velocity, track_number = info
-    #         for onset in onset_list:
-    #             n = Note(velocity=velocity, pitch=pitch, start=onset, end=offset)
-    #             midi.instruments[track_number].notes.append(n)
+        for offset, info_onsets_dict in pending_cont_notes.items():
+            for info, onset_list in info_onsets_dict.items():
+                pitch, velocity, track_number = info
+                for onset in onset_list:
+                    n = Note(velocity=velocity, pitch=pitch, start=onset, end=offset)
+                    midi.instruments[track_number].notes.append(n)
     return midi
