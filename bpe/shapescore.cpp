@@ -168,13 +168,16 @@ void shapeScoring(
     std::vector<std::pair<Shape, T>>& shapeScore,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
-    double samplingRate
+    double samplingRate,
+    bool verbose
 ) {
     if (samplingRate <= 0 || 1 < samplingRate) {
         throw std::runtime_error("samplingRate in oursShapeCounting not in range (0, 1]");
     }
     bool isDefaultScoring = (scoringMethod == "default");
     bool isOursMerge = (mergeCoundition == "ours");
+
+    std::chrono::time_point<std::chrono::system_clock> partStartTimePoint = std::chrono::system_clock::now();
 
     std::vector<unsigned int> dictShapeCount(shapeDict.size(), 0);
     if (!isDefaultScoring) {
@@ -234,6 +237,8 @@ void shapeScoring(
             }
         }
     }
+    if (verbose) std::cout << "\nshape scoring time: " << (std::chrono::system_clock::now() - partStartTimePoint) / std::chrono::seconds(1) << '\n';
+    partStartTimePoint = std::chrono::system_clock::now();
     // merge parrallel maps
     for (int j = 1; j < max_thread_num; ++j) {
         for (auto it = shapeScoreParallel[j].cbegin(); it != shapeScoreParallel[j].cend(); it++) {
@@ -242,6 +247,7 @@ void shapeScoring(
     }
     shapeScore.reserve(shapeScoreParallel[0].size());
     shapeScore.assign(shapeScoreParallel[0].cbegin(), shapeScoreParallel[0].cend());
+    if (verbose) std::cout << "merge mp result time: " << (std::chrono::system_clock::now() - partStartTimePoint) / std::chrono::seconds(1) << '\n';
 }
 
 template<typename T>
@@ -268,7 +274,8 @@ void shapeScoring<unsigned int>(const Corpus& corpus,
     std::vector<std::pair<Shape, unsigned int>>& shapeScore,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
-    double samplingRate
+    double samplingRate,
+    bool verbose=false
 );
 
 template
@@ -277,7 +284,8 @@ void shapeScoring<double>(const Corpus& corpus,
     std::vector<std::pair<Shape, double>>& shapeScore,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
-    double samplingRate
+    double samplingRate,
+    bool verbose=false
 );
 
 template

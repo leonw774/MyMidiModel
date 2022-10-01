@@ -2,7 +2,6 @@
 #include "shapescore.hpp"
 #include <string>
 #include <algorithm>
-#include <chrono>
 
 int main(int argc, char *argv[]) {
     // read and validate args
@@ -82,7 +81,7 @@ int main(int argc, char *argv[]) {
 
     std::chrono::duration<double> onSencondDur = std::chrono::seconds(1);
     std::chrono::time_point<std::chrono::system_clock> programStartTimePoint = std::chrono::system_clock::now();
-    std::chrono::time_point<std::chrono::system_clock>ioStartTimePoint = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::system_clock> ioStartTimePoint = std::chrono::system_clock::now();
 
     // read parameters
     std::map<std::string, std::string> paras = readParasFile(parasFile);
@@ -148,7 +147,7 @@ int main(int argc, char *argv[]) {
         Shape maxScoreShape;
         if (scoring == "default") {
             partStartTimePoint = std::chrono::system_clock::now();
-            shapeScoring<unsigned int>(corpus, shapeDict, shapeScoreFreq, scoring, mergeCondition, samplingRate);
+            shapeScoring<unsigned int>(corpus, shapeDict, shapeScoreFreq, scoring, mergeCondition, samplingRate, verbose);
             shapeScoringTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
             partStartTimePoint = std::chrono::system_clock::now();
             std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScoreFreq);
@@ -163,7 +162,7 @@ int main(int argc, char *argv[]) {
         }
         else {
             partStartTimePoint = std::chrono::system_clock::now();
-            shapeScoring<double>(corpus, shapeDict, shapeScoreWPlike, scoring, mergeCondition, samplingRate);
+            shapeScoring<double>(corpus, shapeDict, shapeScoreWPlike, scoring, mergeCondition, samplingRate, verbose);
             shapeScoringTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
             partStartTimePoint = std::chrono::system_clock::now();
             std::pair<Shape, double> maxValPair = findMaxValPair(shapeScoreWPlike);

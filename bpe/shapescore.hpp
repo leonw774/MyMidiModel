@@ -21,7 +21,8 @@ void shapeScoring(
     std::vector<std::pair<Shape, T>>& shapeScore,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
-    double samplingRate
+    double samplingRate,
+    bool verbose
 );
 
 template<typename T>

@@ -55,10 +55,12 @@ int main(int argc, char *argv[]) {
         std::cout << "Failed to open merged corpus output file: " << outCorpusFilePath << std::endl;
         return 1;
     }
-    std::cout << "Output merged corpus file: " << outCorpusFilePath << std::endl;
+    std::cout << "Output merged corpus file: " << outCorpusFilePath << '\n'
+        << "Reading input files" << std::endl;
 
-    time_t begTime = time(0);
-    std::cout << "Reading input files" << std::endl;
+    std::chrono::duration<double> onSencondDur = std::chrono::seconds(1);
+    std::chrono::time_point<std::chrono::system_clock> programStartTimePoint = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::system_clock> ioStartTimePoint = std::chrono::system_clock::now();
 
     // read parameters
     std::map<std::string, std::string> paras = readParasFile(parasFile);
@@ -76,10 +78,11 @@ int main(int argc, char *argv[]) {
 
     // read notes from corpus
     Corpus corpus = readCorpusFile(inCorpusFile, nth, positionMethod);
+    std::cout << "Reading done. There are " << corpus.piecesTP.size() << " pieces" << std::endl;
 
-    // read shapes from vocab file
     std::vector<Shape> shapeDict = getDefaultShapeDict();
 
+    // read shapes from vocab file
     vocabFile.seekg(0, std::ios::beg);
     std::string line;
     while (vocabFile.good()) {
@@ -119,12 +122,12 @@ int main(int argc, char *argv[]) {
         line.clear();
     }
     vocabFile.close();
-
     std::cout << "Shape vocab size: " << shapeDict.size() << std::endl;
 
     // sort and count notes
     size_t startMultinoteCount = 0, multinoteCount = 0;
     size_t drumMultinoteCount = 0;
+    #pragma omp parallel for reduction(+: multinoteCount, drumMultinoteCount)
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             if (corpus.piecesTP[i][j] == 128) {
@@ -135,33 +138,37 @@ int main(int argc, char *argv[]) {
         }
     }
     startMultinoteCount = multinoteCount;
-    double startAvgMulpi = calculateAvgMulpiSize(corpus);
+    double startAvgMulpi = calculateAvgMulpiSize(corpus, false);
     double avgMulpi = startAvgMulpi;
 
-    std::cout << "Multinote count: " << multinoteCount
+    std::cout << "Start multinote count: " << multinoteCount
         << ", Drum's multinote count: " << drumMultinoteCount
-        << ", Average mulpi: " << avgMulpi
-        << ", Time: " << (unsigned int) time(0) - begTime << std::endl;
+        << ", Start average mulpi: " << avgMulpi
+        << ", Reading used time: " <<  (std::chrono::system_clock::now() - ioStartTimePoint) / onSencondDur << std::endl;
 
     if (multinoteCount == 0 || multinoteCount == drumMultinoteCount) {
         std::cout << "No notes to merge. Exited." << std::endl;
         return 1;
     }
 
-    time_t iterTime;
-    std::cout << "Index, Shape, Score, Multinote count, Time" << std::endl;
+    std::vector<std::pair<Shape, unsigned int>> shapeScoreFreq;
+    std::vector<std::pair<Shape, double>> shapeScoreWPlike;
+    double neighborUpdatingTime, shapeScoringTime, findMaxTime, mergeTime;
+    std::cout << "Index, Shape, Score, Multinote count, Iteration time, Neighbor updating time, Merge time" << std::endl;
     // start from 2 because index 0, 1 are default shapes
     for (int shapeIndex = 2; shapeIndex < shapeDict.size(); ++shapeIndex) {
         if (!verbose && shapeIndex != 0) 
             std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
         std::cout << shapeIndex << ", ";
-        iterTime = time(0);
-
+        std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint = std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::system_clock>partStartTimePoint = std::chrono::system_clock::now();
         updateNeighbor(corpus, shapeDict);
+        neighborUpdatingTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
         Shape mergingShape = shapeDict[shapeIndex];
         if (verbose) std::cout << "\"" << shape2str(mergingShape) << "\", ";
 
+        partStartTimePoint = std::chrono::system_clock::now();
         // merge MultiNotes with newly added shape
         // for each piece
         #pragma omp parallel for
@@ -229,11 +236,18 @@ int main(int argc, char *argv[]) {
                 multinoteCount += corpus.piecesMN[i][j].size();
             }
         }
+        mergeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
+        
         std::cout << multinoteCount << ", ";
-        std::cout << (unsigned int) time(0) - iterTime;
+        std::cout << (std::chrono::system_clock::now() - iterStartTimePoint) / onSencondDur << ", "
+            << neighborUpdatingTime << ", "
+            << shapeScoringTime << ", "
+            << findMaxTime << ", "
+            << mergeTime;
         if (verbose) std::cout << std::endl;
         else         std::cout.flush();
     }
+    if (!verbose) std::cout << '\n';
 
     multinoteCount = 0;
     #pragma omp parallel for reduction(+:multinoteCount)
@@ -248,11 +262,11 @@ int main(int argc, char *argv[]) {
         << ", Non-drum multinote reduce rate: " << 1 - (double) (multinoteCount - drumMultinoteCount) / (startMultinoteCount - drumMultinoteCount)
         << ", Average mulpi reduce rate: " << 1 - avgMulpi / startAvgMulpi << std::endl;
 
+    // Write files
+    ioStartTimePoint = std::chrono::system_clock::now();
     std::cout << "Writing merged corpus file" << std::endl;
-
     writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum, positionMethod);
-
-    std::cout << "Write merged corpus file done. Total used time: " << time(0)-begTime << std::endl;
-
+    std::cout << "Writing done. Writing used time: " << (std::chrono::system_clock::now() - ioStartTimePoint) / onSencondDur << '\n'
+        << "Total used time: " << (std::chrono::system_clock::now() - programStartTimePoint) / onSencondDur << std::endl;
     return 0;
 }
