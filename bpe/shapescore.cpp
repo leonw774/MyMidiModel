@@ -112,8 +112,11 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
 
 
 double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton) {
-    std::vector<uint8_t> multipiSizes;
+    unsigned int max_thread_num = omp_get_max_threads();
+    std::vector<uint8_t> multipiSizes[max_thread_num];
+    #pragma omp parallel for
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+        int thread_num = omp_get_thread_num();
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drums
@@ -142,16 +145,20 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton) {
             }
             for (auto it = thisTrackMulpiSizes.cbegin(); it != thisTrackMulpiSizes.cend(); ++it) {
                 if (it->second > 1 or !ignoreSingleton) {
-                    multipiSizes.push_back(it->second);
+                    multipiSizes[thread_num].push_back(it->second);
                 } 
             }
         }
     }
-    size_t totalMulpiSize = 0;
-    for (int i = 0; i < multipiSizes.size(); ++i) {
-        totalMulpiSize += multipiSizes[i];
+    size_t accumulatedMulpiSize = 0;
+    size_t mulpiCount = 0;
+    for (int i = 0; i < max_thread_num; ++i) {
+        for (int j = 0; j < multipiSizes[i].size(); ++j) {
+            accumulatedMulpiSize += multipiSizes[i][j];
+        }
+        mulpiCount += multipiSizes[i].size();
     }
-    return (double) totalMulpiSize / (double) multipiSizes.size();
+    return (double) accumulatedMulpiSize / (double) mulpiCount;
 }
 
 template<typename T>
@@ -186,6 +193,7 @@ void shapeScoring(
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         int thread_num = omp_get_thread_num();
         // for each track
+        #pragma omp parallel for
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drums
             if (corpus.piecesTP[i][j] == 128) continue;
@@ -228,11 +236,12 @@ void shapeScoring(
     }
     // merge parrallel maps
     for (int j = 1; j < max_thread_num; ++j) {
-        for (auto it = shapeScoreParallel[j].begin(); it != shapeScoreParallel[j].end(); it++) {
+        for (auto it = shapeScoreParallel[j].cbegin(); it != shapeScoreParallel[j].cend(); it++) {
             shapeScoreParallel[0][it->first] += it->second;
         }
     }
-    shapeScore.assign(shapeScoreParallel[0].begin(), shapeScoreParallel[0].end());
+    shapeScore.reserve(shapeScoreParallel[0].size());
+    shapeScore.assign(shapeScoreParallel[0].cbegin(), shapeScoreParallel[0].cend());
 }
 
 template<typename T>

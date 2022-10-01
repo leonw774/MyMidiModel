@@ -89,13 +89,13 @@ def main(corpus_dir_path, log_file_path):
                 )
             else:
                 left_texts = '\n'.join(
-                    [f'{k}={float(v)}' for k, v in dict(Series(col_list).describe()).items()]
+                    [f'{k}={float(v):.5f}' for k, v in dict(Series(col_list).describe()).items()]
                 )
             # fit y = a * e ^ (b * x)
             x = np.array(iter_nums)
             y = np.array(col_list)
             loga, b = np.polyfit(x, np.log(y), 1, w=np.sqrt(y))
-            left_texts += '\nexponential equation fit:\n  ' + f'y = {np.exp(loga):.4f} * e ^ ({b:.4f} * x)'
+            left_texts += '\nexponential equation fit:\n  ' + f'y = {np.exp(loga):.5f} * e ^ ({b:.5f} * x)'
             plt.subplots_adjust(left=0.2)
             plt.text(
                 x=0.01,
