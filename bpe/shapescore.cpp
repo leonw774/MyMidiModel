@@ -244,23 +244,26 @@ void shapeScoring(
     for (int i = 0; i < max_thread_num; ++i) {
         mergingMapIndices.push_back(i);
     }
-    // make merging do find O(logt) time, t is max_thread_num
-    // so that it becom O(log(t+n))
+    // do merging in O(logt) time, t is max_thread_num
+    // so that the time is O(log(t) * log(n))
     while (mergingMapIndices.size() > 1) {
-        // count from back to not disturb index number after erasing
+        #pragma omp parallel for
         for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
             int a = mergingMapIndices[i];
             int b = mergingMapIndices[i-1];
             for (auto it = shapeScoreParallelMaps[a].cbegin(); it != shapeScoreParallelMaps[a].cend(); it++) {
                 shapeScoreParallelMaps[b][it->first] += it->second;
             }
+        }
+        for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
             mergingMapIndices.erase(mergingMapIndices.begin()+i);
         }
+        // count from back to not disturb the index number when erasing
     }
     int lastIndex = mergingMapIndices[0];
     shapeScore.reserve(shapeScoreParallelMaps[lastIndex].size());
     shapeScore.assign(shapeScoreParallelMaps[lastIndex].cbegin(), shapeScoreParallelMaps[lastIndex].cend());
-    if (verbose) std::cout << "merge mp result time=" << (std::chrono::system_clock::now() - partStartTimePoint) / std::chrono::duration<double>(1) << ' ';
+    if (verbose) std::cout << "merge mp result time=" << (std::chrono::system_clock::now() - partStartTimePoint) / std::chrono::duration<double>(1);
 }
 
 template<typename T>
