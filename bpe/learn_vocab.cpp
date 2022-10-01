@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Output merged corpus file: " << outCorpusFilePath << '\n'
         << "Reading input files" << std::endl;
 
-    std::chrono::duration<double> onSencondDur = std::chrono::seconds(1);
+    std::chrono::duration<double> onSencondDur = std::chrono::duration<double>(1);
     std::chrono::time_point<std::chrono::system_clock> programStartTimePoint = std::chrono::system_clock::now();
     std::chrono::time_point<std::chrono::system_clock> ioStartTimePoint = std::chrono::system_clock::now();
 
