@@ -159,14 +159,14 @@ int main(int argc, char *argv[]) {
     for (int shapeIndex = 2; shapeIndex < shapeDict.size(); ++shapeIndex) {
         if (!verbose && shapeIndex != 0) 
             std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
-        std::cout << shapeIndex << ", ";
+        std::cout << shapeIndex;
         std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint = std::chrono::system_clock::now();
         std::chrono::time_point<std::chrono::system_clock>partStartTimePoint = std::chrono::system_clock::now();
         updateNeighbor(corpus, shapeDict);
         neighborUpdatingTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
         Shape mergingShape = shapeDict[shapeIndex];
-        if (verbose) std::cout << "\"" << shape2str(mergingShape) << "\", ";
+        if (verbose) std::cout << ", \"" << shape2str(mergingShape) << "\", ";
 
         partStartTimePoint = std::chrono::system_clock::now();
         // merge MultiNotes with newly added shape
