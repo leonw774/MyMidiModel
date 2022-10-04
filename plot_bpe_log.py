@@ -91,10 +91,10 @@ def main(corpus_dir_path, log_file_path):
                 left_texts = '\n'.join(
                     [f'{k}={float(v):.5f}' for k, v in dict(Series(col_list).describe()).items()]
                 )
-            # fit y = a * e ^ (b * x)
+            # fit y = a * log (x) + b
             x = np.array(iter_nums)
             y = np.array(col_list)
-            loga, b = np.polyfit(x, np.log(y), 1, w=np.sqrt(y))
+            loga, b = np.polyfit(np.log(x), y, 1)
             left_texts += '\nexponential equation fit:\n  ' + f'y = {np.exp(loga):.5f} * e ^ ({b:.5f} * x)'
             plt.subplots_adjust(left=0.2)
             plt.text(
@@ -106,20 +106,15 @@ def main(corpus_dir_path, log_file_path):
 
             plt.plot(iter_nums, col_list, label=col_name)
             plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}.png'))
+            plt.clf()
 
-        # draw shape size distribution
-        if col_name == 'Shape size':
-            plt.clf()
-            plt.figure(figsize=(16.8, 6.4))
-            plt.title(col_name+' histogram')
-            plt.hist(col_list)
-            plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}_hist.png'))
-            plt.clf()
-        else:
-            plt.yscale('log')
-            plt.title(col_name+' log scale')
-            plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}_logscale.png'))
-            plt.clf()
+            # draw shape size distribution
+            if col_name == 'Shape size':
+                plt.figure(figsize=(16.8, 6.4))
+                plt.title(col_name+' histogram')
+                plt.hist(col_list)
+                plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}_hist.png'))
+                plt.clf()
 
     print('Write bpe_stats json and png done.')
 

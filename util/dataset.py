@@ -93,9 +93,9 @@ class MidiDataset(Dataset):
                 mps_sep_indices = np.flatnonzero(np.isin(self.piece_files[filename][:, 0], self._mps_seperators))
                 self._file_mps_sep_indices[filenum] = []
                 for i in range(mps_sep_indices.shape[0] - 1):
-                    self._file_mps_sep_indices.append(mps_sep_indices[i])
+                    self._file_mps_sep_indices[filenum].append(mps_sep_indices[i])
                     if mps_sep_indices[i+1] != mps_sep_indices[i] + 1:
-                        self._file_mps_sep_indices.append(mps_sep_indices[i] + 1)
+                        self._file_mps_sep_indices[filenum].append(mps_sep_indices[i] + 1)
 
             cur_piece_files_length = self.piece_files[filename].shape[0]
             self._piece_files_length[filenum] = cur_piece_files_length

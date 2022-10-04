@@ -126,13 +126,13 @@ if [ -d $MODEL_DIR_PATH ]; then
 echo "Model dir: $MODEL_DIR_PATH"
 
 TRAIN_OTHER_ARGUMENTS=""
-test $USE_PERMUTABL_SUBSEQ_LOSS == true && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-permutable-subseq-loss"
-test $PERMUTE_MPS == true               && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-mps"
-test $PERMUTE_TRACK_NUMBER == true      && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-track-number"
-test $INPUT_NO_TEMPO == true            && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-tempo"
-test $INPUT_NO_TIME_SIGNATURE == true   && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-time-signatrue"
-test $LOG_HEAD_LOSSES == true           && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --log-head-losses"
-test -z $TRAIN_OTHER_ARGUMENTS && { echo "Appended ${TRAIN_OTHER_ARGUMENTS} to train.py's argument" | tee -a $LOG_PATH ; }
+test $USE_PERMUTABLE_SUBSEQ_LOSS == true && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-permutable-subseq-loss"
+test $PERMUTE_MPS == true                && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-mps"
+test $PERMUTE_TRACK_NUMBER == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-track-number"
+test $INPUT_NO_TEMPO == true             && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-tempo"
+test $INPUT_NO_TIME_SIGNATURE == true    && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-time-signatrue"
+test $LOG_HEAD_LOSSES == true            && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --log-head-losses"
+test -z "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended ${TRAIN_OTHER_ARGUMENTS} to train.py's argument" | tee -a $LOG_PATH ; }
 
 # change CUDA_VISIABLE_DEVICES according to the machine it runs on
 CUDA_VISIABLE_DEVICES=0,1 python3 train.py --max-seq-length $MAX_SEQ_LENGTH --sample-stride $SAMPLE_STRIDE \

@@ -245,7 +245,7 @@ void shapeScoring(
         mergingMapIndices.push_back(i);
     }
     // do merging in O(logt) time, t is max_thread_num
-    // so that the time is O(log(t) * log(n))
+    // so that the total time is O(log(t) * log(n))
     while (mergingMapIndices.size() > 1) {
         #pragma omp parallel for
         for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
