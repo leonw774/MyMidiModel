@@ -172,12 +172,15 @@ class MidiDataset(Dataset):
 
         # a numpy array of sequences sep indices would also be returned if self.use_permutable_subseq_loss
         if self.use_permutable_subseq_loss:
+            mps_sep_indices_list = [
+                i - begin_index
+                for i in self._file_mps_sep_indices[filenum]
+                if begin_index <= i < end_index
+            ]
             mps_sep_indices = np.array(
-                self._file_mps_sep_indices[filenum],
+                mps_sep_indices_list,
                 dtype=np.int16
             )
-            mps_sep_indices = mps_sep_indices[(mps_sep_indices >= begin_index) & (mps_sep_indices < end_index)]
-            mps_sep_indices -= begin_index
             return from_numpy(sliced_array), mps_sep_indices
 
         return from_numpy(sliced_array), None

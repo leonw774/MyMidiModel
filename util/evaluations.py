@@ -1,5 +1,5 @@
 import itertools
-from math import log, log2
+from math import log, isnan
 import random
 
 import numpy as np
@@ -110,6 +110,17 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int):
     durations_var = np.var(durations)
     velocities_mean = np.mean(velocities)
     velocities_var = np.var(velocities)
+
+    if isnan(pitch_histogram):
+        return {
+            'pitch_histogram_entropy': pitch_histogram_entropy,
+            'durations_mean': durations_mean,
+            'durations_var': durations_var,
+            'velocities_mean': velocities_mean,
+            'velocities_var': velocities_var,
+            'instrumentation_self_similarity': float('nan'),
+            'grooving_self_similarity': float('nan')
+        }
 
     measure_onsets = [0]
     cur_measure_length = 0

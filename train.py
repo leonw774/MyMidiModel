@@ -11,6 +11,7 @@ import torch
 from torch.utils.data import random_split, DataLoader
 from torch.optim import Adam, lr_scheduler
 import torchinfo
+# import torchviz
 
 from util.model import (
     MidiTransformerDecoder,
@@ -157,13 +158,13 @@ def parse_args():
         action='store_true'
     )
     global_parser.add_argument(
-        'corpus_dir_path',
-        type=str
-    )
-    global_parser.add_argument(
         '--eval-sample-number',
         type=int,
         default=64
+    )
+    global_parser.add_argument(
+        'corpus_dir_path',
+        type=str
     )
     # make them as dicts first
     global_args = dict()
@@ -191,7 +192,7 @@ def lr_warmup_and_linear_decay(step_num: int, warmup_steps: int, decay_end_ratio
 
 
 def log(
-        cur_step:int,
+        cur_step: int,
         start_time: int,
         scheduler: lr_scheduler,
         train_loss_list: list,
@@ -201,16 +202,17 @@ def log(
     avg_valid_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*valid_loss_list) ]
     avg_train_losses_str = ', '.join([f'{l:.4f}' for l in avg_train_losses])
     avg_valid_losses_str = ', '.join([f'{l:.4f}' for l in avg_valid_losses])
+    lr = scheduler.get_last_lr()[0]
     logging.info(
         'Time: %d, Learning rate: %.6f',
-        time()-start_time, scheduler.get_last_lr()[0]
+        time()-start_time, lr
     )
     logging.info(
-        'Avg. train losses: %s, Avg. accum. train loss: %.4f, Avg. valid losses: %s Avg. accum. valid loss: %.4f',
+        'Avg. train losses: %s Avg. accum. train loss: %.4f \nAvg. valid losses: %s Avg. accum. valid loss: %.4f',
         avg_train_losses_str, sum(avg_train_losses), avg_valid_losses_str, sum(avg_valid_losses)
     )
     if loss_file:
-        loss_file.write(f'{avg_train_losses_str}, {avg_valid_losses_str}\n')
+        loss_file.write(f'{cur_step}, {time()-start_time}, {lr:.6f}, {avg_train_losses_str}, {avg_valid_losses_str}\n')
 
 
 def valid(model, valid_dataloader, args):
@@ -283,7 +285,8 @@ def main():
     # loss csv file is in the checkpoint directory
     loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
     loss_file = open(loss_file_path, 'w+', encoding='utf8')
-    loss_csv_head = ', '.join(
+    loss_csv_head = 'step, time, learning_rate, '
+    loss_csv_head += ', '.join(
         ['train_' + n for n in OUTPUT_FEATURE_NAME]
             + ['train_total']
             + ['valid_' + n for n in OUTPUT_FEATURE_NAME]
@@ -373,17 +376,26 @@ def main():
             prediction = model(batch_input_seqs, batch_input_seq_mask)
 
             if args.data_args.use_permutable_subseq_loss:
+                # print(batch_mps_sep_indices)
+                # start_time = time()
                 head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
+                # print('calc_permutable_subseq_losses use time:', time() - start_time)
             else:
+                # start_time = time()
                 head_losses = calc_losses(prediction, batch_target_seqs)
+                # print('calc_losses use time:', time() - start_time)
             train_loss_list.append([float(hl) for hl in head_losses])
             loss = sum(head_losses)
+            # start_time = time()
+            # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
+            # dot.render(filename='lossbackward_mps', format='png')
             optimizer.zero_grad()
             loss.backward()
             # print(torch.cuda.memory_allocated()/1e6, 'MB')
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
             optimizer.step()
             scheduler.step()
+            # print('back propagate use time:', time() - start_time)
             torch.cuda.empty_cache()
 
         print('Validation')
@@ -420,13 +432,15 @@ def main():
     # training end
 
     # evaluation
-    print('Generating unconditional generation sample for evluation')
+    print('Generating unconditional generation sample for evaluation')
     best_model = torch.load(os.path.join(args.model_dir_path, 'best_model.pt'))
     eval_sample_features_per_piece = []
     for i in range(args.eval_sample_number):
         uncond_gen_text_list = generate_sample(best_model, args.data_args.max_seq_length)
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
-        eval_sample_features_per_piece.append(piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=10e6))
+        eval_sample_features_per_piece.append(
+            piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=10e6)
+        )
         open(os.path.join(eval_dir_path, f'{i}'), 'w+', encoding='utf8').write(uncond_gen_piece)
         piece_to_midi(uncond_gen_piece, vocabs.paras['nth']).dump(
             os.path.join(eval_dir_path, f'{i}.mid')
