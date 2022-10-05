@@ -46,15 +46,18 @@ void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict) {
                 int n = 1;
                 while (k+n < corpus.piecesMN[i][j].size()) {
                     // overlapping
-                    if ((corpus.piecesMN[i][j][k+n]).getOnset() < offsetTime) { 
+                    unsigned int nOnsetTime = (corpus.piecesMN[i][j][k+n]).getOnset();
+                    if (nOnsetTime < offsetTime) { 
                         n++;
                     }
                     // immediately after
-                    // else if ((immdAfterOnset == -1 || (corpus.piecesMN[i][j][k+n]).getOnset() == immdAfterOnset)
-                    //     && (corpus.piecesMN[i][j][k+n]).getOnset() - offsetTime <= 4 * RelNote::onsetLimit) // add distance limit to immedAfter ) {
-                    else if (immdAfterOnset == -1 || (corpus.piecesMN[i][j][k+n]).getOnset() == immdAfterOnset) {
-                        immdAfterOnset = (corpus.piecesMN[i][j][k+n]).getOnset();
+                    else if (immdAfterOnset == -1 || nOnsetTime == immdAfterOnset) {
                         n++;
+                        // distance limit to immedAfter
+                        if (nOnsetTime - offsetTime > 3 * ((unsigned int) RelNote::onsetLimit)) {
+                            break;
+                        }
+                        immdAfterOnset = nOnsetTime;
                     }
                     else {
                         break;
