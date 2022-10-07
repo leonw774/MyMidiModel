@@ -182,16 +182,26 @@ void shapeScoring(
 
     std::chrono::time_point<std::chrono::system_clock> partStartTimePoint = std::chrono::system_clock::now();
 
-    std::vector<unsigned int> dictShapeCount(shapeDict.size(), 0);
+    std::vector<double> dictShapeCount(shapeDict.size(), 0);
+    size_t multinoteCount = 0;
     if (!isDefaultScoring) {
+        #pragma omp parallel for reduction(+: multinoteCount)
         for (int i = 0; i < corpus.piecesMN.size(); ++i) {
             for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
+                if (corpus.piecesTP[i][j] == 128) {
+                    break;
+                }
+                multinoteCount += corpus.piecesMN[i][j].size();
                 for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
-                    dictShapeCount[corpus.piecesMN[i][j][k].getShapeIndex()]++;
+                    dictShapeCount[corpus.piecesMN[i][j][k].getShapeIndex()] += 1;
                 }
             }
         }
+        for (int a = 0; a < dictShapeCount.size(); ++a) {
+            dictShapeCount[a] /= multinoteCount;
+        }
     }
+
 
     unsigned int max_thread_num = omp_get_max_threads();
     std::map<Shape, T> shapeScoreParallelMaps[max_thread_num];
@@ -232,8 +242,8 @@ void shapeScoring(
                     }
                     else {
                         unsigned int lShapeIndex = corpus.piecesMN[i][j][k].getShapeIndex(),
-                                    rShapeIndex = corpus.piecesMN[i][j][k+n].getShapeIndex();
-                        double v = 1 / (dictShapeCount[lShapeIndex] + dictShapeCount[rShapeIndex]);
+                                     rShapeIndex = corpus.piecesMN[i][j][k+n].getShapeIndex();
+                        double v = 1.0 / (dictShapeCount[lShapeIndex] + dictShapeCount[rShapeIndex]);
                         shapeScoreParallelMaps[thread_num][s] += v;
                     }
                 }

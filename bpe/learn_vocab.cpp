@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
             maxScoreShape = maxValPair.first;
-            std::cout << ", " << shapeScoreFreq.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
+            std::cout << ", " << shapeScoreWPlike.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
             shapeScoreWPlike.clear();
             findMaxTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
         }
