@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
         std::cout << shapeIndex;
         std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint = std::chrono::system_clock::now();
         std::chrono::time_point<std::chrono::system_clock>partStartTimePoint = std::chrono::system_clock::now();
-        updateNeighbor(corpus, shapeDict);
+        updateNeighbor(corpus, shapeDict, maxDur*2);
         neighborUpdatingTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
         Shape mergingShape = shapeDict[shapeIndex];
