@@ -2,8 +2,9 @@
 #define SHAPE_SCORING_H
 
 #define COUNTING_THREAD_NUM 8
+#define IGNORE_DRUM false
 
-void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict);
+void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit);
 
 Shape getShapeOfMultiNotePair(
     const MultiNote& lmn,

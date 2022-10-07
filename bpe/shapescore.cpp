@@ -27,15 +27,15 @@ int gcd (unsigned int* arr, unsigned int size) {
     return g;
 }
 
-void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict) {
+void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit) {
     // for each piece
     #pragma omp parallel for
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         // for each track
         #pragma omp parallel for
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-            // ignore drum
-            if (corpus.piecesTP[i][j] == 128) continue;
+            // ignore drum?
+            if (corpus.piecesTP[i][j] == 128 && IGNORE_DRUM) continue;
             // for each multinote
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // printTrack(corpus.piecesMN[i][j], shapeDict, k, 1);
@@ -53,8 +53,8 @@ void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict) {
                     // immediately after
                     else if (immdAfterOnset == -1 || nOnsetTime == immdAfterOnset) {
                         n++;
-                        // distance limit to immedAfter
-                        if (nOnsetTime - offsetTime > 3 * ((unsigned int) RelNote::onsetLimit)) {
+                        // gap limit of immedAfter
+                        if (nOnsetTime - offsetTime > gapLimit) {
                             break;
                         }
                         immdAfterOnset = nOnsetTime;
@@ -122,8 +122,8 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton) {
         int thread_num = omp_get_thread_num();
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-            // ignore drums
-            if (corpus.piecesTP[i][j] == 128) continue;
+            // ignore drum?
+            if (corpus.piecesTP[i][j] == 128 && IGNORE_DRUM) continue;
 
             // key: 64 bits: upper 17 unused, 7 for velocity, 8 for duration (time_unit), 32 for onset
             // value: occurence count
@@ -188,9 +188,8 @@ void shapeScoring(
         #pragma omp parallel for reduction(+: multinoteCount)
         for (int i = 0; i < corpus.piecesMN.size(); ++i) {
             for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-                if (corpus.piecesTP[i][j] == 128) {
-                    break;
-                }
+                // ignore drum?
+                if (corpus.piecesTP[i][j] == 128 && IGNORE_DRUM) continue;
                 multinoteCount += corpus.piecesMN[i][j].size();
                 for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                     dictShapeCount[corpus.piecesMN[i][j][k].getShapeIndex()] += 1;
@@ -211,8 +210,8 @@ void shapeScoring(
         int thread_num = omp_get_thread_num();
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-            // ignore drums
-            if (corpus.piecesTP[i][j] == 128) continue;
+            // ignore drum?
+            if (corpus.piecesTP[i][j] == 128 && IGNORE_DRUM) continue;
             // ignore by random
             if (samplingRate != 1.0) {
                 if ((double) rand() / RAND_MAX > samplingRate) continue;

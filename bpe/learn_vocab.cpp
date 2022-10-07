@@ -140,7 +140,7 @@ int main(int argc, char *argv[]) {
         std::cout << iterCount;
         std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint = std::chrono::system_clock::now();
         std::chrono::time_point<std::chrono::system_clock>partStartTimePoint = std::chrono::system_clock::now();
-        updateNeighbor(corpus, shapeDict);
+        updateNeighbor(corpus, shapeDict, maxDur*2);
         neighborUpdatingTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
         // clac shape scores
@@ -187,8 +187,8 @@ int main(int argc, char *argv[]) {
             // for each track
             #pragma omp parallel for
             for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-                // ignore drum
-                if (corpus.piecesTP[i][j] == 128) continue;
+                // ignore drum?
+                if (corpus.piecesTP[i][j] == 128 && IGNORE_DRUM) continue;
                 // for each multinote
                 for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                     // for each neighbor
@@ -272,7 +272,7 @@ int main(int argc, char *argv[]) {
     avgMulpi = calculateAvgMulpiSize(corpus);
     std::cout << "Ending multinote count: " << multinoteCount
         << ", Ending average mulpi: " << avgMulpi
-        << ", Non-drum multinote reduce rate: " << 1 - (double) (multinoteCount - drumMultinoteCount) / (startMultinoteCount - drumMultinoteCount)
+        << ", Multinote reduce rate: " << 1 - (double) multinoteCount / startMultinoteCount
         << ", Average mulpi reduce rate: " << 1 - avgMulpi / startAvgMulpi << std::endl;
 
     // Write files
