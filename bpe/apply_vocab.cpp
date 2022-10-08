@@ -198,8 +198,7 @@ int main(int argc, char *argv[]) {
                         Shape s = getShapeOfMultiNotePair(
                             corpus.piecesMN[i][j][k],
                             corpus.piecesMN[i][j][k+n],
-                            shapeDict[corpus.piecesMN[i][j][k].getShapeIndex()],
-                            shapeDict[corpus.piecesMN[i][j][k+n].getShapeIndex()]
+                            shapeDict
                         );
                         if (s == mergingShape) {
                             // change left multinote to merged multinote

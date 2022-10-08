@@ -9,8 +9,7 @@ void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigne
 Shape getShapeOfMultiNotePair(
     const MultiNote& lmn,
     const MultiNote& rmn,
-    const Shape& lShape,
-    const Shape& rShape
+    const std::vector<Shape>& shapeDict
 );
 
 double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton=false);

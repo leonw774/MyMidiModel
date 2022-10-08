@@ -78,10 +78,11 @@ struct MultiNote {
     uint8_t vel;
 
     // neighbor store relative index from this multinote to others
-    // if neighbor > 0, any multinote in (i+1) ~ (i+neighbor) where i is the index of current multinote
+    // if neighbor > 0, any multinote in index (i+1) ~ (i+neighbor) where i is the index of current multinote
     // is this multinote's neighbor
-    // because we only search toward greater index, it should only be positive integer
+    // because we only search toward greater index, it should only be positive integer or zero
     uint8_t neighbor;
+    static const uint8_t neighborLimit = 0x20;
 
     MultiNote(bool isCont, uint32_t o, uint8_t p, uint8_t d, uint8_t v);
 

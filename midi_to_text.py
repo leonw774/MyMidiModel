@@ -148,6 +148,9 @@ def handler(args_dict: dict):
         raise e
     except Exception as e:
         logging.debug(format_exc())
+        if not (repr(e).startswith('Assert') or repr(e).startswith('Runtime')):
+            print('%d pid: %d file path: %s', n, os.getpid(), args_dict['midi_file_path'])
+            print(repr(e))
         return repr(e)
 
 

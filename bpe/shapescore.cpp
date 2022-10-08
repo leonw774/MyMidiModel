@@ -44,7 +44,7 @@ void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigne
                 unsigned int offsetTime = corpus.piecesMN[i][j][k].getOnset() + maxRelOffset * corpus.piecesMN[i][j][k].unit;
                 unsigned int immdAfterOnset = -1;
                 int n = 1;
-                while (k+n < corpus.piecesMN[i][j].size()) {
+                while (k+n < corpus.piecesMN[i][j].size() && n < MultiNote::neighborLimit) {
                     // overlapping
                     unsigned int nOnsetTime = (corpus.piecesMN[i][j][k+n]).getOnset();
                     if (nOnsetTime < offsetTime) { 
@@ -69,7 +69,9 @@ void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigne
     }
 }
 
-Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const Shape& lShape, const Shape& rShape) {
+Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const std::vector<Shape>& shapeDict) {
+    Shape lShape = shapeDict[lmn.getShapeIndex()],
+          rShape = shapeDict[rmn.getShapeIndex()];
     int leftSize = lShape.size(), rightSize = rShape.size();
     int pairSize = leftSize + rightSize;
     Shape pairShape;
@@ -201,7 +203,6 @@ void shapeScoring(
         }
     }
 
-
     unsigned int max_thread_num = omp_get_max_threads();
     std::map<Shape, T> shapeScoreParallelMaps[max_thread_num];
 
@@ -209,17 +210,19 @@ void shapeScoring(
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         int thread_num = omp_get_thread_num();
         // for each track
+        // ignore some pieces by random
+        if (samplingRate != 1.0) {
+            if ((double) rand() / RAND_MAX > samplingRate) continue;
+        }
+        // to reduce the times we do find operation in big set
+        std::map<Shape, T> tempScoreDiff;
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drum?
             if (corpus.piecesTP[i][j] == 128 && IGNORE_DRUM) continue;
-            // ignore by random
-            if (samplingRate != 1.0) {
-                if ((double) rand() / RAND_MAX > samplingRate) continue;
-            }
             // for each multinote
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // for each neighbor
-                for (int n = 1; n < corpus.piecesMN[i][j][k].neighbor; ++n) {
+                for (int n = 1; n <= corpus.piecesMN[i][j][k].neighbor; ++n) {
                     if (isOursMerge) {
                         if (corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel) continue;
                     }
@@ -231,22 +234,26 @@ void shapeScoring(
                     Shape s = getShapeOfMultiNotePair(
                         corpus.piecesMN[i][j][k],
                         corpus.piecesMN[i][j][k+n],
-                        shapeDict[corpus.piecesMN[i][j][k].getShapeIndex()],
-                        shapeDict[corpus.piecesMN[i][j][k+n].getShapeIndex()]
+                        shapeDict
                     );
                     // empty shape is bad shape
                     if (s.size() == 0) continue;
                     if (isDefaultScoring) {
-                        shapeScoreParallelMaps[thread_num][s] += 1;
+                        // shapeScoreParallelMaps[thread_num][s] += 1;
+                        tempScoreDiff[s] += 1;
                     }
                     else {
                         unsigned int lShapeIndex = corpus.piecesMN[i][j][k].getShapeIndex(),
                                      rShapeIndex = corpus.piecesMN[i][j][k+n].getShapeIndex();
                         double v = 1.0 / (dictShapeCount[lShapeIndex] + dictShapeCount[rShapeIndex]);
-                        shapeScoreParallelMaps[thread_num][s] += v;
+                        // shapeScoreParallelMaps[thread_num][s] += v;
+                        tempScoreDiff[s] += v;
                     }
                 }
             }
+        }
+        for (auto it = tempScoreDiff.cbegin(); it != tempScoreDiff.cend(); it++) {
+            shapeScoreParallelMaps[thread_num][it->first] += it->second;
         }
     }
     if (verbose) std::cout << " shape scoring time=" << (std::chrono::system_clock::now() - partStartTimePoint) / std::chrono::duration<double>(1) << ' ';

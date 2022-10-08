@@ -192,7 +192,7 @@ int main(int argc, char *argv[]) {
                 // for each multinote
                 for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                     // for each neighbor
-                    for (int n = 1; n < corpus.piecesMN[i][j][k].neighbor; ++n) {
+                    for (int n = 1; n <= corpus.piecesMN[i][j][k].neighbor; ++n) {
                         if (k + n >= corpus.piecesMN[i][j].size()) {
                             continue;
                         }
@@ -209,8 +209,7 @@ int main(int argc, char *argv[]) {
                         Shape s = getShapeOfMultiNotePair(
                             corpus.piecesMN[i][j][k],
                             corpus.piecesMN[i][j][k+n],
-                            shapeDict[corpus.piecesMN[i][j][k].getShapeIndex()],
-                            shapeDict[corpus.piecesMN[i][j][k+n].getShapeIndex()]
+                            shapeDict
                         );
                         if (s == maxScoreShape) {
                             // change left multinote to merged multinote

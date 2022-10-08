@@ -51,24 +51,24 @@ def merge_tracks(
         bad_tracks_mapping = dict()
 
         for track in tracks[:max_track_number]:
-            track_attr = (track.program, track.is_drum)
-            if track_attr in good_tracks_mapping:
-                good_tracks_mapping[track_attr].append(track)
+            track_program = track.program if not track.is_drum else 128
+            if track_program in good_tracks_mapping:
+                good_tracks_mapping[track_program].append(track)
             else:
-                good_tracks_mapping[track_attr] = [track]
+                good_tracks_mapping[track_program] = [track]
         for track in tracks[max_track_number:]:
-            track_attr = (track.program, track.is_drum)
-            if track_attr in bad_tracks_mapping:
-                bad_tracks_mapping[track_attr].append(track)
+            track_program = track.program if not track.is_drum else 128
+            if track_program in bad_tracks_mapping:
+                bad_tracks_mapping[track_program].append(track)
             else:
-                bad_tracks_mapping[track_attr] = [track]
+                bad_tracks_mapping[track_program] = [track]
 
         # print(midi_file_path)
-        for bad_track_attr, bad_track_list in bad_tracks_mapping.items():
-            if bad_track_attr in good_tracks_mapping:
+        for bad_track_program, bad_track_list in bad_tracks_mapping.items():
+            if bad_track_program in good_tracks_mapping:
                 for bad_track in bad_track_list:
                     # find one track to merge
-                    rand_good_track = random.choice(good_tracks_mapping[bad_track_attr])
+                    rand_good_track = random.choice(good_tracks_mapping[bad_track_program])
                     rand_good_track.notes.extend(bad_track.notes)
             else:
                 # discard all tracks in bad_tracks_mapping
@@ -232,7 +232,7 @@ def get_time_structure_tokens(
             time_to_last_note_end = last_note_end - cur_timesig_start
             num_of_measures = (time_to_last_note_end // nth_per_measure) + 1
             next_timesig_start = cur_timesig_start + num_of_measures * nth_per_measure
-        
+
         # if note not started yet
         if next_timesig_start <= first_note_start:
             continue
