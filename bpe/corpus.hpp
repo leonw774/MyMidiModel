@@ -82,7 +82,7 @@ struct MultiNote {
     // is this multinote's neighbor
     // because we only search toward greater index, it should only be positive integer or zero
     uint8_t neighbor;
-    static const uint8_t neighborLimit = 0x20;
+    static const uint8_t neighborLimit = 0x7f;
 
     MultiNote(bool isCont, uint32_t o, uint8_t p, uint8_t d, uint8_t v);
 

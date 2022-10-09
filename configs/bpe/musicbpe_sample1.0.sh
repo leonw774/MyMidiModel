@@ -1,6 +1,6 @@
 #!/bin/bash
 # bpe parameters
-BPE_ITER=1000
+BPE_ITER=128
 SCORING="default"
 MERGE_CONDITION="musicbpe"
 MIN_SCORE_LIMIT=0
