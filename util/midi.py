@@ -575,9 +575,6 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error=False) -> Midi
             if len(note_attr) == 5:
                 cur_time = note_attr[4] + cur_measure_onset
                 note_attr = note_attr[:4]
-            # if note_attr[0] == 41 and note_attr[2] == 56 and note_attr[3] == 2:
-            #     print(note_attr)
-            #     print('cur_time', cur_time)
             n = handle_note_continuation(is_cont, note_attr, cur_time, pending_cont_notes)
             if n is not None:
                 midi.instruments[note_attr[3]].notes.append(n)
@@ -599,11 +596,8 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error=False) -> Midi
                 cur_time = position[0] + cur_measure_onset
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
                 note_attr = (base_pitch + rel_pitch, rel_dur * time_unit, velocity, track_number)
-                onset_time_in_tick = cur_time + rel_onset * time_unit
-                # if note_attr[0] == 41 and note_attr[2] == 56:
-                #     print(note_attr)
-                #     print('onset_time_in_tick', onset_time_in_tick)
-                n = handle_note_continuation(is_cont, note_attr, onset_time_in_tick, pending_cont_notes)
+                onset_time = cur_time + rel_onset * time_unit
+                n = handle_note_continuation(is_cont, note_attr, onset_time, pending_cont_notes)
                 if n is not None:
                     midi.instruments[track_number].notes.append(n)
         else:
