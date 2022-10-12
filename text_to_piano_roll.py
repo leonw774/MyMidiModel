@@ -1,11 +1,14 @@
 import sys
 
-from matplotlib.patches import Rectangle
+import matplotlib
+from matplotlib.patches import Rectangle, Ellipse
 from matplotlib import pyplot as plt
 
 from util import CorpusIterator, get_corpus_paras, b36str2int
 
-TRANSPARENT_GREY = (0.8, 0.8, 0.8, 0.8)
+MEASURELINE_COLOR = (0.8, 0.8, 0.8, 1.0)
+TRACK_COLORMAP = matplotlib.colormaps['terrain']
+SHAPE_LINE_COLOR = (0.88, 0.2, 0.24, 0.8)
 
 def print_help():
     print('python3 text_to_piano_roll.py corpus_dir_path out_path begin end')
@@ -36,10 +39,8 @@ def text_to_piano_roll_read_args():
     return corpus_dir_path, out_path, begin, end
 
 def plot_roll(piece, nth, output_file_path):
+
     plt.clf()
-    plt.xlabel('Time')
-    plt.ylabel('Pitch')
-    # plt.ylim(0, 127)
     text_list = piece.split(' ')
 
     cur_measure_length = 0
@@ -52,11 +53,16 @@ def plot_roll(piece, nth, output_file_path):
             cur_measure_onset += cur_measure_length
             cur_measure_length = round(nth * numer / denom)
 
-    figure_width = min((cur_measure_onset+cur_measure_length)*0.5, 64)
+    max_time = cur_measure_onset+cur_measure_length
+    figure_width = min(max_time*0.1, 128)
     plt.figure(figsize=(figure_width, 12.8))
-    plt.subplots_adjust(left=0.025, right=0.975, top=0.975, bottom=0.05)
+    # plt.subplots_adjust(left=0.025, right=0.975, top=0.975, bottom=0.05)
     current_axis = plt.gca()
 
+    is_head = True
+    track_colors = []
+    drum_tracks = set()
+    total_track_number = 0
     cur_time = 0
     cur_measure_length = 0
     cur_measure_onset = 0
@@ -64,9 +70,18 @@ def plot_roll(piece, nth, output_file_path):
     for text in text_list[1:-1]:
         typename = text[0]
         if typename == 'R':
-            pass
+            total_track_number += 1
+            track_number, instrument = (b36str2int(x) for x in text[1:].split(':'))
+            if instrument == 128:
+                drum_tracks.add(track_number)
 
         elif typename == 'M':
+            if is_head:
+                track_colors = [
+                    TRACK_COLORMAP(i / total_track_number, alpha=0.5)
+                    for i in range(total_track_number)
+                ]
+                is_head = False
             numer, denom = (b36str2int(x) for x in text[1:].split('/'))
             cur_measure_onset += cur_measure_length
             cur_time = cur_measure_onset
@@ -74,7 +89,7 @@ def plot_roll(piece, nth, output_file_path):
             # if cur_time_signature != (numer, denom):
             #     cur_time_signature = (numer, denom)
             # draw measure line between itself and the next measure
-            plt.axvline(x=cur_time+cur_measure_length, ymin=0, ymax=128, color=TRANSPARENT_GREY, linewidth=0.5, zorder=0)
+            plt.axvline(x=cur_time, ymin=0, ymax=128, color=MEASURELINE_COLOR, linewidth=0.5, zorder=0)
 
         elif typename == 'P':
             position = b36str2int(text[1:])
@@ -86,7 +101,7 @@ def plot_roll(piece, nth, output_file_path):
                 cur_time = position + cur_measure_onset
             else:
                 tempo = b36str2int(text[1:])
-            plt.text(x=cur_time, y=128, s=f'Tempo={tempo}')
+            plt.annotate(xy=(cur_time+0.05, 0.95), text=f'bpm={tempo}', xycoords=('data', 'axes fraction'))
 
         elif typename == 'N':
             is_cont = (text[1] == '~')
@@ -98,12 +113,20 @@ def plot_roll(piece, nth, output_file_path):
                 cur_time = note_attr[4] + cur_measure_onset
                 note_attr = note_attr[:4]
             pitch, duration, velocity, track_number = note_attr
-            current_axis.add_patch(
-                Rectangle(
-                    (cur_time, pitch), duration-0.1, 0.8,
-                    edgecolor='grey', linewidth=0.75, facecolor='lightblue', fill=True
+            if track_number in drum_tracks:
+                current_axis.add_patch(
+                    Ellipse(
+                        (cur_time+0.4, pitch+0.4), max_time / 256 * 0.1, 0.4,
+                        edgecolor='grey', linewidth=0.75, facecolor=track_colors[track_number], fill=True
+                    )
                 )
-            )
+            else:
+                current_axis.add_patch(
+                    Rectangle(
+                        (cur_time, pitch), duration-0.2, 0.8,
+                        edgecolor='grey', linewidth=0.75, facecolor=track_colors[track_number], fill=True
+                    )
+                )
 
         elif typename == 'S':
             shape_string, *other_attr = text[1:].split(':')
@@ -125,22 +148,36 @@ def plot_roll(piece, nth, output_file_path):
                 pitch = base_pitch + rel_pitch
                 duration = rel_dur * time_unit
                 onset_time = cur_time + rel_onset * time_unit
-                current_axis.add_patch(
-                    Rectangle(
-                        (onset_time, pitch), duration-0.1, 0.8,
-                        edgecolor='grey', linewidth=0.75, facecolor='lightblue', fill=True
+                if track_number in drum_tracks:
+                    current_axis.add_patch(
+                        Ellipse(
+                            (onset_time+0.4, pitch+0.4), max_time / 256 * 0.2, 0.4,
+                            edgecolor='grey', linewidth=0.75, facecolor=track_colors[track_number], fill=True
+                        )
                     )
-                )
+                else:
+                    current_axis.add_patch(
+                        Rectangle(
+                            (onset_time, pitch), duration-0.2, 0.8,
+                            edgecolor='grey', linewidth=0.75, facecolor=track_colors[track_number], fill=True
+                        )
+                    )
                 if prev_pitch is not None:
                     plt.plot(
-                        [prev_onset_time+0.4, onset_time+0.4], [prev_pitch+0.4, pitch+0.4],
-                        color=(0.9, 0.12, 0.2, 0.9), marker='o', markersize=2, linewidth=1.0
+                        [prev_onset_time+0.4, onset_time+0.8], [prev_pitch+0.8, pitch+0.4],
+                        color=SHAPE_LINE_COLOR,  linewidth=1.0,
+                        markerfacecolor=track_colors[track_number], marker='.', markersize=1
                     )
                 prev_pitch = pitch
                 prev_onset_time = onset_time
         else:
             raise ValueError(f'bad token string: {text}')
+    plt.xlabel('Time')
+    plt.ylabel('Pitch')
+    plt.xlim(xmin=0)
     plt.autoscale()
+    plt.margins(x=0)
+    plt.tight_layout()
     plt.savefig(output_file_path)
 
 def text_to_piano_roll(corpus_dir_path, out_path, begin, end):

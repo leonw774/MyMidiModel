@@ -4,7 +4,7 @@
 #include <random>
 #include "omp.h"
 
-int gcd (unsigned int a, unsigned int b) {
+unsigned int gcd(unsigned int a, unsigned int b) {
     if (a == b) return a;
     if (a == 0 || b == 0) return ((a > b) ? a : b);
     if (a == 1 || b == 1) return 1;
@@ -17,9 +17,9 @@ int gcd (unsigned int a, unsigned int b) {
     return a;
 }
 
-int gcd (unsigned int* arr, unsigned int size) {
+unsigned int gcd(unsigned int* arr, unsigned int size) {
     int g = arr[0];
-    for (int i = 1; i < size; ++i) {
+    for (int i = 1; i < size && g != 1; ++i) {
         if (arr[i] != 0) {
             g = gcd(g, arr[i]);
         }
@@ -84,34 +84,35 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
     unitAndOnsets[rightSize] = lmn.unit;
     unitAndOnsets[rightSize+1] = rmn.unit;
     unsigned int newUnit = gcd(unitAndOnsets, rightSize+2);
-    // checking to prevent overflow, because RelNote's onset has value limit
+    // check to prevent overflow, because RelNote's onset is stored in uint8
     for (int i = 0; i < rightSize; ++i) {
         if (unitAndOnsets[i] / newUnit > RelNote::onsetLimit) {
             badShape = true;
             break;
         }
     }
-    if (!badShape) {
-        pairShape.resize(pairSize);
-        for (int i = 0; i < pairSize; ++i) {
-            if (i < leftSize) {
-                if (i != 0) {
-                    pairShape[i].setRelOnset(lShape[i].getRelOnset() * lmn.unit / newUnit);
-                    pairShape[i].relPitch = lShape[i].relPitch;
-                }
-                pairShape[i].relDur = lShape[i].relDur * lmn.unit / newUnit;
-                pairShape[i].setCont(lShape[i].isCont());
+    if (badShape)
+        // return empty shape
+        return pairShape;
+    pairShape.resize(pairSize);
+    for (int i = 0; i < pairSize; ++i) {
+        if (i < leftSize) {
+            if (i != 0) {
+                pairShape[i].setRelOnset(lShape[i].getRelOnset() * lmn.unit / newUnit);
+                pairShape[i].relPitch = lShape[i].relPitch;
             }
-            else {
-                int j = i - leftSize;
-                pairShape[i].setRelOnset(unitAndOnsets[j] / newUnit);
-                pairShape[i].relPitch = rShape[j].relPitch + rmn.pitch - lmn.pitch;
-                pairShape[i].relDur = rShape[j].relDur * rmn.unit / newUnit;
-                pairShape[i].setCont(rShape[j].isCont());
-            }
+            pairShape[i].relDur = lShape[i].relDur * lmn.unit / newUnit;
+            pairShape[i].setCont(lShape[i].isCont());
         }
-        std::sort(pairShape.begin(), pairShape.end());
+        else {
+            int j = i - leftSize;
+            pairShape[i].setRelOnset(unitAndOnsets[j] / newUnit);
+            pairShape[i].relPitch = rShape[j].relPitch + rmn.pitch - lmn.pitch;
+            pairShape[i].relDur = rShape[j].relDur * rmn.unit / newUnit;
+            pairShape[i].setCont(rShape[j].isCont());
+        }
     }
+    std::sort(pairShape.begin(), pairShape.end());
     return pairShape;
 }
 
@@ -203,19 +204,23 @@ void shapeScoring(
         }
     }
 
-    unsigned int max_thread_num = omp_get_max_threads();
-    std::map<Shape, T> shapeScoreParallelMaps[max_thread_num];
-
-    #pragma omp parallel for
+    std::vector<unsigned int> samplePieceIndices;
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
-        int thread_num = omp_get_thread_num();
-        // for each track
-        // ignore some pieces by random
         if (samplingRate != 1.0) {
             if ((double) rand() / RAND_MAX > samplingRate) continue;
         }
-        // to reduce the times we do find operation in big set
+        samplePieceIndices.push_back(i);
+    }
+
+    unsigned int max_thread_num = omp_get_max_threads();
+    std::map<Shape, T> shapeScoreParallel[max_thread_num];
+    #pragma omp parallel for
+    for (int h = 0; h < samplePieceIndices.size(); ++h) {
+        int i = samplePieceIndices[h];
+        int thread_num = omp_get_thread_num();
+        // to reduce the times we do "find" operations in big set
         std::map<Shape, T> tempScoreDiff;
+        // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drum?
             if (corpus.piecesTP[i][j] == 128 && IGNORE_DRUM) continue;
@@ -239,21 +244,20 @@ void shapeScoring(
                     // empty shape is bad shape
                     if (s.size() == 0) continue;
                     if (isDefaultScoring) {
-                        // shapeScoreParallelMaps[thread_num][s] += 1;
+                        // shapeScoreParallel[thread_num][s] += 1;
                         tempScoreDiff[s] += 1;
                     }
                     else {
                         unsigned int lShapeIndex = corpus.piecesMN[i][j][k].getShapeIndex(),
                                      rShapeIndex = corpus.piecesMN[i][j][k+n].getShapeIndex();
-                        double v = 1.0 / (dictShapeCount[lShapeIndex] + dictShapeCount[rShapeIndex]);
-                        // shapeScoreParallelMaps[thread_num][s] += v;
-                        tempScoreDiff[s] += v;
+                        tempScoreDiff[s] += 1.0 / (dictShapeCount[lShapeIndex] + dictShapeCount[rShapeIndex]);
+                        // shapeScoreParallel[thread_num][s] += 1.0 / (dictShapeCount[lShapeIndex] + dictShapeCount[rShapeIndex]);
                     }
                 }
             }
         }
         for (auto it = tempScoreDiff.cbegin(); it != tempScoreDiff.cend(); it++) {
-            shapeScoreParallelMaps[thread_num][it->first] += it->second;
+            shapeScoreParallel[thread_num][it->first] += it->second;
         }
     }
     if (verbose) std::cout << " shape scoring time=" << (std::chrono::system_clock::now() - partStartTimePoint) / std::chrono::duration<double>(1) << ' ';
@@ -270,8 +274,8 @@ void shapeScoring(
         for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
             int a = mergingMapIndices[i];
             int b = mergingMapIndices[i-1];
-            for (auto it = shapeScoreParallelMaps[a].cbegin(); it != shapeScoreParallelMaps[a].cend(); it++) {
-                shapeScoreParallelMaps[b][it->first] += it->second;
+            for (auto it = shapeScoreParallel[a].cbegin(); it != shapeScoreParallel[a].cend(); it++) {
+                shapeScoreParallel[b][it->first] += it->second;
             }
         }
         for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
@@ -280,8 +284,8 @@ void shapeScoring(
         // count from back to not disturb the index number when erasing
     }
     int lastIndex = mergingMapIndices[0];
-    shapeScore.reserve(shapeScoreParallelMaps[lastIndex].size());
-    shapeScore.assign(shapeScoreParallelMaps[lastIndex].cbegin(), shapeScoreParallelMaps[lastIndex].cend());
+    shapeScore.reserve(shapeScoreParallel[lastIndex].size());
+    shapeScore.assign(shapeScoreParallel[lastIndex].cbegin(), shapeScoreParallel[lastIndex].cend());
     if (verbose) std::cout << "merge mp result time=" << (std::chrono::system_clock::now() - partStartTimePoint) / std::chrono::duration<double>(1);
 }
 

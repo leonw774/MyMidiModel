@@ -5,6 +5,7 @@
 models/**/*
 bpe/learn_vocab
 bpe/apply_vocab
+imgs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

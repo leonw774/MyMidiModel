@@ -153,7 +153,7 @@ int main(int argc, char *argv[]) {
 
     std::vector<std::pair<Shape, unsigned int>> shapeScoreFreq;
     std::vector<std::pair<Shape, double>> shapeScoreWPlike;
-    double neighborUpdatingTime, shapeScoringTime, findMaxTime, mergeTime;
+    double neighborUpdatingTime, mergeTime;
     std::cout << "Index, Shape, Score, Multinote count, Iteration time, Neighbor updating time, Merge time" << std::endl;
     // start from 2 because index 0, 1 are default shapes
     for (int shapeIndex = 2; shapeIndex < shapeDict.size(); ++shapeIndex) {
@@ -240,8 +240,6 @@ int main(int argc, char *argv[]) {
         std::cout << multinoteCount << ", ";
         std::cout << (std::chrono::system_clock::now() - iterStartTimePoint) / onSencondDur << ", "
             << neighborUpdatingTime << ", "
-            << shapeScoringTime << ", "
-            << findMaxTime << ", "
             << mergeTime;
         if (verbose) std::cout << std::endl;
         else         std::cout.flush();

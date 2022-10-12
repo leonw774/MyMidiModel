@@ -33,8 +33,8 @@ int main(int argc, char *argv[]) {
         std::cout << "Error: scoring is not ( default | wplike ): " << scoring << std::endl;
         return 1;
     }
-    if (mergeCondition != "ours" && mergeCondition != "musicbpe") {
-        std::cout << "Error: mergeCondition is not ( ours | musicbpe ): " << mergeCondition << std::endl;
+    if (mergeCondition != "ours" && mergeCondition != "mulpi") {
+        std::cout << "Error: mergeCondition is not ( ours | mulpi ): " << mergeCondition << std::endl;
         return 1;
     }
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
@@ -132,8 +132,8 @@ int main(int argc, char *argv[]) {
 
     std::vector<std::pair<Shape, unsigned int>> shapeScoreFreq;
     std::vector<std::pair<Shape, double>> shapeScoreWPlike;
-    double neighborUpdatingTime, shapeScoringTime, findMaxTime, mergeTime;
-    std::cout << "Iter, Found shapes count, Shape, Score, Multinote count, Iteration time, Neighbor updating time, Shape scoring time, Find max time, Merge time" << std::endl;
+    double neighborUpdatingTime, findBestShapeTime, mergeTime;
+    std::cout << "Iter, Found shapes count, Shape, Score, Multinote count, Iteration time, Neighbor update time, Find best shape time, Merge time" << std::endl;
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
         if (!verbose && iterCount != 0) 
             std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
@@ -145,11 +145,9 @@ int main(int argc, char *argv[]) {
 
         // clac shape scores
         Shape maxScoreShape;
+        partStartTimePoint = std::chrono::system_clock::now();
         if (scoring == "default") {
-            partStartTimePoint = std::chrono::system_clock::now();
             shapeScoring<unsigned int>(corpus, shapeDict, shapeScoreFreq, scoring, mergeCondition, samplingRate, verbose);
-            shapeScoringTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
-            partStartTimePoint = std::chrono::system_clock::now();
             std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScoreFreq);
             if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
@@ -158,13 +156,9 @@ int main(int argc, char *argv[]) {
             maxScoreShape = maxValPair.first;
             std::cout << ", " << shapeScoreFreq.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
             shapeScoreFreq.clear();
-            findMaxTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
         }
         else {
-            partStartTimePoint = std::chrono::system_clock::now();
             shapeScoring<double>(corpus, shapeDict, shapeScoreWPlike, scoring, mergeCondition, samplingRate, verbose);
-            shapeScoringTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
-            partStartTimePoint = std::chrono::system_clock::now();
             std::pair<Shape, double> maxValPair = findMaxValPair(shapeScoreWPlike);
             if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
@@ -173,8 +167,8 @@ int main(int argc, char *argv[]) {
             maxScoreShape = maxValPair.first;
             std::cout << ", " << shapeScoreWPlike.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
             shapeScoreWPlike.clear();
-            findMaxTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
         }
+        findBestShapeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
         unsigned int newShapeIndex = shapeDict.size();
         shapeDict.push_back(maxScoreShape);
@@ -251,8 +245,7 @@ int main(int argc, char *argv[]) {
         std::cout << multinoteCount << ", ";
         std::cout << (std::chrono::system_clock::now() - iterStartTimePoint) / onSencondDur << ", "
             << neighborUpdatingTime << ", "
-            << shapeScoringTime << ", "
-            << findMaxTime << ", "
+            << findBestShapeTime << ", "
             << mergeTime;
         if (verbose) std::cout << std::endl;
         else         std::cout.flush();
