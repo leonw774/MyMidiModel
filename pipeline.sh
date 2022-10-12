@@ -45,7 +45,7 @@ CORPUS_DIR_PATH="data/corpus/${DATA_NAME}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_
 MIDI_TO_TEXT_OTHER_ARGUMENTS=""
 test $CONTINUING_NOTE == true && MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --use-continuing-note"
 test "${MIDI_TO_TEXT_VERBOSE}" == true && MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --verbose"
-echo "Appended ${MIDI_TO_TEXT_OTHER_ARGUMENTS} to midi_to_text's argument" | tee -a $LOG_PATH
+test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended ${MIDI_TO_TEXT_OTHER_ARGUMENTS} to midi_to_text's argument" | tee -a $LOG_PATH }
 
 echo "Corpus dir: ${CORPUS_DIR_PATH}"
 
@@ -132,7 +132,7 @@ test $PERMUTE_TRACK_NUMBER == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER
 test $INPUT_NO_TEMPO == true             && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-tempo"
 test $INPUT_NO_TIME_SIGNATURE == true    && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-time-signatrue"
 test $LOG_HEAD_LOSSES == true            && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --log-head-losses"
-test -z "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended ${TRAIN_OTHER_ARGUMENTS} to train.py's argument" | tee -a $LOG_PATH ; }
+test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended ${TRAIN_OTHER_ARGUMENTS} to train.py's argument" | tee -a $LOG_PATH ; }
 
 # change CUDA_VISIABLE_DEVICES according to the machine it runs on
 CUDA_VISIABLE_DEVICES=0,1 python3 train.py --max-seq-length $MAX_SEQ_LENGTH --sample-stride $SAMPLE_STRIDE \
