@@ -81,7 +81,9 @@ def parse_args():
         type=float,
         nargs=2,
         default=[9, 1],
-        help='The split ratio for training and validation. Default is 9:1.'
+        help='The split ratio for training and validation. \
+            If one is set to -1, for example (-1, 200), it means (len(complete_dataset), 200) \
+            Default is 9:1.'
     )
     train_parser.add_argument(
         '--batch-size',
@@ -321,7 +323,12 @@ def main():
 
     # make dataset
     complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args))
-    train_len = int(len(complete_dataset) * args.train_args.split_ratio[0] / sum(args.train_args.split_ratio))
+    train_ratio, valid_ratio = args.train_args.split_ratio
+    if train_ratio == -1:
+        train_ratio = len(complete_dataset)
+    if valid_ratio == -1:
+        valid_ratio = len(complete_dataset)
+    train_len = int(len(complete_dataset) * train_ratio / (train_ratio + valid_ratio))
     valid_len = len(complete_dataset) - train_len
     train_dataset, valid_dataset = random_split(complete_dataset, (train_len, valid_len))
     train_dataloader = DataLoader(
