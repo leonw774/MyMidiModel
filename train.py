@@ -82,7 +82,7 @@ def parse_args():
         nargs=2,
         default=[9, 1],
         help='The split ratio for training and validation. \
-            If one is set to -1, for example (-1, 200), it means (len(complete_dataset), 200) \
+            If one is set to -1, for example (-1, 200), it means (len(complete_dataset) - 200, 200) \
             Default is 9:1.'
     )
     train_parser.add_argument(
@@ -324,10 +324,13 @@ def main():
     # make dataset
     complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args))
     train_ratio, valid_ratio = args.train_args.split_ratio
-    if train_ratio == -1:
-        train_ratio = len(complete_dataset)
-    if valid_ratio == -1:
-        valid_ratio = len(complete_dataset)
+    if train_ratio == valid_ratio == -1:
+        raise ValueError('split_ratio (-1, -1) is undefined')
+    else:
+        if train_ratio == -1:
+            train_ratio = len(complete_dataset) - valid_ratio
+        if valid_ratio == -1:
+            valid_ratio = len(complete_dataset) - train_ratio
     train_len = int(len(complete_dataset) * train_ratio / (train_ratio + valid_ratio))
     valid_len = len(complete_dataset) - train_len
     train_dataset, valid_dataset = random_split(complete_dataset, (train_len, valid_len))
