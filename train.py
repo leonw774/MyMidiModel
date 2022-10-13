@@ -334,7 +334,7 @@ def main():
     valid_dataloader = DataLoader(
         dataset=valid_dataset,
         num_workers=args.dataloader_worker_number,
-        batch_size=1,
+        batch_size=args.train_args.batch_size,
         shuffle=True,
         collate_fn=collate_mididataset
     )
