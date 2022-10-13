@@ -334,11 +334,12 @@ def main():
     valid_dataloader = DataLoader(
         dataset=valid_dataset,
         num_workers=args.dataloader_worker_number,
-        batch_size=args.train_args.batch_size,
+        batch_size=1,
         shuffle=True,
         collate_fn=collate_mididataset
     )
-
+    logging.info('Legnth of training set: %d', len(train_dataloader))
+    logging.info('Legnth of vlaidation set: %d', len(valid_dataloader))
     # make optimizer
     optimizer = Adam(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-9)
     scheduler = lr_scheduler.LambdaLR(
