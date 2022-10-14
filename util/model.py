@@ -156,10 +156,11 @@ def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq = None,
         try_count_limit = 1000
         while try_count < try_count_limit:
             sampled_features = [
-                torch.multinomial(F.softmax(l[0] / temperature, dim=0), 1) 
+                torch.multinomial(F.softmax(l[0] / temperature, dim=0), 1)
                 for l in last_logits # l has shape (1, feature_vocab_size)
             ]
             new_token = torch.stack(sampled_features, dim=1) # shape = (1, feature_num)
+            # print([ model.vocabs.to_dict()[OUTPUT_FEATURE_NAME[i]]['id2text'][int(f)] for i, f in enumerate(new_token[0]) ])
             new_token = torch.unsqueeze(new_token, dim=0) # shape = (1, 1, feature_num)
             new_output_seq = torch.cat((output_seq, new_token), dim=1)
             new_output_text_list = array_to_text_list(new_output_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=True)

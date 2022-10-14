@@ -213,6 +213,7 @@ def main():
                 plt.barh(list(v.keys()), list(v.values()))
             else:
                 plt.bar(list(v.keys()), list(v.values()))
+                plt.yscale('log')
         elif isinstance(v, list):
             # note_number_per_piece and token_number_per_piece
             k_describle = k + '_describe'

@@ -11,6 +11,7 @@
 #include <map>
 #include <unordered_map>
 #include <set>
+#include <algorithm>
 #include <chrono>
 
 struct RelNote {
@@ -146,6 +147,8 @@ struct Corpus {
 
     void pushNewPiece();
     void shrink();
+    size_t getMultiNoteCount(bool onlyDrums=false);
+    void sortAllTracks();
 };
 
 std::map<std::string, std::string> readParasFile(std::ifstream& paraFile);

@@ -104,19 +104,10 @@ int main(int argc, char *argv[]) {
     std::vector<Shape> shapeDict = getDefaultShapeDict();
 
     // sort and count notes
-    size_t startMultinoteCount = 0, multinoteCount = 0;
-    size_t drumMultinoteCount = 0;
-    #pragma omp parallel for reduction(+: multinoteCount, drumMultinoteCount)
-    for (int i = 0; i < corpus.piecesMN.size(); ++i) {
-        for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-            if (corpus.piecesTP[i][j] == 128) {
-                drumMultinoteCount += corpus.piecesMN[i][j].size();
-            }
-            multinoteCount += corpus.piecesMN[i][j].size();
-            sort(corpus.piecesMN[i][j].begin(), corpus.piecesMN[i][j].end());
-        }
-    }
-    startMultinoteCount = multinoteCount;
+    corpus.sortAllTracks();
+    size_t startMultinoteCount, multinoteCount, drumMultinoteCount;
+    startMultinoteCount = multinoteCount = corpus.getMultiNoteCount();
+    drumMultinoteCount = corpus.getMultiNoteCount(true);
     double startAvgMulpi = calculateAvgMulpiSize(corpus, false);
     double avgMulpi = startAvgMulpi;
 
@@ -125,7 +116,7 @@ int main(int argc, char *argv[]) {
         << ", Start average mulpi: " << avgMulpi
         << ", Reading used time: " << (std::chrono::system_clock::now() - ioStartTimePoint) / onSencondDur << std::endl;
 
-    if (multinoteCount == 0 || multinoteCount == drumMultinoteCount) {
+    if (multinoteCount == 0 || (multinoteCount == drumMultinoteCount && IGNORE_DRUM)) {
         std::cout << "No notes to merge. Exited." << std::endl;
         return 1;
     }
@@ -133,14 +124,15 @@ int main(int argc, char *argv[]) {
     std::vector<std::pair<Shape, unsigned int>> shapeScoreFreq;
     std::vector<std::pair<Shape, double>> shapeScoreWPlike;
     double neighborUpdatingTime, findBestShapeTime, mergeTime;
-    std::cout << "Iter, Found shapes count, Shape, Score, Multinote count, Iteration time, Neighbor update time, Find best shape time, Merge time" << std::endl;
+    std::cout << "Iter, Avg neighbor number, Found shapes count, Shape, Score, Multinote count, Iteration time, Neighbor update time, Find best shape time, Merge time" << std::endl;
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
         if (!verbose && iterCount != 0) 
             std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
-        std::cout << iterCount;
+        std::cout << iterCount << ", ";
         std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint = std::chrono::system_clock::now();
         std::chrono::time_point<std::chrono::system_clock>partStartTimePoint = std::chrono::system_clock::now();
-        updateNeighbor(corpus, shapeDict, maxDur*2);
+        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, maxDur*2);
+        std:: cout << (double) totalNeighborNumber / multinoteCount << ", ";
         neighborUpdatingTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
         // clac shape scores
@@ -154,7 +146,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
             maxScoreShape = maxValPair.first;
-            std::cout << ", " << shapeScoreFreq.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
+            std::cout << shapeScoreFreq.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
             shapeScoreFreq.clear();
         }
         else {
@@ -165,7 +157,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
             maxScoreShape = maxValPair.first;
-            std::cout << ", " << shapeScoreWPlike.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
+            std::cout << shapeScoreWPlike.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
             shapeScoreWPlike.clear();
         }
         findBestShapeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
@@ -233,13 +225,7 @@ int main(int argc, char *argv[]) {
             }
         }
         
-        multinoteCount = 0;
-        #pragma omp parallel for reduction(+: multinoteCount)
-        for (int i = 0; i < corpus.piecesMN.size(); ++i) {
-            for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-                multinoteCount += corpus.piecesMN[i][j].size();
-            }
-        }
+        multinoteCount = corpus.getMultiNoteCount();
         mergeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
         std::cout << multinoteCount << ", ";
@@ -254,13 +240,6 @@ int main(int argc, char *argv[]) {
     }
     if (!verbose) std::cout << '\n';
 
-    multinoteCount = 0;
-    #pragma omp parallel for reduction(+:multinoteCount)
-    for (int i = 0; i < corpus.piecesMN.size(); ++i) {
-        for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-            multinoteCount += corpus.piecesMN[i][j].size();
-        }
-    }
     avgMulpi = calculateAvgMulpiSize(corpus);
     std::cout << "Ending multinote count: " << multinoteCount
         << ", Ending average mulpi: " << avgMulpi

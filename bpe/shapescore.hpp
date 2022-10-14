@@ -4,7 +4,8 @@
 #define COUNTING_THREAD_NUM 8
 #define IGNORE_DRUM true
 
-void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit);
+// return sum of all note's neighbor number
+size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit);
 
 Shape getShapeOfMultiNotePair(
     const MultiNote& lmn,

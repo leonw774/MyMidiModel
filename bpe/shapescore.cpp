@@ -1,6 +1,5 @@
 #include "corpus.hpp"
 #include "shapescore.hpp"
-#include <algorithm>
 #include <random>
 #include "omp.h"
 
@@ -27,12 +26,13 @@ unsigned int gcd(unsigned int* arr, unsigned int size) {
     return g;
 }
 
-void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit) {
+
+size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit) {
+    size_t totalNeighborNumber = 0;
     // for each piece
-    #pragma omp parallel for
+    #pragma omp parallel for reduction(+: totalNeighborNumber)
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         // for each track
-        #pragma omp parallel for
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drum?
             if (corpus.piecesTP[i][j] == 128 && IGNORE_DRUM) continue;
@@ -64,9 +64,11 @@ void updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigne
                     }
                 }
                 corpus.piecesMN[i][j][k].neighbor = n - 1;
+                totalNeighborNumber += n - 1;
             }
         }
     }
+
 }
 
 Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const std::vector<Shape>& shapeDict) {

@@ -202,6 +202,31 @@ void Corpus::shrink() {
     piecesTP.shrink_to_fit();
 }
 
+size_t Corpus::getMultiNoteCount(bool onlyDrums=false) {
+    size_t multinoteCount = 0;
+    for (int i = 0; i < piecesMN.size(); ++i) {
+        for (int j = 0; j < piecesMN[i].size(); ++j) {
+            if (onlyDrums && piecesTP[i][j] != 128) {
+                continue;
+            }
+            multinoteCount += piecesMN[i][j].size();
+        }
+    }
+    return multinoteCount;
+}
+
+void Corpus::sortAllTracks() {
+    for (int i = 0; i < piecesMN.size(); ++i) {
+        for (int j = 0; j < piecesMN[i].size(); ++j) {
+            std::sort(piecesMN[i][j].begin(), piecesMN[i][j].end());
+        }
+    }
+}
+
+/********
+ Corpus's IO
+********/
+
 std::map<std::string, std::string> readParasFile(std::ifstream& parasFile) {
     if (!parasFile) {
         throw std::runtime_error("Could not open file");
