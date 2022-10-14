@@ -68,7 +68,7 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
             }
         }
     }
-
+    return totalNeighborNumber;
 }
 
 Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const std::vector<Shape>& shapeDict) {

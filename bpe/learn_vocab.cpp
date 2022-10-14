@@ -128,11 +128,10 @@ int main(int argc, char *argv[]) {
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
         if (!verbose && iterCount != 0) 
             std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
-        std::cout << iterCount << ", ";
+        std::cout << iterCount;
         std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint = std::chrono::system_clock::now();
         std::chrono::time_point<std::chrono::system_clock>partStartTimePoint = std::chrono::system_clock::now();
-        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, maxDur*2);
-        std:: cout << (double) totalNeighborNumber / multinoteCount << ", ";
+        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, maxDur*2); 
         neighborUpdatingTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
         // clac shape scores
@@ -146,7 +145,10 @@ int main(int argc, char *argv[]) {
                 break;
             }
             maxScoreShape = maxValPair.first;
-            std::cout << shapeScoreFreq.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
+            std::cout << ", " << (double) totalNeighborNumber / multinoteCount << ", "
+                      << shapeScoreFreq.size() << ", "
+                      << "\"" << shape2str(maxScoreShape) << "\", "
+                      << maxValPair.second << ", ";
             shapeScoreFreq.clear();
         }
         else {
@@ -157,7 +159,10 @@ int main(int argc, char *argv[]) {
                 break;
             }
             maxScoreShape = maxValPair.first;
-            std::cout << shapeScoreWPlike.size() << ", " << "\"" << shape2str(maxScoreShape) << "\", " << maxValPair.second << ", ";
+            std::cout << ", " << (double) totalNeighborNumber / multinoteCount << ", "
+                      << shapeScoreWPlike.size() << ", "
+                      << "\"" << shape2str(maxScoreShape) << "\", "
+                      << maxValPair.second << ", ";
             shapeScoreWPlike.clear();
         }
         findBestShapeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
