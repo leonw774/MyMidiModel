@@ -43,7 +43,8 @@ int main(int argc, char *argv[]) {
         << "scoring: " << scoring << '\n'
         << "mergeCondition: " << mergeCondition << '\n'
         << "samplingRate: " << samplingRate << '\n'
-        << "minScoreLimit: " << minScoreLimit << std::endl;
+        << "minScoreLimit: " << minScoreLimit << '\n'
+        << "IGNORE_DRUM: " << (IGNORE_DRUM ? "true" : "false") << std::endl;
 
     // open files
     std::string inCorpusFilePath = inCorpusDirPath + "/corpus";
