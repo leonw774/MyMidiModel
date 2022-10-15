@@ -150,6 +150,7 @@ def handler(args_dict: dict):
         logging.debug(format_exc())
         if not (repr(e).startswith('Assert') or repr(e).startswith('Runtime')):
             print(f'{n} pid: {os.getpid()} file path: {args_dict["midi_file_path"]} ', repr(e))
+            print(format_exc())
         return repr(e)
 
 
