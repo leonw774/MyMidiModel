@@ -218,6 +218,11 @@ def get_time_structure_tokens(
 
     measure_token_list = []
     for i, time_sig in enumerate(time_sig_list):
+        assert is_supported_time_signature(time_sig.numerator, time_sig.denominator), \
+            'Unsupported time signature'
+            # f'Unsupported time signature {(time_sig.numerator, time_sig.denominator)}'
+        # print(f'TimeSig {i}:', cur_timesig_start, next_timesig_start, nth_per_measure)
+
         nth_per_measure = round(nth_per_beat * time_sig.numerator * (4 / time_sig.denominator))
         cur_timesig_start = time_sig.time
 
@@ -247,11 +252,6 @@ def get_time_structure_tokens(
         while cur_timesig_start + nth_per_measure <= first_note_start:
             cur_timesig_start += nth_per_measure
         # now cur_measure_start_time is the REAL first measure
-
-        assert is_supported_time_signature(time_sig.numerator, time_sig.denominator), \
-            'Unsupported time signature'
-            # f'Unsupported time signature {(time_sig.numerator, time_sig.denominator)}'
-        # print(f'TimeSig {i}:', cur_timesig_start, next_timesig_start, nth_per_measure)
 
         for cur_measure_start_time in range(cur_timesig_start, next_timesig_start, nth_per_measure):
             if cur_measure_start_time > last_note_end:
