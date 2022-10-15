@@ -21,12 +21,11 @@ def merge_drums(midi: MidiFile) -> None:
     if len(merged_perc_notes) > 0:
         # remove duplicate
         merged_perc_notes = list(set(merged_perc_notes))
-        merged_perc_notes.sort(key=lambda x: x.start)
+        merged_perc_notes.sort(key=lambda x: (x.start, x.end))
         merged_perc_inst = Instrument(program=128, is_drum=True, name='merged_drums')
         merged_perc_inst.notes = merged_perc_notes
         new_instruments = [track for track in midi.instruments if not track.is_drum] + [merged_perc_inst]
         midi.instruments = new_instruments
-
 
 def merge_tracks(
         midi: MidiFile,
@@ -94,6 +93,8 @@ def quantize_to_nth(midi, nth):
         for n in track.notes:
             n.start = tick_to_nth(n.start, ticks_per_nth)
             n.end = tick_to_nth(n.end, ticks_per_nth)
+            if n.end == n.start: # to prevent note perishment
+                n.end = n.start + 1
     for tempo in midi.tempo_changes:
         tempo.time = tick_to_nth(tempo.time, ticks_per_nth)
     for time_sig in midi.time_signature_changes:
@@ -396,6 +397,7 @@ def midi_to_token_list(
         position_method: str) -> list:
 
     note_token_list = get_note_tokens(midi, max_duration, velocity_step, use_cont_note)
+    assert len(note_token_list) > 0, 'No notes in midi'
     measure_token_list, tempo_token_list = get_time_structure_tokens(midi, note_token_list, nth, tempo_quantization)
     assert measure_token_list[0].onset <= note_token_list[0].onset, 'First measure is after first note'
     pos_token_list = get_position_infos(note_token_list, measure_token_list, tempo_token_list, position_method)

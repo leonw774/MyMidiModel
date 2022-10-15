@@ -120,8 +120,7 @@ def parse_args():
         '-o', '--output-path',
         dest='output_path',
         type=str,
-        default=os.getcwd(),
-        help='The path of the directory for the output files. Default is current work directory.'
+        help='The path of the directory for the corpus.'
     )
     main_parser.add_argument(
         'input_path',
@@ -244,7 +243,7 @@ def main():
 
     # check if output_path is a directory
     if os.path.exists(args.output_path):
-        if (os.path.exists(to_corpus_file_path(args.output_path)) 
+        if (os.path.exists(to_corpus_file_path(args.output_path))
                 and os.path.exists(to_paras_file_path(args.output_path))
                 and os.path.exists(to_pathlist_file_path(args.output_path))):
             if args.use_existed:
