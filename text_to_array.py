@@ -207,13 +207,12 @@ def main():
                 for p in v:
                     instrument_count[p] = v[p]
                 plt.xticks(rotation=90, fontsize='small')
-                plt.subplots_adjust(left=0.025, right=1-0.025, bottom=0.25)
+                plt.subplots_adjust(left=0.075, right=1-0.025, bottom=0.25)
                 plt.bar(INSTRUMENT_NAMES, instrument_count)
             elif k == 'token_type_distribution':
                 plt.barh(list(v.keys()), list(v.values()))
             else:
                 plt.bar(list(v.keys()), list(v.values()))
-                plt.yscale('log')
         elif isinstance(v, list):
             # note_number_per_piece and token_number_per_piece
             k_describle = k + '_describe'
@@ -226,6 +225,7 @@ def main():
             )
             plt.subplots_adjust(left=0.125)
             plt.hist(v, 100)
+            plt.yscale('log')
         else:
             continue
         plt.savefig(os.path.join(stats_dir_path, f'{k}.png'))
