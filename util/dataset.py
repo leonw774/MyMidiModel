@@ -20,7 +20,7 @@ class MidiDataset(Dataset):
             sample_stride: int,
             use_permutable_subseq_loss: bool,
             permute_mps: bool,
-            permute_track_number: bool = False
+            permute_track_number: bool
         ) -> None:
         """
             Parameters:
@@ -29,7 +29,7 @@ class MidiDataset(Dataset):
             - use_permutable_subseq_loss: Whether or not we provide a mps_seperator_indices information at __getitem__
             - permute_mps: Whether or not the dataset should permute all the *maximal permutable subsequences*
               in the sequence before returning in `__getitem__`
-            - permute_tracks: Permute all the track numbers, as data augmentation
+            - permute_track_number: Permute all the track numbers, as data augmentation
         """
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
         self.piece_files = np.load(npz_path)
