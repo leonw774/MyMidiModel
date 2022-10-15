@@ -24,7 +24,7 @@ def merge_drums(midi: MidiFile) -> None:
         merged_perc_notes.sort(key=lambda x: x.start)
         merged_perc_inst = Instrument(program=128, is_drum=True, name="merged_drums")
         merged_perc_inst.notes = merged_perc_notes
-        new_instruments = [track for track in midi.Instruments if not track.is_drum] + [merged_perc_inst]
+        new_instruments = [track for track in midi.instruments if not track.is_drum] + [merged_perc_inst]
         midi.instruments = new_instruments
 
 
