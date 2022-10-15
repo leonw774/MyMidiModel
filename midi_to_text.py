@@ -137,7 +137,6 @@ def parse_args():
 
 def handler(args_dict: dict):
     n = args_dict.pop('n', 0)
-    logging.debug('%d pid: %d file path: %s', n, os.getpid(), args_dict['midi_file_path'])
     try:
         text_list = midi_to_text_list(**args_dict)
         piece_bytes = ' '.join(text_list).encode()
@@ -146,10 +145,11 @@ def handler(args_dict: dict):
     except KeyboardInterrupt as e:
         raise e
     except Exception as e:
+        logging.debug('%d pid: %d file path: %s', n, os.getpid(), args_dict['midi_file_path'])
         logging.debug(format_exc())
-        if not (repr(e).startswith('Assert') or repr(e).startswith('Runtime')):
-            print(f'{n} pid: {os.getpid()} file path: {args_dict["midi_file_path"]} ', repr(e))
-            print(format_exc())
+        # if not (repr(e).startswith('Assert') or repr(e).startswith('Runtime')):
+        #     print(f'{n} pid: {os.getpid()} file path: {args_dict["midi_file_path"]}')
+        #     print(format_exc())
         return repr(e)
 
 
