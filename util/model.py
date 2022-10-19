@@ -166,13 +166,17 @@ def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq = None,
             new_output_seq = torch.cat((output_seq, new_token), dim=1)
             new_output_text_list = array_to_text_list(new_output_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=True)
             # print(new_output_text_list)
+            if new_output_text_list[-1] == END_TOKEN_STR:
+                # if sampled EOS, then just end
+                break
 
             try:
                 # format checking
-                piece_to_midi(' '.join(new_output_text_list), model.vocabs.paras['nth'])
+                # have to append EOS at the end to not raise error
+                piece_to_midi(' '.join(new_output_text_list + [END_TOKEN_STR]), model.vocabs.paras['nth'])
                 # format checking and position, tempo, measure_number calculation
                 input_seq = torch.from_numpy(
-                    text_list_to_array(new_output_text_list, vocabs=model.vocabs)
+                    text_list_to_array(new_output_text_list + [END_TOKEN_STR], vocabs=model.vocabs)
                 ).unsqueeze(0).long()
             except:
                 try_count += 1
@@ -185,7 +189,7 @@ def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq = None,
         if try_count == try_count_limit:
             break
 
-        if sampled_features[FEATURE_INDEX['evt']] == model.vocabs.events.text2id[END_TOKEN_STR]:
+        if new_output_text_list[-1] == END_TOKEN_STR:
             end_with_end_token = True
             break
 
