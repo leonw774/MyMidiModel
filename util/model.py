@@ -111,9 +111,9 @@ class MidiTransformerDecoder(nn.Module):
             src=x,
             mask=mask
         )
-        logits = [
+        logits = tuple(
             logit(x) for logit in self.logits
-        ]
+        )
         return logits
 
 def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq = None, temperature=1.0) -> list:
@@ -123,10 +123,11 @@ def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq = None,
         return the text list of the generated piece
     """
     if start_seq is not None:
+        exception_msg = f'start_seq\'s shape have to be (1, seq_length, complete_feature_number), get {start_seq.shape}'
         if len(start_seq.shape) != 3:
-            raise AssertionError(f'start_seq\'s shape have to be (1, seq_length, complete_feature_number), get {start_seq.shape}')
+            raise AssertionError(exception_msg)
         elif start_seq.shape[0] != 1 or start_seq.shape[2] != len(COMPLETE_FEATURE_NAME):
-            raise AssertionError(f'start_seq\'s shape have to be (1, seq_length, complete_feature_number), get {start_seq.shape}')
+            raise AssertionError(exception_msg)
     else:
         start_seq = torch.from_numpy(text_list_to_array([BEGIN_TOKEN_STR], model.vocabs)).unsqueeze(0).int()
     max_length_mask = get_seq_mask(model.max_seq_length).to(start_seq.device)

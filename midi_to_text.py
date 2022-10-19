@@ -252,12 +252,14 @@ def main():
                 logging.info('==== midi_to_text.py exited ====')
                 return 0
             else:
-                shutil.rmtree(args.output_path)
-                logging.info('Output directory: %s already has corpus file. Removed.', args.output_path)
+                os.remove(to_corpus_file_path(args.output_path))
+                os.remove(to_paras_file_path(args.output_path))
+                os.remove(to_pathlist_file_path(args.output_path))
+                logging.info('Output directory: %s already has corpus files. Removed.', args.output_path)
         else:
-            shutil.rmtree(args.output_path)
-            logging.info('Output directory: %s already existed, but no corpus file. Removed.', args.output_path)
-    os.makedirs(args.output_path)
+            logging.info('Output directory: %s already existed, but no corpus files.', args.output_path)
+    else:
+        os.makedirs(args.output_path)
 
     start_time = time()
     file_path_list = list()

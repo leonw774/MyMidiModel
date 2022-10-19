@@ -536,7 +536,7 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error=False) -> Midi
                 assert len(track_program_mapping) > 0
                 track_numbers_list = list(track_program_mapping.keys())
                 track_numbers_list.sort()
-                assert track_numbers_list == list(range(len(track_numbers_list)))
+                # assert track_numbers_list == list(range(len(track_numbers_list)))
                 for track_number in track_numbers_list:
                     program = track_program_mapping[track_number]
                     midi.instruments.append(

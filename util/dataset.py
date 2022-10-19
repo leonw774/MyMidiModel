@@ -34,7 +34,7 @@ class MidiDataset(Dataset):
         """
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
         npz_file = np.load(npz_path)
-
+        print('Loaded', npz_path)
         available_memory_size = psutil.virtual_memory().available
         array_memory_size = 0
         for filenum in range(len(npz_file)):
@@ -42,6 +42,7 @@ class MidiDataset(Dataset):
             array_memory_size += np.prod(npz_file[filename].shape) * 2 # times 2 because array dtype is int16
         if array_memory_size >= available_memory_size:
             # load from disk every time indexing
+            print('Memory size not enough, using NPZ mmap.')
             self.pieces = npz_file
         else:
             # load into memory to be faster
@@ -50,7 +51,6 @@ class MidiDataset(Dataset):
                 for filenum in range(len(npz_file))
             }
 
-        print('Loaded', npz_path)
         self.vocabs = get_corpus_vocabs(data_dir_path)
         self.max_seq_length = max_seq_length
         self.sample_stride = sample_stride

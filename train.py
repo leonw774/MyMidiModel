@@ -369,11 +369,14 @@ def main():
     complete_valid_loss_list = []
     min_avg_valid_loss = float('inf')
     early_stop_counter = 0
+
     start_time = time()
     for start_step in range(0, args.train_args.steps, args.train_args.validation_interval):
         logging.info('Training: %d/%d', start_step, args.train_args.steps)
         model.train()
         train_loss_list = []
+        forward_time = 0
+        backward_time = 0
         for _ in tqdm(range(args.train_args.validation_interval)):
             try:
                 batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
@@ -384,20 +387,21 @@ def main():
             batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
             batch_target_seqs = (model.to_output_features(batch_seqs[:, 1:])).to(args.use_device)
             batch_input_seq_mask = get_seq_mask(batch_input_seqs.shape[1]).to(args.use_device)
+
+            start_forward_time = time()
             prediction = model(batch_input_seqs, batch_input_seq_mask)
+            forward_time += time() - start_forward_time
 
             if args.data_args.use_permutable_subseq_loss:
                 # print(batch_mps_sep_indices)
-                # start_time = time()
                 head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
                 # print('calc_permutable_subseq_losses use time:', time() - start_time)
             else:
-                # start_time = time()
                 head_losses = calc_losses(prediction, batch_target_seqs)
                 # print('calc_losses use time:', time() - start_time)
             train_loss_list.append([float(hl) for hl in head_losses])
             loss = sum(head_losses)
-            # start_time = time()
+            start_backward_time = time()
             # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
             # dot.render(filename='lossbackward_mps', format='png')
             optimizer.zero_grad()
@@ -408,7 +412,8 @@ def main():
             scheduler.step()
             # print('back propagate use time:', time() - start_time)
             torch.cuda.empty_cache()
-
+            backward_time += time() - start_backward_time
+        print('Forward time', forward_time, 'Backward time', backward_time)
         print('Validation')
         valid_loss_list = valid(model, valid_dataloader, args)
 
