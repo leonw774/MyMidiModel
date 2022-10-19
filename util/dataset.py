@@ -1,6 +1,7 @@
+import bisect
 import os
 import sys
-import bisect
+import psutil
 
 import numpy as np
 from torch import from_numpy
@@ -32,7 +33,23 @@ class MidiDataset(Dataset):
             - permute_track_number: Permute all the track numbers, as data augmentation
         """
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
-        self.piece_files = np.load(npz_path)
+        npz_file = np.load(npz_path)
+
+        available_memory_size = psutil.virtual_memory().available
+        array_memory_size = 0
+        for filenum in range(len(npz_file)):
+            filename = str(filenum)
+            array_memory_size += np.prod(npz_file[filename].shape) * 2 # times 2 because array dtype is int16
+        if array_memory_size >= available_memory_size:
+            # load from disk every time indexing
+            self.pieces = npz_file
+        else:
+            # load into memory to be faster
+            self.pieces = {
+                str(filenum): npz_file[str(filenum)]
+                for filenum in range(len(npz_file))
+            }
+
         print('Loaded', npz_path)
         self.vocabs = get_corpus_vocabs(data_dir_path)
         self.max_seq_length = max_seq_length
@@ -80,28 +97,28 @@ class MidiDataset(Dataset):
         self._mps_seperators = np.sort(np.array(list(self._mps_seperators)))
 
         # preprocessing
-        self._filenum_indices = [0] * len(self.piece_files)
-        self._piece_files_length = [0] * len(self.piece_files)
-        self._piece_body_start_index = [0] * len(self.piece_files) if self.permute_track_number else None
-        self._file_mps_sep_indices = [None] * len(self.piece_files) if use_permutable_subseq_loss else None
+        self._filenum_indices = [0] * len(self.pieces)
+        self._piece_lengths = [0] * len(self.pieces)
+        self._piece_body_start_index = [0] * len(self.pieces) if self.permute_track_number else None
+        self._file_mps_sep_indices = [None] * len(self.pieces) if use_permutable_subseq_loss else None
         cur_index = 0
-        for filenum in tqdm(range(len(self.piece_files))):
+        for filenum in tqdm(range(len(self.pieces))):
             filename = str(filenum)
 
             if use_permutable_subseq_loss:
                 # find all seperater's index
-                mps_sep_indices = np.flatnonzero(np.isin(self.piece_files[filename][:, 0], self._mps_seperators))
+                mps_sep_indices = np.flatnonzero(np.isin(self.pieces[filename][:, 0], self._mps_seperators))
                 self._file_mps_sep_indices[filenum] = []
                 for i in range(mps_sep_indices.shape[0] - 1):
                     self._file_mps_sep_indices[filenum].append(mps_sep_indices[i])
                     if mps_sep_indices[i+1] != mps_sep_indices[i] + 1:
                         self._file_mps_sep_indices[filenum].append(mps_sep_indices[i] + 1)
 
-            cur_piece_files_length = self.piece_files[filename].shape[0]
-            self._piece_files_length[filenum] = cur_piece_files_length
+            cur_piece_lengths = self.pieces[filename].shape[0]
+            self._piece_lengths[filenum] = cur_piece_lengths
 
-            if cur_piece_files_length > max_seq_length:
-                cur_index += cur_piece_files_length - max_seq_length + 1
+            if cur_piece_lengths > max_seq_length:
+                cur_index += cur_piece_lengths - max_seq_length + 1
             else:
                 cur_index += 1
             self._filenum_indices[filenum] = cur_index
@@ -117,11 +134,11 @@ class MidiDataset(Dataset):
         #         break
         filenum = bisect.bisect_left(self._filenum_indices, index)
         begin_index = index if filenum == 0 else index - self._filenum_indices[filenum-1] - 1
-        if self._piece_files_length[filenum] <= self.max_seq_length:
-            end_index = self._piece_files_length[filenum]
+        if self._piece_lengths[filenum] <= self.max_seq_length:
+            end_index = self._piece_lengths[filenum]
         else:
             end_index = begin_index + self.max_seq_length
-        sliced_array = np.array(self.piece_files[str(filenum)][begin_index:end_index]) # copy
+        sliced_array = np.array(self.pieces[str(filenum)][begin_index:end_index]) # copy
         sliced_array = sliced_array.astype(np.int32) # was int16 to save space but torch ask for int
 
         # shift down measure number so that it didn't exceed max_seq_length
@@ -137,7 +154,7 @@ class MidiDataset(Dataset):
             # amortize the calculation
             if self._piece_body_start_index[filenum] == 0:
                 j = 2 # because first token is BOS and second must be track as we excluded all empty midis
-                while self.piece_files[str(filenum)][j][0] in self._track_ids:
+                while self.pieces[str(filenum)][j][0] in self._track_ids:
                     j += 1
                 self._piece_body_start_index[filenum] = j
 
@@ -187,10 +204,10 @@ class MidiDataset(Dataset):
 
 
     # def __del__(self):
-        # because self.piece_files is a NpzFile object which could be a memory-mapped to a opened file
+        # If self.pieces is a NpzFile object which could be a memory-mapped to a opened file
         # use context management (__enter__, __exit__) would be better but it shouldn't cause big trouble
-        # because we will only open the file once in the whole training process
-        # self.piece_files.close()
+        # but we will only open the file once in the whole training process so dont bother after all
+        # self.pieces.close()
 
 
     def __len__(self):
