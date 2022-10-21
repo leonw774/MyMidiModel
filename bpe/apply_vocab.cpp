@@ -153,7 +153,7 @@ int main(int argc, char *argv[]) {
         std::cout << shapeIndex << ", ";
         std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint = std::chrono::system_clock::now();
         std::chrono::time_point<std::chrono::system_clock>partStartTimePoint = std::chrono::system_clock::now();
-        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, maxDur*2);
+        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth);
         std:: cout << (double) totalNeighborNumber / multinoteCount << ", ";
         neighborUpdatingTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
