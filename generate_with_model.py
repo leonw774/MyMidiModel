@@ -7,11 +7,11 @@ from util import (
     b36str2int,
     midi_to_text_list,
     piece_to_midi,
+    text_list_to_array,
     CorpusIterator,
     MidiTransformerDecoder,
     generate_sample
 )
-from util.corpus import Vocabs, text_list_to_array
 
 def read_args():
     parser = ArgumentParser()
@@ -171,7 +171,7 @@ def main():
             if args.output_txt:
                 with open(f'{args.output_file_path}_{i}.txt', 'w+', encoding='utf8') as f:
                     f.write(' '.join(gen_text_list))
-    
+
     return 0
 
 

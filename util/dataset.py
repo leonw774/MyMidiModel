@@ -1,9 +1,9 @@
 import bisect
 import os
 import sys
-import psutil
 
 import numpy as np
+import psutil
 from torch import from_numpy
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
