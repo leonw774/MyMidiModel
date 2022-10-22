@@ -47,9 +47,9 @@ def main(corpus_dir_path, log_file_path):
                 row_element = int(row_text)
             else:
                 try:
-                    row_element = float(row_element)
+                    row_element = float(row_text)
                 except ValueError:
-                    row_element = row_element
+                    row_element = row_text
             iteration_log_lists[i].append(row_element)
     iteration_log_dict = {
         col_name: col_list
