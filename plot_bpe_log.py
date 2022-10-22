@@ -42,14 +42,15 @@ def main(corpus_dir_path, log_file_path):
     iteration_log_lists = [[] for _ in range(len(iteration_log_column_name))]
     for iter_log_line in iteration_log_lines:
         for i, row_text in enumerate(iter_log_line.split(', ')[1:]):
-            if i == 0 or i == 3: # found unique shapes, multinote count
-                iteration_log_lists[i].append(int(row_text))
-            elif i == 1: # shape text
-                iteration_log_lists[i].append(row_text)
-            elif i == 2: # score
-                iteration_log_lists[i].append(float(row_text))
-            elif i >= 4: # times
-                iteration_log_lists[i].append(float(row_text))
+            row_element = None
+            if row_text.isdigit():
+                row_element = int(row_text)
+            else:
+                try:
+                    row_element = float(row_element)
+                except ValueError:
+                    row_element = row_element
+            iteration_log_lists[i].append(row_element)
     iteration_log_dict = {
         col_name: col_list
         for col_name, col_list in zip(iteration_log_column_name, iteration_log_lists)
