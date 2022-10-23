@@ -12,13 +12,8 @@ from traceback import format_exc
 
 from tqdm import tqdm
 
-from util import (
-    midi_to_text_list,
-    to_paras_file_path,
-    to_corpus_file_path,
-    to_pathlist_file_path,
-    dump_corpus_paras
-)
+from util.midi import midi_to_text_list
+from util.corpus import to_paras_file_path, to_corpus_file_path, to_pathlist_file_path, dump_corpus_paras
 
 
 def parse_args():

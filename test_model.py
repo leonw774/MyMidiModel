@@ -4,7 +4,7 @@ from time import time
 from torch import randint
 
 from util.corpus import to_vocabs_file_path
-from util.model import MidiTransformerDecoder, get_seq_mask, calc_loss
+from util.model import MidiTransformerDecoder, get_seq_mask, calc_losses
 
 vocabs_dict = json.load(
     open(to_vocabs_file_path('data/corpus/test_midis_nth96_r32_d96_v4_t24_200_1_posattribute'), 'r', encoding='utf8')
@@ -37,7 +37,8 @@ pred = model(input_seq, test_mask)
 print([str(a.shape) for a in pred])
 print(target_seq.shape)
 
-loss = calc_loss(pred, target_seq)
+loss = calc_losses(pred, target_seq)
+loss = sum(loss)
 loss.backward()
 print(loss)
 print('model train step time:', time()-start_time)

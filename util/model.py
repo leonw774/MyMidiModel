@@ -206,6 +206,7 @@ def calc_losses(pred_logit, target_logit):
         - length: out_feature_num
         - elements are tenors with shape: (batch_size, seq_size, feature_vocab_size)
         target_logit has shape: (batch_size, seq_size, out_feature_num)
+        return a list of losses of each head
     """
     # basically treat seq_size as one of the K dimensions and K = 1
     # target_logit have to be long int
@@ -228,6 +229,7 @@ def calc_permutable_subseq_losses(pred_logit, target_logit, batched_mps_indices)
         - elements are tenors with shape: (batch_size, seq_size, feature_vocabs_size)
         target_logit has shape: (batch_size, seq_size, out_feature_num)
         mps_indices is a numpy object array of numpy int16 arrays in varying lengths
+        return a list of losses of each head
     """
     target_logit = target_logit.long()
     # min_head_losses = [[] for _ in range(len(pred_logit))]

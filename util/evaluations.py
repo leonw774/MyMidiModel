@@ -178,7 +178,7 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int):
     }
     return features
 
-FEATURE_NAMES = {
+EVAL_FEATURE_NAMES = {
     'pitch_histogram_entropy',
     'durations_mean',
     'durations_var',

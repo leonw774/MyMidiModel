@@ -1,6 +1,7 @@
 from argparse import ArgumentParser 
 
-from util import piece_to_midi, CorpusIterator, get_corpus_paras
+from util.midi import piece_to_midi
+from util.corpus import CorpusIterator, get_corpus_paras
 
 def text_to_midi_read_args():
     parser = ArgumentParser()

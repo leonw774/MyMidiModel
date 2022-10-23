@@ -13,6 +13,10 @@ from torch.optim import Adam, lr_scheduler
 import torchinfo
 # import torchviz
 
+
+from util.midi import piece_to_midi
+from util.corpus import COMPLETE_FEATURE_NAME, OUTPUT_FEATURE_NAME, get_corpus_vocabs
+from util.dataset import MidiDataset, collate_mididataset
 from util.model import (
     MidiTransformerDecoder,
     generate_sample,
@@ -20,10 +24,7 @@ from util.model import (
     calc_permutable_subseq_losses,
     get_seq_mask,
 )
-from util.midi import piece_to_midi
-from util.corpus import COMPLETE_FEATURE_NAME, OUTPUT_FEATURE_NAME, get_corpus_vocabs
-from util.dataset import MidiDataset, collate_mididataset
-from util.evaluations import FEATURE_NAMES, piece_to_features
+from util.evaluations import EVAL_FEATURE_NAMES, piece_to_features
 
 def parse_args():
     data_parser = ArgumentParser()
@@ -467,10 +468,10 @@ def main():
             fs[fname]
             for fs in eval_sample_features_per_piece
         ]
-        for fname in FEATURE_NAMES
+        for fname in EVAL_FEATURE_NAMES
     }
     eval_sample_features_stats = dict()
-    for fname in FEATURE_NAMES:
+    for fname in EVAL_FEATURE_NAMES:
         eval_sample_features_stats[fname] = {
             k : float(v) for k, v in dict(Series(eval_sample_features[fname]).dropna().describe()).items()
         }

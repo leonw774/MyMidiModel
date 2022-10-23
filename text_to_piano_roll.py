@@ -4,7 +4,8 @@ import matplotlib
 from matplotlib.patches import Rectangle, Ellipse
 from matplotlib import pyplot as plt
 
-from util import CorpusIterator, get_corpus_paras, b36str2int
+from util.tokens import b36str2int
+from util.corpus import CorpusIterator, get_corpus_paras
 
 MEASURELINE_COLOR = (0.8, 0.8, 0.8, 1.0)
 TRACK_COLORMAP = matplotlib.colormaps['terrain']

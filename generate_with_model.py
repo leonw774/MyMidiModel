@@ -3,15 +3,10 @@ from traceback import format_exc
 
 import torch
 
-from util import (
-    b36str2int,
-    midi_to_text_list,
-    piece_to_midi,
-    text_list_to_array,
-    CorpusIterator,
-    MidiTransformerDecoder,
-    generate_sample
-)
+from util.tokens import b36str2int
+from util.midi import midi_to_text_list, piece_to_midi
+from util.corpus import CorpusIterator, text_list_to_array
+from util.model import MidiTransformerDecoder, generate_sample
 
 def read_args():
     parser = ArgumentParser()

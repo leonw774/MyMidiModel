@@ -9,6 +9,7 @@ from time import strftime, time
 import numpy as np
 from tqdm import tqdm
 
+from util.tokens import b36str2int, INSTRUMENT_NAMES
 from util.corpus import (
     to_shape_vocab_file_path,
     to_vocabs_file_path,
@@ -18,7 +19,6 @@ from util.corpus import (
     text_list_to_array,
     get_input_array_debug_string,
 )
-from util.tokens import b36str2int, INSTRUMENT_NAMES
 
 
 def parse_args():
