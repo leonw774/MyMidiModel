@@ -93,10 +93,11 @@ def main(corpus_dir_path, log_file_path):
                     [f'{k}={float(v):.5f}' for k, v in dict(Series(col_list).describe()).items()]
                 )
             # fit y = a * exp(b * x) --> log(y) = log(a) + b * x
-            x = np.array(iter_nums)
-            y = np.array(col_list)
-            b, loga = np.polyfit(x, np.log(y), 1, w=np.sqrt(y))
-            left_texts += '\nexponential equation fit:\n  ' + f'y = {np.exp(loga):.5f} * e ^ ({b:.5f} * x)'
+            # x = np.array(iter_nums)
+            # y = np.array(col_list)
+            # b, loga = np.polyfit(x, np.log(y), 1, w=np.sqrt(y))
+            # left_texts += '\nexponential equation fit:\n  ' + f'y = {np.exp(loga):.5f} * e ^ ({b:.5f} * x)'
+
             plt.subplots_adjust(left=0.2)
             plt.text(
                 x=0.01,
@@ -113,7 +114,7 @@ def main(corpus_dir_path, log_file_path):
             if col_name == 'Shape size':
                 plt.figure(figsize=(16.8, 6.4))
                 plt.title(col_name+' histogram')
-                plt.hist(col_list)
+                plt.hist(col_list, bins=list(range(max(col_list)+1)))
                 plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}_hist.png'))
                 plt.clf()
 
