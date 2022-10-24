@@ -1,9 +1,10 @@
 #!/bin/bash
 # dataset parameters
-MAX_SEQ_LENGTH=4096
+MAX_SEQ_LENGTH=256
 USE_PERMUTABLE_SUBSEQ_LOSS=false
 PERMUTE_MPS=false
 PERMUTE_TRACK_NUMBER=false
+SAMPLE_FROM_START=true
 
 # model parameter
 LAYERS_NUMBER=6

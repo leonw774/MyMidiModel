@@ -45,6 +45,10 @@ def parse_args():
         '--permute-track-number',
         action='store_true'
     )
+    data_parser.add_argument(
+        '--sample-from-start',
+        action='store_true'
+    )
 
     model_parser = ArgumentParser()
     model_parser.add_argument(

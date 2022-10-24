@@ -20,7 +20,8 @@ class MidiDataset(Dataset):
             max_seq_length: int,
             use_permutable_subseq_loss: bool,
             permute_mps: bool,
-            permute_track_number: bool
+            permute_track_number: bool,
+            sample_from_start: bool = False
         ) -> None:
         """
             Parameters:
@@ -94,6 +95,7 @@ class MidiDataset(Dataset):
         self._mps_seperators = np.sort(np.array(list(self._mps_seperators)))
 
         # preprocessing
+        self._sample_from_start = sample_from_start
         self._filenum_indices = [0] * len(self.pieces)
         self._piece_lengths = [0] * len(self.pieces)
         self._piece_body_start_index = [0] * len(self.pieces) if self.permute_track_number else None
@@ -114,7 +116,7 @@ class MidiDataset(Dataset):
             cur_piece_lengths = self.pieces[filename].shape[0]
             self._piece_lengths[filenum] = cur_piece_lengths
 
-            if cur_piece_lengths > max_seq_length:
+            if cur_piece_lengths > max_seq_length and not sample_from_start:
                 cur_index += cur_piece_lengths - max_seq_length + 1
             else:
                 cur_index += 1
