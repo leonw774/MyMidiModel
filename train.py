@@ -428,7 +428,7 @@ def main():
         print('Generating unconditional generation sample for checkpoint')
         uncond_gen_text_list = generate_sample(model, args.data_args.max_seq_length)
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
-        open(os.path.join(ckpt_dir_path, f'{cur_step}_uncondgen'), 'w+', encoding='utf8').write(uncond_gen_piece)
+        open(os.path.join(ckpt_dir_path, f'{cur_step}_uncondgen.txt'), 'w+', encoding='utf8').write(uncond_gen_piece)
         piece_to_midi(uncond_gen_piece, vocabs.paras['nth']).dump(
             os.path.join(ckpt_dir_path, f'{cur_step}_uncondgen.mid')
         )

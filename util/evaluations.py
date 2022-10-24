@@ -111,7 +111,7 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int):
     velocities_mean = np.mean(velocities)
     velocities_var = np.var(velocities)
 
-    if isnan(pitch_histogram):
+    if isnan(pitch_histogram_entropy):
         return {
             'pitch_histogram_entropy': pitch_histogram_entropy,
             'durations_mean': durations_mean,
