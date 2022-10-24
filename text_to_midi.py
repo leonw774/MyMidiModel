@@ -67,4 +67,4 @@ def text_to_midi(corpus_dir_path, out_path, begin, end, extract_txt):
 if __name__ == '__main__':
     corpus_dir_path, out_path, begin, end, extract_txt = text_to_midi_read_args()
     print('start text_to_midi.py:', corpus_dir_path, out_path, begin, end)
-    text_to_midi(corpus_dir_path, out_path, begin, end)
+    text_to_midi(corpus_dir_path, out_path, begin, end, extract_txt)
