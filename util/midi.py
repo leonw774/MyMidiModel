@@ -574,6 +574,8 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error=False) -> Midi
                 note_attr = tuple(b36str2int(x) for x in text[3:].split(':'))
             else:
                 note_attr = tuple(b36str2int(x) for x in text[2:].split(':'))
+            # note_attr = pitch, duration, velocity, track_number, (position)
+            assert note_attr[3] in track_program_mapping, 'Note not in used track'
             if len(note_attr) == 5:
                 cur_time = note_attr[4] + cur_measure_onset
                 note_attr = note_attr[:4]
@@ -594,6 +596,7 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error=False) -> Midi
                 relnote = [is_cont] + relnote
                 relnote_list.append(relnote)
             base_pitch, time_unit, velocity, track_number, *position = (b36str2int(x) for x in other_attr)
+            assert track_number in track_program_mapping, 'Note not in used track'
             if len(position) == 1:
                 cur_time = position[0] + cur_measure_onset
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
