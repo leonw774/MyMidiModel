@@ -29,7 +29,7 @@ print(test_mask)
 
 input_seq = test_seq[:-1]
 target_seq = test_seq[1:]
-target_seq = model.to_output_features(test_seq[1:])
+target_seq = model.to_output_attrs(test_seq[1:])
 
 start_time = time()
 pred = model(input_seq, test_mask)

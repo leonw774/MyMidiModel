@@ -258,7 +258,7 @@ def build_vocabs(
     return vocabs, summary_string
 
 
-FEATURE_INDEX = {
+TOKEN_ATTR_INDEX = {
     'evt': 0, 'events': 0,
     'pit': 1, 'pitchs': 1,
     'dur': 2, 'durations': 2,
@@ -271,12 +271,12 @@ FEATURE_INDEX = {
     'tis': 9, 'time_signatures': 9,
 }
 
-COMPLETE_FEATURE_NAME = [
+COMPLETE_ATTR_NAME = [
     'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions',
     'measure_numbers', 'tempos', 'time_signatures'
 ]
 
-OUTPUT_FEATURE_NAME = [
+OUTPUT_ATTR_NAME = [
     'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions'
 ]
 
@@ -293,7 +293,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
     vocabs.events.text2id = vocabs.events.text2id
     # in build_vocabs, padding token is made to be the 0th element
     padding = 0
-    x = np.full((len(text_list), len(COMPLETE_FEATURE_NAME)), fill_value=padding, dtype=np.int16)
+    x = np.full((len(text_list), len(COMPLETE_ATTR_NAME)), fill_value=padding, dtype=np.int16)
 
     tracks_count = 0
 
@@ -310,26 +310,26 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
             continue
 
         if typename == 'B' or typename == 'E':
-            x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[text]
+            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
 
         elif typename == 'R':
             event_text, instrument = text.split(':')
             track_number = event_text[1:]
             tracks_count += 1
-            x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[event_text]
-            x[i][FEATURE_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
-            x[i][FEATURE_INDEX['ins']] = vocabs.instruments.text2id[instrument]
+            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
+            x[i][TOKEN_ATTR_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
+            x[i][TOKEN_ATTR_INDEX['ins']] = vocabs.instruments.text2id[instrument]
 
         elif typename == 'M':
             cur_position_id = vocabs.positions.text2id['0']
             cur_time_sig_id = vocabs.time_signatures.text2id[text]
             cur_measure_number += 1
             cur_measure_cursor = i
-            x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[text]
-            x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
-            x[i][FEATURE_INDEX['pos']] = cur_position_id
-            x[i][FEATURE_INDEX['mea']] = cur_measure_number
-            x[i][FEATURE_INDEX['tis']] = cur_time_sig_id
+            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
+            x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
+            x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
+            x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
+            x[i][TOKEN_ATTR_INDEX['tis']] = cur_time_sig_id
 
         elif typename == 'T':
             event_text, *attr = text = text.split(':')
@@ -337,38 +337,38 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
             if position_method == 'attribute':
                 cur_position_id = b36str2int(attr[0])
             else:
-                x[cur_position_cursor][FEATURE_INDEX['tmp']] = cur_tempo_id
+                x[cur_position_cursor][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
             # because tempo come after position and/or measure token, which are assigned to previous tempo's id
-            x[cur_measure_cursor][FEATURE_INDEX['tmp']] = cur_tempo_id
-            x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[event_text]
-            x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
-            x[i][FEATURE_INDEX['pos']] = cur_position_id
-            x[i][FEATURE_INDEX['mea']] = cur_measure_number
+            x[cur_measure_cursor][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
+            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
+            x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
+            x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
+            x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
 
         elif typename == 'P':
             cur_position_id = vocabs.positions.text2id[text[1:]]
             cur_position_cursor = i
-            x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[event_text]
-            x[i][FEATURE_INDEX['pos']] = cur_position_id
-            x[i][FEATURE_INDEX['mea']] = cur_measure_number
-            x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
-            x[i][FEATURE_INDEX['tis']] = cur_time_sig_id
+            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
+            x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
+            x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
+            x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
+            x[i][TOKEN_ATTR_INDEX['tis']] = cur_time_sig_id
 
         elif typename == 'N' or typename == 'S':
             event_text, *attr = text.split(':')
             if position_method == 'attribute':
                 cur_position_id = vocabs.positions.text2id[attr[4]]
-            x[i][FEATURE_INDEX['evt']] = vocabs.events.text2id[event_text]
-            x[i][FEATURE_INDEX['pit']] = vocabs.pitchs.text2id[attr[0]]
-            x[i][FEATURE_INDEX['dur']] = vocabs.durations.text2id[attr[1]]
-            x[i][FEATURE_INDEX['vel']] = vocabs.velocities.text2id[attr[2]]
-            x[i][FEATURE_INDEX['trn']] = vocabs.track_numbers.text2id[attr[3]]
+            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
+            x[i][TOKEN_ATTR_INDEX['pit']] = vocabs.pitchs.text2id[attr[0]]
+            x[i][TOKEN_ATTR_INDEX['dur']] = vocabs.durations.text2id[attr[1]]
+            x[i][TOKEN_ATTR_INDEX['vel']] = vocabs.velocities.text2id[attr[2]]
+            x[i][TOKEN_ATTR_INDEX['trn']] = vocabs.track_numbers.text2id[attr[3]]
             assert b36str2int(attr[3]) < tracks_count, 'Invalid track number'
-            x[i][FEATURE_INDEX['ins']] = x[b36str2int(attr[3])+1, FEATURE_INDEX['ins']]
-            x[i][FEATURE_INDEX['pos']] = cur_position_id
-            x[i][FEATURE_INDEX['mea']] = cur_measure_number
-            x[i][FEATURE_INDEX['tmp']] = cur_tempo_id
-            x[i][FEATURE_INDEX['tis']] = cur_time_sig_id
+            x[i][TOKEN_ATTR_INDEX['ins']] = x[b36str2int(attr[3])+1, TOKEN_ATTR_INDEX['ins']]
+            x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
+            x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
+            x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
+            x[i][TOKEN_ATTR_INDEX['tis']] = cur_time_sig_id
 
         else:
             raise ValueError('unknown typename')
@@ -383,17 +383,17 @@ def array_to_text_list(data, vocabs: Vocabs, is_output=False):
     assert len(data.shape) == 2 and data.shape[0] > 0, f'bad numpy array shape: {data.shape}'
     if is_output:
         if position_method == 'event':
-            assert data.shape[1] == len(OUTPUT_FEATURE_NAME) - 1, f'bad numpy array shape: {data.shape}'
+            assert data.shape[1] == len(OUTPUT_ATTR_NAME) - 1, f'bad numpy array shape: {data.shape}'
         else:
-            assert data.shape[1] == len(OUTPUT_FEATURE_NAME), f'bad numpy array shape: {data.shape}'
+            assert data.shape[1] == len(OUTPUT_ATTR_NAME), f'bad numpy array shape: {data.shape}'
     else:
-        assert data.shape[1] == len(COMPLETE_FEATURE_NAME), f'bad numpy array shape: {data.shape}'
+        assert data.shape[1] == len(COMPLETE_ATTR_NAME), f'bad numpy array shape: {data.shape}'
 
 
     text_list = []
     for i in range(data.shape[0]):
         # in json, key can only be string
-        event_text = vocabs.events.id2text[data[i][FEATURE_INDEX['evt']]]
+        event_text = vocabs.events.id2text[data[i][TOKEN_ATTR_INDEX['evt']]]
         typename = event_text[0]
 
         if typename == 'B' or typename == 'E':
@@ -401,7 +401,7 @@ def array_to_text_list(data, vocabs: Vocabs, is_output=False):
 
         elif typename == 'R':
             # track token has instrument attribute
-            token_text = event_text + ':' + vocabs.instruments.id2text[data[i][FEATURE_INDEX['ins']]]
+            token_text = event_text + ':' + vocabs.instruments.id2text[data[i][TOKEN_ATTR_INDEX['ins']]]
             text_list.append(token_text)
 
         elif typename == 'M':
@@ -415,16 +415,16 @@ def array_to_text_list(data, vocabs: Vocabs, is_output=False):
 
         elif typename == 'N' or typename == 'S':
             # subtract one because there is padding token at the beginning of the vocab
-            track_number = data[i][FEATURE_INDEX['trn']] - 1
+            track_number = data[i][TOKEN_ATTR_INDEX['trn']] - 1
             token_text = (
                 event_text + ':'
-                + vocabs.pitchs.id2text[data[i][FEATURE_INDEX['pit']]] + ':'
-                + vocabs.durations.id2text[data[i][FEATURE_INDEX['dur']]] + ':'
-                + vocabs.velocities.id2text[data[i][FEATURE_INDEX['vel']]] + ':'
+                + vocabs.pitchs.id2text[data[i][TOKEN_ATTR_INDEX['pit']]] + ':'
+                + vocabs.durations.id2text[data[i][TOKEN_ATTR_INDEX['dur']]] + ':'
+                + vocabs.velocities.id2text[data[i][TOKEN_ATTR_INDEX['vel']]] + ':'
                 + int2b36str(track_number)
             )
             if position_method == 'attribute':
-                token_text += ':' + vocabs.positions.id2text[data[i][FEATURE_INDEX['pos']]]
+                token_text += ':' + vocabs.positions.id2text[data[i][TOKEN_ATTR_INDEX['pos']]]
             text_list.append(token_text)
         elif event_text == PADDING_TOKEN_STR:
             pass

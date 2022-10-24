@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from .corpus import FEATURE_INDEX, COMPLETE_FEATURE_NAME, OUTPUT_FEATURE_NAME, Vocabs, array_to_text_list, text_list_to_array
+from .corpus import TOKEN_ATTR_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, Vocabs, array_to_text_list, text_list_to_array
 from .midi import piece_to_midi
 from .tokens import PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR
 
@@ -28,17 +28,17 @@ class MyMidiTransformer(nn.Module):
         self.input_no_tempo = input_no_tempo
         self.input_no_time_signature = input_no_time_signature
 
-        # Input features
+        # Input attributess
 
-        # the indices of input features in complete feature list
-        self.input_features_indices = [
-            FEATURE_INDEX[fname]
-            for fname in COMPLETE_FEATURE_NAME
+        # the indices of input attrs in complete attribute list
+        self.input_attrs_indices = [
+            TOKEN_ATTR_INDEX[fname]
+            for fname in COMPLETE_ATTR_NAME
             if not (input_no_tempo and fname=='tempos') or not (input_no_time_signature and fname=='time_signatures')
         ]
         self.embedding_vocabs_size = [
             ( getattr(vocabs, fname).size if fname != 'measure_numbers' else max_seq_length )
-            for fname in COMPLETE_FEATURE_NAME
+            for fname in COMPLETE_ATTR_NAME
             if not (input_no_tempo and fname=='tempos') or not (input_no_time_signature and fname=='time_signatures')
         ]
         self.embeddings = nn.ModuleList([
@@ -51,17 +51,17 @@ class MyMidiTransformer(nn.Module):
             for vsize in self.embedding_vocabs_size
         ])
 
-        # Output features
-        self.output_features_indices = [
-            FEATURE_INDEX[fname]
-            for fname in OUTPUT_FEATURE_NAME
+        # Output attributes
+        self.output_attrs_indices = [
+            TOKEN_ATTR_INDEX[fname]
+            for fname in OUTPUT_ATTR_NAME
         ]
-        # because position is the last feature in OUTPUT_FEATURE_NAME
+        # because position is the last attribute in OUTPUT_ATTR_NAME
         if vocabs.paras['position_method'] == 'event':
-            self.output_features_indices.pop()
+            self.output_attrs_indices.pop()
         self.logit_vocabs_size = [
-            getattr(vocabs, OUTPUT_FEATURE_NAME[i]).size
-            for i in self.output_features_indices
+            getattr(vocabs, OUTPUT_ATTR_NAME[i]).size
+            for i in self.output_attrs_indices
         ]
         self.logits = nn.ModuleList([
             nn.Linear(
@@ -81,15 +81,15 @@ class MyMidiTransformer(nn.Module):
             num_layers=layers_number
         )
 
-    # batched_seq_complete_features has shape: (batch_size, seq_size, complete_feature_num)
-    def to_input_features(self, batched_seq_complete_features):
-        return batched_seq_complete_features[..., self.input_features_indices]
+    # batched_seq_complete_attrs has shape: (batch_size, seq_size, complete_attr_num)
+    def to_input_attrs(self, batched_seq_complete_attrs):
+        return batched_seq_complete_attrs[..., self.input_attrs_indices]
 
-    def to_output_features(self, batched_seq_complete_features):
-        return batched_seq_complete_features[..., self.output_features_indices]
+    def to_output_attrs(self, batched_seq_complete_attrs):
+        return batched_seq_complete_attrs[..., self.output_attrs_indices]
 
     def forward(self, x, mask):
-        # x has shape: (batch_size, seq_size, in_feature_number)
+        # x has shape: (batch_size, seq_size, in_attr_number)
         x = sum(
             emb(x[:,:,i]) for i, emb in enumerate(self.embeddings)
         )
@@ -118,15 +118,15 @@ class MyMidiTransformer(nn.Module):
 
 def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temperature=1.0, try_count_limit=1000, print_exception=False) -> list:
     """
-        Expect start_seq to be Tensor with shape: (1, seq_size, complete_feature_number) or None
+        Expect start_seq to be Tensor with shape: (1, seq_size, complete_attr_number) or None
         - if start_seq is None, will use `text_list_to_array([BEGIN_TOKEN_STR])` as start_seq
         return the text list of the generated piece
     """
     if start_seq is not None:
-        exception_msg = f'start_seq\'s shape have to be (1, seq_length, complete_feature_number), get {start_seq.shape}'
+        exception_msg = f'start_seq\'s shape have to be (1, seq_length, complete_attr_number), get {start_seq.shape}'
         if len(start_seq.shape) != 3:
             raise AssertionError(exception_msg)
-        elif start_seq.shape[0] != 1 or start_seq.shape[2] != len(COMPLETE_FEATURE_NAME):
+        elif start_seq.shape[0] != 1 or start_seq.shape[2] != len(COMPLETE_ATTR_NAME):
             raise AssertionError(exception_msg)
     else:
         start_seq = torch.from_numpy(text_list_to_array([BEGIN_TOKEN_STR], model.vocabs)).unsqueeze(0).int()
@@ -141,7 +141,7 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
     output_text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
 
     input_seq = start_seq
-    output_seq = model.to_output_features(start_seq)
+    output_seq = model.to_output_attrs(start_seq)
     end_with_end_token = False
     # print(output_seq.shape)
     # for _ in tqdm(range(steps)):
@@ -150,18 +150,18 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
         mask = max_length_mask[:clipped_input_seq.shape[1], :clipped_input_seq.shape[1]]
         logits = model.forward(clipped_input_seq, mask)
         last_logits = [
-            l[:, -1, :] # l has shape (1, sequence, feature_vocab_size)
+            l[:, -1, :] # l has shape (1, sequence, attr_vocab_size)
             for l in logits
         ]
         try_count = 0
         while try_count < try_count_limit:
-            sampled_features = [
+            sampled_attrs = [
                 torch.multinomial(F.softmax(l[0] / temperature, dim=0), 1)
-                for l in last_logits # l has shape (1, feature_vocab_size)
+                for l in last_logits # l has shape (1, attr_vocab_size)
             ]
-            new_token = torch.stack(sampled_features, dim=1) # shape = (1, feature_num)
+            new_token = torch.stack(sampled_attrs, dim=1) # shape = (1, attr_num)
             # print([ model.vocabs.to_dict()[OUTPUT_FEATURE_NAME[i]]['id2text'][int(f)] for i, f in enumerate(new_token[0]) ])
-            new_token = torch.unsqueeze(new_token, dim=0) # shape = (1, 1, feature_num)
+            new_token = torch.unsqueeze(new_token, dim=0) # shape = (1, 1, attr_num)
             new_output_seq = torch.cat((output_seq, new_token), dim=1)
             new_output_text_list = array_to_text_list(new_output_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=True)
             # print(new_output_text_list)
@@ -204,9 +204,9 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
 def calc_losses(pred_logit, target_logit):
     """
         pred_logit is a list
-        - length: out_feature_num
-        - elements are tenors with shape: (batch_size, seq_size, feature_vocab_size)
-        target_logit has shape: (batch_size, seq_size, out_feature_num)
+        - length: out_attr_num
+        - elements are tenors with shape: (batch_size, seq_size, attr_vocab_size)
+        target_logit has shape: (batch_size, seq_size, out_attr_num)
         return a list of losses of each head
     """
     # basically treat seq_size as one of the K dimensions and K = 1
@@ -214,10 +214,10 @@ def calc_losses(pred_logit, target_logit):
     target_logit = target_logit.long()
     head_losses = [
         F.cross_entropy(
-            input=pred_feature_logit.transpose(1, 2), # (batch_size, feature_vocab_size, seq_size)
+            input=pred_attr_logit.transpose(1, 2), # (batch_size, attr_vocab_size, seq_size)
             target=target_logit[..., k] # (batch_size, seq_size)
         )
-        for k, pred_feature_logit in enumerate(pred_logit)
+        for k, pred_attr_logit in enumerate(pred_logit)
     ]
     return head_losses
     # loss = sum(head_losses)
@@ -226,9 +226,9 @@ def calc_losses(pred_logit, target_logit):
 def calc_permutable_subseq_losses(pred_logit, target_logit, batched_mps_indices):
     """
         pred_logit is a list
-        - length: out_feature_num
-        - elements are tenors with shape: (batch_size, seq_size, feature_vocabs_size)
-        target_logit has shape: (batch_size, seq_size, out_feature_num)
+        - length: out_attr_num
+        - elements are tenors with shape: (batch_size, seq_size, attr_vocabs_size)
+        target_logit has shape: (batch_size, seq_size, out_attr_num)
         mps_indices is a numpy object array of numpy int16 arrays in varying lengths
         return a list of losses of each head
     """
@@ -241,21 +241,21 @@ def calc_permutable_subseq_losses(pred_logit, target_logit, batched_mps_indices)
             end_index = mps_indices_with_begin_and_end[i+1]
             for begin_index in range(mps_indices_with_begin_and_end[i], end_index):
                 mps_size = end_index-begin_index
-                begin_index_pred_feature_logit = [
-                    pred_feature_logit[batch_number, begin_index].unsqueeze(0).expand((mps_size, -1))
-                    # expand into (1, feature_vocabs_size) and then expand into (mps_size, feature_vocabs_size)
-                    # shape = (mps_size, feature_vocabs_size)
-                    for pred_feature_logit in pred_logit
+                begin_index_pred_attr_logit = [
+                    pred_attr_logit[batch_number, begin_index].unsqueeze(0).expand((mps_size, -1))
+                    # expand into (1, attr_vocabs_size) and then expand into (mps_size, attr_vocabs_size)
+                    # shape = (mps_size, attr_vocabs_size)
+                    for pred_attr_logit in pred_logit
                 ]
                 begin_index_head_losses = [
                     F.cross_entropy(
-                        input=begin_index_pred_feature_logit[k], # shape = (mps_size, feature_vocabs_size)
+                        input=begin_index_pred_attr_logit[k], # shape = (mps_size, attr_vocabs_size)
                         target=target_logit[batch_number, begin_index:end_index, k], # shape = (mps_size)
                         reduction='none' # return (mps_size, )
                     )
                     for k, _ in enumerate(pred_logit)
                 ]
-                # head_losses is now a list of out_feature_num tensors, each has shape (mps_size, )
+                # head_losses is now a list of out_attr_num tensors, each has shape (mps_size, )
                 min_head_losses_arg = min(
                     range(mps_size),
                     key=lambda x: sum([l[x] for l in begin_index_head_losses])

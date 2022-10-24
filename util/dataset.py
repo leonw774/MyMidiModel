@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
-from util import get_corpus_vocabs, FEATURE_INDEX
+from util.corpus import get_corpus_vocabs, TOKEN_ATTR_INDEX
 from util.tokens import BEGIN_TOKEN_STR, END_TOKEN_STR
 
 class MidiDataset(Dataset):
@@ -142,13 +142,13 @@ class MidiDataset(Dataset):
         sliced_array = sliced_array.astype(np.int32) # was int16 to save space but torch ask for int
 
         # shift down measure number so that it didn't exceed max_seq_length
-        min_measure_num = sliced_array[0, FEATURE_INDEX['mea']]
+        min_measure_num = sliced_array[0, TOKEN_ATTR_INDEX['mea']]
         if min_measure_num > 1:
-            sliced_array[:, FEATURE_INDEX['mea']] -= (min_measure_num - 1)
+            sliced_array[:, TOKEN_ATTR_INDEX['mea']] -= (min_measure_num - 1)
         # because EOS also has measure_number = 0
-        if sliced_array[-1, FEATURE_INDEX['mea']] < 0:
+        if sliced_array[-1, TOKEN_ATTR_INDEX['mea']] < 0:
             # set EOS measure number back to zero
-            sliced_array[-1, FEATURE_INDEX['mea']] = 0
+            sliced_array[-1, TOKEN_ATTR_INDEX['mea']] = 0
 
         if self.permute_track_number:
             # amortize the calculation
@@ -162,7 +162,7 @@ class MidiDataset(Dataset):
             track_count = self._piece_body_start_index[filenum] - 1
             # add one because there is a padding token at the beginning of the vocab
             perm_array = np.random.permutation(track_count) + 1
-            track_num_column = sliced_array[:, FEATURE_INDEX['trn']] # view
+            track_num_column = sliced_array[:, TOKEN_ATTR_INDEX['trn']] # view
             track_num_column_expand = np.asarray([
                 (track_num_column == i + 1) for i in range(track_count)
             ])

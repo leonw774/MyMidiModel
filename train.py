@@ -15,7 +15,7 @@ import torchinfo
 
 
 from util.midi import piece_to_midi
-from util.corpus import COMPLETE_FEATURE_NAME, OUTPUT_FEATURE_NAME, get_corpus_vocabs
+from util.corpus import COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, get_corpus_vocabs
 from util.dataset import MidiDataset, collate_mididataset
 from util.model import (
     MyMidiTransformer,
@@ -223,7 +223,7 @@ def valid(model, valid_dataloader, args):
     loss_list = []
     for batch_seqs, batch_mps_sep_indices in tqdm(valid_dataloader):
         batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
-        batch_target_seqs = (model.to_output_features(batch_seqs[:, 1:])).to(args.use_device)
+        batch_target_seqs = (model.to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
         batch_input_seq_mask = get_seq_mask(batch_input_seqs.shape[1]).to(args.use_device)
         prediction = model(batch_input_seqs, batch_input_seq_mask)
 
@@ -290,9 +290,9 @@ def main():
     loss_file = open(loss_file_path, 'w+', encoding='utf8')
     loss_csv_head = 'step, time, learning_rate, '
     loss_csv_head += ', '.join(
-        ['train_' + n for n in OUTPUT_FEATURE_NAME]
+        ['train_' + n for n in OUTPUT_ATTR_NAME]
             + ['train_total']
-            + ['valid_' + n for n in OUTPUT_FEATURE_NAME]
+            + ['valid_' + n for n in OUTPUT_ATTR_NAME]
             + ['valid_total']
     )
     loss_file.write(loss_csv_head+'\n')
@@ -307,12 +307,12 @@ def main():
     )
     logging.info('Embedding size:')
     logging.info('\n'.join([
-        f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(COMPLETE_FEATURE_NAME, model.embedding_vocabs_size))
+        f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(COMPLETE_ATTR_NAME, model.embedding_vocabs_size))
     ]))
     summary_str = str(torchinfo.summary(
         model,
         input_size=[
-            (args.train_args.batch_size, args.data_args.max_seq_length, len(model.input_features_indices)), # x
+            (args.train_args.batch_size, args.data_args.max_seq_length, len(model.input_attrs_indices)), # x
             (args.data_args.max_seq_length, args.data_args.max_seq_length) # mask
         ],
         dtypes=[torch.long, torch.bool],
@@ -386,7 +386,7 @@ def main():
                 batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
 
             batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
-            batch_target_seqs = (model.to_output_features(batch_seqs[:, 1:])).to(args.use_device)
+            batch_target_seqs = (model.to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
             batch_input_seq_mask = get_seq_mask(batch_input_seqs.shape[1]).to(args.use_device)
 
             start_forward_time = time()
