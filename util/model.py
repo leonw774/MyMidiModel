@@ -138,17 +138,16 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
     training_state = model.training
     model.eval()
 
-    output_text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
+    text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
 
-    input_seq = start_seq
-    output_seq = model.to_output_attrs(start_seq)
+    seq = model.to_output_attrs(start_seq)
     end_with_end_token = False
-    # print(output_seq.shape)
+    # print(seq.shape)
     # for _ in tqdm(range(steps)):
     for _ in range(steps):
-        clipped_input_seq = input_seq[:, -model.max_seq_length:]
-        mask = max_length_mask[:clipped_input_seq.shape[1], :clipped_input_seq.shape[1]]
-        logits = model.forward(clipped_input_seq, mask)
+        clipped_seq = seq[:, -model.max_seq_length:]
+        mask = max_length_mask[:clipped_seq.shape[1], :clipped_seq.shape[1]]
+        logits = model.forward(clipped_seq, mask)
         last_logits = [
             l[:, -1, :] # l has shape (1, sequence, attr_vocab_size)
             for l in logits
@@ -159,46 +158,47 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
                 torch.multinomial(F.softmax(l[0] / temperature, dim=0), 1)
                 for l in last_logits # l has shape (1, attr_vocab_size)
             ]
-            new_token = torch.stack(sampled_attrs, dim=1) # shape = (1, attr_num)
-            # print([ model.vocabs.to_dict()[OUTPUT_FEATURE_NAME[i]]['id2text'][int(f)] for i, f in enumerate(new_token[0]) ])
-            new_token = torch.unsqueeze(new_token, dim=0) # shape = (1, 1, attr_num)
-            new_output_seq = torch.cat((output_seq, new_token), dim=1)
-            new_output_text_list = array_to_text_list(new_output_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=True)
+            try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, attr_num)
+            # print([ model.vocabs.to_dict()[OUTPUT_FEATURE_NAME[i]]['id2text'][int(f)] for i, f in enumerate(try_token[0]) ])
+            try_token = torch.unsqueeze(try_token, dim=0) # shape = (1, 1, attr_num)
+            try_seq = torch.cat((seq, try_token), dim=1)
+            try_text_list = array_to_text_list(try_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=True)
             # print(new_output_text_list)
-            if new_output_text_list[-1] == END_TOKEN_STR:
-                # if sampled EOS, then just end
+            if try_text_list[-1] == END_TOKEN_STR:
+                text_list = try_text_list
+                # if sampled EOS, then dont check. just end
                 break
 
             try:
                 # format checking
                 # have to append EOS at the end to not raise error
-                piece_to_midi(' '.join(new_output_text_list + [END_TOKEN_STR]), model.vocabs.paras['nth'])
+                piece_to_midi(' '.join(try_text_list + [END_TOKEN_STR]), model.vocabs.paras['nth'])
                 # format checking and position, tempo, measure_number calculation
-                input_seq = torch.from_numpy(
-                    text_list_to_array(new_output_text_list + [END_TOKEN_STR], vocabs=model.vocabs)
+                seq = torch.from_numpy(
+                    text_list_to_array(try_text_list + [END_TOKEN_STR], vocabs=model.vocabs)
                 ).unsqueeze(0).long()
+                text_list = try_text_list
+                break
             except Exception as e:
                 if print_exception:
                     print(repr(e))
                 try_count += 1
                 continue # keep sampling until no error
-
-            output_seq = new_output_seq
-            output_text_list = new_output_text_list
-            break
+        # end while
 
         if try_count == try_count_limit:
             break
 
-        if new_output_text_list[-1] == END_TOKEN_STR:
+        if text_list[-1] == END_TOKEN_STR:
             end_with_end_token = True
             break
+    # end for each step
 
     if not end_with_end_token:
-        output_text_list.append(END_TOKEN_STR)
+        text_list.append(END_TOKEN_STR)
 
     model.train(training_state)
-    return output_text_list
+    return text_list
 
 
 def calc_losses(pred_logit, target_logit):
