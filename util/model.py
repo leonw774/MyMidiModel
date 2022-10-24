@@ -76,7 +76,7 @@ class MyMidiTransformer(nn.Module):
             nhead=attn_heads_number,
             batch_first=True
         )
-        self.transformer_decoder = nn.TransformerEncoder(
+        self.transformer_encoder = nn.TransformerEncoder(
             encoder_layer=layer,
             num_layers=layers_number
         )
@@ -107,7 +107,7 @@ class MyMidiTransformer(nn.Module):
         #                 if not torch.all(0 <= x[b,:,i]) and torch.all(x[b,:,i] < vsize):
         #                     print(x[b,:,i])
         #     raise e
-        x = self.transformer_decoder(
+        x = self.transformer_encoder(
             src=x,
             mask=mask
         )
