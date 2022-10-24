@@ -140,12 +140,13 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
 
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
 
-    seq = model.to_input_attrs(start_seq)
+    input_seq = start_seq
+    output_seq = model.to_output_attrs(start_seq)
     end_with_end_token = False
     # print(seq.shape)
     # for _ in tqdm(range(steps)):
     for _ in range(steps):
-        clipped_seq = seq[:, -model.max_seq_length:]
+        clipped_seq = input_seq[:, -model.max_seq_length:]
         mask = max_length_mask[:clipped_seq.shape[1], :clipped_seq.shape[1]]
         logits = model.forward(clipped_seq, mask)
         last_logits = [
@@ -161,7 +162,7 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
             try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, attr_num)
             # print([ model.vocabs.to_dict()[OUTPUT_FEATURE_NAME[i]]['id2text'][int(f)] for i, f in enumerate(try_token[0]) ])
             try_token = torch.unsqueeze(try_token, dim=0) # shape = (1, 1, attr_num)
-            try_seq = torch.cat((seq, try_token), dim=1)
+            try_seq = torch.cat((output_seq, try_token), dim=1)
             try_text_list = array_to_text_list(try_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=True)
             # print(new_output_text_list)
             if try_text_list[-1] == END_TOKEN_STR:
@@ -174,9 +175,10 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
                 # have to append EOS at the end to not raise error
                 piece_to_midi(' '.join(try_text_list + [END_TOKEN_STR]), model.vocabs.paras['nth'])
                 # format checking and position, tempo, measure_number calculation
-                seq = torch.from_numpy(
+                input_seq = torch.from_numpy(
                     text_list_to_array(try_text_list + [END_TOKEN_STR], vocabs=model.vocabs)
-                ).unsqueeze(0).long()
+                ).unsqueeze(0).int()
+                output_seq = model.to_output_attrs(input_seq)
                 text_list = try_text_list
                 break
             except Exception as e:
