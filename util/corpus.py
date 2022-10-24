@@ -284,7 +284,7 @@ OUTPUT_ATTR_NAME = [
 def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
     """
         Serialize pieces into numpy array for the model input.
-        Each token is processed into an 9-dimension vector:
+        Each token is processed into an 9-dimensional vector:
             event, pitch, duration, velocity, track_number, instrument, position, tempo, measure_number
         If a token doesn't have an attribute, fill the index of PAD (which should be zero)
         If a token has an attrbute, but it is not in the dictionary, fill the index of UNK.
