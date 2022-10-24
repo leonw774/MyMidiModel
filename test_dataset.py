@@ -9,14 +9,12 @@ from util.dataset import MidiDataset, collate_mididataset
 dataset = MidiDataset(
     data_dir_path='data/corpus/test_midis_nth96_r32_d96_v4_t24_200_1_posattribute',
     max_seq_length=16, # to be printed on screen, so small
-    sample_stride=1,
     use_permutable_subseq_loss=True,
     permute_mps=False,
     permute_track_number=False
 )
 vocabs_dict = dataset.vocabs
 print('max_seq_length', dataset.max_seq_length)
-print('sample_stride', dataset.sample_stride)
 print('use_permutable_subseq_loss', dataset.use_permutable_subseq_loss)
 print('permute_mps', dataset.permute_mps)
 print('permute_track_number', dataset.permute_track_number)

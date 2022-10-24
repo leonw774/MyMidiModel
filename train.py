@@ -34,11 +34,6 @@ def parse_args():
         default=2048
     )
     data_parser.add_argument(
-        '--sample-stride',
-        type=int,
-        default=1
-    )
-    data_parser.add_argument(
         '--use-permutable-subseq-loss',
         action='store_true'
     )

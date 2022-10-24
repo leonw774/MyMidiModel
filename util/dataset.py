@@ -18,7 +18,6 @@ class MidiDataset(Dataset):
             self,
             data_dir_path: str,
             max_seq_length: int,
-            sample_stride: int,
             use_permutable_subseq_loss: bool,
             permute_mps: bool,
             permute_track_number: bool
