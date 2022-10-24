@@ -6,7 +6,7 @@ from .corpus import FEATURE_INDEX, COMPLETE_FEATURE_NAME, OUTPUT_FEATURE_NAME, V
 from .midi import piece_to_midi
 from .tokens import PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR
 
-class MidiTransformerDecoder(nn.Module):
+class MyMidiTransformer(nn.Module):
     def __init__(self,
             vocabs: Vocabs,
             max_seq_length: int,
@@ -116,7 +116,7 @@ class MidiTransformerDecoder(nn.Module):
         )
         return logits
 
-def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq = None, temperature=1.0, try_count_limit=1000, print_exception=False) -> list:
+def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temperature=1.0, try_count_limit=1000, print_exception=False) -> list:
     """
         Expect start_seq to be Tensor with shape: (1, seq_size, complete_feature_number) or None
         - if start_seq is None, will use `text_list_to_array([BEGIN_TOKEN_STR])` as start_seq

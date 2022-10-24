@@ -4,14 +4,14 @@ from time import time
 from torch import randint
 
 from util.corpus import to_vocabs_file_path
-from util.model import MidiTransformerDecoder, get_seq_mask, calc_losses
+from util.model import MyMidiTransformer, get_seq_mask, calc_losses
 
 vocabs_dict = json.load(
     open(to_vocabs_file_path('data/corpus/test_midis_nth96_r32_d96_v4_t24_200_1_posattribute'), 'r', encoding='utf8')
 )
 
 start_time = time()
-model = MidiTransformerDecoder(
+model = MyMidiTransformer(
     layers_number=2,
     attn_heads_number=4,
     d_model=32,

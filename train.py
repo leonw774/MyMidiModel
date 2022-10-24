@@ -18,7 +18,7 @@ from util.midi import piece_to_midi
 from util.corpus import COMPLETE_FEATURE_NAME, OUTPUT_FEATURE_NAME, get_corpus_vocabs
 from util.dataset import MidiDataset, collate_mididataset
 from util.model import (
-    MidiTransformerDecoder,
+    MyMidiTransformer,
     generate_sample,
     calc_losses,
     calc_permutable_subseq_losses,
@@ -300,7 +300,7 @@ def main():
 
     # make model
     vocabs = get_corpus_vocabs(args.corpus_dir_path)
-    model = MidiTransformerDecoder(
+    model = MyMidiTransformer(
         vocabs=vocabs,
         max_seq_length=args.data_args.max_seq_length,
         **vars(args.model_args)

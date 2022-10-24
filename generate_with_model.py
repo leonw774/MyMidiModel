@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from traceback import format_exc
 
 import torch
@@ -6,7 +6,7 @@ import torch
 from util.tokens import b36str2int, BEGIN_TOKEN_STR, END_TOKEN_STR
 from util.midi import midi_to_text_list, piece_to_midi
 from util.corpus import CorpusIterator, text_list_to_array
-from util.model import MidiTransformerDecoder, generate_sample
+from util.model import MyMidiTransformer, generate_sample
 
 def read_args():
     parser = ArgumentParser()
@@ -80,7 +80,7 @@ def read_args():
 
     return parser.parse_args()
 
-def gen_handler(model, args, output_file_path):
+def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_file_path: str):
     gen_text_list = generate_sample(
         model,
         steps=args.max_generation_step,
@@ -91,7 +91,7 @@ def gen_handler(model, args, output_file_path):
     if gen_text_list == BEGIN_TOKEN_STR + " " + END_TOKEN_STR:
         print(f'{output_file_path}: generated empty piece. will not output file.')
     else:
-        midi = piece_to_midi(' '.join(gen_text_list), nth, ignore_panding_note_error=True)
+        midi = piece_to_midi(' '.join(gen_text_list), model.vocabs.paras['nth'], ignore_panding_note_error=True)
         midi.dump(f'{args.output_file_path}_{i}.mid')
         if args.output_txt:
             with open(f'{args.output_file_path}_{i}.txt', 'w+', encoding='utf8') as f:
@@ -101,7 +101,7 @@ def main():
     args = read_args()
     # model
     model = torch.load(args.model_file_path)
-    assert isinstance(model, MidiTransformerDecoder)
+    assert isinstance(model, MyMidiTransformer)
     nth = model.vocabs.paras['nth']
 
     # primer
@@ -184,10 +184,10 @@ def main():
         primer_seq = text_list_to_array(primer_text_list, vocabs=model.vocabs)
 
     if args.sample_number == 1:
-        gen_handler(model, args, args.output_file_path)
+        gen_handler(model, primer_seq, args, args.output_file_path)
     else:
         for i in range(1, args.sample_number+1):
-            gen_handler(model, args, f'{args.output_file_path}_{i}')
+            gen_handler(model, primer_seq, args, f'{args.output_file_path}_{i}')
 
     return 0
 
