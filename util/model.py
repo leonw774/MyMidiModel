@@ -283,3 +283,5 @@ def calc_permutable_subseq_losses(pred_logit, target_logit, batched_mps_indices)
 
 def get_seq_mask(size: int):
     return torch.triu(torch.ones(size, size), diagonal=1).bool()
+
+MidiTransformerDecoder = MyMidiTransformer # old name

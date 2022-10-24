@@ -525,15 +525,15 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error=False) -> Midi
     for text in text_list[1:-1]:
         typename = text[0]
         if typename == 'R':
-            assert is_head
+            assert is_head, 'R token at body'
             track_number, instrument = (b36str2int(x) for x in text[1:].split(':'))
-            assert track_number not in track_program_mapping
+            assert track_number not in track_program_mapping, 'Repeated track number'
             track_program_mapping[track_number] = instrument
 
         elif typename == 'M':
             # if this is the first measure
             if is_head:
-                assert len(track_program_mapping) > 0
+                assert len(track_program_mapping) > 0, 'No track in head'
                 track_numbers_list = list(track_program_mapping.keys())
                 track_numbers_list.sort()
                 # assert track_numbers_list == list(range(len(track_numbers_list)))
@@ -554,12 +554,12 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error=False) -> Midi
                 midi.time_signature_changes.append(TimeSignature(numerator=numer, denominator=denom, time=cur_time))
 
         elif typename == 'P':
-            assert not is_head
+            assert not is_head, 'P token at head'
             position = b36str2int(text[1:])
             cur_time = position + cur_measure_onset
 
         elif typename == 'T':
-            assert not is_head
+            assert not is_head, 'T token at head'
             if ':' in text[1:]:
                 tempo, position = (b36str2int(x) for x in text[1:].split(':'))
                 cur_time = position + cur_measure_onset
@@ -568,7 +568,7 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error=False) -> Midi
                 midi.tempo_changes.append(TempoChange(tempo=b36str2int(text[1:]), time=cur_time))
 
         elif typename == 'N':
-            assert not is_head
+            assert not is_head, 'N token at head'
             is_cont = (text[1] == '~')
             if is_cont:
                 note_attr = tuple(b36str2int(x) for x in text[3:].split(':'))
@@ -582,7 +582,7 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error=False) -> Midi
                 midi.instruments[note_attr[3]].notes.append(n)
 
         elif typename == 'S':
-            assert not is_head
+            assert not is_head, 'S token at head'
             shape_string, *other_attr = text[1:].split(':')
             relnote_list = []
             for s in shape_string[:-1].split(';'):
@@ -603,7 +603,7 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error=False) -> Midi
                 if n is not None:
                     midi.instruments[track_number].notes.append(n)
         else:
-            raise ValueError(f'bad token string: {text}')
+            raise ValueError(f'Bad token string: {text}')
 
     if len(pending_cont_notes) > 0:
         # because with bpe, sometimes a note will appears earlier than the continuing note it is going to be appending to
