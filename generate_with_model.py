@@ -18,7 +18,7 @@ def read_args():
         '--primer', '-p',
         type=str,
         default=None,
-        help='A MIDI or a piece text file that used as the primer in conditional generation.\n\
+        help='A MIDI or a single-piece corpus file that used as the primer in conditional generation.\n\
             If the extension is not "*.mid" or "*.midi", \
                 the program will try to parse it as a corpus text file containing only one piece.\n\
             If this option is not set, unconditional generation will be performed.'
@@ -34,6 +34,7 @@ def read_args():
     parser.add_argument(
         '--unit',
         choices=['measure', 'nth', 'token'],
+        default='measure',
         help='Specify the unit of PRIMER_LENGTH. \
             If use "measure", primer will be the first PRIMER_LENGTH measures of the piece no matter how long is actually is.\n\
             If use "nth", the length of a "nth"-note is the unit. \
