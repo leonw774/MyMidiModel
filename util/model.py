@@ -116,7 +116,7 @@ class MidiTransformerDecoder(nn.Module):
         )
         return logits
 
-def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq = None, temperature=1.0) -> list:
+def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq = None, temperature=1.0, try_count_limit=1000, print_exception=False) -> list:
     """
         Expect start_seq to be Tensor with shape: (1, seq_size, complete_feature_number) or None
         - if start_seq is None, will use `text_list_to_array([BEGIN_TOKEN_STR])` as start_seq
@@ -154,7 +154,6 @@ def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq = None,
             for l in logits
         ]
         try_count = 0
-        try_count_limit = 1000
         while try_count < try_count_limit:
             sampled_features = [
                 torch.multinomial(F.softmax(l[0] / temperature, dim=0), 1)
@@ -178,7 +177,9 @@ def generate_sample(model: MidiTransformerDecoder, steps: int, start_seq = None,
                 input_seq = torch.from_numpy(
                     text_list_to_array(new_output_text_list + [END_TOKEN_STR], vocabs=model.vocabs)
                 ).unsqueeze(0).long()
-            except:
+            except Exception as e:
+                if print_exception:
+                    print(repr(e))
                 try_count += 1
                 continue # keep sampling until no error
 

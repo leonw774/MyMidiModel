@@ -3,7 +3,7 @@ from traceback import format_exc
 
 import torch
 
-from util.tokens import b36str2int
+from util.tokens import b36str2int, BEGIN_TOKEN_STR, END_TOKEN_STR
 from util.midi import midi_to_text_list, piece_to_midi
 from util.corpus import CorpusIterator, text_list_to_array
 from util.model import MidiTransformerDecoder, generate_sample
@@ -55,16 +55,47 @@ def read_args():
         help='How many generated sample will created. Default is 1.'
     )
     parser.add_argument(
+        '--output-txt', '-t',
+        action='store_true'
+    )
+
+    parser.add_argument(
         '--max-generation-step', '--step',
         type=int,
         default=1024,
         help='The maximum TOKENS in each sample would be generated.'
     )
     parser.add_argument(
-        '--output-txt', '-t',
-        action='store_true'
+        '--try-count-limit',
+        type=int,
+        default=1000,
+        help='The model may fail to generate next token that satisfy the rule.\
+            The generation ends when its trying times pass this limit.'
     )
+    parser.add_argument(
+        '--print-exception',
+        action='store_true',
+        help='When model fail to generate next toke that satisfy the rule. Print out the exception message.'
+    )
+
     return parser.parse_args()
+
+def gen_handler(model, args, output_file_path):
+    gen_text_list = generate_sample(
+        model,
+        steps=args.max_generation_step,
+        start_seq=primer_seq,
+        try_count_limit=args.try_count_limit,
+        print_exception=args.print_exception
+    )
+    if gen_text_list == BEGIN_TOKEN_STR + " " + END_TOKEN_STR:
+        print(f'{output_file_path}: generated empty piece. will not output file.')
+    else:
+        midi = piece_to_midi(' '.join(gen_text_list), nth, ignore_panding_note_error=True)
+        midi.dump(f'{args.output_file_path}_{i}.mid')
+        if args.output_txt:
+            with open(f'{args.output_file_path}_{i}.txt', 'w+', encoding='utf8') as f:
+                f.write(' '.join(gen_text_list))
 
 def main():
     args = read_args()
@@ -153,20 +184,10 @@ def main():
         primer_seq = text_list_to_array(primer_text_list, vocabs=model.vocabs)
 
     if args.sample_number == 1:
-        gen_text_list = generate_sample(model, steps=args.max_generation_step, start_seq=primer_seq)
-        midi = piece_to_midi(' '.join(gen_text_list), nth, ignore_panding_note_error=True)
-        midi.dump(f'{args.output_file_path}.mid')
-        if args.output_txt:
-            with open(f'{args.output_file_path}.txt', 'w+', encoding='utf8') as f:
-                f.write(' '.join(gen_text_list))
+        gen_handler(model, args, args.output_file_path)
     else:
         for i in range(1, args.sample_number+1):
-            gen_text_list = generate_sample(model, steps=args.max_generation_step, start_seq=primer_seq)
-            midi = piece_to_midi(' '.join(gen_text_list), nth, ignore_panding_note_error=True)
-            midi.dump(f'{args.output_file_path}_{i}.mid')
-            if args.output_txt:
-                with open(f'{args.output_file_path}_{i}.txt', 'w+', encoding='utf8') as f:
-                    f.write(' '.join(gen_text_list))
+            gen_handler(model, args, f'{args.output_file_path}_{i}')
 
     return 0
 
