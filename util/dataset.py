@@ -25,7 +25,6 @@ class MidiDataset(Dataset):
         """
             Parameters:
             - data_dir_path: Expected to have 'data.npz' and 'vocabs.json'
-            - sample_stride: The moving window moves `sample_stride` to right for the next sample.
             - use_permutable_subseq_loss: Whether or not we provide a mps_seperator_indices information at __getitem__
             - permute_mps: Whether or not the dataset should permute all the *maximal permutable subsequences*
               in the sequence before returning in `__getitem__`
@@ -52,7 +51,6 @@ class MidiDataset(Dataset):
 
         self.vocabs = get_corpus_vocabs(data_dir_path)
         self.max_seq_length = max_seq_length
-        self.sample_stride = sample_stride
         self.use_permutable_subseq_loss = use_permutable_subseq_loss
         self.permute_mps = permute_mps
         self.permute_track_number = permute_track_number
