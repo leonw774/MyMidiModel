@@ -165,7 +165,7 @@ def plot_roll(piece, nth, output_file_path):
                     )
                 if prev_pitch is not None:
                     plt.plot(
-                        [prev_onset_time+0.8, onset_time+0.8], [prev_pitch+0.8, pitch+0.8],
+                        [prev_onset_time+0.4, onset_time+0.4], [prev_pitch+0.4, pitch+0.4],
                         color=SHAPE_LINE_COLOR,  linewidth=1.0,
                         markerfacecolor=track_colors[track_number], marker='.', markersize=1
                     )
