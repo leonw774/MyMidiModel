@@ -124,7 +124,7 @@ class MidiDataset(Dataset):
             self._filenum_indices[filenum] = cur_index
         self._max_index = cur_index
         # cast self._filenum_indices from list of tuples into np array to save space
-        print('self._filenum_indices size:', sys.getsizeof(self._filenum_indices), 'bytes')
+        # print('self.pieces size:', sys.getsizeof(self.pieces), 'bytes')
 
     def __getitem__(self, index):
         # while True:

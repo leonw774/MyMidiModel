@@ -5,10 +5,18 @@ import torch.nn.functional as F
 
 from fast_transformers.builders import TransformerEncoderBuilder
 from fast_transformers.masking import FullMask
+from fast_transformers.feature_maps import ActivationFunctionFeatureMap
 
 from .corpus import TOKEN_ATTR_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, Vocabs, array_to_text_list, text_list_to_array
 from .midi import piece_to_midi
 from .tokens import PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR
+
+# becasuse the elu feature map implemented in fast_transformers use lambda function
+# have to rewrite it to pickle-able
+def my_elu_function(x):
+    return F.elu(x) + 1
+
+MY_ELU_FEATURE_MAP = ActivationFunctionFeatureMap.factory(my_elu_function)
 
 class MyMidiTransformer(nn.Module):
     def __init__(self,
@@ -83,18 +91,19 @@ class MyMidiTransformer(nn.Module):
             # this causal (lower trianglur) mask is not actually used,
             # because the "causal-ness" is already implemented in the calculation of linear attention
         if use_linear_attn:
-            enc_builder = TransformerEncoderBuilder()
-            enc_builder.activation = 'relu'
-            enc_builder.n_layers = layers_number
-            enc_builder.n_heads = attn_heads_number
-            enc_builder.feed_forward_dimensions = 2048  # same as torch's default
-            enc_builder.query_dimensions = embedding_dim // attn_heads_number
-            enc_builder.value_dimensions = embedding_dim // attn_heads_number
-            enc_builder.dropout = 0.1                   # same as torch's default
-            enc_builder.attention_dropout = 0.1         # same as torch's default
-            # the low trianglur mask is already implemented in the 'causal-linear' attention
-            enc_builder.attention_type = "causal-linear"
-            enc_builder.final_normalization = True      # same as torch's default
+            enc_builder = TransformerEncoderBuilder.from_kwargs(
+                activation='relu',
+                n_layers=layers_number,
+                n_heads=attn_heads_number,
+                feed_forward_dimensions=2048,   # same as torch's default
+                query_dimensions=embedding_dim // attn_heads_number,
+                value_dimensions=embedding_dim // attn_heads_number,
+                dropout=0.1,                    # same as torch's default
+                attention_dropout=0.1,          # same as torch's default
+                attention_type="causal-linear",
+                final_normalization=True,       # same as torch's default
+                feature_map=MY_ELU_FEATURE_MAP  # make the model pickle-able
+            )
             self.transformer_encoder = enc_builder.get()
         else:
             layer = nn.TransformerEncoderLayer( # name's encoder, used as decoder.
