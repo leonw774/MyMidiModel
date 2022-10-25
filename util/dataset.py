@@ -33,7 +33,7 @@ class MidiDataset(Dataset):
         """
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
         npz_file = np.load(npz_path)
-        print('Opened', npz_path)
+        print('Reading', npz_path)
         available_memory_size = psutil.virtual_memory().available
         array_memory_size = 0
         for filenum in range(len(npz_file)):
@@ -45,7 +45,7 @@ class MidiDataset(Dataset):
             self.pieces = npz_file
         else:
             # load into memory to be faster
-            print('Loading arrays to memory...')
+            print('Loading arrays to memory')
             self.pieces = {
                 str(filenum): npz_file[str(filenum)]
                 for filenum in range(len(npz_file))

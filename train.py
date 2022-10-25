@@ -352,7 +352,7 @@ def main():
         collate_fn=collate_mididataset
     )
     logging.info('Legnth of training set: %d', len(train_dataloader))
-    logging.info('Legnth of vlaidation set: %d', len(valid_dataloader))
+    logging.info('Legnth of validation set: %d', len(valid_dataloader))
     # make optimizer
     optimizer = Adam(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-9)
     scheduler = lr_scheduler.LambdaLR(
