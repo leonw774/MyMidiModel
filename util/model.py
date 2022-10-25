@@ -27,7 +27,8 @@ class MyMidiTransformer(nn.Module):
             attn_heads_number: int,
             embedding_dim: int,
             input_no_tempo: bool,
-            input_no_time_signature: bool
+            input_no_time_signature: bool,
+            embedding_dropout_rate=0.0
             ) -> None:
         super().__init__()
 
@@ -63,6 +64,7 @@ class MyMidiTransformer(nn.Module):
             )
             for vsize in self.embedding_vocabs_size
         ])
+        self.embedding_dropout = nn.Dropout(embedding_dropout_rate)
 
         # Output attributes
         self.output_attrs_indices = [
@@ -128,22 +130,17 @@ class MyMidiTransformer(nn.Module):
         x = sum(
             emb(x[..., i]) for i, emb in enumerate(self.embeddings)
         )
-        # try:
-        #     x = sum(
-        #         emb(x[:,:,i]) for i, emb in enumerate(self.embeddings)
-        #     )
-        # except Exception as e:
-        #     for i, vsize in enumerate(self.embedding_vocabs_size):
-        #         if torch.all(0 <= x[:,:,i]) and torch.all(x[:,:,i] < vsize):
-        #             print(i, True)
-        #         else:
-        #             print(i)
-        #             for b in range(x.shape[0]):
-        #                 if not torch.all(0 <= x[b,:,i]) and torch.all(x[b,:,i] < vsize):
-        #                     print(x[b,:,i])
-        #     raise e
+        # emb_sum = None
+        # for i, emb in enumerate(self.embeddings):
+        #     emb_i = emb(x[..., i])
+        #     # to deal with sparisity of non-padding tokens in some attribute
+        #     emb_mask = emb_i.ne(0).float().unsqueeze(dim=-1).to(x.device)
+        #     if emb_sum:
+        #         emb_sum += emb_mask * emb_i
+        #     else:
+        #         emb_sum = emb_mask * emb_i
+        x = self.embedding_dropout(x)
 
-        # event id 0 means padding
         length_mask = x[..., 0].ne(0).bool().to(x.device)
         if self.use_linear_attn:
             length_mask = FullMask(mask=length_mask)
@@ -196,21 +193,23 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
         clipped_seq = input_seq[:, -model.max_seq_length:]
         logits = model(clipped_seq)
         last_logits = [
-            l[:, -1, :] # l has shape (1, sequence, attr_vocab_size)
+            l[0, -1, :] # l has shape (1, sequence_length, attr_vocab_size)
             for l in logits
         ]
+        # print('\n'.join([repr(logit) for logit in last_logits]))
         try_count = 0
         while try_count < try_count_limit:
             sampled_attrs = [
-                torch.multinomial(F.softmax(l[0] / temperature, dim=0), 1)
+                torch.multinomial(F.softmax(l / temperature, dim=0), 1)
                 for l in last_logits # l has shape (1, attr_vocab_size)
             ]
+            # print(sampled_attrs)
             try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, attr_num)
-            # print([ model.vocabs.to_dict()[OUTPUT_FEATURE_NAME[i]]['id2text'][int(f)] for i, f in enumerate(try_token[0]) ])
+            # print([ model.vocabs.to_dict()[OUTPUT_ATTR_NAME[i]]['id2text'][int(f)] for i, f in enumerate(try_token[0]) ])
             try_token = torch.unsqueeze(try_token, dim=0) # shape = (1, 1, attr_num)
             try_seq = torch.cat((output_seq, try_token), dim=1)
             try_text_list = array_to_text_list(try_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=True)
-            # print(new_output_text_list)
+            # print(try_text_list)
             if try_text_list[-1] == END_TOKEN_STR:
                 text_list = try_text_list
                 # if sampled EOS, then dont check. just end
@@ -222,7 +221,7 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
                 piece_to_midi(' '.join(try_text_list + [END_TOKEN_STR]), model.vocabs.paras['nth'])
                 # format checking and position, tempo, measure_number calculation
                 input_seq = torch.from_numpy(
-                    text_list_to_array(try_text_list + [END_TOKEN_STR], vocabs=model.vocabs)
+                    text_list_to_array(try_text_list, vocabs=model.vocabs)
                 ).unsqueeze(0).int()
                 output_seq = model.to_output_attrs(input_seq)
                 text_list = try_text_list
@@ -233,7 +232,7 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
                 try_count += 1
                 continue # keep sampling until no error
         # end while
-
+        # print(text_list)
         if try_count == try_count_limit:
             break
 
