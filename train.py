@@ -21,8 +21,7 @@ from util.model import (
     MyMidiTransformer,
     generate_sample,
     calc_losses,
-    calc_permutable_subseq_losses,
-    get_seq_mask,
+    calc_permutable_subseq_losses
 )
 from util.evaluations import EVAL_FEATURE_NAMES, piece_to_features
 
@@ -227,8 +226,7 @@ def valid(model, valid_dataloader, args):
     for batch_seqs, batch_mps_sep_indices in tqdm(valid_dataloader):
         batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
         batch_target_seqs = (model.to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
-        batch_input_seq_mask = get_seq_mask(batch_input_seqs.shape[1]).to(args.use_device)
-        prediction = model(batch_input_seqs, batch_input_seq_mask)
+        prediction = model(batch_input_seqs)
 
         if args.data_args.use_permutable_subseq_loss:
             head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
@@ -312,6 +310,8 @@ def main():
     logging.info('\n'.join([
         f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(COMPLETE_ATTR_NAME, model.embedding_vocabs_size))
     ]))
+
+    # use torchinfo
     summary_str = str(torchinfo.summary(
         model,
         input_size=[
@@ -390,10 +390,9 @@ def main():
 
             batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
             batch_target_seqs = (model.to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
-            batch_input_seq_mask = get_seq_mask(batch_input_seqs.shape[1]).to(args.use_device)
 
             start_forward_time = time()
-            prediction = model(batch_input_seqs, batch_input_seq_mask)
+            prediction = model(batch_input_seqs)
             forward_time += time() - start_forward_time
 
             if args.data_args.use_permutable_subseq_loss:

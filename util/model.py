@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from fast_transformers.builders import TransformerEncoderBuilder 
+from fast_transformers.builders import TransformerEncoderBuilder
 
 from .corpus import TOKEN_ATTR_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, Vocabs, array_to_text_list, text_list_to_array
 from .midi import piece_to_midi
@@ -107,10 +107,10 @@ class MyMidiTransformer(nn.Module):
     def to_output_attrs(self, batched_seq_complete_attrs):
         return batched_seq_complete_attrs[..., self.output_attrs_indices]
 
-    def forward(self, x, mask):
+    def forward(self, x):
         # x has shape: (batch_size, seq_size, in_attr_number)
         x = sum(
-            emb(x[:,:,i]) for i, emb in enumerate(self.embeddings)
+            emb(x[..., i]) for i, emb in enumerate(self.embeddings)
         )
         # try:
         #     x = sum(
@@ -126,9 +126,16 @@ class MyMidiTransformer(nn.Module):
         #                 if not torch.all(0 <= x[b,:,i]) and torch.all(x[b,:,i] < vsize):
         #                     print(x[b,:,i])
         #     raise e
+
+        causal_mask = torch.tril(torch.ones(x.shape[1], x.shape[1]), diagonal=1).bool().to(x.device)
+        # event id 0 means padding
+        length_mask = x[..., 0].ne(0).bool().to(x.device)
         x = self.transformer_encoder(
-            src=x,
-            mask=mask
+            x,
+            causal_mask,
+            # causal (lower trianglur) mask is not used in fast_transformer's implementation,
+            # because the "causal-ness" is in the already in the calculation of attention
+            length_mask
         )
         logits = tuple(
             logit(x) for logit in self.logits
@@ -149,7 +156,6 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
             raise AssertionError(exception_msg)
     else:
         start_seq = torch.from_numpy(text_list_to_array([BEGIN_TOKEN_STR], model.vocabs)).unsqueeze(0).int()
-    max_length_mask = get_seq_mask(model.max_seq_length).to(start_seq.device)
 
     # get model device
     device = next(model.parameters()).device
@@ -166,8 +172,7 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
     # for _ in tqdm(range(steps)):
     for _ in range(steps):
         clipped_seq = input_seq[:, -model.max_seq_length:]
-        mask = max_length_mask[:clipped_seq.shape[1], :clipped_seq.shape[1]]
-        logits = model.forward(clipped_seq, mask)
+        logits = model(clipped_seq)
         last_logits = [
             l[:, -1, :] # l has shape (1, sequence, attr_vocab_size)
             for l in logits
@@ -302,7 +307,7 @@ def calc_permutable_subseq_losses(pred_logit, target_logit, batched_mps_indices)
     return head_losses
 
 
-def get_seq_mask(size: int):
-    return torch.triu(torch.ones(size, size), diagonal=1).bool()
+def get_lower_trianglur_mask(size: int, device):
+    return (torch.tril(torch.ones(size, size), diagonal=1).bool()).to(device)
 
 MidiTransformerDecoder = MyMidiTransformer # old name
