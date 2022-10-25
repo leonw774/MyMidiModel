@@ -127,10 +127,11 @@ if [ -d $MODEL_DIR_PATH ]; then
 echo "Model dir: $MODEL_DIR_PATH"
 
 TRAIN_OTHER_ARGUMENTS=""
-test "$SAMPLE_FROM_START" == true                  && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --sample-from-start"
+test "$USE_LINEAR_ATTENTION" == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-linear-attn"
 test "$USE_PERMUTABLE_SUBSEQ_LOSS" == true && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-permutable-subseq-loss"
 test "$PERMUTE_MPS" == true                && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-mps"
 test "$PERMUTE_TRACK_NUMBER" == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-track-number"
+test "$SAMPLE_FROM_START" == true          && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --sample-from-start"
 test "$INPUT_NO_TEMPO" == true             && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-tempo"
 test "$INPUT_NO_TIME_SIGNATURE" == true    && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-time-signatrue"
 test "$LOG_HEAD_LOSSES" == true            && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --log-head-losses"

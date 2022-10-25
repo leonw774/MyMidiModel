@@ -26,3 +26,4 @@ torchvision==0.13.1
 tqdm==4.64.0
 typing_extensions==4.3.0
 urllib3==1.26.12
+pytorch-fast-transformers==0.4.0

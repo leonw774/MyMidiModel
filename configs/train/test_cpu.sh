@@ -1,6 +1,7 @@
 #!/bin/bash
 # dataset parameters
 MAX_SEQ_LENGTH=1024
+USE_LINEAR_ATTENTION=false
 USE_PERMUTABLE_SUBSEQ_LOSS=false
 PERMUTE_MPS=false
 PERMUTE_TRACK_NUMBER=false

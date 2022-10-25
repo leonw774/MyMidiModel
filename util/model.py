@@ -2,6 +2,8 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+from fast_transformers.builders import TransformerEncoderBuilder 
+
 from .corpus import TOKEN_ATTR_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, Vocabs, array_to_text_list, text_list_to_array
 from .midi import piece_to_midi
 from .tokens import PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR
@@ -9,6 +11,7 @@ from .tokens import PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR
 class MyMidiTransformer(nn.Module):
     def __init__(self,
             vocabs: Vocabs,
+            use_linear_attn: bool,
             max_seq_length: int,
             layers_number: int,
             attn_heads_number: int,
@@ -71,15 +74,28 @@ class MyMidiTransformer(nn.Module):
             for vsize in self.logit_vocabs_size
         ])
 
-        layer = nn.TransformerEncoderLayer( # name's encoder, used as decoder.
-            d_model=embedding_dim,
-            nhead=attn_heads_number,
-            batch_first=True
-        )
-        self.transformer_encoder = nn.TransformerEncoder(
-            encoder_layer=layer,
-            num_layers=layers_number
-        )
+        self.use_linear_attn = use_linear_attn
+        if use_linear_attn:
+            enc_builder = TransformerEncoderBuilder()
+            enc_builder.n_layers = layers_number
+            enc_builder.n_heads = attn_heads_number
+            enc_builder.feed_forward_dimensions = 2048  # same as torch's default
+            enc_builder.query_dimensions = embedding_dim
+            enc_builder.value_dimensions = embedding_dim
+            enc_builder.dropout = 0.1                   # same as torch's default
+            enc_builder.attention_dropout = 0.1         # same as torch's default
+            enc_builder.attention_type = "casual_linear"# the low trianglur mask is already implemented in the casual_linear layer
+            self.transformer_encoder = enc_builder.get()
+        else:
+            layer = nn.TransformerEncoderLayer( # name's encoder, used as decoder.
+                d_model=embedding_dim,
+                nhead=attn_heads_number,
+                batch_first=True
+            )
+            self.transformer_encoder = nn.TransformerEncoder(
+                encoder_layer=layer,
+                num_layers=layers_number
+            )
 
     # batched_seq_complete_attrs has shape: (batch_size, seq_size, complete_attr_num)
     def to_input_attrs(self, batched_seq_complete_attrs):

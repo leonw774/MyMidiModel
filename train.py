@@ -34,6 +34,10 @@ def parse_args():
         default=2048
     )
     data_parser.add_argument(
+        '--use-linear-attn',
+        action='store_true'
+    )
+    data_parser.add_argument(
         '--use-permutable-subseq-loss',
         action='store_true'
     )
