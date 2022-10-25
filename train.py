@@ -34,10 +34,6 @@ def parse_args():
         default=2048
     )
     data_parser.add_argument(
-        '--use-linear-attn',
-        action='store_true'
-    )
-    data_parser.add_argument(
         '--use-permutable-subseq-loss',
         action='store_true'
     )
@@ -55,6 +51,10 @@ def parse_args():
     )
 
     model_parser = ArgumentParser()
+    model_parser.add_argument(
+        '--use-linear-attn',
+        action='store_true'
+    )
     model_parser.add_argument(
         '--layers-number',
         type=int,

@@ -77,6 +77,7 @@ class MyMidiTransformer(nn.Module):
         self.use_linear_attn = use_linear_attn
         if use_linear_attn:
             enc_builder = TransformerEncoderBuilder()
+            enc_builder.activation = 'relu'
             enc_builder.n_layers = layers_number
             enc_builder.n_heads = attn_heads_number
             enc_builder.feed_forward_dimensions = 2048  # same as torch's default
@@ -84,7 +85,9 @@ class MyMidiTransformer(nn.Module):
             enc_builder.value_dimensions = embedding_dim
             enc_builder.dropout = 0.1                   # same as torch's default
             enc_builder.attention_dropout = 0.1         # same as torch's default
-            enc_builder.attention_type = "casual_linear"# the low trianglur mask is already implemented in the casual_linear layer
+            # the low trianglur mask is already implemented in the 'casual_linear_attention'
+            enc_builder.attention_type = "casual_linear"
+            enc_builder.final_normalization = True      # same as torch's default
             self.transformer_encoder = enc_builder.get()
         else:
             layer = nn.TransformerEncoderLayer( # name's encoder, used as decoder.
