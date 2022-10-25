@@ -85,8 +85,8 @@ class MyMidiTransformer(nn.Module):
             enc_builder.value_dimensions = embedding_dim
             enc_builder.dropout = 0.1                   # same as torch's default
             enc_builder.attention_dropout = 0.1         # same as torch's default
-            # the low trianglur mask is already implemented in the 'casual_linear_attention'
-            enc_builder.attention_type = "casual_linear"
+            # the low trianglur mask is already implemented in the 'causal-linear' attention
+            enc_builder.attention_type = "causal-linear"
             enc_builder.final_normalization = True      # same as torch's default
             self.transformer_encoder = enc_builder.get()
         else:
