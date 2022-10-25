@@ -1,3 +1,4 @@
+from queue import Full
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -76,14 +77,19 @@ class MyMidiTransformer(nn.Module):
         ])
 
         self.use_linear_attn = use_linear_attn
+        self.causal_mask = torch.tril(torch.ones(max_seq_length, max_seq_length), diagonal=0).bool()
+        if use_linear_attn:
+            self.causal_mask = FullMask(self.causal_mask)
+            # this causal (lower trianglur) mask is not actually used,
+            # because the "causal-ness" is already implemented in the calculation of linear attention
         if use_linear_attn:
             enc_builder = TransformerEncoderBuilder()
             enc_builder.activation = 'relu'
             enc_builder.n_layers = layers_number
             enc_builder.n_heads = attn_heads_number
             enc_builder.feed_forward_dimensions = 2048  # same as torch's default
-            enc_builder.query_dimensions = embedding_dim
-            enc_builder.value_dimensions = embedding_dim
+            enc_builder.query_dimensions = embedding_dim // attn_heads_number
+            enc_builder.value_dimensions = embedding_dim // attn_heads_number
             enc_builder.dropout = 0.1                   # same as torch's default
             enc_builder.attention_dropout = 0.1         # same as torch's default
             # the low trianglur mask is already implemented in the 'causal-linear' attention
@@ -128,17 +134,20 @@ class MyMidiTransformer(nn.Module):
         #                     print(x[b,:,i])
         #     raise e
 
-        causal_mask = torch.tril(torch.ones(x.shape[1], x.shape[1]), diagonal=1).bool().to(x.device)
         # event id 0 means padding
         length_mask = x[..., 0].ne(0).bool().to(x.device)
         if self.use_linear_attn:
-            causal_mask = FullMask(mask=causal_mask)
             length_mask = FullMask(mask=length_mask)
+            causal_mask = self.causal_mask
+        else:
+            if x.shape[1] < self.max_seq_length:
+                causal_mask = self.causal_mask[:x.shape[1], :x.shape[1]]
+            else:
+                causal_mask = self.causal_mask
+
         x = self.transformer_encoder(
             x,
             causal_mask,
-            # causal (lower trianglur) mask is not used in fast_transformer's implementation,
-            # because the "causal-ness" is in the already in the calculation of attention
             length_mask
         )
         logits = tuple(
