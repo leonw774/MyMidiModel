@@ -315,8 +315,7 @@ def main():
     summary_str = str(torchinfo.summary(
         model,
         input_size=[
-            (args.train_args.batch_size, args.data_args.max_seq_length, len(model.input_attrs_indices)), # x
-            (args.data_args.max_seq_length, args.data_args.max_seq_length) # mask
+            (args.train_args.batch_size, args.data_args.max_seq_length, len(model.input_attrs_indices))
         ],
         dtypes=[torch.long, torch.bool],
         device=args.use_device,

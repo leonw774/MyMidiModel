@@ -3,6 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from fast_transformers.builders import TransformerEncoderBuilder
+from fast_transformers.masking import FullMask
 
 from .corpus import TOKEN_ATTR_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, Vocabs, array_to_text_list, text_list_to_array
 from .midi import piece_to_midi
@@ -130,6 +131,9 @@ class MyMidiTransformer(nn.Module):
         causal_mask = torch.tril(torch.ones(x.shape[1], x.shape[1]), diagonal=1).bool().to(x.device)
         # event id 0 means padding
         length_mask = x[..., 0].ne(0).bool().to(x.device)
+        if self.use_linear_attn:
+            causal_mask = FullMask(mask=causal_mask)
+            length_mask = FullMask(mask=length_mask)
         x = self.transformer_encoder(
             x,
             causal_mask,
