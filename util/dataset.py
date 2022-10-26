@@ -1,6 +1,6 @@
 import bisect
 import os
-import sys
+import zipfile
 
 import numpy as np
 import psutil
@@ -35,10 +35,8 @@ class MidiDataset(Dataset):
         npz_file = np.load(npz_path)
         print('Reading', npz_path)
         available_memory_size = psutil.virtual_memory().available
-        array_memory_size = 0
-        for filenum in range(len(npz_file)):
-            filename = str(filenum)
-            array_memory_size += np.prod(npz_file[filename].shape) * 2 # times 2 because array dtype is int16
+        npz_zipinfo_list = zipfile.ZipFile(data_dir_path).infolist
+        array_memory_size = sum([zinfo.file_size for zinfo in npz_zipinfo_list])
         if array_memory_size >= available_memory_size:
             # load from disk every time indexing
             print('Memory size not enough, using NPZ mmap.')
