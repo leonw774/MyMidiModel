@@ -32,18 +32,18 @@ class MidiDataset(Dataset):
             - permute_track_number: Permute all the track numbers, as data augmentation
         """
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
-        npz_file = np.load(npz_path)
         print('Reading', npz_path)
         available_memory_size = psutil.virtual_memory().available
-        npz_zipinfo_list = zipfile.ZipFile(data_dir_path).infolist
+        npz_zipinfo_list = zipfile.ZipFile(npz_path).infolist
         array_memory_size = sum([zinfo.file_size for zinfo in npz_zipinfo_list])
         if array_memory_size * 1.1 >= available_memory_size:
             # load from disk every time indexing
             print('Memory size not enough, using NPZ mmap.')
-            self.pieces = npz_file
+            self.pieces = np.load(npz_path)
         else:
             # load into memory to be faster
             print('Loading arrays to memory')
+            npz_file = np.load(npz_path)
             self.pieces = {
                 str(filenum): npz_file[str(filenum)]
                 for filenum in range(len(npz_file))
