@@ -247,10 +247,14 @@ def main():
                 logging.info('==== midi_to_text.py exited ====')
                 return 0
             else:
-                os.remove(to_corpus_file_path(args.output_path))
-                os.remove(to_paras_file_path(args.output_path))
-                os.remove(to_pathlist_file_path(args.output_path))
-                logging.info('Output directory: %s already has corpus files. Removed.', args.output_path)
+                logging.info('Output directory: %s already has corpus files. Remove? (y/n)', args.output_path)
+                if input() == 'y':
+                    os.remove(to_corpus_file_path(args.output_path))
+                    os.remove(to_paras_file_path(args.output_path))
+                    os.remove(to_pathlist_file_path(args.output_path))
+                else:
+                    logging.info('==== midi_to_text.py exited ====')
+                    return 0
         else:
             logging.info('Output directory: %s already existed, but no corpus files.', args.output_path)
     else:
