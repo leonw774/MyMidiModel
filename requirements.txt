@@ -1,6 +1,7 @@
 miditoolkit
 numpy
 pandas
+scipy
 matplotlib
 psutil
 PyYAML
