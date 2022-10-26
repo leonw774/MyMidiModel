@@ -96,11 +96,10 @@ def main():
                     os.remove(to_vocabs_file_path(args.corpus_dir_path))
                     os.remove(os.path.join(args.corpus_dir_path, 'arrays.npz'))
                     break
-                elif i == 'n':
+                if i == 'n':
                     logging.info('==== text_to_array.py exited ====')
                     return 0
-                else:
-                    print('(y/n):')
+                print('(y/n):')
 
     logging.info('Begin build vocabs for %s', args.corpus_dir_path)
     corpus_paras = get_corpus_paras(args.corpus_dir_path)

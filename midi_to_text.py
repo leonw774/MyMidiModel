@@ -237,15 +237,16 @@ def main():
     logging.info(corpus_paras_str)
 
     # check if output_path is a directory
+    corpus_file_path = to_corpus_file_path(args.output_path)
     if os.path.exists(args.output_path):
-        if os.path.exists(to_corpus_file_path(args.output_path)):
+        if os.path.exists():
             if args.use_existed:
-                logging.info('Output directory: %s already has corpus file.', to_corpus_file_path(args.output_path))
+                logging.info('Output directory: %s already has corpus file.', corpus_file_path)
                 logging.info('Flag --use-existed is set')
                 logging.info('==== midi_to_text.py exited ====')
                 return 0
             else:
-                logging.info('Output directory: %s already has corpus files. Remove? (y/n)', to_corpus_file_path(args.output_path))
+                logging.info('Output directory: %s already has corpus files. Remove? (y/n)', corpus_file_path)
                 while True:
                     i = input()
                     if i == 'y':
@@ -253,11 +254,10 @@ def main():
                         os.remove(to_paras_file_path(args.output_path))
                         os.remove(to_pathlist_file_path(args.output_path))
                         break
-                    elif i == 'n':
+                    if i == 'n':
                         logging.info('==== midi_to_text.py exited ====')
                         return 0
-                    else:
-                        print('(y/n):')
+                    print('(y/n):')
         else:
             logging.info('Output directory: %s already existed, but no corpus files.', args.output_path)
     else:
