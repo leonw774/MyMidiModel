@@ -88,8 +88,7 @@ class MyMidiTransformer(nn.Module):
 
         self.use_linear_attn = use_linear_attn
         # True means masked, False means unchanged
-        
-        print(self.causal_mask[:8,:8])
+
         if use_linear_attn:
             # in fast_transformer's FullMask class, 0 is masked, 1 is keep
             # but this causal (lower trianglur) mask is not actually used,

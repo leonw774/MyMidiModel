@@ -237,8 +237,8 @@ def main():
     logging.info(corpus_paras_str)
 
     # check if output_path is a directory
-    corpus_file_path = to_corpus_file_path(args.output_path)
     if os.path.isdir(args.output_path):
+        corpus_file_path = to_corpus_file_path(args.output_path)
         if os.path.exists(corpus_file_path):
             if args.use_existed:
                 logging.info('Output directory: %s already has corpus file.', corpus_file_path)
