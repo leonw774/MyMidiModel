@@ -88,12 +88,16 @@ class MyMidiTransformer(nn.Module):
 
         self.use_linear_attn = use_linear_attn
         # True means masked, False means unchanged
-        self.causal_mask = torch.triu(torch.ones(max_seq_length, max_seq_length), diagonal=0).bool()
+        
         print(self.causal_mask[:8,:8])
         if use_linear_attn:
-            self.causal_mask = FullMask(self.causal_mask)
-            # this causal (lower trianglur) mask is not actually used,
+            # in fast_transformer's FullMask class, 0 is masked, 1 is keep
+            # but this causal (lower trianglur) mask is not actually used,
             # because the "causal-ness" is already implemented in the calculation of linear attention
+            self.causal_mask = FullMask(torch.tril(torch.ones(max_seq_length, max_seq_length), diagonal=0).bool())
+        else:
+            # in pytorch's official implementation, True is masked, False is keep
+            self.causal_mask = torch.triu(torch.ones(max_seq_length, max_seq_length), diagonal=0).bool()
         if use_linear_attn:
             enc_builder = TransformerEncoderBuilder.from_kwargs(
                 activation='relu',
