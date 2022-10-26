@@ -238,8 +238,8 @@ def main():
 
     # check if output_path is a directory
     corpus_file_path = to_corpus_file_path(args.output_path)
-    if os.path.exists(args.output_path):
-        if os.path.exists():
+    if os.path.isdir(args.output_path):
+        if os.path.exists(corpus_file_path):
             if args.use_existed:
                 logging.info('Output directory: %s already has corpus file.', corpus_file_path)
                 logging.info('Flag --use-existed is set')
@@ -260,6 +260,9 @@ def main():
                     print('(y/n):')
         else:
             logging.info('Output directory: %s already existed, but no corpus files.', args.output_path)
+    elif os.path.isfile(args.output_path):
+        logging.info('Output directory path: %s is a file.', args.output_path)
+        return 1
     else:
         os.makedirs(args.output_path)
 
