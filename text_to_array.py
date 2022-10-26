@@ -69,7 +69,7 @@ def main():
             level=loglevel,
             format='%(message)s'
         )
-    logging.info(strftime('==== text_to_array.py start at %Y%m%d-%H%M$S ===='))
+    logging.info(strftime('==== text_to_array.py start at %Y%m%d-%H%M$%S ===='))
 
     if not os.path.isdir(args.corpus_dir_path):
         logging.info('%s does not exist', args.corpus_dir_path)
