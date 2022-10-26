@@ -48,6 +48,7 @@ class MidiDataset(Dataset):
                 str(filenum): npz_file[str(filenum)]
                 for filenum in tqdm(range(len(npz_file)))
             }
+        print('Processing')
 
         self.vocabs = get_corpus_vocabs(data_dir_path)
         self.max_seq_length = max_seq_length
