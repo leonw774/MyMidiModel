@@ -147,9 +147,9 @@ class MyMidiTransformer(nn.Module):
             causal_mask = self.causal_mask
         else:
             if x.shape[1] < self.max_seq_length:
-                causal_mask = self.causal_mask[:x.shape[1], :x.shape[1]]
+                causal_mask = self.causal_mask[:x.shape[1], :x.shape[1]].to(x.device)
             else:
-                causal_mask = self.causal_mask
+                causal_mask = self.causal_mask.to(x.device)
 
         x = self.transformer_encoder(
             x,
