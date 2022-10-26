@@ -95,7 +95,8 @@ class MyMidiTransformer(nn.Module):
             self.causal_mask = FullMask(torch.tril(torch.ones(max_seq_length, max_seq_length), diagonal=0).bool())
         else:
             # in pytorch's official implementation, True is masked, False is keep
-            self.causal_mask = torch.triu(torch.ones(max_seq_length, max_seq_length), diagonal=0).bool()
+            self.causal_mask = torch.triu(torch.ones(max_seq_length, max_seq_length), diagonal=1).bool()
+        print(self.causal_mask[:8, :8])
 
         if use_linear_attn:
             enc_builder = TransformerEncoderBuilder.from_kwargs(
@@ -146,7 +147,6 @@ class MyMidiTransformer(nn.Module):
         #         emb_sum = emb_mask * emb_i
         x = self.embedding_dropout(x)
 
-        
         if self.use_linear_attn:
             # in fast_transformer's FullMask class, 0 is masked, 1 is keep
             length_mask = x[..., 0].ne(0).long().to(x.device)
@@ -186,22 +186,23 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
         start_seq = torch.from_numpy(text_list_to_array([BEGIN_TOKEN_STR], model.vocabs)).unsqueeze(0).int()
 
     # get model device
-    device = next(model.parameters()).device
+    model_device = next(model.parameters()).device
     training_state = model.training
     model.eval()
 
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
 
-    input_seq = start_seq.to(device)
-    output_seq = model.to_output_attrs(start_seq).to(device)
+    input_seq = start_seq
+    output_seq = model.to_output_attrs(start_seq)
     end_with_end_token = False
     # print(seq.shape)
     # for _ in tqdm(range(steps)):
     for _ in range(steps):
         clipped_seq = input_seq[:, -model.max_seq_length:]
-        logits = model(clipped_seq)
+        logits = model(clipped_seq.to(model_device))
         last_logits = [
-            l[0, -1, :] # l has shape (1, sequence_length, attr_vocab_size)
+            l[0, -1, :].to('cpu') # back to cpu, if was cuda (likely)
+            # l has shape (1, sequence_length, attr_vocab_size)
             for l in logits
         ]
         # print('\n'.join([repr(logit) for logit in last_logits]))
@@ -335,8 +336,5 @@ def calc_permutable_subseq_losses(pred_logit, target_logit, batched_mps_indices)
     # ])
     return head_losses
 
-
-def get_lower_trianglur_mask(size: int, device):
-    return (torch.tril(torch.ones(size, size), diagonal=1).bool()).to(device)
 
 MidiTransformerDecoder = MyMidiTransformer # old name
