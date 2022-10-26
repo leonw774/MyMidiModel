@@ -37,7 +37,7 @@ class MidiDataset(Dataset):
         available_memory_size = psutil.virtual_memory().available
         npz_zipinfo_list = zipfile.ZipFile(data_dir_path).infolist
         array_memory_size = sum([zinfo.file_size for zinfo in npz_zipinfo_list])
-        if array_memory_size >= available_memory_size:
+        if array_memory_size * 1.1 >= available_memory_size:
             # load from disk every time indexing
             print('Memory size not enough, using NPZ mmap.')
             self.pieces = npz_file
