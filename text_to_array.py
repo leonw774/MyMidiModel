@@ -105,15 +105,34 @@ def main():
         npy_dir_path = os.path.join(args.corpus_dir_path, 'arrays')
         npy_zip_path = os.path.join(args.corpus_dir_path, 'arrays.zip')
         npz_path = os.path.join(args.corpus_dir_path, 'arrays.npz')
+        existing_file_paths = []
+        all_exist = 0
         if os.path.exists(npy_dir_path):
-            shutil.rmtree(npy_dir_path)
-            print(f'Find existing {npy_dir_path}. Removed.')
+            existing_file_paths += npy_dir_path
+            all_exist += 1
         if os.path.exists(npy_zip_path):
-            os.remove(npy_zip_path)
-            print(f'Find existing {npy_zip_path}. Removed.')
+            existing_file_paths += npy_zip_path
+            all_exist += 1
         if os.path.exists(npz_path):
-            os.remove(npz_path)
-            print(f'Find existing {npz_path}. Removed.')
+            existing_file_paths += npz_path
+            all_exist += 1
+        if len(existing_file_paths) != 0:
+            print(f'Find existing file(s): {" ".join(existing_file_paths)}. Removed? (y/n)')
+            while True:
+                i = input()
+                if i == 'y':
+                    if os.path.exists(npy_dir_path):
+                        shutil.rmtree(npy_dir_path)
+                    if os.path.exists(npy_zip_path):
+                        os.remove(npy_zip_path)
+                    if os.path.exists(npz_path):
+                        os.remove(npz_path)
+                    break
+                elif i == 'n':
+                    logging.info('==== text_to_array.py exited ====')
+                    return 0
+                else:
+                    print('(y/n):')
 
         os.makedirs(npy_dir_path)
         for i, p in tqdm(enumerate(corpus_iterator), total=len(corpus_iterator)):
@@ -243,4 +262,5 @@ def main():
     return 0
 
 if __name__ == '__main__':
-    main()
+    exit_code = main()
+    exit(exit_code)

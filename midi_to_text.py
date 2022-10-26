@@ -238,23 +238,26 @@ def main():
 
     # check if output_path is a directory
     if os.path.exists(args.output_path):
-        if (os.path.exists(to_corpus_file_path(args.output_path))
-                and os.path.exists(to_paras_file_path(args.output_path))
-                and os.path.exists(to_pathlist_file_path(args.output_path))):
+        if os.path.exists(to_corpus_file_path(args.output_path)):
             if args.use_existed:
-                logging.info('Output directory: %s already has corpus file.', args.output_path)
+                logging.info('Output directory: %s already has corpus file.', to_corpus_file_path(args.output_path))
                 logging.info('Flag --use-existed is set')
                 logging.info('==== midi_to_text.py exited ====')
                 return 0
             else:
-                logging.info('Output directory: %s already has corpus files. Remove? (y/n)', args.output_path)
-                if input() == 'y':
-                    os.remove(to_corpus_file_path(args.output_path))
-                    os.remove(to_paras_file_path(args.output_path))
-                    os.remove(to_pathlist_file_path(args.output_path))
-                else:
-                    logging.info('==== midi_to_text.py exited ====')
-                    return 0
+                logging.info('Output directory: %s already has corpus files. Remove? (y/n)', to_corpus_file_path(args.output_path))
+                while True:
+                    i = input()
+                    if i == 'y':
+                        os.remove(to_corpus_file_path(args.output_path))
+                        os.remove(to_paras_file_path(args.output_path))
+                        os.remove(to_pathlist_file_path(args.output_path))
+                        break
+                    elif i == 'n':
+                        logging.info('==== midi_to_text.py exited ====')
+                        return 0
+                    else:
+                        print('(y/n):')
         else:
             logging.info('Output directory: %s already existed, but no corpus files.', args.output_path)
     else:

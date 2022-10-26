@@ -46,7 +46,7 @@ class MidiDataset(Dataset):
             npz_file = np.load(npz_path)
             self.pieces = {
                 str(filenum): npz_file[str(filenum)]
-                for filenum in range(len(npz_file))
+                for filenum in tqdm(range(len(npz_file)))
             }
 
         self.vocabs = get_corpus_vocabs(data_dir_path)

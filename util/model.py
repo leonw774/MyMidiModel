@@ -178,14 +178,14 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
 
     # get model device
     device = next(model.parameters()).device
-    start_seq.to(device)
+    start_seq
     training_state = model.training
     model.eval()
 
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
 
-    input_seq = start_seq
-    output_seq = model.to_output_attrs(start_seq)
+    input_seq = start_seq.to(device)
+    output_seq = model.to_output_attrs(start_seq).to(device)
     end_with_end_token = False
     # print(seq.shape)
     # for _ in tqdm(range(steps)):
