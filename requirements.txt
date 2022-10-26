@@ -1,13 +1,11 @@
-matplotlib
 miditoolkit
 numpy
 pandas
+matplotlib
 psutil
 PyYAML
-torch==1.12.1
-torchaudio==0.12.1
-torchinfo==1.7.0
-torchvision==0.13.1
-torchviz==0.0.2
+torch -f https://download.pytorch.org/whl/cu91/torch_stable.html
+torchinfo
+torchviz
 tqdm
-pytorch-fast-transformers==0.4.0
+pytorch-fast-transformers
