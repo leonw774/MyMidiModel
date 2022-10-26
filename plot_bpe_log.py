@@ -3,8 +3,8 @@ import os
 import sys
 
 from matplotlib import pyplot as plt
-from pandas import Series
 import numpy as np
+from pandas import Series
 
 def main(corpus_dir_path, log_file_path):
     with open(log_file_path, 'r', encoding='utf8') as logfile:

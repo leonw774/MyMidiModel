@@ -1,4 +1,3 @@
-from queue import Full
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -7,7 +6,8 @@ from fast_transformers.builders import TransformerEncoderBuilder
 from fast_transformers.masking import FullMask
 from fast_transformers.feature_maps import ActivationFunctionFeatureMap
 
-from .corpus import TOKEN_ATTR_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, Vocabs, array_to_text_list, text_list_to_array
+from .vocabs import Vocabs
+from .corpus import TOKEN_ATTR_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, array_to_text_list, text_list_to_array
 from .midi import piece_to_midi
 from .tokens import PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR
 

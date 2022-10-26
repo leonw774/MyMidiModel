@@ -32,21 +32,21 @@ def parse_args():
         type=int,
         default=24,
         help='The maximum tracks nubmer to keep in text, if the input midi has more "instruments" than this value, \
-            some tracks would be merged or discard. Default is 24.'
+            some tracks would be merged or discard. Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--max-duration',
         dest='max_duration',
         type=int,
         default=4,
-        help='Max length of duration in unit of quarter note (beat). Default is 4.'
+        help='Max length of duration in unit of quarter note (beat). Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--velocity-step',
         dest='velocity_step',
         type=int,
         default=16,
-        help='Snap the value of velocities to multiple of this number. Default is 16.'
+        help='Snap the value of velocities to multiple of this number. Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--tempo-quantization',
@@ -55,7 +55,7 @@ def parse_args():
         type=int,
         default=[120-6*16, 120+5*16, 16], # 24, 200, 16
         metavar=('TEMPO_MIN', 'TEMPO_MAX', 'TEMPO_STEP'),
-        help='Three integers: (min, max, step), where min and max are INCLUSIVE. Default is 24, 200, 16.'
+        help='Three integers: (min, max, step), where min and max are INCLUSIVE. Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--position-method',
@@ -108,7 +108,7 @@ def parse_args():
         dest='mp_work_number',
         type=int,
         default=1,
-        help='The number of worker for multiprocessing. Default is 1. \
+        help='The number of worker for multiprocessing. Default is %(default)s. \
             If this number is 1 or below, multiprocessing would not be used.'
     )
     main_parser.add_argument(

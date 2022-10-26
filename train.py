@@ -86,7 +86,7 @@ def parse_args():
         default=[9, 1],
         help='The split ratio for training and validation. \
             If one is set to -1, for example (-1, 200), it means (len(complete_dataset) - 200, 200) \
-            Default is 9:1.'
+            Default is %(default)s.'
     )
     train_parser.add_argument(
         '--batch-size',

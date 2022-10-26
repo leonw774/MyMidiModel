@@ -10,12 +10,12 @@ import numpy as np
 from tqdm import tqdm
 
 from util.tokens import b36str2int, INSTRUMENT_NAMES
+from util.vocabs import build_vocabs
 from util.corpus import (
     to_shape_vocab_file_path,
     to_vocabs_file_path,
     get_corpus_paras,
     CorpusIterator,
-    build_vocabs,
     text_list_to_array,
     get_input_array_debug_string,
 )
@@ -27,7 +27,7 @@ def parse_args():
         '--bpe',
         type=int,
         default=0,
-        help='The number of iteration the BPE algorithm did. Default is 0.\
+        help='The number of iteration the BPE algorithm did. Default is %(default)s.\
             If the number is integer that greater than 0, it implicated that BPE was performed.'
     )
     parser.add_argument(
@@ -81,8 +81,8 @@ def main():
         with open(to_shape_vocab_file_path(args.corpus_dir_path), 'r', encoding='utf8') as vocabs_file:
             bpe_shapes_list = vocabs_file.read().splitlines()
 
-    if (    os.path.isfile(to_vocabs_file_path(args.corpus_dir_path))
-        and os.path.isfile(os.path.join(args.corpus_dir_path, 'arrays.npz'))):
+    npz_path = os.path.join(args.corpus_dir_path, 'arrays.npz')
+    if os.path.isfile(to_vocabs_file_path(args.corpus_dir_path)) and os.path.isfile(npz_path):
         if args.use_existed:
             logging.info('Corpus directory: %s already has vocabs file and array file.', args.corpus_dir_path)
             logging.info('Flag --use-existed is set')
@@ -94,7 +94,7 @@ def main():
                 i = input()
                 if i == 'y':
                     os.remove(to_vocabs_file_path(args.corpus_dir_path))
-                    os.remove(os.path.join(args.corpus_dir_path, 'arrays.npz'))
+                    os.remove(npz_path)
                     break
                 if i == 'n':
                     logging.info('==== text_to_array.py exited ====')
