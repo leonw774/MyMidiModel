@@ -34,7 +34,7 @@ class MidiDataset(Dataset):
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
         print('Reading', npz_path)
         available_memory_size = psutil.virtual_memory().available
-        npz_zipinfo_list = zipfile.ZipFile(npz_path).infolist
+        npz_zipinfo_list = zipfile.ZipFile(npz_path).infolist()
         array_memory_size = sum([zinfo.file_size for zinfo in npz_zipinfo_list])
         if array_memory_size * 1.1 >= available_memory_size:
             # load from disk every time indexing
