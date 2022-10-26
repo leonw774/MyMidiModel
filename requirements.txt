@@ -4,8 +4,6 @@ pandas
 matplotlib
 psutil
 PyYAML
-torch -f https://download.pytorch.org/whl/cu91/torch_stable.html
-torchinfo
-torchviz
+torch
 tqdm
 pytorch-fast-transformers
