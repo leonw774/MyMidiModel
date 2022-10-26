@@ -96,7 +96,6 @@ class MyMidiTransformer(nn.Module):
         else:
             # in pytorch's official implementation, True is masked, False is keep
             self.causal_mask = torch.triu(torch.ones(max_seq_length, max_seq_length), diagonal=1).bool()
-        print(self.causal_mask[:8, :8])
 
         if use_linear_attn:
             enc_builder = TransformerEncoderBuilder.from_kwargs(
@@ -149,16 +148,12 @@ class MyMidiTransformer(nn.Module):
 
         if self.use_linear_attn:
             # in fast_transformer's FullMask class, 0 is masked, 1 is keep
-            length_mask = x[..., 0].ne(0).long().to(x.device)
-            length_mask = FullMask(mask=length_mask)
+            length_mask = FullMask(mask=x[..., 0].ne(0).long().to(x.device))
             causal_mask = self.causal_mask
         else:
             # in pytorch's official implementation, True is masked, False is keep
             length_mask = x[..., 0].eq(0).to(x.device)
-            if x.shape[1] < self.max_seq_length:
-                causal_mask = self.causal_mask[:x.shape[1], :x.shape[1]].to(x.device)
-            else:
-                causal_mask = self.causal_mask.to(x.device)
+            causal_mask = self.causal_mask[:x.shape[1], :x.shape[1]].to(x.device)
 
         x = self.transformer_encoder(
             x,
