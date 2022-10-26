@@ -4,6 +4,6 @@ pandas
 matplotlib
 psutil
 PyYAML
-torch==1.7.0+cu92
+torch==1.7.0
 tqdm
 pytorch-fast-transformers
