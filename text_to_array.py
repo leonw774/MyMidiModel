@@ -83,10 +83,24 @@ def main():
 
     if (    os.path.isfile(to_vocabs_file_path(args.corpus_dir_path))
         and os.path.isfile(os.path.join(args.corpus_dir_path, 'arrays.npz'))):
-        logging.info('Corpus directory: %s already has vocabs file and array file.', args.corpus_dir_path)
-        logging.info('Flag --use-existed is set')
-        logging.info('==== text_to_array.py exited ====')
-        return 1
+        if args.use_existed:
+            logging.info('Corpus directory: %s already has vocabs file and array file.', args.corpus_dir_path)
+            logging.info('Flag --use-existed is set')
+            logging.info('==== text_to_array.py exited ====')
+            return 0
+        else:
+            logging.info('Corpus directory: %s already has vocabs file and array file. Remove? (y/n)', args.corpus_dir_path)
+            while True:
+                i = input()
+                if i == 'y':
+                    os.remove(to_vocabs_file_path(args.corpus_dir_path))
+                    os.remove(os.path.join(args.corpus_dir_path, 'arrays.npz'))
+                    break
+                elif i == 'n':
+                    logging.info('==== text_to_array.py exited ====')
+                    return 0
+                else:
+                    print('(y/n):')
 
     logging.info('Begin build vocabs for %s', args.corpus_dir_path)
     corpus_paras = get_corpus_paras(args.corpus_dir_path)
@@ -104,35 +118,15 @@ def main():
         # handle existed files/dirs
         npy_dir_path = os.path.join(args.corpus_dir_path, 'arrays')
         npy_zip_path = os.path.join(args.corpus_dir_path, 'arrays.zip')
-        npz_path = os.path.join(args.corpus_dir_path, 'arrays.npz')
         existing_file_paths = []
-        all_exist = 0
         if os.path.exists(npy_dir_path):
             existing_file_paths += npy_dir_path
-            all_exist += 1
         if os.path.exists(npy_zip_path):
             existing_file_paths += npy_zip_path
-            all_exist += 1
-        if os.path.exists(npz_path):
-            existing_file_paths += npz_path
-            all_exist += 1
         if len(existing_file_paths) != 0:
-            print(f'Find existing file(s): {" ".join(existing_file_paths)}. Removed? (y/n)')
-            while True:
-                i = input()
-                if i == 'y':
-                    if os.path.exists(npy_dir_path):
-                        shutil.rmtree(npy_dir_path)
-                    if os.path.exists(npy_zip_path):
-                        os.remove(npy_zip_path)
-                    if os.path.exists(npz_path):
-                        os.remove(npz_path)
-                    break
-                elif i == 'n':
-                    logging.info('==== text_to_array.py exited ====')
-                    return 0
-                else:
-                    print('(y/n):')
+            print(f'Find existing intermidiate file(s): {" ".join(existing_file_paths)}. Removed.')
+            shutil.rmtree(npy_dir_path)
+            os.remove(npy_zip_path)
 
         os.makedirs(npy_dir_path)
         for i, p in tqdm(enumerate(corpus_iterator), total=len(corpus_iterator)):
