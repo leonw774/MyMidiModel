@@ -87,7 +87,9 @@ class MyMidiTransformer(nn.Module):
         ])
 
         self.use_linear_attn = use_linear_attn
-        self.causal_mask = torch.tril(torch.ones(max_seq_length, max_seq_length), diagonal=0).bool()
+        # True means masked, False means unchanged
+        self.causal_mask = torch.triu(torch.ones(max_seq_length, max_seq_length), diagonal=0).bool()
+        print(self.causal_mask[:8,:8])
         if use_linear_attn:
             self.causal_mask = FullMask(self.causal_mask)
             # this causal (lower trianglur) mask is not actually used,
@@ -141,11 +143,13 @@ class MyMidiTransformer(nn.Module):
         #         emb_sum = emb_mask * emb_i
         x = self.embedding_dropout(x)
 
-        length_mask = x[..., 0].ne(0).bool().to(x.device)
+        
         if self.use_linear_attn:
+            length_mask = x[..., 0].ne(0).bool().to(x.device) # in fast_transformer's FullMask class, 0 is masked, 1 is keep
             length_mask = FullMask(mask=length_mask)
             causal_mask = self.causal_mask
         else:
+            length_mask = x[..., 0].eq(0).bool().to(x.device) # in pytorch's official implementation, True is masked, False is keep
             if x.shape[1] < self.max_seq_length:
                 causal_mask = self.causal_mask[:x.shape[1], :x.shape[1]].to(x.device)
             else:
@@ -178,7 +182,6 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
 
     # get model device
     device = next(model.parameters()).device
-    start_seq
     training_state = model.training
     model.eval()
 
