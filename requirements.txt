@@ -6,5 +6,7 @@ matplotlib
 psutil
 PyYAML
 torch==1.12.1
+torchinfo
+torchvision
 tqdm
 pytorch-fast-transformers
