@@ -138,12 +138,14 @@ test "$LOG_HEAD_LOSSES" == true            && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTH
 test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended${TRAIN_OTHER_ARGUMENTS} to train.py's argument" | tee -a $LOG_PATH ; }
 
 # change CUDA_VISIABLE_DEVICES according to the machine it runs on
-# CUDA_VISIBLE_DEVICES=0,1 \
-python3 train.py --max-seq-length $MAX_SEQ_LENGTH \
+if [ -f "./set_cuda_device_env_var.sh" ]; then
+    source "./set_cuda_device_env_var.sh"
+# CUDA_VISIBLE_DEVICES=0,1
+$SET_CUDA_DEVICE_ENV_VAR python3 train.py --max-seq-length $MAX_SEQ_LENGTH $TRAIN_OTHER_ARGUMENTS \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
     --split-ratio $SPLIT_RATIO --batch-size $BATCH_SIZE --steps $STEPS --validation-interval $VALIDATION_INTERVAL --grad-norm-clip $GRAD_NORM_CLIP --early-stop-tolerance $EARLY_STOP_TOLERANCE \
     --lr $LEARNING_RATE --lr-warmup-steps $LEARNING_RATE_WARMUP_STEPS --lr-decay-end-steps $LEARNING_RATE_DECAY_END_STEPS --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
-    --use-device $USE_DEVICE --log $LOG_PATH --model-dir-path $MODEL_DIR_PATH $TRAIN_OTHER_ARGUMENTS $CORPUS_DIR_PATH
+    --use-device $USE_DEVICE --log $LOG_PATH --model-dir-path $MODEL_DIR_PATH $CORPUS_DIR_PATH
 
 test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 

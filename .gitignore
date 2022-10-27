@@ -1,11 +1,11 @@
-*env
 *.o
 *.log
 .vscode
 models/**/*
 bpe/learn_vocab
 bpe/apply_vocab
-imgs
+extracted
+set_cuda_device_env_var.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
