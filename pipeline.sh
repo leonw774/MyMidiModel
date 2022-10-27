@@ -139,7 +139,8 @@ test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended${TRAIN_OTHER_ARGUMENTS} to 
 
 # change CUDA_VISIABLE_DEVICES according to the machine it runs on
 if [ -f "./set_cuda_device_env_var.sh" ]; then
-    source "./set_cuda_device_env_var.sh"
+    source ./set_cuda_device_env_var.sh
+fi
 # CUDA_VISIBLE_DEVICES=0,1
 $SET_CUDA_DEVICE_ENV_VAR python3 train.py --max-seq-length $MAX_SEQ_LENGTH $TRAIN_OTHER_ARGUMENTS \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
