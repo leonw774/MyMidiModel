@@ -140,7 +140,7 @@ def parse_args():
     global_parser.add_argument(
         '--dataloader-worker-number',
         type=int,
-        default=1 # npz file cannot handle multiprocessing, sad
+        default=1 # cannot handle multiprocessing if use npz mmap
     )
     global_parser.add_argument(
         '--use-device',
@@ -154,6 +154,11 @@ def parse_args():
         default='',
     )
     global_parser.add_argument(
+        '--eval-sample-number',
+        type=int,
+        default=64
+    )
+    global_parser.add_argument(
         '--model-dir-path',
         type=str,
         required=True
@@ -161,11 +166,6 @@ def parse_args():
     global_parser.add_argument(
         '--log-head-losses',
         action='store_true'
-    )
-    global_parser.add_argument(
-        '--eval-sample-number',
-        type=int,
-        default=64
     )
     global_parser.add_argument(
         'corpus_dir_path',
@@ -196,7 +196,7 @@ def lr_warmup_and_linear_decay(step_num: int, warmup_steps: int, decay_end_ratio
     return 1 - r * (1 - decay_end_ratio)
 
 
-def log(
+def log_loss(
         cur_step: int,
         start_time: int,
         scheduler: lr_scheduler,
@@ -239,29 +239,14 @@ def valid(model, valid_dataloader, args):
 
 def main():
     args = parse_args()
-    if args.use_device != 'cuda' and args.use_device != 'cpu':
+    if not args.use_device.startswith('cuda') and args.use_device != 'cpu':
         raise ValueError(f'Bad device name {args.use_device}')
     if not torch.cuda.is_available():
         args.use_device = 'cpu'
-    if args.use_device == 'cuda':
-        logging.info('Using CUDA deivces: %s', torch.cuda.current_device())
     args.use_device = torch.device(args.use_device)
 
-    if not os.path.isdir(args.model_dir_path):
-        logging.info('Invalid model dir path: %s', args.model_dir_path)
-        return 1
-    ckpt_dir_path = os.path.join(args.model_dir_path, 'ckpt')
-    if not os.path.isdir(ckpt_dir_path):
-        logging.info('Invalid model ckpt dir path: %s', ckpt_dir_path)
-        return 1
-    eval_dir_path = os.path.join(args.model_dir_path, 'eval_samples')
-    if not os.path.isdir(eval_dir_path):
-        logging.info('Invalid model eval samples dir path: %s', eval_dir_path)
-        return 1
-
-    # logging setting
     # root logger
-    if args.log_file_path:
+    if args.log_file_path != '':
         logging.basicConfig(
             filename=args.log_file_path,
             filemode='a',
@@ -278,6 +263,18 @@ def main():
         )
     logging.info(strftime('=== train.py start at %Y%m%d-%H%M%S ==='))
 
+    if not os.path.isdir(args.model_dir_path):
+        logging.info('Invalid model dir path: %s', args.model_dir_path)
+        return 1
+    ckpt_dir_path = os.path.join(args.model_dir_path, 'ckpt')
+    if not os.path.isdir(ckpt_dir_path):
+        logging.info('Invalid model ckpt dir path: %s', ckpt_dir_path)
+        return 1
+    eval_dir_path = os.path.join(args.model_dir_path, 'eval_samples')
+    if not os.path.isdir(eval_dir_path):
+        logging.info('Invalid model eval samples dir path: %s', eval_dir_path)
+        return 1
+
     data_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.data_args).items()])
     model_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.model_args).items()])
     train_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.train_args).items()])
@@ -286,6 +283,9 @@ def main():
     logging.info(model_args_str)
     logging.info(train_args_str)
     logging.info(args_str)
+
+    if args.use_device == 'cuda':
+        logging.info('Using CUDA deivces: %s', torch.cuda.current_device())
 
     # loss csv file is in the checkpoint directory
     loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
@@ -329,7 +329,7 @@ def main():
     complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args))
     train_ratio, valid_ratio = args.train_args.split_ratio
     if train_ratio == valid_ratio == -1:
-        raise ValueError('split_ratio (-1, -1) is undefined')
+        raise ValueError('split_ratio (-1, -1) is not allowed')
     else:
         if train_ratio == -1:
             train_ratio = len(complete_dataset) - valid_ratio
@@ -423,7 +423,7 @@ def main():
         complete_train_loss_list.extend(train_loss_list)
         complete_valid_loss_list.extend(valid_loss_list)
         cur_step = start_step + args.train_args.validation_interval
-        log(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_file)
+        log_loss(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_file)
 
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}_model.pt')
         torch.save(model, ckpt_model_file_path)
