@@ -243,7 +243,7 @@ def main():
         raise ValueError(f'Bad device name {args.use_device}')
     if not torch.cuda.is_available():
         args.use_device = 'cpu'
-    if args.use_devoce == 'cuda':
+    if args.use_device == 'cuda':
         logging.info('Using CUDA deivces: %s', torch.cuda.current_device())
     args.use_device = torch.device(args.use_device)
 
