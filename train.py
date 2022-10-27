@@ -241,9 +241,10 @@ def main():
     args = parse_args()
     if args.use_device != 'cuda' and args.use_device != 'cpu':
         raise ValueError(f'Bad device name {args.use_device}')
-
     if not torch.cuda.is_available():
         args.use_device = 'cpu'
+    if args.use_devoce == 'cuda':
+        logging.info('Using CUDA deivces: %s', torch.cuda.current_device())
     args.use_device = torch.device(args.use_device)
 
     if not os.path.isdir(args.model_dir_path):
