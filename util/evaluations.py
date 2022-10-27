@@ -106,10 +106,10 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int):
         pitch_histogram_entropy = _entropy(pitch_histogram)
     except ValueError:
         pitch_histogram_entropy = float('nan')
-    durations_mean = np.mean(durations)
-    durations_var = np.var(durations)
-    velocities_mean = np.mean(velocities)
-    velocities_var = np.var(velocities)
+    durations_mean = np.mean(durations) if len(durations) > 0 else float('nan')
+    durations_var = np.var(durations) if len(durations) > 0 else float('nan')
+    velocities_mean = np.mean(velocities) if len(velocities) > 0 else float('nan')
+    velocities_var = np.var(velocities) if len(velocities) > 0 else float('nan')
 
     if isnan(pitch_histogram_entropy):
         return {
@@ -132,7 +132,7 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int):
 
     max_position = get_largest_possible_position(nth)
     instrumentation_per_bar = np.zeros(shape=(len(measure_onsets), 129), dtype=np.bool8)
-    grooving_per_bar = np.zeros(shape=(len(measure_onsets), max_position), dtype=np.int32)
+    grooving_per_bar = np.zeros(shape=(len(measure_onsets), max_position), dtype=np.bool8)
     for track in midi.instruments:
         measure_index = 0
         for note in track.notes:

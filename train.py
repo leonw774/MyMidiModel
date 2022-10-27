@@ -450,7 +450,7 @@ def main():
     # training end
 
     # evaluation
-    print('Generating unconditional generation sample for evaluation')
+    logging.info('Generating unconditional generation sample for evaluation')
     best_model = torch.load(os.path.join(args.model_dir_path, 'best_model.pt'))
     eval_sample_features_per_piece = []
     for i in range(args.eval_sample_number):
@@ -478,7 +478,7 @@ def main():
         }
     with open(os.path.join(args.model_dir_path, 'eval_sample_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
         json.dump(eval_sample_features_stats, eval_stat_file)
-
+    logging.info('==== train.py exit ====')
     return 0
 
 
