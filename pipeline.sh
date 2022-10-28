@@ -57,21 +57,35 @@ test $? -ne 0 && { echo "midi_to_text.py failed. pipeline.sh exit." | tee -a $LO
 
 
 if [ $BPE_ITER -ne 0 ]; then
-    echo "Start learn bpe vocab" | tee -a $LOG_PATH
     CORPUS_DIR_PATH_WITH_BPE="${CORPUS_DIR_PATH}_bpe${BPE_ITER}_${SCORING}_${MERGE_CONDITION}_${SAMPLE_RATE}"
     
-    if [ -n "${USE_EXISTED}" ] && [ -d $CORPUS_DIR_PATH_WITH_BPE ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/corpus" ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/shape_vocab" ]; then
-        echo "Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already has corpus and shape_vocab file." | tee -a $LOG_PATH
-        echo "Flag --use-existed is set" | tee -a $LOG_PATH
-        echo "Learn bpe vocab is skipped" | tee -a $LOG_PATH
-    else
+    DO_BPE=true
+    if [ -d $CORPUS_DIR_PATH_WITH_BPE ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/corpus" ] || [ -f "${CORPUS_DIR_PATH_WITH_BPE}/shape_vocab" ]; then
+        if [ -n "${USE_EXISTED}" ]; then
+            echo "BPE Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already has corpus and/or shape_vocab file." | tee -a $LOG_PATH
+            echo "Flag --use-existed is set" | tee -a $LOG_PATH
+            echo "Learn bpe vocab is skipped" | tee -a $LOG_PATH
+            DO_BPE=false
+        else
+            echo "BPE Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already has corpus and/or shape_vocab file. Remove? (y=remove/n=skip bpe)" | tee -a $LOG_PATH
+            read yn
+            if [ "$yn" == "${yn#[Yy]}" ]; then 
+            # this grammar (the #[] operator) means that the variable $yn where any Y or y in 1st position will be dropped if they exist.
+                DO_BPE=false
+            else
+                echo "Learn bpe vocab is skipped" | tee -a $LOG_PATH
+            fi
+        fi
+    fi
+    if [ "$DO_BPE" == true ]; then
+        echo "Start learn bpe vocab" | tee -a $LOG_PATH
         # compile
         make -C ./bpe
         test $? -ne 0 && { echo "Compile error. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
         # create new dir 
         if [ -d $CORPUS_DIR_PATH_WITH_BPE ]; then
-            echo "Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already existed. Removed."
+            echo "BPE Output directory: ${CORPUS_DIR_PATH_WITH_BPE}. Removed."
             rm -f "${CORPUS_DIR_PATH_WITH_BPE}/*"
         else
             mkdir $CORPUS_DIR_PATH_WITH_BPE
@@ -82,7 +96,7 @@ if [ $BPE_ITER -ne 0 ]; then
         cp "${CORPUS_DIR_PATH}/pathlist" $CORPUS_DIR_PATH_WITH_BPE
 
         # run learn_vocab
-        bpe/learn_vocab $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SCORING $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_VERBOSE | tee -a $LOG_PATH
+        bpe/learn_vocab $BPE_VERBOSE $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SCORING $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT | tee -a $LOG_PATH
         
         BPE_EXIT_CODE=${PIPESTATUS[0]}
         if [ $BPE_EXIT_CODE -ne 0 ]; then

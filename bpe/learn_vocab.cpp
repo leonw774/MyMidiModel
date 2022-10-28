@@ -2,29 +2,46 @@
 #include "shapescore.hpp"
 #include <string>
 #include <algorithm>
+#include <unistd.h>
 
 int main(int argc, char *argv[]) {
     // read and validate args
-    if (argc != 8 && argc != 9) {
-        std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit (--verbose)" << std::endl;
+    int cmd_opt = 0;
+    bool verbose = false;
+    bool ignoreDrum = false;
+    while ((cmd_opt = getopt(argc, argv, "v:i:")) != -1) {
+        switch (cmd_opt) {
+            case 'v':
+                verbose = optarg;
+                break;
+            case 'i':
+                ignoreDrum = optarg;
+                break;
+            case '?':
+                if (isprint(optopt)) {
+                    std::cout << "Bad argument: " << argv[optopt] << "\n";
+                }
+                std::cout << "./learn_vocab [-verbose] [-ignoredrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
+                return 1;
+            default:
+                std::cout << "./learn_vocab [-verbose] [-ignoredrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
+                exit(1);
+        }
+    }
+    int nonOptStartIndex = optind;
+    std::cout << nonOptStartIndex << " " << argc << "\n";
+    if (argc - nonOptStartIndex != 7) {
+        std::cout << "./learn_vocab [-verbose] [-ignoredrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
         return 1;
     }
-    std::string inCorpusDirPath(argv[1]);
-    std::string outCorpusDirPath(argv[2]);
-    int bpeIter = atoi(argv[3]);
-    std::string scoring(argv[4]);
-    std::string mergeCondition(argv[5]);
-    double samplingRate = atof(argv[6]);
-    double minScoreLimit = atof(argv[7]);
-    bool verbose = false;
-    if (argc == 9) {
-        std::string v(argv[8]);
-        if (v != "--verbose") {
-            std::cout << "./learn_vocab inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit (--verbose)" << std::endl;
-            return 1;
-        }
-        verbose = true;
-    }
+    std::string inCorpusDirPath(argv[nonOptStartIndex]);
+    std::string outCorpusDirPath(argv[nonOptStartIndex+1]);
+    int bpeIter = atoi(argv[nonOptStartIndex+2]);
+    std::string scoring(argv[nonOptStartIndex+3]);
+    std::string mergeCondition(argv[nonOptStartIndex+4]);
+    double samplingRate = atof(argv[nonOptStartIndex+5]);
+    double minScoreLimit = atof(argv[nonOptStartIndex+6]);
+    
     if (bpeIter <= 0 || 2045 < bpeIter) {
         std::cout << "Error: bpeIter <= 0 or > 2045: " << bpeIter << std::endl;
         return 1;
@@ -64,19 +81,9 @@ int main(int argc, char *argv[]) {
     std::cout << "Input parameter file: " << parasFilePath << std::endl;
 
     std::string vocabFilePath = outCorpusDirPath + "/shape_vocab";
-    std::ofstream vocabFile(vocabFilePath, std::ios::out | std::ios::trunc);
-    if (!vocabFile.is_open()) {
-        std::cout << "Failed to open vocab output file: " << vocabFilePath << std::endl;
-        return 1;
-    }
     std::cout << "Output shape vocab file: " << vocabFilePath << std::endl;
 
     std::string outCorpusFilePath = outCorpusDirPath + "/corpus";
-    std::ofstream outCorpusFile(outCorpusFilePath, std::ios::out | std::ios::trunc);
-    if (!outCorpusFile.is_open()) {
-        std::cout << "Failed to open merged corpus output file: " << outCorpusFilePath << std::endl;
-        return 1;
-    }
     std::cout << "Output merged corpus file: " << outCorpusFilePath << '\n'
         << "Reading input files" << std::endl;
 
@@ -109,7 +116,7 @@ int main(int argc, char *argv[]) {
     size_t startMultinoteCount, multinoteCount, drumMultinoteCount;
     startMultinoteCount = multinoteCount = corpus.getMultiNoteCount();
     drumMultinoteCount = corpus.getMultiNoteCount(true);
-    double startAvgMulpi = calculateAvgMulpiSize(corpus, false);
+    double startAvgMulpi = calculateAvgMulpiSize(corpus, ignoreDrum, false);
     double avgMulpi = startAvgMulpi;
 
     std::cout << "Start Multinote count: " << multinoteCount
@@ -132,14 +139,14 @@ int main(int argc, char *argv[]) {
         std::cout << iterCount;
         std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint = std::chrono::system_clock::now();
         std::chrono::time_point<std::chrono::system_clock>partStartTimePoint = std::chrono::system_clock::now();
-        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth); 
+        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth, ignoreDrum); 
         neighborUpdatingTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
         // clac shape scores
         Shape maxScoreShape;
         partStartTimePoint = std::chrono::system_clock::now();
         if (scoring == "default") {
-            shapeScoring<unsigned int>(corpus, shapeDict, shapeScoreFreq, scoring, mergeCondition, samplingRate, verbose);
+            shapeScoring<unsigned int>(corpus, shapeDict, shapeScoreFreq, scoring, mergeCondition, samplingRate, ignoreDrum, verbose);
             std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScoreFreq);
             if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
@@ -153,7 +160,7 @@ int main(int argc, char *argv[]) {
             shapeScoreFreq.clear();
         }
         else {
-            shapeScoring<double>(corpus, shapeDict, shapeScoreWPlike, scoring, mergeCondition, samplingRate, verbose);
+            shapeScoring<double>(corpus, shapeDict, shapeScoreWPlike, scoring, mergeCondition, samplingRate, ignoreDrum, verbose);
             std::pair<Shape, double> maxValPair = findMaxValPair(shapeScoreWPlike);
             if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
@@ -246,13 +253,24 @@ int main(int argc, char *argv[]) {
     }
     if (!verbose) std::cout << '\n';
 
-    avgMulpi = calculateAvgMulpiSize(corpus);
+    avgMulpi = calculateAvgMulpiSize(corpus, ignoreDrum);
     std::cout << "Ending multinote count: " << multinoteCount
         << ", Ending average mulpi: " << avgMulpi
         << ", Multinote reduce rate: " << 1 - (double) multinoteCount / startMultinoteCount
         << ", Average mulpi reduce rate: " << 1 - avgMulpi / startAvgMulpi << std::endl;
 
     // Write files
+    std::ofstream vocabFile(vocabFilePath, std::ios::out | std::ios::trunc);
+    if (!vocabFile.is_open()) {
+        std::cout << "Failed to open vocab output file: " << vocabFilePath << std::endl;
+        return 1;
+    }
+    std::ofstream outCorpusFile(outCorpusFilePath, std::ios::out | std::ios::trunc);
+    if (!outCorpusFile.is_open()) {
+        std::cout << "Failed to open merged corpus output file: " << outCorpusFilePath << std::endl;
+        return 1;
+    }
+
     ioStartTimePoint = std::chrono::system_clock::now();
     writeShapeVocabFile(vocabFile, shapeDict);
     std::cout << "Writing merged corpus file" << std::endl;

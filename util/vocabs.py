@@ -159,10 +159,11 @@ def build_vocabs(
     summary_string = (
         f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
         f'Event vocab size: {len(event_tokens)}\n'\
-        f'- Measure_time_sig event count: {len(event_measure_time_sig_tokens)}\n'\
-        # f'- Corpus Measure_time_sig: {len(corpus_measure_time_sig_tokens)} ({corpus_measure_time_sig_tokens})\n'\
-        f'- Position event count: {len(position_tokens)}\n'\
-        # f'- Corpus position tokens count: {len(corpus_position_tokens)}\n'\
+        f'- Shapes: {len(bpe_shapes_list)}\n'\
+        f'- Tracks: {paras["max_track_number"]}\n'\
+        f'- Measure/TimeSig event: {len(event_measure_time_sig_tokens)}\n'\
+        f'- Position event: {len(position_tokens)}\n'\
+        f'- Tempo event: {len(event_tempo_tokens)}\n'\
         f'Largest possible duration: {paras["max_duration"] * paras["nth"] // 4}\n'\
         f'Velocity vocab: {velocity_tokens}\n'\
         f'Tempo vocab: {len(event_tempo_tokens)} ({event_tempo_tokens})\n'\

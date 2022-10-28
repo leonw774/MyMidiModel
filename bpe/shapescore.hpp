@@ -5,7 +5,7 @@
 #define IGNORE_DRUM false
 
 // return sum of all note's neighbor number
-size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit);
+size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit, bool ignoreDrum);
 
 Shape getShapeOfMultiNotePair(
     const MultiNote& lmn,
@@ -13,7 +13,7 @@ Shape getShapeOfMultiNotePair(
     const std::vector<Shape>& shapeDict
 );
 
-double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton=false);
+double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreDrum, bool ignoreSingleton=false);
 
 template<typename T>
 void shapeScoring(
@@ -23,6 +23,7 @@ void shapeScoring(
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate,
+    bool ignoreDrum,
     bool verbose
 );
 

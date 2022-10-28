@@ -27,7 +27,7 @@ unsigned int gcd(unsigned int* arr, unsigned int size) {
 }
 
 
-size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit) {
+size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit, bool ignoreDrum) {
     size_t totalNeighborNumber = 0;
     // for each piece
     #pragma omp parallel for reduction(+: totalNeighborNumber)
@@ -35,7 +35,7 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drum?
-            if (corpus.piecesTP[i][j] == 128 && IGNORE_DRUM) continue;
+            if (corpus.piecesTP[i][j] == 128 && ignoreDrum) continue;
             // for each multinote
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // printTrack(corpus.piecesMN[i][j], shapeDict, k, 1);
@@ -119,7 +119,7 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
 }
 
 
-double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton) {
+double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreDrum, bool ignoreSingleton) {
     unsigned int max_thread_num = omp_get_max_threads();
     std::vector<uint8_t> multipiSizes[max_thread_num];
     #pragma omp parallel for
@@ -128,7 +128,7 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton) {
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drum?
-            if (corpus.piecesTP[i][j] == 128 && IGNORE_DRUM) continue;
+            if (corpus.piecesTP[i][j] == 128 && ignoreDrum) continue;
 
             // key: 64 bits: upper 17 unused, 7 for velocity, 8 for duration (time_unit), 32 for onset
             // value: occurence count
@@ -177,6 +177,7 @@ void shapeScoring(
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate,
+    bool ignoreDrum,
     bool verbose
 ) {
     if (samplingRate <= 0 || 1 < samplingRate) {
@@ -194,7 +195,7 @@ void shapeScoring(
         for (int i = 0; i < corpus.piecesMN.size(); ++i) {
             for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
                 // ignore drum?
-                if (corpus.piecesTP[i][j] == 128 && IGNORE_DRUM) continue;
+                if (corpus.piecesTP[i][j] == 128 && ignoreDrum) continue;
                 multinoteCount += corpus.piecesMN[i][j].size();
                 for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                     dictShapeCount[corpus.piecesMN[i][j][k].getShapeIndex()] += 1;
@@ -225,7 +226,7 @@ void shapeScoring(
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drum?
-            if (corpus.piecesTP[i][j] == 128 && IGNORE_DRUM) continue;
+            if (corpus.piecesTP[i][j] == 128 && ignoreDrum) continue;
             // for each multinote
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // for each neighbor
@@ -316,6 +317,7 @@ void shapeScoring<unsigned int>(const Corpus& corpus,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate,
+    bool ignoreDrum,
     bool verbose=false
 );
 
@@ -326,6 +328,7 @@ void shapeScoring<double>(const Corpus& corpus,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate,
+    bool ignoreDrum,
     bool verbose=false
 );
 

@@ -2,26 +2,38 @@
 #include "shapescore.hpp"
 #include <string>
 #include <algorithm>
-#include <ctime>
+#include <unistd.h>
 
 int main(int argc, char *argv[]) {
     // read and validate args
-    if (argc != 4 && argc != 5) {
-        std::cout << "./learn_vocab inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath (--verbose)" << std::endl;
+    int cmd_opt = 0;
+    bool verbose = false;
+    bool ignoreDrum = false;
+    while (cmd_opt = getopt(argc, argv, "v:i:") != -1) {
+        switch (cmd_opt) {
+            case 'v':
+                verbose = optarg;
+                break;
+            case 'i':
+                ignoreDrum = optarg;
+                break;
+            case '?':
+                std::cout << "Bad argument: " << optopt << "\n";
+                std::cout << "./apply_vocab [-verbose] [-ignoredrum] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
+                return 1;
+            default:
+                exit(1);
+        }
+    }
+    int nonOptStartIndex = optind;
+    if (argc - nonOptStartIndex != 2) {
+        std::cout << "./apply_vocab [-verbose] [-ignoredrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
         return 1;
     }
-    std::string inCorpusDirPath(argv[1]);
-    std::string outCorpusFilePath(argv[2]);
-    std::string vocabFilePath(argv[3]);
-    bool verbose = false;
-    if (argc == 5) {
-        std::string v(argv[4]);
-        if (v != "--verbose") {
-            std::cout << "./learn_vocab inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath (--verbose)" << std::endl;
-            return 1;
-        }
-        verbose = true;
-    }
+    std::string inCorpusDirPath(argv[nonOptStartIndex]);
+    std::string outCorpusFilePath(argv[nonOptStartIndex+1]);
+    std::string vocabFilePath(argv[nonOptStartIndex+2]);
+
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
         << "outCorpusFilePath: " << outCorpusFilePath << '\n'
         << "vocabFilePath: " << vocabFilePath << std::endl;
@@ -129,7 +141,7 @@ int main(int argc, char *argv[]) {
     size_t startMultinoteCount, multinoteCount, drumMultinoteCount;
     startMultinoteCount = multinoteCount = corpus.getMultiNoteCount();
     drumMultinoteCount = corpus.getMultiNoteCount(true);
-    double startAvgMulpi = calculateAvgMulpiSize(corpus, false);
+    double startAvgMulpi = calculateAvgMulpiSize(corpus, ignoreDrum, false);
     double avgMulpi = startAvgMulpi;
 
     std::cout << "Start multinote count: " << multinoteCount
@@ -153,7 +165,7 @@ int main(int argc, char *argv[]) {
         std::cout << shapeIndex << ", ";
         std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint = std::chrono::system_clock::now();
         std::chrono::time_point<std::chrono::system_clock>partStartTimePoint = std::chrono::system_clock::now();
-        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth);
+        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth, ignoreDrum);
         std:: cout << (double) totalNeighborNumber / multinoteCount << ", ";
         neighborUpdatingTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
@@ -232,7 +244,7 @@ int main(int argc, char *argv[]) {
     }
     if (!verbose) std::cout << '\n';
 
-    avgMulpi = calculateAvgMulpiSize(corpus);
+    avgMulpi = calculateAvgMulpiSize(corpus, ignoreDrum);
     std::cout << "Ending multinote count: " << multinoteCount
         << ", Ending average mulpi: " << avgMulpi
         << ", Non-drum multinote reduce rate: " << 1 - (double) (multinoteCount - drumMultinoteCount) / (startMultinoteCount - drumMultinoteCount)
