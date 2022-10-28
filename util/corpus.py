@@ -163,7 +163,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
         elif typename == 'P':
             cur_position_id = vocabs.positions.text2id[text[1:]]
             cur_position_cursor = i
-            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
+            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
             x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
             x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
             x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
