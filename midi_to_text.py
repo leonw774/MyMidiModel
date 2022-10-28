@@ -241,12 +241,12 @@ def main():
         corpus_file_path = to_corpus_file_path(args.output_path)
         if os.path.exists(corpus_file_path):
             if args.use_existed:
-                logging.info('Output directory: %s already has corpus file.', corpus_file_path)
+                logging.info('Output corpus path: %s already has file.', corpus_file_path)
                 logging.info('Flag --use-existed is set')
                 logging.info('==== midi_to_text.py exited ====')
                 return 0
             else:
-                logging.info('Output directory: %s already has corpus files. Remove? (y/n)', corpus_file_path)
+                logging.info('Output corpus: %s already has files. Remove? (y=remove/n=exit)', corpus_file_path)
                 while True:
                     i = input()
                     if i == 'y':

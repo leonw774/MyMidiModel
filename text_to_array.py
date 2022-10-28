@@ -89,7 +89,7 @@ def main():
             logging.info('==== text_to_array.py exited ====')
             return 0
         else:
-            logging.info('Corpus directory: %s already has vocabs file and array file. Remove? (y/n)', args.corpus_dir_path)
+            logging.info('Corpus directory: %s already has vocabs file and array file. Remove? (y=remove/n=exit)', args.corpus_dir_path)
             while True:
                 i = input()
                 if i == 'y':
