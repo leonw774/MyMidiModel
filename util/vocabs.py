@@ -132,28 +132,27 @@ def build_vocabs(
     instrument_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(129)))
     position_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(get_largest_possible_position(paras['nth']))))
 
-
     token_count_per_piece = []
-    max_measured_count = 0 # max measure number in all pieces
-    corpus_measure_time_sig_tokens = set()
-    corpus_position_tokens = set() # we want to see how sparse measure and position is
+    # max_measured_count = 0 # find max measure number in all pieces
+    # corpus_measure_time_sig_tokens = set()
+    # corpus_position_tokens = set() # we want to see how sparse measure and position is
     for piece in corpus_iterator:
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
-        measures_count = 0
-        measures_set = set()
-        for t in text_list:
-            if t[0] == 'M':
-                measures_set.add(t)
-                measures_count += 1
-        max_measured_count = max(max_measured_count, measures_count)
+        # measures_count = 0
+        # measures_set = set()
+        # for t in text_list:
+        #     if t[0] == 'M':
+        #         measures_set.add(t)
+        #         measures_count += 1
+        # max_measured_count = max(max_measured_count, measures_count)
 
-        corpus_measure_time_sig_tokens.update(measures_set)
-        if paras['position_method'] == 'event':
-            positions = {t[1:] for t in text_list if t[0] == 'P'}
-        else:
-            positions = {t.split(':')[-1] for t in text_list if t[0] == 'N'}
-        corpus_position_tokens.update(positions)
+        # corpus_measure_time_sig_tokens.update(measures_set)
+        # if paras['position_method'] == 'event':
+        #     positions = {t[1:] for t in text_list if t[0] == 'P'}
+        # else:
+        #     positions = {t.split(':')[-1] for t in text_list if t[0] == 'N'}
+        # corpus_position_tokens.update(positions)
     corpus_measure_time_sig_tokens = list(corpus_measure_time_sig_tokens)
     corpus_position_tokens = list(corpus_position_tokens)
 
@@ -161,10 +160,9 @@ def build_vocabs(
         f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
         f'Event vocab size: {len(event_tokens)}\n'\
         f'- Measure_time_sig event count: {len(event_measure_time_sig_tokens)}\n'\
-        f'- Corpus Measure_time_sig: {len(corpus_measure_time_sig_tokens)} ({corpus_measure_time_sig_tokens})\n'\
+        # f'- Corpus Measure_time_sig: {len(corpus_measure_time_sig_tokens)} ({corpus_measure_time_sig_tokens})\n'\
         f'- Position event count: {len(position_tokens)}\n'\
-        f'- Corpus position tokens count: {len(corpus_position_tokens)}\n'\
-        f'- Max corpus position: {max(b36str2int(cpts) for cpts in corpus_position_tokens)}\n'\
+        # f'- Corpus position tokens count: {len(corpus_position_tokens)}\n'\
         f'Largest possible duration: {paras["max_duration"] * paras["nth"] // 4}\n'\
         f'Velocity vocab: {velocity_tokens}\n'\
         f'Tempo vocab: {len(event_tempo_tokens)} ({event_tempo_tokens})\n'\
