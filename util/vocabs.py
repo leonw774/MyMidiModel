@@ -166,7 +166,7 @@ def build_vocabs(
         f'- Tempo event: {len(event_tempo_tokens)}\n'\
         f'Largest possible duration: {paras["max_duration"] * paras["nth"] // 4}\n'\
         f'Velocity vocab: {velocity_tokens}\n'\
-        f'Tempo vocab: {len(event_tempo_tokens)} ({event_tempo_tokens})\n'\
+        f'Tempo vocab: {len(event_tempo_tokens)} ({event_tempo_tokens})'\
     )
     # print(f'Vocabulary build time: {time()-start_time}')
 
