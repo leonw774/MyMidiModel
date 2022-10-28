@@ -285,7 +285,7 @@ def main():
     logging.info(args_str)
 
     if args.use_device.type == 'cuda':
-        logging.info('Torch sees %d CUDA devices. Using devices #%d', torch.cuda.device_count(), torch.cuda.current_device())
+        logging.info('Torch sees %d CUDA devices. Using device #%d', torch.cuda.device_count(), torch.cuda.current_device())
 
     # loss csv file is in the checkpoint directory
     loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
