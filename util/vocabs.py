@@ -106,9 +106,9 @@ def build_vocabs(
         'R'+int2b36str(i) for i in range(paras['max_track_number'])
     ]
     event_position_tokens = (
-        []
-        if paras['position_method'] == 'event' else
         ['P'+int2b36str(i) for i in range(get_largest_possible_position(paras['nth']))]
+        if paras['position_method'] == 'event' else
+        []
     )
     event_measure_time_sig_tokens = [
         f'M{int2b36str(n)}/{int2b36str(d)}' for n, d in SUPPORTED_TIME_SIGNATURES
