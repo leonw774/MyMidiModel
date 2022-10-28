@@ -119,9 +119,9 @@ def main():
         npy_zip_path = os.path.join(args.corpus_dir_path, 'arrays.zip')
         existing_file_paths = []
         if os.path.exists(npy_dir_path):
-            existing_file_paths += npy_dir_path
+            existing_file_paths.append(npy_dir_path)
         if os.path.exists(npy_zip_path):
-            existing_file_paths += npy_zip_path
+            existing_file_paths.append(npy_zip_path)
         if len(existing_file_paths) != 0:
             print(f'Find existing intermidiate file(s): {" ".join(existing_file_paths)}. Removed.')
             shutil.rmtree(npy_dir_path)
