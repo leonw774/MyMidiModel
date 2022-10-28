@@ -153,8 +153,8 @@ def build_vocabs(
         # else:
         #     positions = {t.split(':')[-1] for t in text_list if t[0] == 'N'}
         # corpus_position_tokens.update(positions)
-    corpus_measure_time_sig_tokens = list(corpus_measure_time_sig_tokens)
-    corpus_position_tokens = list(corpus_position_tokens)
+    # corpus_measure_time_sig_tokens = list(corpus_measure_time_sig_tokens)
+    # corpus_position_tokens = list(corpus_position_tokens)
 
     summary_string = (
         f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
