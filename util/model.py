@@ -307,13 +307,14 @@ def calc_permutable_subseq_losses(pred_logit, target_logit, batched_mps_indices)
                     for k, _ in enumerate(pred_logit)
                 ]
                 # head_losses is now a list of out_attr_num tensors, each has shape (mps_size, )
-                min_head_losses_arg = min(
-                    range(mps_size),
-                    key=lambda x: sum([l[x] for l in begin_index_head_losses])
-                )
+                arg_to_head_losses = [
+                    float(sum([l[x] for l in begin_index_head_losses]))
+                    for x in range(mps_size)
+                ]
+                min_arg_head_losses = min(range(mps_size), key=arg_to_head_losses.__getitem__)
                 # print(begin_index, ': mps_size', mps_size, 'min_head_losses_arg', min_head_losses_arg)
                 min_head_losses_indices.append(
-                    begin_index + min_head_losses_arg
+                    begin_index + min_arg_head_losses
                 )
                 # for k, _ in enumerate(min_head_losses):
                 #     min_head_losses[k].append(begin_index_head_losses[k][min_head_losses_arg])

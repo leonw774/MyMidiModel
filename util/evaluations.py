@@ -1,6 +1,7 @@
 import itertools
 from math import log, isnan
 import random
+from typing import Dict
 
 import numpy as np
 
@@ -83,7 +84,7 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
     return head + sampled_body
 
 
-def piece_to_features(piece: str, nth: int, max_pairs_number: int):
+def piece_to_features(piece: str, nth: int, max_pairs_number: int) -> Dict[str, float]:
     '''
         Return:
         - pitch class histogram entropy

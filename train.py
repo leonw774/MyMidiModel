@@ -1,13 +1,17 @@
 from argparse import ArgumentParser, Namespace
+from io import TextIOWrapper
 import json
 import logging
 import os
 import shutil
 from time import strftime, time
+from typing import List, Dict
 
+import numpy as np 
 from pandas import Series
 from tqdm import tqdm
 import torch
+from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.data import random_split, DataLoader
 from torch.optim import Adam, lr_scheduler
 import torchinfo
@@ -198,11 +202,11 @@ def lr_warmup_and_linear_decay(step_num: int, warmup_steps: int, decay_end_ratio
 
 def log_loss(
         cur_step: int,
-        start_time: int,
-        scheduler: lr_scheduler,
+        start_time: float,
+        scheduler: lr_scheduler.LambdaLR,
         train_loss_list: list,
         valid_loss_list: list,
-        loss_file):
+        loss_file: TextIOWrapper):
     avg_train_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
     avg_valid_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*valid_loss_list) ]
     avg_train_losses_str = ', '.join([f'{l:.4f}' for l in avg_train_losses])
@@ -403,14 +407,14 @@ def main():
                 head_losses = calc_losses(prediction, batch_target_seqs)
                 # print('calc_losses use time:', time() - start_time)
             train_loss_list.append([float(hl) for hl in head_losses])
-            loss = sum(head_losses)
+            loss = torch.sum(torch.stack(head_losses))
             start_backward_time = time()
             # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
             # dot.render(filename='lossbackward_mps', format='png')
             optimizer.zero_grad()
             loss.backward()
             # print(torch.cuda.memory_allocated()/1e6, 'MB')
-            torch.nn.utils.clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
+            clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
             optimizer.step()
             scheduler.step()
             # print('back propagate use time:', time() - start_time)
@@ -454,11 +458,12 @@ def main():
     logging.info('Generating unconditional generation sample for evaluation')
     best_model = torch.load(os.path.join(args.model_dir_path, 'best_model.pt'))
     eval_sample_features_per_piece = []
+    eval_sample_features_per_piece: List[ Dict[str, float] ]
     for i in range(args.eval_sample_number):
         uncond_gen_text_list = generate_sample(best_model, args.data_args.max_seq_length)
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
         eval_sample_features_per_piece.append(
-            piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=10e6)
+            piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=int(10e6))
         )
         open(os.path.join(eval_dir_path, f'{i}'), 'w+', encoding='utf8').write(uncond_gen_piece)
         piece_to_midi(uncond_gen_piece, vocabs.paras['nth']).dump(
@@ -472,10 +477,13 @@ def main():
         ]
         for fname in EVAL_FEATURE_NAMES
     }
+
     eval_sample_features_stats = dict()
     for fname in EVAL_FEATURE_NAMES:
+        fname_description = dict(Series(eval_sample_features[fname]).dropna().describe())
+        fname_description: Dict[str, np.float64]
         eval_sample_features_stats[fname] = {
-            k : float(v) for k, v in dict(Series(eval_sample_features[fname]).dropna().describe()).items()
+            k : float(v) for k, v in fname_description.items()
         }
     with open(os.path.join(args.model_dir_path, 'eval_sample_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
         json.dump(eval_sample_features_stats, eval_stat_file)

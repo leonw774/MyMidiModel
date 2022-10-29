@@ -29,7 +29,6 @@ int main(int argc, char *argv[]) {
         }
     }
     int nonOptStartIndex = optind;
-    std::cout << nonOptStartIndex << " " << argc << "\n";
     if (argc - nonOptStartIndex != 7) {
         std::cout << "./learn_vocab [-verbose] [-ignoredrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
         return 1;

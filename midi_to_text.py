@@ -1,4 +1,5 @@
 import glob
+from io import TextIOWrapper
 import logging
 import os
 import shutil
@@ -124,6 +125,7 @@ def parse_args():
     )
     args = dict()
     args['handler_args'], others = handler_args_parser.parse_known_args()
+    args['handler_args'].tempo_quantization = tuple(args['handler_args'].tempo_quantization)
     args.update(vars(
         main_parser.parse_known_args(others)[0]
     ))
@@ -149,8 +151,8 @@ def handler(args_dict: dict):
 
 
 def loop_func(
-        midi_file_path_list,
-        out_file,
+        midi_file_path_list: list,
+        out_file: TextIOWrapper,
         args_dict: dict):
 
     token_number_list = []
@@ -173,8 +175,8 @@ def loop_func(
 
 
 def mp_func(
-        midi_file_path_list: set,
-        out_file,
+        midi_file_path_list: list,
+        out_file: TextIOWrapper,
         mp_work_number: int,
         args_dict: dict):
 

@@ -5,8 +5,11 @@ import os
 import shutil
 from argparse import ArgumentParser
 from time import strftime, time
+from typing import Dict
 
+from matplotlib import pyplot as plt
 import numpy as np
+from pandas import Series
 from tqdm import tqdm
 
 from util.tokens import b36str2int, INSTRUMENT_NAMES
@@ -81,8 +84,9 @@ def main():
         with open(to_shape_vocab_file_path(args.corpus_dir_path), 'r', encoding='utf8') as vocabs_file:
             bpe_shapes_list = vocabs_file.read().splitlines()
 
+    vocab_path = to_vocabs_file_path(args.corpus_dir_path)
     npz_path = os.path.join(args.corpus_dir_path, 'arrays.npz')
-    if os.path.isfile(to_vocabs_file_path(args.corpus_dir_path)) and os.path.isfile(npz_path):
+    if os.path.isfile(vocab_path) and os.path.isfile(npz_path):
         if args.use_existed:
             logging.info('Corpus directory: %s already has vocabs file and array file.', args.corpus_dir_path)
             logging.info('Flag --use-existed is set')
@@ -93,8 +97,9 @@ def main():
             while True:
                 i = input()
                 if i == 'y':
-                    os.remove(to_vocabs_file_path(args.corpus_dir_path))
+                    os.remove(vocab_path)
                     os.remove(npz_path)
+                    logging.info('Removed %s and %s', npz_path, vocab_path)
                     break
                 if i == 'n':
                     logging.info('==== text_to_array.py exited ====')
@@ -107,7 +112,7 @@ def main():
         assert len(corpus_iterator) > 0, f'empty corpus: {args.corpus_dir_path}'
 
         vocabs, summary_string = build_vocabs(corpus_iterator, corpus_paras, bpe_shapes_list)
-        with open(to_vocabs_file_path(args.corpus_dir_path), 'w+', encoding='utf8') as vocabs_file:
+        with open(vocab_path, 'w+', encoding='utf8') as vocabs_file:
             json.dump(vocabs.to_dict(), vocabs_file)
         logging.info(summary_string)
 
@@ -171,38 +176,43 @@ def main():
     logging.info('Making statistics')
     logging.getLogger('matplotlib.font_manager').disabled = True
     logging.getLogger('matplotlib.pyplot').disabled = True
-    from matplotlib import pyplot as plt
-    from pandas import Series
-    text_stats = {
-        'track_number_distribution': Counter(),
-        'instrument_distribution': Counter(),
-        'token_type_distribution': Counter(),
-        'note_number_per_piece' : list(),
-        'token_number_per_piece': list()
+    distributions = {
+        'track_number': Counter(),
+        'instrument': Counter(),
+        'token_type': Counter(),
+    }
+    number_per_piece = {
+        'note' : list(),
+        'token': list()
     }
     with CorpusIterator(args.corpus_dir_path) as corpus_iterator:
         for piece in corpus_iterator:
-            text_stats['track_number_distribution'][piece.count(' R')] += 1
+            distributions['track_number'][piece.count(' R')] += 1
             head_end = piece.find(' M') # find first occurence of measure token
             tracks_text = piece[4:head_end]
             track_tokens = tracks_text.split()
             for track_token in track_tokens:
                 instrument_id = b36str2int(track_token.split(':')[1])
-                text_stats['instrument_distribution'][instrument_id] += 1
+                distributions['instrument'][instrument_id] += 1
             note_token_number = piece.count(' N')
-            text_stats['token_type_distribution']['note'] += note_token_number
-            text_stats['token_type_distribution']['position'] += piece.count(' P')
-            text_stats['token_type_distribution']['tempo'] += piece.count(' T')
-            text_stats['token_type_distribution']['measure'] += piece.count(' M')
-            text_stats['token_type_distribution']['track'] += piece.count(' R')
-            text_stats['note_number_per_piece'].append(note_token_number)
-            text_stats['token_number_per_piece'].append(piece.count(" ") + 1)
+            distributions['token_type']['note'] += note_token_number
+            distributions['token_type']['position'] += piece.count(' P')
+            distributions['token_type']['tempo'] += piece.count(' T')
+            distributions['token_type']['measure'] += piece.count(' M')
+            distributions['token_type']['track'] += piece.count(' R')
+            number_per_piece['note'].append(note_token_number)
+            number_per_piece['token'].append(piece.count(" ") + 1)
 
-    text_stats['note_number_per_piece_describe'] = {
-        k:float(v) for k, v in dict(Series(text_stats['note_number_per_piece']).describe()).items()
+    number_per_piece_description = dict()
+    note_number_desciption = dict(Series(number_per_piece['note']).dropna().describe())
+    note_number_desciption: Dict[str, np.float64]
+    number_per_piece_description['note'] = {
+        k:float(v) for k, v in note_number_desciption.items()
     }
-    text_stats['token_number_per_piece_describe'] = {
-        k:float(v) for k, v in dict(Series(text_stats['token_number_per_piece']).describe()).items()
+    token_number_desciption = dict(Series(number_per_piece['token']).dropna().describe())
+    token_number_desciption: Dict[str, np.float64]
+    number_per_piece_description['token']  = {
+        k:float(v) for k, v in token_number_desciption.items()
     }
 
     stats_dir_path = os.path.join(args.corpus_dir_path, 'stats')
@@ -210,42 +220,44 @@ def main():
         os.mkdir(stats_dir_path)
 
     # draw graph for each value
-    for k, v in text_stats.items():
+    for k, counter in distributions.items():
         plt.figure(figsize=(16.8, 6.4))
-        if isinstance(v, Counter):
-            plt.title(k)
-            if k == 'instrument_distribution':
-                instrument_count = [0] * 129
-                for p in v:
-                    instrument_count[p] = v[p]
-                plt.xticks(rotation=90, fontsize='small')
-                plt.subplots_adjust(left=0.075, right=1-0.025, bottom=0.25)
-                plt.bar(INSTRUMENT_NAMES, instrument_count)
-            elif k == 'token_type_distribution':
-                plt.barh(list(v.keys()), list(v.values()))
-            else:
-                plt.bar(list(v.keys()), list(v.values()))
-        elif isinstance(v, list):
-            # note_number_per_piece and token_number_per_piece
-            k_describle = k + '_describe'
-            plt.title(k)
-            plt.text(
-                x=0.01,
-                y=0.5,
-                s='\n'.join([f'{k}={round(v, 3)}' for k, v in text_stats[k_describle].items()]),
-                transform=plt.gcf().transFigure
-            )
-            plt.subplots_adjust(left=0.125)
-            plt.hist(v, 100)
-            plt.yscale('log')
+        plt.title(k + ' distribution')
+        if k == 'instrument':
+            instrument_count = [0] * 129
+            for p in counter:
+                instrument_count[p] = counter[p]
+            plt.xticks(rotation=90, fontsize='small')
+            plt.subplots_adjust(left=0.075, right=1-0.025, bottom=0.25)
+            plt.bar(INSTRUMENT_NAMES, instrument_count)
+        elif k == 'token_type_distribution':
+            plt.barh(list(counter.keys()), list(counter.values()))
         else:
-            continue
+            plt.bar(list(counter.keys()), list(counter.values()))
+
+    for k, description in number_per_piece.items():
+        plt.title(k + ' number per piece')
+        plt.text(
+            x=0.01,
+            y=0.5,
+            s='\n'.join([f'{e}={round(v, 3)}' for e, v in number_per_piece_description[k].items()]),
+            transform=plt.gcf().transFigure
+        )
+        plt.subplots_adjust(left=0.125)
+        plt.hist(description, 100)
+        plt.yscale('log')
+
         plt.savefig(os.path.join(stats_dir_path, f'{k}.png'))
         plt.clf()
 
-    text_stats['track_number_distribution'] = dict(text_stats['track_number_distribution'])
-    text_stats['instrument_distribution'] = dict(text_stats['instrument_distribution'])
-    text_stats['token_type_distribution'] = dict(text_stats['token_type_distribution'])
+    distributions = {
+        k: dict(counter)
+        for k, counter in distributions.items()
+    }
+    text_stats = {
+        'distribution' : distributions,
+        'number_per_piece_description': number_per_piece_description
+    }
     with open(os.path.join(stats_dir_path, 'stats.json'), 'w+', encoding='utf8') as statfile:
         json.dump(text_stats, statfile)
     logging.info('Dumped stats.json at %s', os.path.join(stats_dir_path, 'stats.json'))

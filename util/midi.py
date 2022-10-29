@@ -1,4 +1,5 @@
 import random
+from typing import Tuple, List, Dict, Union
 # from time import time
 
 from miditoolkit import MidiFile, Instrument, TempoChange, TimeSignature, Note
@@ -83,11 +84,11 @@ def merge_tracks(
         midi.instruments = good_tracks_mapping
 
 
-def tick_to_nth(tick, ticks_per_nth):
+def tick_to_nth(tick: int, ticks_per_nth: Union[float, int]) -> int:
     return round(tick/ticks_per_nth)
 
 
-def quantize_to_nth(midi, nth):
+def quantize_to_nth(midi: MidiFile, nth: int):
     ticks_per_nth = midi.ticks_per_beat / (nth // 4)
     for track in midi.instruments:
         for n in track.notes:
@@ -101,7 +102,7 @@ def quantize_to_nth(midi, nth):
         time_sig.time = tick_to_nth(time_sig.time, ticks_per_nth)
 
 
-def quantize_tempo(tempo, tempo_quantization):
+def quantize_tempo(tempo: int, tempo_quantization: Tuple[int, int, int]) -> int:
     # snap
     t = round(tempo_quantization[0] + tempo_quantization[2] * round((tempo - tempo_quantization[0]) / tempo_quantization[2]))
     # clamp
@@ -183,9 +184,9 @@ def get_time_structure_tokens(
         midi: MidiFile,
         note_token_list: list,
         nth: int,
-        tempo_quantization: list) -> list:
+        tempo_quantization: Tuple[int, int, int]) -> Tuple[list, list]:
     """
-        This return measure and tempo. The first measure have to contain the
+        This return measure list and tempo list. The first measure have to contain the
         first note and the last note must end in the last measure
     """
     nth_per_beat = nth // 4
@@ -393,7 +394,7 @@ def midi_to_token_list(
         max_duration: int,
         velocity_step: int,
         use_cont_note: bool,
-        tempo_quantization: list,
+        tempo_quantization: Tuple[int, int, int],
         position_method: str) -> list:
 
     note_token_list = get_note_tokens(midi, max_duration, velocity_step, use_cont_note)
@@ -416,7 +417,7 @@ def midi_to_text_list(
         max_duration: int,
         velocity_step: int,
         use_cont_note: bool,
-        tempo_quantization: list, # [tempo_min, tempo_max, tempo_step]
+        tempo_quantization: Tuple[int, int, int], # [tempo_min, tempo_max, tempo_step]
         position_method: str,
         use_merge_drums: bool) -> list:
     """
@@ -466,13 +467,14 @@ def midi_to_text_list(
 
 def handle_note_continuation(
         is_cont: bool,
-        note_attrs: tuple,
+        note_attrs: Tuple[int, int, int, int],
         cur_time: int,
-        pending_cont_notes: dict):
+        pending_cont_notes: Dict[int, Dict[Tuple[int, int, int], List[int]]]):
     # pending_cont_notes is dict object so it is pass by reference
     pitch, duration, velocity, track_number = note_attrs
     info = (pitch, velocity, track_number)
     # check if there is a note to continue at this time position
+    onset = -1
     if cur_time in pending_cont_notes:
         if info in pending_cont_notes[cur_time]:
             if len(pending_cont_notes[cur_time][info]) > 0:
@@ -508,7 +510,7 @@ def handle_note_continuation(
     return None
 
 
-def piece_to_midi(piece: str, nth: int, ignore_panding_note_error=False) -> MidiFile:
+def piece_to_midi(piece: str, nth: int, ignore_panding_note_error: bool = False) -> MidiFile:
     # tick time == nth time
     midi = MidiFile(ticks_per_beat=nth//4)
 

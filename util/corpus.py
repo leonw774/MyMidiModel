@@ -1,6 +1,7 @@
 import io
 import json
 import os
+from typing import Union
 
 import numpy as np
 import matplotlib
@@ -55,18 +56,25 @@ class CorpusIterator:
         return self
 
     def __exit__(self, _value, _type, _trackback):
+        assert self.file is not None
         self.file.close()
 
     def __len__(self) -> int:
         if self.length is None:
-            self.file.seek(0)
-            self.length = sum(
-                1 if line.startswith('BOS') else 0
-                for line in self.file
-            )
-        return self.length
+            if self.file is not None:
+                self.file.seek(0)
+                self.length = sum(
+                    1 if line.startswith('BOS') else 0
+                    for line in self.file
+                )
+                return self.length
+            else:
+                raise IOError('CorpusIterator.file is None')
+        else:
+            return self.length
 
     def __iter__(self):
+        assert self.file is not None
         self.file.seek(0)
         for line in self.file:
             if len(line) > 1:
@@ -356,8 +364,8 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
             base_pitch, time_unit, velocity, track_number, *position = (b36str2int(x) for x in other_attr)
             if len(position) == 1:
                 cur_time = position[0] + cur_measure_onset
-            prev_pitch = None
-            prev_onset_time = None
+            prev_pitch = -1
+            prev_onset_time = -1
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
                 pitch = base_pitch + rel_pitch
                 duration = rel_dur * time_unit
@@ -395,7 +403,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
     return plt.gcf()
 
 
-def get_input_array_debug_string(input_array: np.ndarray, mps_sep_indices, vocabs: dict):
+def get_input_array_debug_string(input_array: np.ndarray, mps_sep_indices, vocabs: Vocabs):
     array_text_byteio = io.BytesIO()
     np.savetxt(array_text_byteio, input_array, fmt='%d')
     array_savetxt_list = array_text_byteio.getvalue().decode().split('\n')
