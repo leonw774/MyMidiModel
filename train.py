@@ -145,7 +145,7 @@ def parse_args():
     global_parser.add_argument(
         '--dataloader-worker-number',
         type=int,
-        default=1 # cannot handle multiprocessing if use npz mmap
+        default=4
     )
     global_parser.add_argument(
         '--use-device',
@@ -343,6 +343,9 @@ def main():
     train_len = int(len(complete_dataset) * train_ratio / (train_ratio + valid_ratio))
     valid_len = len(complete_dataset) - train_len
     train_dataset, valid_dataset = random_split(complete_dataset, (train_len, valid_len))
+    # cannot handle multiprocessing if use npz mmap
+    if not isinstance(complete_dataset.pieces, dict):
+        args.dataloader_worker_number = 1
     train_dataloader = DataLoader(
         dataset=train_dataset,
         num_workers=args.dataloader_worker_number,
