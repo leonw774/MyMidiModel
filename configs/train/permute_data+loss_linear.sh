@@ -1,9 +1,9 @@
 #!/bin/bash
 # dataset parameters
 MAX_SEQ_LENGTH=4096
-USE_PERMUTABLE_SUBSEQ_LOSS=false
-PERMUTE_MPS=false
-PERMUTE_TRACK_NUMBER=false
+USE_PERMUTABLE_SUBSEQ_LOSS=true
+PERMUTE_MPS=true
+PERMUTE_TRACK_NUMBER=true
 SAMPLE_FROM_START=false
 
 # model parameter
