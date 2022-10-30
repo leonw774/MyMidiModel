@@ -1,4 +1,5 @@
 from argparse import ArgumentParser, Namespace
+import glob
 from io import TextIOWrapper
 import json
 import logging
@@ -453,6 +454,11 @@ def main():
                 shutil.copyfile(ckpt_model_file_path, os.path.join(args.model_dir_path, 'best_model.pt'))
                 print('New best model.')
     # training end
+
+    # remove all checkpoints
+    ckpt_file_paths = glob.glob(os.path.join(ckpt_dir_path, '*.pt'), recursive=True)
+    for ckpt_file_path in ckpt_file_paths:
+        os.remove(ckpt_file_path)
 
     # evaluation
     logging.info('Generating unconditional generation sample for evaluation')
