@@ -26,7 +26,8 @@ from util.model import (
     MyMidiTransformer,
     generate_sample,
     calc_losses,
-    calc_permutable_subseq_losses
+    calc_permutable_subseq_losses,
+    old_calc_permutable_subseq_losses
 )
 from util.evaluations import EVAL_FEATURE_NAMES, piece_to_features
 
@@ -403,16 +404,16 @@ def main():
             prediction = model(batch_input_seqs)
             forward_time += time() - start_forward_time
 
+            start_backward_time = time()
             if args.data_args.use_permutable_subseq_loss:
                 # print(batch_mps_sep_indices)
                 head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
-                # print('calc_permutable_subseq_losses use time:', time() - start_time)
+                print('calc_permutable_subseq_losses use time:', time() - start_backward_time)
             else:
                 head_losses = calc_losses(prediction, batch_target_seqs)
-                # print('calc_losses use time:', time() - start_time)
+                # print('calc_losses use time:', time() - start_backward_time)
             train_loss_list.append([float(hl) for hl in head_losses])
             loss = torch.sum(torch.stack(head_losses))
-            start_backward_time = time()
             # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
             # dot.render(filename='lossbackward_mps', format='png')
             optimizer.zero_grad()
@@ -421,7 +422,7 @@ def main():
             clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
             optimizer.step()
             scheduler.step()
-            # print('back propagate use time:', time() - start_time)
+            # print('loss + back propagate use time:', time() - start_backward_time)
             torch.cuda.empty_cache()
             backward_time += time() - start_backward_time
         print('Forward time', forward_time, 'Backward time', backward_time)

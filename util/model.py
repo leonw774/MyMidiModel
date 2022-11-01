@@ -1,6 +1,11 @@
+from tracemalloc import start
+from typing import List
+from time import time
+
 import torch
-from torch import nn
+from torch import nn, Tensor
 import torch.nn.functional as F
+import numpy as np
 
 from fast_transformers.builders import TransformerEncoderBuilder
 from fast_transformers.masking import FullMask
@@ -252,12 +257,12 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
     return text_list
 
 
-def calc_losses(pred_logit, target_logit):
+def calc_losses(pred_logit: List[Tensor], target_logit: Tensor) -> List[Tensor]:
     """
         pred_logit is a list
-        - length: out_attr_num
+        - length: out_attr_number
         - elements are tenors with shape: (batch_size, seq_size, attr_vocab_size)
-        target_logit has shape: (batch_size, seq_size, out_attr_num)
+        target_logit has shape: (batch_size, seq_size, out_attr_number)
         return a list of losses of each head
     """
     # basically treat seq_size as one of the K dimensions and K = 1
@@ -274,7 +279,7 @@ def calc_losses(pred_logit, target_logit):
     # loss = sum(head_losses)
     # return loss
 
-def calc_permutable_subseq_losses(pred_logit, target_logit, batched_mps_indices):
+def old_calc_permutable_subseq_losses(pred_logit, target_logit, batched_mps_indices):
     """
         pred_logit is a list
         - length: out_attr_num
@@ -330,6 +335,92 @@ def calc_permutable_subseq_losses(pred_logit, target_logit, batched_mps_indices)
     #     float(sum(mhl) / len(mhl))
     #     for mhl in min_head_losses
     # ])
+    return head_losses
+
+
+def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor, batched_mps_indices):
+    """
+        pred_logit is a list
+        - length: out_attr_number
+        - elements are tenors with shape: (batch_size, seq_size, attr_vocabs_size)
+        target_logit has shape: (batch_size, seq_size, out_attr_number)
+        mps_indices is a numpy object array of numpy int16 arrays in varying lengths
+        return a list of losses of each head
+    """
+    target_logit = target_logit.long()
+    detached_pred_logit = [
+        pred_attr_logit.detach()
+        for pred_attr_logit in pred_logit
+    ]
+    detached_target_logit = target_logit.detach()
+    out_attr_number = len(detached_pred_logit)
+    for batch_number, mps_indices in enumerate(batched_mps_indices):
+        mps_indices_with_begin_and_end = [0] + [m for m in mps_indices] + [detached_target_logit.shape[1]]
+        indices_replacments = []
+        seq_flatten_target_logits_list = []
+        # will become a tensor of shape (seq_mps_flatten_size, out_attr_number)
+        seq_flatten_pred_logits_list = [[] for _ in range(out_attr_number)]
+        # will have out_attr_number tensors, each has shape (seq_mps_flatten_size, attr_vocabs_size)
+        for i in range(len(mps_indices_with_begin_and_end) - 1):
+            end_index = mps_indices_with_begin_and_end[i+1]
+            if mps_indices_with_begin_and_end[i] + 1 == end_index:
+                continue
+            for begin_index in range(mps_indices_with_begin_and_end[i], end_index):
+                mps_size = end_index-begin_index
+                if mps_size == 1: # no need to find
+                    continue
+                for k, pred_attr_logit in enumerate(detached_pred_logit):
+                    seq_flatten_pred_logits_list[k].append(
+                        pred_attr_logit[batch_number, begin_index].unsqueeze(0).expand((mps_size, -1))
+                    )
+                    # expand into (1, attr_vocabs_size) and then expand into (mps_size, attr_vocabs_size)
+                seq_flatten_target_logits_list.append(
+                    detached_target_logit[batch_number, begin_index:end_index]
+                )
+
+        if len(seq_flatten_target_logits_list) == 0:
+            continue
+        seq_flatten_target_logits = torch.cat(seq_flatten_target_logits_list, dim=0)
+        seq_flatten_pred_logits = [
+            torch.cat(seq_flatten_pred_logits_list[k], dim=0)
+            for k in range(out_attr_number)
+        ]
+        seq_flatten_head_losses = [
+            F.cross_entropy(
+                input=seq_flatten_pred_logits[k], # shape = (seq_mps_flatten_size, attr_vocabs_size)
+                target=seq_flatten_target_logits[:, k], # shape = (seq_mps_flatten_size, )
+                reduction='none' # return shape (seq_mps_flatten_size, )
+            )
+            for k in range(out_attr_number)
+        ]
+        seq_flatten_head_losses = torch.stack(seq_flatten_head_losses) # (out_attr_number, seq_mps_flatten_size)
+        print(
+            'mps_indices len:', len(mps_indices),
+            'orig len:', detached_target_logit.shape[1],
+            'flatten len:', seq_flatten_target_logits.shape[0]
+        )
+        seq_flatten_loss_sum = torch.sum(seq_flatten_head_losses, dim=0) # (seq_mps_flatten_size, )
+
+        prev_seq_flatten_index = 0
+        for i in range(len(mps_indices_with_begin_and_end) - 1):
+            end_index = mps_indices_with_begin_and_end[i+1]
+            if mps_indices_with_begin_and_end[i] + 1 == end_index:
+                continue
+            for begin_index in range(mps_indices_with_begin_and_end[i], end_index):
+                mps_size = end_index-begin_index
+                if mps_size == 1: # no need to find
+                    continue
+                argmin_losses_sum = torch.argmin(
+                    seq_flatten_loss_sum[prev_seq_flatten_index:prev_seq_flatten_index+mps_size]
+                )
+                indices_replacments.append((begin_index, begin_index + argmin_losses_sum))
+                prev_seq_flatten_index += mps_size
+
+        # modify target logit such that the target at cur_index is now the target at min_loss_sum_index
+        for cur_index, min_loss_sum_index in indices_replacments:
+            detached_target_logit[batch_number, cur_index] = detached_target_logit[batch_number, min_loss_sum_index]
+
+    head_losses = calc_losses(pred_logit, detached_target_logit.to(target_logit.device))
     return head_losses
 
 

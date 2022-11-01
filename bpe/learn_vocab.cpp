@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
         << "mergeCondition: " << mergeCondition << '\n'
         << "samplingRate: " << samplingRate << '\n'
         << "minScoreLimit: " << minScoreLimit << '\n'
-        << "IGNORE_DRUM: " << (IGNORE_DRUM ? "true" : "false") << std::endl;
+        << "ignoreDrum: " << (ignoreDrum ? "true" : "false") << std::endl;
 
     // open files
     std::string inCorpusFilePath = inCorpusDirPath + "/corpus";
@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
         << ", Start average mulpi: " << avgMulpi
         << ", Reading used time: " << (std::chrono::system_clock::now() - ioStartTimePoint) / onSencondDur << std::endl;
 
-    if (multinoteCount == 0 || (multinoteCount == drumMultinoteCount && IGNORE_DRUM)) {
+    if (multinoteCount == 0 || (multinoteCount == drumMultinoteCount && ignoreDrum)) {
         std::cout << "No notes to merge. Exited." << std::endl;
         return 1;
     }
@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
             #pragma omp parallel for
             for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
                 // ignore drum?
-                if (corpus.piecesTP[i][j] == 128 && IGNORE_DRUM) continue;
+                if (corpus.piecesTP[i][j] == 128 && ignoreDrum) continue;
                 // for each multinote
                 for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                     // for each neighbor

@@ -62,7 +62,7 @@ class MidiDataset(Dataset):
         self._mps_seperators = set()
         self._bos_id = self.vocabs.events.text2id[BEGIN_TOKEN_STR]
         self._eos_id = self.vocabs.events.text2id[END_TOKEN_STR]
-        # the pad id should be the same across all vocabs
+        # the pad id should be the same across all vocabs (aka zero)
         self._pad_id = self.vocabs.events.text2id[self.vocabs.padding_token]
         self._note_ids = set()
         self._measure_ids = set()

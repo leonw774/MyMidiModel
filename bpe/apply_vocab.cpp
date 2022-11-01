@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
     }
     int nonOptStartIndex = optind;
     if (argc - nonOptStartIndex != 2) {
-        std::cout << "./apply_vocab [-verbose] [-ignoredrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
+        std::cout << "./apply_vocab [-verbose] [-ignoredrum] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[nonOptStartIndex]);
