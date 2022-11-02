@@ -394,12 +394,12 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
             for k in range(out_attr_number)
         ]
         seq_flatten_head_losses = torch.stack(seq_flatten_head_losses) # (out_attr_number, seq_mps_flatten_size)
-        print(
-            'mps_indices len:', len(mps_indices),
-            'orig len:', detached_target_logit.shape[1],
-            'flatten len:', seq_flatten_target_logits.shape[0]
-        )
         seq_flatten_loss_sum = torch.sum(seq_flatten_head_losses, dim=0) # (seq_mps_flatten_size, )
+        # print(
+        #     'mps_indices len:', len(mps_indices),
+        #     'orig len:', detached_target_logit.shape[1],
+        #     'flatten len:', seq_flatten_target_logits.shape[0]
+        # )
 
         prev_seq_flatten_index = 0
         for i in range(len(mps_indices_with_begin_and_end) - 1):
@@ -424,4 +424,4 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
     return head_losses
 
 
-MidiTransformerDecoder = MyMidiTransformer # old name
+# MidiTransformerDecoder = MyMidiTransformer # old name
