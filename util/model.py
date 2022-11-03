@@ -347,7 +347,6 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
         mps_indices is a numpy object array of numpy int16 arrays in varying lengths
         return a list of losses of each head
     """
-    target_logit = target_logit.long()
     detached_pred_logit = [
         pred_attr_logit.detach()
         for pred_attr_logit in pred_logit
@@ -380,9 +379,10 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
 
         if len(seq_flatten_target_logits_list) == 0:
             continue
-        seq_flatten_target_logits = torch.cat(seq_flatten_target_logits_list, dim=0)
+        # F.cross_entropy only accept long
+        seq_flatten_target_logits = torch.cat(seq_flatten_target_logits_list, dim=0).long()
         seq_flatten_pred_logits = [
-            torch.cat(seq_flatten_pred_logits_list[k], dim=0)
+            torch.cat(seq_flatten_pred_logits_list[k], dim=0).long()
             for k in range(out_attr_number)
         ]
         seq_flatten_head_losses = [
