@@ -2,7 +2,7 @@ miditoolkit
 numpy
 pandas
 scipy
-matplotlib
+matplotlib==3.6
 psutil
 PyYAML
 torch==1.12.1
