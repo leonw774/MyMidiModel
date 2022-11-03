@@ -434,15 +434,15 @@ def main():
         cur_step = start_step + args.train_args.validation_interval
         log_loss(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_file)
 
-        ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}_model.pt')
+        ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
         torch.save(model, ckpt_model_file_path)
 
         print('Generating unconditional generation sample for checkpoint')
         uncond_gen_text_list = generate_sample(model, args.data_args.max_seq_length)
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
-        open(os.path.join(ckpt_dir_path, f'{cur_step}_uncondgen.txt'), 'w+', encoding='utf8').write(uncond_gen_piece)
+        open(os.path.join(ckpt_dir_path, f'{cur_step}.txt'), 'w+', encoding='utf8').write(uncond_gen_piece)
         piece_to_midi(uncond_gen_piece, vocabs.paras['nth']).dump(
-            os.path.join(ckpt_dir_path, f'{cur_step}_uncondgen.mid')
+            os.path.join(ckpt_dir_path, f'{cur_step}.mid')
         )
 
         if args.train_args.early_stop > 0:
