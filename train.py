@@ -408,7 +408,7 @@ def main():
             if args.data_args.use_permutable_subseq_loss:
                 # print(batch_mps_sep_indices)
                 head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
-                print('calc_permutable_subseq_losses use time:', time() - start_backward_time)
+                # print('calc_permutable_subseq_losses use time:', time() - start_backward_time)
             else:
                 head_losses = calc_losses(prediction, batch_target_seqs)
                 # print('calc_losses use time:', time() - start_backward_time)
