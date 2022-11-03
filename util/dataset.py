@@ -1,10 +1,12 @@
 import bisect
 import os
+import sys
+from typing import Iterable, List, Tuple, Union
 import zipfile
 
 import numpy as np
 import psutil
-from torch import from_numpy
+from torch import from_numpy, Tensor
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
@@ -36,7 +38,8 @@ class MidiDataset(Dataset):
         available_memory_size = psutil.virtual_memory().available
         npz_zipinfo_list = zipfile.ZipFile(npz_path).infolist()
         array_memory_size = sum([zinfo.file_size for zinfo in npz_zipinfo_list])
-        if array_memory_size * 1.1 >= available_memory_size:
+        print('available_memory_size:', available_memory_size, 'array_memory_size:', array_memory_size)
+        if array_memory_size >= available_memory_size - 1e9: # keep 1G for other things
             # load from disk every time indexing
             print('Memory size not enough, using NPZ mmap.')
             self.pieces = np.load(npz_path)
@@ -59,21 +62,21 @@ class MidiDataset(Dataset):
         # Seperators are:
         # EOS, BOS, PADDING, first track token (R0), measure tokens (M\w+), position tokens (P\w+)
         # stores their index in event vocab, empty when `use_permutable_subseq_loss` is not True
-        self._mps_seperators = set()
+        self._mps_seperators = list()
+        self._note_ids = list()
+        self._position_ids = list()
         self._bos_id = self.vocabs.events.text2id[BEGIN_TOKEN_STR]
         self._eos_id = self.vocabs.events.text2id[END_TOKEN_STR]
         # the pad id should be the same across all vocabs (aka zero)
         self._pad_id = self.vocabs.events.text2id[self.vocabs.padding_token]
-        self._note_ids = set()
-        self._measure_ids = set()
-        self._position_ids = set()
         self._tempo_ids = set()
+        self._measure_ids = set()
         self._track_ids = set()
         for text, index in self.vocabs.events.text2id.items():
             if text[0] == 'N' or text[0] == 'S':
-                self._note_ids.add(index)
+                self._note_ids.append(index)
             elif text[0] == 'P':
-                self._position_ids.add(index)
+                self._position_ids.append(index)
             elif text[0] == 'T':
                 self._tempo_ids.add(index)
             elif text[0] == 'M':
@@ -89,17 +92,17 @@ class MidiDataset(Dataset):
             ])
             self._mps_seperators.update(self._measure_ids)
             self._mps_seperators.update(self._position_ids)
+            self._mps_seperators = np.sort(np.array(list(self._mps_seperators)))
         # numpy.isin can work on set, turn it into sorted 1d array helps search speed
-        self._note_ids = np.sort(np.array(list(self._note_ids)))
-        self._position_ids = np.sort(np.array(list(self._position_ids)))
-        self._mps_seperators = np.sort(np.array(list(self._mps_seperators)))
+        self._note_ids = np.sort(np.array(self._note_ids))
+        self._position_ids = np.sort(np.array(self._position_ids))
 
         # preprocessing
         self._sample_from_start = sample_from_start
         self._filenum_indices = [0] * len(self.pieces)
         self._piece_lengths = [0] * len(self.pieces)
-        self._piece_body_start_index = [0] * len(self.pieces) if self.permute_track_number else None
-        self._file_mps_sep_indices = [None] * len(self.pieces) if use_permutable_subseq_loss else None
+        self._piece_body_start_index = [0] * len(self.pieces)
+        self._file_mps_sep_indices = [[]] * len(self.pieces)
         cur_index = 0
         for filenum in tqdm(range(len(self.pieces))):
             filename = str(filenum)
@@ -107,7 +110,6 @@ class MidiDataset(Dataset):
             if use_permutable_subseq_loss:
                 # find all seperater's index
                 mps_sep_indices = np.flatnonzero(np.isin(self.pieces[filename][:, 0], self._mps_seperators))
-                self._file_mps_sep_indices[filenum] = []
                 for i in range(mps_sep_indices.shape[0] - 1):
                     self._file_mps_sep_indices[filenum].append(mps_sep_indices[i])
                     if mps_sep_indices[i+1] != mps_sep_indices[i] + 1:
@@ -123,7 +125,12 @@ class MidiDataset(Dataset):
             self._filenum_indices[filenum] = cur_index
         self._max_index = cur_index
         # cast self._filenum_indices from list of tuples into np array to save space
-        # print('self.pieces size:', sys.getsizeof(self.pieces), 'bytes')
+        self_size = sum(
+            sys.getsizeof(getattr(self, attr_name))
+            for attr_name in dir(self)
+            if not attr_name.startswith('__')
+        )
+        print('Dataset object size:', self_size, 'bytes')
 
     def __getitem__(self, index):
         # while True:
@@ -202,18 +209,11 @@ class MidiDataset(Dataset):
         return from_numpy(sliced_array), None
 
 
-    # def __del__(self):
-        # If self.pieces is a NpzFile object which could be a memory-mapped to a opened file
-        # use context management (__enter__, __exit__) would be better but it shouldn't cause big trouble
-        # but we will only open the file once in the whole training process so dont bother after all
-        # self.pieces.close()
-
-
     def __len__(self):
         return self._max_index
 
 
-def collate_mididataset(data):
+def collate_mididataset(data: List[Tuple[Tensor, Union[np.ndarray, None]]]):
     """
         for batched sequences: stack them on batch-first to becom 3-d array and pad them
         for others, become 1-d object numpy array if not None
