@@ -382,7 +382,7 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
         # F.cross_entropy only accept long
         seq_flatten_target_logits = torch.cat(seq_flatten_target_logits_list, dim=0).long()
         seq_flatten_pred_logits = [
-            torch.cat(seq_flatten_pred_logits_list[k], dim=0).long()
+            torch.cat(seq_flatten_pred_logits_list[k], dim=0)
             for k in range(out_attr_number)
         ]
         seq_flatten_head_losses = [
