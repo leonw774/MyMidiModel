@@ -147,7 +147,7 @@ def parse_args():
     global_parser.add_argument(
         '--dataloader-worker-number',
         type=int,
-        default=4
+        default=1
     )
     global_parser.add_argument(
         '--use-device',
@@ -415,7 +415,7 @@ def main():
             else:
                 head_losses = calc_losses(prediction, batch_target_seqs)
                     # print('calc_losses use time:', time() - start_backward_time)
-            print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=30))
+            # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=30))
 
             train_loss_list.append([float(hl) for hl in head_losses])
             loss = torch.sum(torch.stack(head_losses))
