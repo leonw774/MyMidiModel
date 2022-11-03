@@ -288,71 +288,11 @@ def old_calc_permutable_subseq_losses(pred_logit, target_logit, batched_mps_indi
         mps_indices is a numpy object array of numpy int16 arrays in varying lengths
         return a list of losses of each head
     """
-    target_logit = target_logit.long()
-    # min_head_losses = [[] for _ in range(len(pred_logit))]
-    for batch_number, mps_indices in enumerate(batched_mps_indices):
-        min_head_losses_indices = []
-        mps_indices_with_begin_and_end = [0] + [m for m in mps_indices] + [target_logit.shape[1]]
-        for i in range(len(mps_indices_with_begin_and_end) - 1):
-            end_index = mps_indices_with_begin_and_end[i+1]
-            for begin_index in range(mps_indices_with_begin_and_end[i], end_index):
-                mps_size = end_index-begin_index
-                begin_index_pred_attr_logit = [
-                    pred_attr_logit[batch_number, begin_index].unsqueeze(0).expand((mps_size, -1))
-                    # expand into (1, attr_vocabs_size) and then expand into (mps_size, attr_vocabs_size)
-                    # shape = (mps_size, attr_vocabs_size)
-                    for pred_attr_logit in pred_logit
-                ]
-                begin_index_head_losses = [
-                    F.cross_entropy(
-                        input=begin_index_pred_attr_logit[k], # shape = (mps_size, attr_vocabs_size)
-                        target=target_logit[batch_number, begin_index:end_index, k], # shape = (mps_size)
-                        reduction='none' # return (mps_size, )
-                    )
-                    for k, _ in enumerate(pred_logit)
-                ]
-                # head_losses is now a list of out_attr_num tensors, each has shape (mps_size, )
-                arg_to_head_losses = [
-                    float(sum([l[x] for l in begin_index_head_losses]))
-                    for x in range(mps_size)
-                ]
-                min_arg_head_losses = min(range(mps_size), key=arg_to_head_losses.__getitem__)
-                # print(begin_index, ': mps_size', mps_size, 'min_head_losses_arg', min_head_losses_arg)
-                min_head_losses_indices.append(
-                    begin_index + min_arg_head_losses
-                )
-                # for k, _ in enumerate(min_head_losses):
-                #     min_head_losses[k].append(begin_index_head_losses[k][min_head_losses_arg])
-            # end for begin_index
-        # end for mps_number
-        # modify target logit such that the target at ith index is now the target at min_head_losses_indices[i]
-        for i, min_head_losses_index in enumerate(min_head_losses_indices):
-            target_logit[batch_number, i] = target_logit[batch_number, min_head_losses_index]
-    head_losses = calc_losses(pred_logit, target_logit)
-    # compare
-    # print([float(hl) for hl in head_losses])
-    # print([
-    #     float(sum(mhl) / len(mhl))
-    #     for mhl in min_head_losses
-    # ])
-    return head_losses
-
-
-def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor, batched_mps_indices):
-    """
-        pred_logit is a list
-        - length: out_attr_number
-        - elements are tenors with shape: (batch_size, seq_size, attr_vocabs_size)
-        target_logit has shape: (batch_size, seq_size, out_attr_number)
-        mps_indices is a numpy object array of numpy int16 arrays in varying lengths
-        return a list of losses of each head
-    """
-    use_device = target_logit.device
     detached_pred_logit = [
-        pred_attr_logit.detach().cpu()
+        pred_attr_logit.detach()
         for pred_attr_logit in pred_logit
     ]
-    detached_target_logit = target_logit.detach().cpu()
+    detached_target_logit = target_logit.detach()
     out_attr_number = len(detached_pred_logit)
     for batch_number, mps_indices in enumerate(batched_mps_indices):
         mps_indices_with_begin_and_end = [0] + [m for m in mps_indices] + [detached_target_logit.shape[1]]
@@ -382,6 +322,122 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
         if len(seq_flatten_target_logits_list) == 0:
             continue
         # F.cross_entropy only accept long
+        seq_flatten_target_logits = torch.cat(seq_flatten_target_logits_list, dim=0).long()
+        # cat into (attr_vocabs_size, out_attr_number)
+        seq_flatten_pred_logits = [
+            torch.cat(seq_flatten_pred_logits_list[k], dim=0)
+            # cat into (attr_vocabs_size, attr_vocabs_size)
+            for k in range(out_attr_number)
+        ]
+        seq_flatten_head_losses = [
+            F.cross_entropy(
+                input=seq_flatten_pred_logits[k], # shape = (seq_mps_flatten_size, attr_vocabs_size)
+                target=seq_flatten_target_logits[:, k], # shape = (seq_mps_flatten_size, )
+                reduction='none' # return shape (seq_mps_flatten_size, )
+            )
+            for k in range(out_attr_number)
+        ]
+        seq_flatten_head_losses = torch.stack(seq_flatten_head_losses) # (out_attr_number, seq_mps_flatten_size)
+        seq_flatten_loss_sum = torch.sum(seq_flatten_head_losses, dim=0) # (seq_mps_flatten_size, )
+        # print(
+        #     'mps_indices len:', len(mps_indices),
+        #     'flatten len:', seq_flatten_target_logits.shape[0]
+        # )
+
+        prev_seq_flatten_index = 0
+        for i in range(len(mps_indices_with_begin_and_end) - 1):
+            end_index = mps_indices_with_begin_and_end[i+1]
+            if mps_indices_with_begin_and_end[i] + 1 == end_index:
+                continue
+            for begin_index in range(mps_indices_with_begin_and_end[i], end_index):
+                mps_size = end_index-begin_index
+                if mps_size == 1: # no need to find
+                    continue
+                argmin_losses_sum = torch.argmin(
+                    seq_flatten_loss_sum[prev_seq_flatten_index:prev_seq_flatten_index+mps_size]
+                )
+                indices_replacments.append((begin_index, begin_index + argmin_losses_sum))
+                prev_seq_flatten_index += mps_size
+
+        # modify target logit such that the target at cur_index is now the target at min_loss_sum_index
+        for cur_index, min_loss_sum_index in indices_replacments:
+            detached_target_logit[batch_number, cur_index] = detached_target_logit[batch_number, min_loss_sum_index]
+
+    head_losses = calc_losses(pred_logit, detached_target_logit.to(target_logit.device))
+    return head_losses
+
+
+def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor, batched_mps_indices):
+    """
+        pred_logit is a list
+        - length: out_attr_number
+        - elements are tenors with shape: (batch_size, seq_size, attr_vocabs_size)
+        target_logit has shape: (batch_size, seq_size, out_attr_number)
+        mps_indices is a numpy object array of numpy int16 arrays in varying lengths
+        return a list of losses of each head
+    """
+    use_device = target_logit.device
+    detached_pred_logit = [
+        pred_attr_logit.detach()
+        for pred_attr_logit in pred_logit
+    ]
+    detached_target_logit = target_logit.detach()
+    out_attr_number = len(detached_pred_logit)
+    for batch_number, mps_indices in enumerate(batched_mps_indices):
+        mps_indices_with_begin_and_end = [0] + [m for m in mps_indices] + [detached_target_logit.shape[1]]
+        indices_replacments = []
+        seq_flatten_target_logits_list = []
+        # will become a tensor of shape (seq_mps_flatten_size, out_attr_number)
+        seq_flatten_pred_logits_list = [[] for _ in range(out_attr_number)]
+        # will have out_attr_number tensors, each has shape (seq_mps_flatten_size, attr_vocabs_size)
+        for i in range(len(mps_indices_with_begin_and_end) - 1):
+            begin_index = mps_indices_with_begin_and_end[i]
+            end_index = mps_indices_with_begin_and_end[i+1]
+            mps_size = end_index - begin_index
+            if begin_index + 1 == end_index:
+                continue
+            elif begin_index + 2 == end_index:
+                seq_flatten_target_logits_list.append(
+                    detached_target_logit[batch_number, begin_index:end_index]
+                )
+                # view (mps_size, out_attr_number)
+                for k, pred_attr_logit in enumerate(detached_pred_logit):
+                    seq_flatten_pred_logits_list[k].append(
+                        pred_attr_logit[batch_number, begin_index].expand((2, -1))
+                    )
+                    # view (attr_vocabs_size, ) and then expand into (mps_size, attr_vocabs_size)
+            else:
+                triu_indices = torch.triu_indices(mps_size, mps_size)
+                triu_indices = triu_indices[:, :-1] # drop last
+                full_mps_target = detached_target_logit[batch_number, begin_index:end_index]
+                # view (mps_size, out_attr_number)
+                full_mps_target = full_mps_target.unsqueeze(0).expand((mps_size, -1, -1))
+                # exapnd dim to (1, mps_size, out_attr_number) then repeat to (mps_size, mps_size, out_attr_number)
+                # t1, t2, t3 ... -> t1, t2, t3 ...
+                #                   t1, t2, t3 ...
+                #                   :
+                #                   t1, t2, t3 ...
+                flatten_full_mps_target = full_mps_target[triu_indices[0], triu_indices[1]].flatten(end_dim=-2)
+                # print(flatten_full_mps_target.shape)
+                # t1, t2, t3 ... tn, t2, t3, t4 ... tn, tn-1, tn
+                seq_flatten_target_logits_list.append(flatten_full_mps_target)
+
+                for k, pred_attr_logit in enumerate(detached_pred_logit):
+                    full_mps_attr_logit = pred_attr_logit[batch_number, begin_index:end_index]
+                    # view (mps_size, attr_vocabs_size)
+                    full_mps_attr_logit = full_mps_attr_logit.unsqueeze(1).expand((-1, mps_size, -1))
+                    # exapnd dim to (mps_size, 1, out_attr_number) then repeat to (mps_size, mps_size, attr_vocabs_size)
+                    # l1        l1, l1, l1 ...
+                    # l2  -->   l2, l2, l2 ...
+                    # l3        l3, l3, l3 ...
+                    # :         :
+                    flatten_full_mps_attr_logit = full_mps_attr_logit[triu_indices[0], triu_indices[1]].flatten(end_dim=-2)
+                    # l1, l1, l1, ... l2, l2, l2, ... ln-1, ln, ln
+                    seq_flatten_pred_logits_list[k].append(flatten_full_mps_attr_logit)
+
+        if len(seq_flatten_target_logits_list) == 0:
+            continue
+        # F.cross_entropy only accept long
         seq_flatten_target_logits = torch.cat(seq_flatten_target_logits_list, dim=0).long().to(use_device)
         # cat into (attr_vocabs_size, out_attr_number)
         seq_flatten_pred_logits = [
@@ -401,7 +457,7 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
         seq_flatten_loss_sum = torch.sum(seq_flatten_head_losses, dim=0) # (seq_mps_flatten_size, )
         # print(
         #     'mps_indices len:', len(mps_indices),
-        #     'flatten len:', seq_flatten_target_logits.shape[0]
+        #     'flatten len:', seq_flatten_loss_sum.shape[0]
         # )
 
         prev_seq_flatten_index = 0

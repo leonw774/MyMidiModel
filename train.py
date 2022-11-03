@@ -15,6 +15,7 @@ import torch
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.data import random_split, DataLoader
 from torch.optim import Adam, lr_scheduler
+from torch.profiler import profile, record_function, ProfilerActivity
 import torchinfo
 # import torchviz
 
@@ -405,13 +406,17 @@ def main():
             forward_time += time() - start_forward_time
 
             start_backward_time = time()
+
+            # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
             if args.data_args.use_permutable_subseq_loss:
-                # print(batch_mps_sep_indices)
+                # with record_function("use_permutable_subseq_loss"):
                 head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
                 # print('calc_permutable_subseq_losses use time:', time() - start_backward_time)
             else:
                 head_losses = calc_losses(prediction, batch_target_seqs)
-                # print('calc_losses use time:', time() - start_backward_time)
+                    # print('calc_losses use time:', time() - start_backward_time)
+            print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=30))
+
             train_loss_list.append([float(hl) for hl in head_losses])
             loss = torch.sum(torch.stack(head_losses))
             # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
@@ -425,6 +430,8 @@ def main():
             # print('loss + back propagate use time:', time() - start_backward_time)
             torch.cuda.empty_cache()
             backward_time += time() - start_backward_time
+
+
         print('Forward time', forward_time, 'Backward time', backward_time)
         print('Validation')
         valid_loss_list = valid(model, valid_dataloader, args)
