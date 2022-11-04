@@ -58,6 +58,7 @@ class MidiDataset(Dataset):
         self.use_permutable_subseq_loss = use_permutable_subseq_loss
         self.permute_mps = permute_mps
         self.permute_track_number = permute_track_number
+        self.number_of_pieces = len(self.pieces)
 
         # Seperators are:
         # EOS, BOS, PADDING, first track token (R0), measure tokens (M\w+), position tokens (P\w+)
@@ -99,12 +100,12 @@ class MidiDataset(Dataset):
 
         # preprocessing
         self._sample_from_start = sample_from_start
-        self._filenum_indices = [0] * len(self.pieces)
-        self._piece_lengths = [0] * len(self.pieces)
-        self._piece_body_start_index = [0] * len(self.pieces)
-        self._file_mps_sep_indices = [[]] * len(self.pieces)
+        self._filenum_indices = [0] * self.number_of_pieces
+        self._piece_lengths = [0] * self.number_of_pieces
+        self._piece_body_start_index = [0] * self.number_of_pieces
+        self._file_mps_sep_indices = [[] for _ in range(self.number_of_pieces)]
         cur_index = 0
-        for filenum in tqdm(range(len(self.pieces))):
+        for filenum in tqdm(range(self.number_of_pieces)):
             filename = str(filenum)
 
             if use_permutable_subseq_loss:
@@ -213,7 +214,7 @@ class MidiDataset(Dataset):
         return self._max_index
 
 
-def collate_mididataset(data: List[Tuple[Tensor, Union[np.ndarray, None]]]):
+def collate_mididataset(data: List[Tuple[Tensor, Union[np.ndarray, None]]]) -> Tuple[Tensor, List]:
     """
         for batched sequences: stack them on batch-first to becom 3-d array and pad them
         for others, become 1-d object numpy array if not None
@@ -223,7 +224,7 @@ def collate_mididataset(data: List[Tuple[Tensor, Union[np.ndarray, None]]]):
     batched_seqs = pad_sequence(seqs, batch_first=True, padding_value=0)
     # mps_sep_indices could be None or numpy object array of tuples
     if mps_sep_indices[0] is None:
-        batched_mps_sep_indices = None
+        batched_mps_sep_indices = []
     else:
-        batched_mps_sep_indices = np.array(mps_sep_indices, dtype=object)
+        batched_mps_sep_indices = list(mps_sep_indices)
     return batched_seqs, batched_mps_sep_indices

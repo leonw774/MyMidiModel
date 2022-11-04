@@ -367,7 +367,7 @@ def old_calc_permutable_subseq_losses(pred_logit, target_logit, batched_mps_indi
     return head_losses
 
 
-def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor, batched_mps_indices):
+def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor, batched_mps_indices: List):
     """
         pred_logit is a list
         - length: out_attr_number
@@ -394,6 +394,7 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
             begin_index = mps_indices_with_begin_and_end[i]
             end_index = mps_indices_with_begin_and_end[i+1]
             mps_size = end_index - begin_index
+            assert mps_size > 1, f'{len(batched_mps_indices)}\n{mps_indices}'
             if begin_index + 1 == end_index:
                 continue
             elif begin_index + 2 == end_index:
