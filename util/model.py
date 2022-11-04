@@ -394,7 +394,7 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
             begin_index = mps_indices_with_begin_and_end[i]
             end_index = mps_indices_with_begin_and_end[i+1]
             mps_size = end_index - begin_index
-            assert mps_size >= 0, f'{begin_index}~{end_index}\n{mps_indices_with_begin_and_end}'
+            # assert mps_size >= 0, f'{begin_index}~{end_index}\n{mps_indices_with_begin_and_end}'
             if mps_size == 2:
                 seq_flatten_target_logits_list.append(
                     detached_target_logit[batch_number, begin_index:end_index]

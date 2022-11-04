@@ -21,8 +21,9 @@ class MidiDataset(Dataset):
             data_dir_path: str,
             max_seq_length: int,
             use_permutable_subseq_loss: bool,
-            permute_mps: bool,
-            permute_track_number: bool,
+            permute_mps: bool = False,
+            permute_track_number: bool = False,
+            pitch_augmentation: int = 0,
             sample_from_start: bool = False
         ) -> None:
         """
@@ -58,6 +59,7 @@ class MidiDataset(Dataset):
         self.use_permutable_subseq_loss = use_permutable_subseq_loss
         self.permute_mps = permute_mps
         self.permute_track_number = permute_track_number
+        self.pitch_augmentation = pitch_augmentation
         self.number_of_pieces = len(self.pieces)
 
         # Seperators are:
@@ -120,9 +122,9 @@ class MidiDataset(Dataset):
             self._piece_lengths[filenum] = cur_piece_lengths
 
             if cur_piece_lengths > max_seq_length and not sample_from_start:
-                cur_index += cur_piece_lengths - max_seq_length + 1
+                cur_index += cur_piece_lengths - max_seq_length + 1 * (self.pitch_augmentation * 2 + 1)
             else:
-                cur_index += 1
+                cur_index += 1 * (self.pitch_augmentation * 2 + 1)
             self._filenum_indices[filenum] = cur_index
         self._max_index = cur_index
         # cast self._filenum_indices from list of tuples into np array to save space
@@ -140,13 +142,24 @@ class MidiDataset(Dataset):
         #     else:
         #         break
         filenum = bisect.bisect_left(self._filenum_indices, index)
-        begin_index = index if filenum == 0 else index - self._filenum_indices[filenum-1] - 1
+        begin_index_augmented = index if filenum == 0 else index - self._filenum_indices[filenum-1] - 1
+        begin_index, pitch_augment = divmod(begin_index_augmented, (self.pitch_augmentation * 2 + 1))
+        pitch_augment -= self.pitch_augmentation
         if self._piece_lengths[filenum] <= self.max_seq_length:
             end_index = self._piece_lengths[filenum]
         else:
             end_index = begin_index + self.max_seq_length
         sliced_array = np.array(self.pieces[str(filenum)][begin_index:end_index]) # copy
         sliced_array = sliced_array.astype(np.int32) # was int16 to save space but torch ask for int
+
+        # pitch augmentation
+        # assume pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
+        if pitch_augment != 0:
+            valid_pitches = (sliced_array[:, TOKEN_ATTR_INDEX['pit']]) != 0
+            min_pitch = np.min( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[valid_pitches] ) + pitch_augment
+            max_pitch = np.max( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[valid_pitches] ) + pitch_augment
+            if min_pitch >= 1 and max_pitch <= 128:
+                (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[valid_pitches] += pitch_augment
 
         # shift down measure number so that it didn't exceed max_seq_length
         min_measure_num = sliced_array[0, TOKEN_ATTR_INDEX['mea']]

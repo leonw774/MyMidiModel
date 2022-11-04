@@ -7,7 +7,7 @@ import sys
 from tqdm import tqdm
 
 from util.midi import piece_to_midi
-from util.corpus import CorpusIterator, get_corpus_paras
+from util.corpus import CorpusReader, get_corpus_paras
 
 MP_WORKER_NUMBER = 16
 
@@ -108,14 +108,14 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str) -> bool:
         return False
 
     equality = True
-    with CorpusIterator(a_corpus_dir) as a_corpus_iterator, CorpusIterator(b_corpus_dir) as b_corpus_iterator:
-        assert len(a_corpus_iterator) == len(b_corpus_iterator)
-        corpus_length = len(a_corpus_iterator)
+    with CorpusReader(a_corpus_dir) as a_corpus_reader, CorpusReader(b_corpus_dir) as b_corpus_reader:
+        assert len(a_corpus_reader) == len(b_corpus_reader)
+        corpus_length = len(a_corpus_reader)
         nth = paras['nth']
         args_zip = zip(
             range(corpus_length),      # piece_index
-            a_corpus_iterator,         # a_piece
-            b_corpus_iterator,         # b_piece
+            a_corpus_reader,         # a_piece
+            b_corpus_reader,         # b_piece
             repeat(nth, corpus_length) # nth
         )
         args_dict_list = [

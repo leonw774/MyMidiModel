@@ -4,14 +4,15 @@ import os
 from typing import Union
 
 import numpy as np
-import matplotlib
-from matplotlib.patches import Rectangle, Ellipse
 from matplotlib import pyplot as plt
+from matplotlib import cm
+from matplotlib.patches import Rectangle, Ellipse
 from matplotlib.figure import Figure
+from tqdm import tqdm
 import yaml
 
 from .vocabs import Vocabs
-from .tokens import b36str2int, int2b36str, PADDING_TOKEN_STR
+from .tokens import b36str2int, int2b36str, PADDING_TOKEN_STR, BEGIN_TOKEN_STR
 
 def to_paras_file_path(corpus_dir_path: str) -> str:
     return os.path.join(corpus_dir_path, 'paras')
@@ -20,7 +21,6 @@ def to_corpus_file_path(corpus_dir_path: str) -> str:
     return os.path.join(corpus_dir_path, 'corpus')
 
 def to_pathlist_file_path(corpus_dir_path: str) -> str:
-    # whaaaaat
     return os.path.join(corpus_dir_path, 'pathlist')
 
 def to_shape_vocab_file_path(corpus_dir_path: str) -> str:
@@ -43,43 +43,59 @@ def get_corpus_vocabs(corpus_dir_path: str) -> Vocabs:
     corpus_vocabs = Vocabs.from_dict(corpus_vocabs_dict)
     return corpus_vocabs
 
-# use iterator to handle large file
-class CorpusIterator:
+# use to handle large file
+class CorpusReader:
     def __init__(self, corpus_dir_path: str) -> None:
         self.file_path = os.path.join(corpus_dir_path, 'corpus')
-        self.length = None
-        self.file = None
+        self.line_pos = []
+        self.length = -1
+        self.file = open(self.file_path, 'r', encoding='utf8')
 
     # context manager
     def __enter__(self):
-        self.file = open(self.file_path, 'r', encoding='utf8')
         return self
 
     def __exit__(self, _value, _type, _trackback):
-        assert self.file is not None
         self.file.close()
 
     def __len__(self) -> int:
-        if self.length is None:
-            if self.file is not None:
-                self.file.seek(0)
-                self.length = sum(
-                    1 if line.startswith('BOS') else 0
-                    for line in self.file
-                )
-                return self.length
-            else:
-                raise IOError('CorpusIterator.file is None')
-        else:
-            return self.length
+        if self.length == -1:
+            for _ in self: # iter itself to get cache
+                pass
+        return self.length
 
     def __iter__(self):
-        assert self.file is not None
-        self.file.seek(0)
-        for line in self.file:
-            if len(line) > 1:
-                yield line[:-1] # remove \n at the end
+        if len(self.line_pos) == 0:
+            self.file.seek(0)
+            tmp_line_pos = [0]
+            tmp_length = 0
+            offset = 0
+            for line in tqdm(self.file, desc=f'CorpusReader reading {self.file_path} '):
+                offset += len(line)
+                if len(self.line_pos) == 0:
+                    tmp_line_pos.append(offset)
+                if len(line) > 1: # not just newline
+                    tmp_length += 1 if line.startswith(BEGIN_TOKEN_STR) else 0
+                    yield line[:-1] # remove \n at the end
+            self.line_pos = tmp_line_pos
+            self.length = tmp_length
+        else:
+            for i in range(self.length):
+                yield self[i]
 
+    def __getitem__(self, index: int) -> str:
+        if index >= self.length:
+            raise IndexError(f'line index out of range: {index} > {self.length}')
+        if len(self.line_pos) == 0:
+            result = ''
+            for i, line in enumerate(self): # iter itself to get cache
+                if i == index:
+                    result = line
+            return result
+        else:
+            self.file.seek(self.line_pos[index])
+            result = self.file.read(self.line_pos[index+1]-self.line_pos[index])
+            return result
 
 TOKEN_ATTR_INDEX = {
     'evt': 0, 'events': 0,
@@ -258,7 +274,7 @@ def array_to_text_list(data, vocabs: Vocabs, is_output=False):
 
 
 PIANOROLL_MEASURELINE_COLOR = (0.8, 0.8, 0.8, 1.0)
-PIANOROLL_TRACK_COLORMAP = matplotlib.colormaps['terrain']
+PIANOROLL_TRACK_COLORMAP = cm.get_cmap('terrain')
 PIANOROLL_SHAPE_LINE_COLOR = (0.88, 0.2, 0.24, 0.8)
 
 def piece_to_roll(piece: str, nth: int) -> Figure:
@@ -338,7 +354,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
             if track_number in drum_tracks:
                 current_axis.add_patch(
                     Ellipse(
-                        (cur_time+0.4, pitch+0.4), max_time / 256 * 0.1, 0.4,
+                        (cur_time+0.4, pitch+0.4), max_time / 256 * 0.2, 0.4,
                         edgecolor='grey', linewidth=0.75, facecolor=track_colors[track_number], fill=True
                     )
                 )
@@ -384,7 +400,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
                             edgecolor='grey', linewidth=0.75, facecolor=track_colors[track_number], fill=True
                         )
                     )
-                if prev_pitch is not None:
+                if prev_pitch != -1:
                     plt.plot(
                         [prev_onset_time+0.4, onset_time+0.4], [prev_pitch+0.4, pitch+0.4],
                         color=PIANOROLL_SHAPE_LINE_COLOR,  linewidth=1.0,

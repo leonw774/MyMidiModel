@@ -5,7 +5,7 @@ import torch
 
 from util.tokens import b36str2int, BEGIN_TOKEN_STR, END_TOKEN_STR
 from util.midi import midi_to_text_list, piece_to_midi
-from util.corpus import CorpusIterator, text_list_to_array
+from util.corpus import CorpusReader, text_list_to_array
 from util.model import MyMidiTransformer, generate_sample
 
 def read_args():
@@ -112,8 +112,8 @@ def main():
             primer_text_list = midi_to_text_list(args.primer, **model.vocabs.paras)
         else:
             try:
-                with CorpusIterator(args.primer) as corpus_iter:
-                    piece = next(iter(corpus_iter)) # get first piece
+                with CorpusReader(args.primer) as corpus_reader:
+                    piece = next(iter(corpus_reader)) # get first piece
                 primer_text_list = piece.split()
             except:
                 print('Failed to parse primer as corpus: following exception raised')

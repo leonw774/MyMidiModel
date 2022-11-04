@@ -1,11 +1,11 @@
+# from util.corpus import CorpusReader # will cause circular import
 from .tokens import (
     BEGIN_TOKEN_STR,
     END_TOKEN_STR,
     PADDING_TOKEN_STR,
-    b36str2int,
     int2b36str,
     get_largest_possible_position,
-    SUPPORTED_TIME_SIGNATURES,
+    SUPPORTED_TIME_SIGNATURES
 )
 
 class Vocabs:
@@ -82,7 +82,7 @@ class Vocabs:
 
 
 def build_vocabs(
-        corpus_iterator,
+        corpus_reader,
         paras: dict,
         bpe_shapes_list: list):
     """
@@ -136,7 +136,7 @@ def build_vocabs(
     # max_measured_count = 0 # find max measure number in all pieces
     # corpus_measure_time_sig_tokens = set()
     # corpus_position_tokens = set() # we want to see how sparse measure and position is
-    for piece in corpus_iterator:
+    for piece in corpus_reader:
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
         # measures_count = 0

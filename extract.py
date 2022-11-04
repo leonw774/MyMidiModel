@@ -1,12 +1,13 @@
 from argparse import ArgumentParser, RawTextHelpFormatter
 
 from util.midi import piece_to_midi
-from util.corpus import CorpusIterator, get_corpus_paras, piece_to_roll
+from util.corpus import CorpusReader, get_corpus_paras, piece_to_roll
 
 def read_args():
     parser = ArgumentParser(formatter_class=RawTextHelpFormatter)
     parser.add_argument(
         'corpus_dir_path',
+        metavar='CORPUS_DIR_PATH',
         type=str
     )
     parser.add_argument(
@@ -91,41 +92,36 @@ def main():
         for k, v in vars(args).items()
     ]))
 
-    with CorpusIterator(args.corpus_dir_path) as corpus_iterator:
+    with CorpusReader(args.corpus_dir_path) as corpus_reader:
         corpus_paras = get_corpus_paras(args.corpus_dir_path)
         print('Corpus parameters:')
         print(corpus_paras)
-        if len(corpus_iterator) == 0:
+        if len(corpus_reader) == 0:
             print('Error: no piece in input file')
             return 1
 
-        indices_to_extract = parse_index_string(args.indexing.split(','), len(corpus_iterator))
-        print(indices_to_extract)
+        indices_to_extract = parse_index_string(args.indexing.split(','), len(corpus_reader))
+        print("extracting indices:", list(indices_to_extract))
 
         # extract
-        for i, piece in enumerate(corpus_iterator):
-            if i in indices_to_extract:
-                indices_to_extract.remove(i)
-                if len(piece) == 0:
-                    continue
+        for i in indices_to_extract:
+            piece = corpus_reader[i]
+            if len(piece) == 0:
+                continue
 
-                if args.extract_midi:
-                    midi = piece_to_midi(piece, corpus_paras['nth'], ignore_panding_note_error=False)
-                    midi.dump(f'{args.output_path}_{i}.mid')
+            if args.extract_midi:
+                midi = piece_to_midi(piece, corpus_paras['nth'], ignore_panding_note_error=False)
+                midi.dump(f'{args.output_path}_{i}.mid')
 
-                if args.extract_txt:
-                    with open(f'{args.output_path}_{i}.txt', 'w+', encoding='utf8') as f:
-                        f.write(piece+'\n')
-                        f.write()
+            if args.extract_txt:
+                with open(f'{args.output_path}_{i}.txt', 'w+', encoding='utf8') as f:
+                    f.write(piece+'\n')
 
-                if args.extract_img:
-                    figure = piece_to_roll(piece, corpus_paras['nth'])
-                    figure.savefig(f'{args.output_path}_{i}.png')
+            if args.extract_img:
+                figure = piece_to_roll(piece, corpus_paras['nth'])
+                figure.savefig(f'{args.output_path}_{i}.png')
 
-                print(f'extracted {args.output_path}_{i}')
-
-            if len(indices_to_extract) == 0:
-                break
+            print(f'extracted {args.output_path}_{i}')
 
 if __name__ == '__main__':
     exit_code = main()

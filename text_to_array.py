@@ -18,7 +18,7 @@ from util.corpus import (
     to_shape_vocab_file_path,
     to_vocabs_file_path,
     get_corpus_paras,
-    CorpusIterator,
+    CorpusReader,
     text_list_to_array,
     get_input_array_debug_string,
 )
@@ -108,10 +108,10 @@ def main():
 
     logging.info('Begin build vocabs for %s', args.corpus_dir_path)
     corpus_paras = get_corpus_paras(args.corpus_dir_path)
-    with CorpusIterator(args.corpus_dir_path) as corpus_iterator:
-        assert len(corpus_iterator) > 0, f'empty corpus: {args.corpus_dir_path}'
+    with CorpusReader(args.corpus_dir_path) as corpus_reader:
+        assert len(corpus_reader) > 0, f'empty corpus: {args.corpus_dir_path}'
 
-        vocabs, summary_string = build_vocabs(corpus_iterator, corpus_paras, bpe_shapes_list)
+        vocabs, summary_string = build_vocabs(corpus_reader, corpus_paras, bpe_shapes_list)
         with open(vocab_path, 'w+', encoding='utf8') as vocabs_file:
             json.dump(vocabs.to_dict(), vocabs_file)
         logging.info(summary_string)
@@ -133,7 +133,7 @@ def main():
             os.remove(npy_zip_path)
 
         os.makedirs(npy_dir_path)
-        for i, p in tqdm(enumerate(corpus_iterator), total=len(corpus_iterator)):
+        for i, p in tqdm(enumerate(corpus_reader), total=len(corpus_reader)):
             try:
                 array = text_list_to_array(p.split(), vocabs)
             except Exception as e:
@@ -153,7 +153,7 @@ def main():
 
         # for debugging
         if args.debug:
-            p0 = next(iter(corpus_iterator))
+            p0 = next(iter(corpus_reader))
             original_text_list = p0.split()
             array_data = text_list_to_array(p0.split(), vocabs)
 
@@ -185,8 +185,8 @@ def main():
         'note' : list(),
         'token': list()
     }
-    with CorpusIterator(args.corpus_dir_path) as corpus_iterator:
-        for piece in corpus_iterator:
+    with CorpusReader(args.corpus_dir_path) as corpus_reader:
+        for piece in corpus_reader:
             distributions['track_number'][piece.count(' R')] += 1
             head_end = piece.find(' M') # find first occurence of measure token
             tracks_text = piece[4:head_end]
