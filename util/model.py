@@ -394,10 +394,8 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
             begin_index = mps_indices_with_begin_and_end[i]
             end_index = mps_indices_with_begin_and_end[i+1]
             mps_size = end_index - begin_index
-            assert mps_size > 1, f'{len(batched_mps_indices)}\n{mps_indices}'
-            if begin_index + 1 == end_index:
-                continue
-            elif begin_index + 2 == end_index:
+            assert mps_size >= 0, f'{begin_index}~{end_index}\n{mps_indices_with_begin_and_end}'
+            if mps_size == 2:
                 seq_flatten_target_logits_list.append(
                     detached_target_logit[batch_number, begin_index:end_index]
                 )
@@ -407,7 +405,7 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
                         pred_attr_logit[batch_number, begin_index].expand((2, -1))
                     )
                     # view (attr_vocabs_size, ) and then expand into (mps_size, attr_vocabs_size)
-            else:
+            elif mps_size > 2:
                 triu_indices = torch.triu_indices(mps_size, mps_size)
                 triu_indices = triu_indices[:, :-1] # drop last
                 full_mps_target = detached_target_logit[batch_number, begin_index:end_index]
@@ -467,8 +465,8 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
             if mps_indices_with_begin_and_end[i] + 1 == end_index:
                 continue
             for begin_index in range(mps_indices_with_begin_and_end[i], end_index):
-                mps_size = end_index-begin_index
-                if mps_size == 1: # no need to find
+                mps_size = end_index - begin_index
+                if mps_size <= 1: # no need to find
                     continue
                 argmin_losses_sum = torch.argmin(
                     seq_flatten_loss_sum[prev_seq_flatten_index:prev_seq_flatten_index+mps_size]
