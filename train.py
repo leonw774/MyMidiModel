@@ -27,8 +27,7 @@ from util.model import (
     MyMidiTransformer,
     generate_sample,
     calc_losses,
-    calc_permutable_subseq_losses,
-    old_calc_permutable_subseq_losses
+    calc_permutable_subseq_losses
 )
 from util.evaluations import EVAL_FEATURE_NAMES, piece_to_features
 
@@ -406,16 +405,14 @@ def main():
             forward_time += time() - start_forward_time
 
             start_backward_time = time()
-
-            # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
+        # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
             if args.data_args.use_permutable_subseq_loss:
-                # with record_function("use_permutable_subseq_loss"):
                 head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
-                # print('calc_permutable_subseq_losses use time:', time() - start_backward_time)
+                # print('\ncalc_permutable_subseq_losses use time:', time() - start_backward_time)
             else:
                 head_losses = calc_losses(prediction, batch_target_seqs)
-                    # print('calc_losses use time:', time() - start_backward_time)
-            # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=30))
+                    # print('\ncalc_losses use time:', time() - start_backward_time)
+        # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=32))
 
             train_loss_list.append([float(hl) for hl in head_losses])
             loss = torch.sum(torch.stack(head_losses))
