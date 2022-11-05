@@ -180,14 +180,27 @@ class MidiDataset(Dataset):
 
             # use self._piece_body_start_index to know how many tracks there are in this piece
             track_count = self._piece_body_start_index[filenum] - 1
+            body_begin_index_in_slice = self._piece_body_start_index[filenum] - begin_index
+            body_begin_index_in_slice = max(0, body_begin_index_in_slice)
             # add one because there is a padding token at the beginning of the vocab
             perm_array = np.random.permutation(track_count) + 1
-            track_num_column = sliced_array[:, TOKEN_ATTR_INDEX['trn']] # view
-            track_num_column_expand = np.asarray([
-                (track_num_column == i + 1) for i in range(track_count)
+            # view body's track number col
+            body_track_num_column = sliced_array[body_begin_index_in_slice:, TOKEN_ATTR_INDEX['trn']]
+            body_track_num_column_expand = np.asarray([
+                (body_track_num_column == i + 1) for i in range(track_count)
             ])
-            for i in range(perm_array.shape[0]):
-                track_num_column[track_num_column_expand[i]] = perm_array[i]
+            # permute body's track number
+            ins_col_index = TOKEN_ATTR_INDEX['ins']
+            for i in range(track_count):
+                body_track_num_column[body_track_num_column_expand[i]] = perm_array[i]
+            # permute head's track instruments
+            if body_begin_index_in_slice > 0:
+                track_begin_index_in_slice = 1 if begin_index == 0 else 0
+                track_token_permuted_ins = [0] * track_count
+                for i in range(1, track_count+1):
+                    track_token_permuted_ins[perm_array[i-1]-1] = self.pieces[str(filenum)][i, ins_col_index]
+                track_token_permuted_ins = track_token_permuted_ins[max(0, begin_index-1):]
+                sliced_array[track_begin_index_in_slice:body_begin_index_in_slice, ins_col_index] = track_token_permuted_ins
 
         if self.permute_mps:
             mps_tokens_ranges = []

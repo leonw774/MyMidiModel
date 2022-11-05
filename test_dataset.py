@@ -9,9 +9,9 @@ from util.dataset import MidiDataset, collate_mididataset
 dataset = MidiDataset(
     data_dir_path='data/corpus/test_midis_nth96_r32_d96_v4_t24_200_1_posattribute',
     max_seq_length=16, # to be printed on screen, so small
-    use_permutable_subseq_loss=True,
+    use_permutable_subseq_loss=False,
     permute_mps=False,
-    permute_track_number=False
+    permute_track_number=True
 )
 vocabs_dict = dataset.vocabs
 print('max_seq_length', dataset.max_seq_length)
@@ -43,7 +43,7 @@ train_dataloader = DataLoader(
     collate_fn=collate_mididataset
 )
 batched_samples, batched_mps_sep_indices = next(iter(train_dataloader))
-if batched_mps_sep_indices is not None:
+if len(batched_mps_sep_indices) != 0:
     for i, (s, e) in enumerate(zip(batched_samples, batched_mps_sep_indices)):
         print(f'BATCHED[{i}]')
         print(get_input_array_debug_string(s.numpy(), e, vocabs_dict))
