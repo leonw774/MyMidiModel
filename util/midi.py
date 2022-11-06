@@ -530,6 +530,8 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error: bool = False)
             assert is_head, 'R token at body'
             track_number, instrument = (b36str2int(x) for x in text[1:].split(':'))
             assert track_number not in track_program_mapping, 'Repeated track number'
+            # shoud we use more strict track list?: not allow permutation, just 1, ..., n
+            assert track_number == len(track_program_mapping) + 1, 'Track number not increasing by one'
             track_program_mapping[track_number] = instrument
 
         elif typename == 'M':
@@ -538,7 +540,8 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error: bool = False)
                 assert len(track_program_mapping) > 0, 'No track in head'
                 track_numbers_list = list(track_program_mapping.keys())
                 track_numbers_list.sort()
-                assert track_numbers_list == list(range(len(track_numbers_list))) # track number must be a permutation of 1 ~ n
+                # track number must at least be a permutation of 1, ..., n
+                assert track_numbers_list == list(range(len(track_numbers_list))), 'Track numbers are not consecutive integers starting from 1'
                 for track_number in track_numbers_list:
                     program = track_program_mapping[track_number]
                     midi.instruments.append(
