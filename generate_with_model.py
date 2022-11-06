@@ -166,7 +166,7 @@ def main():
 
                 elif typename == 'S':
                     shape_string, *other_attr = text[1:].split(':')
-                    note_attr = (b36str2int(x) for x in other_attr)
+                    note_attr = tuple(b36str2int(x) for x in other_attr)
                     if len(note_attr) == 5:
                         cur_time = note_attr[4] + cur_measure_onset
 
