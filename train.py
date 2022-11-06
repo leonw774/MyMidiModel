@@ -351,14 +351,14 @@ def main():
         dataset=train_dataset,
         num_workers=args.dataloader_worker_number,
         batch_size=args.train_args.batch_size,
-        shuffle=True,
+        shuffle=False, # shuffle would use A LOT of memory
         collate_fn=collate_mididataset
     )
     valid_dataloader = DataLoader(
         dataset=valid_dataset,
         num_workers=args.dataloader_worker_number,
         batch_size=args.train_args.batch_size,
-        shuffle=True,
+        shuffle=False,
         collate_fn=collate_mididataset
     )
     logging.info('Legnth of training set: %d', len(train_dataloader))

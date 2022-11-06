@@ -40,7 +40,7 @@ class MidiDataset(Dataset):
         npz_zipinfo_list = zipfile.ZipFile(npz_path).infolist()
         array_memory_size = sum([zinfo.file_size for zinfo in npz_zipinfo_list])
         print('available_memory_size:', available_memory_size, 'array_memory_size:', array_memory_size)
-        if array_memory_size >= available_memory_size - 1e9: # keep 1G for other things
+        if array_memory_size >= available_memory_size - 4e9: # keep 4G for other things
             # load from disk every time indexing
             print('Memory size not enough, using NPZ mmap.')
             self.pieces = np.load(npz_path)
