@@ -116,15 +116,15 @@ int main(int argc, char *argv[]) {
     startMultinoteCount = multinoteCount = corpus.getMultiNoteCount();
     drumMultinoteCount = corpus.getMultiNoteCount(true);
     double startAvgMulpi = calculateAvgMulpiSize(corpus, ignoreDrum, false);
-    double startNLL = -calculateShapeLogLikelihood(corpus, ignoreDrum);
-    double startEntropy = calculateShapeEntropy(corpus, ignoreDrum);
+    double startShapeEntropy = calculateShapeEntropy(corpus, ignoreDrum);
+    double startTotalEntropy = -calculateOtherAttributeEntropy(corpus, maxDur, ignoreDrum);
     double avgMulpi = startAvgMulpi;
 
     std::cout << "Start Multinote count: " << multinoteCount
         << ", Drum's multinote count: " << drumMultinoteCount
         << ", Start average mulpi: " << avgMulpi
-        << ", Start NLL: " << startNLL
-        << ", Start entropy: " << startEntropy
+        << ", Start shape entropy: " << startShapeEntropy
+        << ", Start all attribute entropy: " << startTotalEntropy
         << ", Reading used time: " << (std::chrono::system_clock::now() - ioStartTimePoint) / onSencondDur << std::endl;
 
     if (multinoteCount == 0 || (multinoteCount == drumMultinoteCount && ignoreDrum)) {
