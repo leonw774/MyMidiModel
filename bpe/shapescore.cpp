@@ -197,11 +197,12 @@ double calculateShapeEntropy(const Corpus& corpus, bool ignoreDrum) {
         totalCount += shapeCounts[i];
     }
     double logTotlaCount = log2(totalCount);
+    std::cout << logTotlaCount << '\n';
     double entropy = 0;
     std::vector<double> shapeFreq(shapeCounts.size(), 0.0);
     for (int i = 0; i < shapeFreq.size(); ++i) {
         if (shapeCounts[i] != 0) {
-            entropy -= shapeCounts[i] * (log2(shapeFreq[i]) - logTotlaCount) / totalCount;
+            entropy -= shapeCounts[i] * ((log2(shapeCounts[i]) - logTotlaCount) / totalCount);
         }
     }
     return entropy;
