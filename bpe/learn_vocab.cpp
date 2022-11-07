@@ -241,11 +241,11 @@ int main(int argc, char *argv[]) {
             }
         }
         double shapeEntropy = calculateShapeEntropy(corpus, ignoreDrum);
-        double allAttributeEntropy = calculateAllAttributeEntropy(corpus, maxDur, ignoreDrum);
+        double otherAttributeEntropy = calculateOtherAttributeEntropy(corpus, maxDur, ignoreDrum);
         multinoteCount = corpus.getMultiNoteCount();
         mergeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
-        std::cout << multinoteCount << ", " << shapeEntropy << ", " << allAttributeEntropy << ", ";
+        std::cout << multinoteCount << ", " << shapeEntropy << ", " << shapeEntropy + otherAttributeEntropy << ", ";
         std::cout << (std::chrono::system_clock::now() - iterStartTimePoint) / onSencondDur << ", "
             << findBestShapeTime << ", "
             << mergeTime;
