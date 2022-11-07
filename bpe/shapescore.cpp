@@ -209,10 +209,13 @@ double calculateShapeEntropy(const Corpus& corpus, bool ignoreDrum) {
 
 
 double calculateAllAttributeEntropy(const Corpus& corpus, bool ignoreDrum) {
-    std::map<uint64_t, unsigned int> allAttrCount;
+    unsigned int max_thread_num = omp_get_max_threads();
+    std::map<uint64_t, unsigned int> allAttrCountParallel[max_thread_num];
     size_t totalCount = 0;
     // array of shape index, pitch, unit, velocity
+    #pragma omp parallel for
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+        int thread_num = omp_get_thread_num();
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drum?
             if (corpus.piecesTP[i][j] == 128 && ignoreDrum) continue;
@@ -222,14 +225,35 @@ double calculateAllAttributeEntropy(const Corpus& corpus, bool ignoreDrum) {
                 key |= ((uint64_t) corpus.piecesMN[i][j][k].pitch) << 16;
                 key |= ((uint64_t) corpus.piecesMN[i][j][k].unit)  << 24;
                 key |= ((uint64_t) corpus.piecesMN[i][j][k].vel)   << 32;
-                allAttrCount[key] += 1;
+                allAttrCountParallel[thread_num][key] += 1;
             }
         }
     }
-
+    // merge parrallel maps
+    std::vector<int> mergingMapIndices;
+    for (int i = 0; i < max_thread_num; ++i) {
+        mergingMapIndices.push_back(i);
+    }
+    // do merging in O(logt) time, t is max_thread_num
+    // so that the total time is O(log(t) * log(n))
+    while (mergingMapIndices.size() > 1) {
+        #pragma omp parallel for
+        for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
+            int a = mergingMapIndices[i];
+            int b = mergingMapIndices[i-1];
+            for (auto it = allAttrCountParallel[a].cbegin(); it != allAttrCountParallel[a].cend(); it++) {
+                allAttrCountParallel[b][it->first] += it->second;
+            }
+        }
+        for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
+            mergingMapIndices.erase(mergingMapIndices.begin()+i);
+        }
+        // count from back to not disturb the index number when erasing
+    }
+    int lastIndex = mergingMapIndices[0];
     double logTotlaCount = log2(totalCount);
     double entropy = 0;
-    for (auto it = allAttrCount.begin(); it != allAttrCount.end(); ++it) {
+    for (auto it = allAttrCountParallel[lastIndex].begin(); it != allAttrCountParallel[lastIndex].end(); ++it) {
         unsigned int count = it->second;
         entropy -= count * ((log2(count) - logTotlaCount) / totalCount);
     }
