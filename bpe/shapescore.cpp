@@ -209,7 +209,7 @@ double calculateShapeEntropy(const Corpus& corpus, bool ignoreDrum) {
 
 
 double calculateAllAttributeEntropy(const Corpus& corpus, bool ignoreDrum) {
-    std::map<std::array<uint64_t>, unsigned int> allAttrCount;
+    std::map<uint64_t, unsigned int> allAttrCount;
     size_t totalCount = 0;
     // array of shape index, pitch, unit, velocity
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
