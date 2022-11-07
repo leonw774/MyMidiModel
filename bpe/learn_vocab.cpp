@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
     drumMultinoteCount = corpus.getMultiNoteCount(true);
     double startAvgMulpi = calculateAvgMulpiSize(corpus, ignoreDrum, false);
     double startShapeEntropy = calculateShapeEntropy(corpus, ignoreDrum);
-    double startTotalEntropy = -calculateOtherAttributeEntropy(corpus, maxDur, ignoreDrum);
+    double startTotalEntropy = calculateOtherAttributeEntropy(corpus, maxDur, ignoreDrum);
     double avgMulpi = startAvgMulpi;
 
     std::cout << "Start Multinote count: " << multinoteCount

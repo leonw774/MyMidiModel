@@ -243,7 +243,7 @@ double calculateOtherAttributeEntropy(const Corpus& corpus, int maxDur, bool ign
                 totalEntropy -= pitchFreq[i] * log2(pitchFreq[i]);
             }
             else {
-                totalEntropy = -std::numeric_limits<float>::infinity();
+                totalEntropy = std::numeric_limits<float>::infinity();
                 return totalEntropy;
             }
         }
@@ -255,7 +255,7 @@ double calculateOtherAttributeEntropy(const Corpus& corpus, int maxDur, bool ign
                 totalEntropy -= unitFreq[i] * log2(unitFreq[i]);
             }
             else {
-                totalEntropy = -std::numeric_limits<float>::infinity();
+                totalEntropy = std::numeric_limits<float>::infinity();
                 return totalEntropy;
             }
         }
@@ -267,7 +267,7 @@ double calculateOtherAttributeEntropy(const Corpus& corpus, int maxDur, bool ign
                 totalEntropy -= velocityFreq[i] * log2(velocityFreq[i]);
             }
             else {
-                totalEntropy = -std::numeric_limits<float>::infinity();
+                totalEntropy = std::numeric_limits<float>::infinity();
                 return totalEntropy;
             }
         }
