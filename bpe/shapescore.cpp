@@ -190,7 +190,7 @@ std::vector<size_t> getShapeCounts(const Corpus& corpus, bool ignoreDrum = false
 }
 
 
-double calculateLogLikelihood(const Corpus& corpus, bool ignoreDrum) {
+double calculateShapeLogLikelihood(const Corpus& corpus, bool ignoreDrum) {
     std::vector<size_t> shapeCounts = getShapeCounts(corpus, ignoreDrum);
     std::vector<double> shapeFreq(shapeCounts.size(), 0);
     size_t totalCount = 0;
@@ -205,6 +205,24 @@ double calculateLogLikelihood(const Corpus& corpus, bool ignoreDrum) {
         }
     }
     return loglikelihood;
+}
+
+
+double calculateShapeEntropy(const Corpus& corpus, bool ignoreDrum) {
+    std::vector<size_t> shapeCounts = getShapeCounts(corpus, ignoreDrum);
+    std::vector<double> shapeFreq(shapeCounts.size(), 0);
+    size_t totalCount = 0;
+    double entropy = 0;
+    for (int i = 0; i < shapeCounts.size(); ++i) {
+        totalCount += shapeCounts[i];
+    }
+    for (int i = 0; i < shapeFreq.size(); ++i) {
+        shapeFreq[i] = ((double) shapeCounts[i]) / totalCount;
+        if (shapeFreq[i] != 0) {
+            entropy -= shapeFreq[i] * log(shapeFreq[i]);
+        }
+    }
+    return entropy;
 }
 
 

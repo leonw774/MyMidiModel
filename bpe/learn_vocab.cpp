@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
     std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint;
     std::chrono::time_point<std::chrono::system_clock>partStartTimePoint;
     double findBestShapeTime, mergeTime;
-    std::cout << "Iter, Avg neighbor number, Found shapes count, Shape, Score, Multinote count, NLL, Iteration time, Find best shape time, Merge time" << std::endl;
+    std::cout << "Iter, Avg neighbor number, Found shapes count, Shape, Score, Multinote count, NLL, Entropy, Iteration time, Find best shape time, Merge time" << std::endl;
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
         if (!verbose && iterCount != 0) 
             std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
@@ -236,11 +236,12 @@ int main(int argc, char *argv[]) {
                 sort(corpus.piecesMN[i][j].begin(), corpus.piecesMN[i][j].end());
             }
         }
-        double negLoglikelihood = -calculateLogLikelihood(corpus, ignoreDrum);
+        double negLoglikelihood = -calculateShapeLogLikelihood(corpus, ignoreDrum);
+        double entropy = calculateShapeEntropy(corpus, ignoreDrum);
         multinoteCount = corpus.getMultiNoteCount();
         mergeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
-        std::cout << multinoteCount << ", " << negLoglikelihood << ", ";
+        std::cout << multinoteCount << ", " << negLoglikelihood << ", " << entropy << ", ";
         std::cout << (std::chrono::system_clock::now() - iterStartTimePoint) / onSencondDur << ", "
             << findBestShapeTime << ", "
             << mergeTime;
