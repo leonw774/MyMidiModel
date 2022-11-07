@@ -116,11 +116,15 @@ int main(int argc, char *argv[]) {
     startMultinoteCount = multinoteCount = corpus.getMultiNoteCount();
     drumMultinoteCount = corpus.getMultiNoteCount(true);
     double startAvgMulpi = calculateAvgMulpiSize(corpus, ignoreDrum, false);
+    double startNLL = -calculateShapeLogLikelihood(corpus, ignoreDrum);
+    double startEntropy = calculateShapeEntropy(corpus, ignoreDrum);
     double avgMulpi = startAvgMulpi;
 
     std::cout << "Start Multinote count: " << multinoteCount
         << ", Drum's multinote count: " << drumMultinoteCount
         << ", Start average mulpi: " << avgMulpi
+        << ", Start NLL: " << startNLL
+        << ", Start entropy: " << startEntropy
         << ", Reading used time: " << (std::chrono::system_clock::now() - ioStartTimePoint) / onSencondDur << std::endl;
 
     if (multinoteCount == 0 || (multinoteCount == drumMultinoteCount && ignoreDrum)) {
@@ -133,7 +137,7 @@ int main(int argc, char *argv[]) {
     std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint;
     std::chrono::time_point<std::chrono::system_clock>partStartTimePoint;
     double findBestShapeTime, mergeTime;
-    std::cout << "Iter, Avg neighbor number, Found shapes count, Shape, Score, Multinote count, NLL, Entropy, Iteration time, Find best shape time, Merge time" << std::endl;
+    std::cout << "Iter, Avg neighbor number, Found shapes count, Shape, Score, Multinote count, Shape entropy, All attribute entropy, Iteration time, Find best shape time, Merge time" << std::endl;
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
         if (!verbose && iterCount != 0) 
             std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
@@ -236,12 +240,12 @@ int main(int argc, char *argv[]) {
                 sort(corpus.piecesMN[i][j].begin(), corpus.piecesMN[i][j].end());
             }
         }
-        double negLoglikelihood = -calculateShapeLogLikelihood(corpus, ignoreDrum);
-        double entropy = calculateShapeEntropy(corpus, ignoreDrum);
+        double shapeEntropy = calculateShapeEntropy(corpus, ignoreDrum);
+        double allAttributeEntropy = calculateAllAttributeEntropy(corpus, maxDur, ignoreDrum);
         multinoteCount = corpus.getMultiNoteCount();
         mergeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
-        std::cout << multinoteCount << ", " << negLoglikelihood << ", " << entropy << ", ";
+        std::cout << multinoteCount << ", " << shapeEntropy << ", " << allAttributeEntropy << ", ";
         std::cout << (std::chrono::system_clock::now() - iterStartTimePoint) / onSencondDur << ", "
             << findBestShapeTime << ", "
             << mergeTime;

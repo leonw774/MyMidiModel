@@ -14,9 +14,9 @@ Shape getShapeOfMultiNotePair(
 
 double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreDrum, bool ignoreSingleton=false);
 
-double calculateShapeLogLikelihood(const Corpus& corpus, bool ignoreDrum);
-
 double calculateShapeEntropy(const Corpus& corpus, bool ignoreDrum);
+
+double calculateAllAttributeEntropy(const Corpus& corpus, int maxDur, bool ignoreDrum);
 
 template<typename T>
 void shapeScoring(
