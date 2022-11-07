@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
         << ", Drum's multinote count: " << drumMultinoteCount
         << ", Start average mulpi: " << avgMulpi
         << ", Start shape entropy: " << startShapeEntropy
-        << ", Start all attribute entropy: " << startTotalEntropy
+        << ", Start all attribute entropy: " << startShapeEntropy + startTotalEntropy
         << ", Reading used time: " << (std::chrono::system_clock::now() - ioStartTimePoint) / onSencondDur << std::endl;
 
     if (multinoteCount == 0 || (multinoteCount == drumMultinoteCount && ignoreDrum)) {
