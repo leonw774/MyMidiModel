@@ -95,6 +95,7 @@ class MidiDataset(Dataset):
             ])
             self._mps_seperators.update(self._measure_ids)
             self._mps_seperators.update(self._position_ids)
+            self._mps_seperators.update(self._track_ids)
             self._mps_seperators = np.sort(np.array(list(self._mps_seperators)))
         # numpy.isin can work on set, turn it into sorted 1d array helps search speed
         self._note_ids = np.sort(np.array(self._note_ids))
