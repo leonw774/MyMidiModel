@@ -197,7 +197,6 @@ double calculateShapeEntropy(const Corpus& corpus, bool ignoreDrum) {
         totalCount += shapeCounts[i];
     }
     double logTotlaCount = log2(totalCount);
-    std::cout << logTotlaCount << '\n';
     double entropy = 0;
     std::vector<double> shapeFreq(shapeCounts.size(), 0.0);
     for (int i = 0; i < shapeFreq.size(); ++i) {
@@ -234,17 +233,17 @@ double calculateOtherAttributeEntropy(const Corpus& corpus, int maxDur, bool ign
     double totalEntropy = 0, entropy = 0;
     for (int i = 0; i < pitchFreq.size(); ++i) {
         if (pitchCounts[i] != 0) {
-            totalEntropy -= pitchCounts[i] * (log2(pitchCounts[i]) - logTotlaCount) / totalCount;
+            totalEntropy -= pitchCounts[i] * ((log2(pitchCounts[i]) - logTotlaCount) / totalCount);
         }
     }
     for (int i = 0; i < unitFreq.size(); ++i) {
         if (unitCounts[i] != 0) {
-            totalEntropy -= unitCounts[i] * (log2(unitCounts[i]) - logTotlaCount) / totalCount;
+            totalEntropy -= unitCounts[i] * ((log2(unitCounts[i]) - logTotlaCount) / totalCount);
         }
     }
     for (int i = 0; i < velocityFreq.size(); ++i) {
         if (velocityCount[i] != 0) {
-            totalEntropy -= velocityCount[i] * (log2(velocityCount[i]) - logTotlaCount) / totalCount;
+            totalEntropy -= velocityCount[i] * ((log2(velocityCount[i]) - logTotlaCount) / totalCount);
         }
     }
     return totalEntropy;
