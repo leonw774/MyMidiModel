@@ -196,15 +196,12 @@ double calculateShapeEntropy(const Corpus& corpus, bool ignoreDrum) {
     for (int i = 0; i < shapeCounts.size(); ++i) {
         totalCount += shapeCounts[i];
     }
+    double logTotlaCount = log2(totalCount);
     double entropy = 0;
     std::vector<double> shapeFreq(shapeCounts.size(), 0.0);
     for (int i = 0; i < shapeFreq.size(); ++i) {
         if (shapeCounts[i] != 0) {
-            shapeFreq[i] = ((double) shapeCounts[i]) / totalCount;
-            if (shapeFreq[i] == 0) {
-                shapeFreq[i] = std::numeric_limits<double>::min();
-            }
-            entropy -= shapeFreq[i] * log2(shapeFreq[i]);
+            entropy -= shapeCounts[i] * (log2(shapeFreq[i]) - logTotlaCount);
         }
     }
     return entropy;
@@ -228,38 +225,32 @@ double calculateOtherAttributeEntropy(const Corpus& corpus, int maxDur, bool ign
     for (int i = 0; i < pitchCounts.size(); ++i) {
         totalCount += pitchCounts[i];
     }
+    double logTotlaCount = log2(totalCount);
 
     std::vector<double> pitchFreq(128, 0.0),
                         unitFreq(maxDur, 0.0),
                         velocityFreq(128, 0.0);
-    double totalEntropy = 0;
+    double totalEntropy = 0, entropy = 0;
     for (int i = 0; i < pitchFreq.size(); ++i) {
         if (pitchCounts[i] != 0) {
-            pitchFreq[i] = ((double) pitchCounts[i]) / totalCount;
-            if (pitchFreq[i] == 0) {
-                pitchFreq[i] = std::numeric_limits<double>::min();
-            }
-            totalEntropy -= pitchFreq[i] * log2(pitchFreq[i]);
+            entropy -= pitchCounts[i] * (log2(pitchCounts[i]) - logTotlaCount);
         }
     }
+    totalEntropy += entropy / totalCount;
+    entropy = 0;
     for (int i = 0; i < unitFreq.size(); ++i) {
         if (unitCounts[i] != 0) {
-            unitFreq[i] = ((double) unitFreq[i]) / totalCount;
-            if (unitFreq[i] == 0) {
-                unitFreq[i] = std::numeric_limits<double>::min();
-            }
-            totalEntropy -= unitFreq[i] * log2(unitFreq[i]);
+            entropy -= unitCounts[i] * (log2(unitCounts[i]) - logTotlaCount);
         }
     }
+    totalEntropy += entropy / totalCount;
+    entropy = 0;
     for (int i = 0; i < velocityFreq.size(); ++i) {
         if (velocityCount[i] != 0) {
-            velocityFreq[i] = ((double) velocityFreq[i]) / totalCount;
-            if (velocityFreq[i] == 0) {
-                velocityFreq[i] = std::numeric_limits<double>::min();
-            }
-            totalEntropy -= velocityFreq[i] * log2(velocityFreq[i]);
+            entropy -= velocityCount[i] * (log2(velocityCount[i]) - logTotlaCount);
         }
     }
+    totalEntropy += entropy / totalCount;
     return totalEntropy;
 }
 
