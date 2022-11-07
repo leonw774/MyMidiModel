@@ -1,6 +1,8 @@
 #include "corpus.hpp"
 #include "shapescore.hpp"
 #include <random>
+#include <cmath>
+#include <limits>
 #include "omp.h"
 
 unsigned int gcd(unsigned int a, unsigned int b) {
@@ -169,6 +171,43 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreDrum, bool ignoreS
     return (double) accumulatedMulpiSize / (double) mulpiCount;
 }
 
+
+std::vector<size_t> getShapeCounts(const Corpus& corpus, bool ignoreDrum = false) {
+    std::vector<size_t> shapeCounts = {0, 0}; 
+    for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+        for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
+            // ignore drum?
+            if (corpus.piecesTP[i][j] == 128 && ignoreDrum) continue;
+            for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
+                if (corpus.piecesMN[i][j][k].getShapeIndex() >= shapeCounts.size() - 1) {
+                    shapeCounts.resize(corpus.piecesMN[i][j][k].getShapeIndex() + 1);
+                }
+                shapeCounts[corpus.piecesMN[i][j][k].getShapeIndex()] += 1;
+            }
+        }
+    }
+    return shapeCounts;
+}
+
+
+double calculateLogLikelihood(const Corpus& corpus, bool ignoreDrum) {
+    std::vector<size_t> shapeCounts = getShapeCounts(corpus, ignoreDrum);
+    std::vector<double> shapeFreq(shapeCounts.size(), 0);
+    size_t totalCount = 0;
+    double loglikelihood = 0;
+    for (int i = 0; i < shapeCounts.size(); ++i) {
+        totalCount += shapeCounts[i];
+    }
+    for (int i = 0; i < shapeFreq.size(); ++i) {
+        shapeFreq[i] = ((double) shapeCounts[i]) / totalCount;
+        if (shapeFreq[i] != 0) {
+            loglikelihood += log(shapeFreq[i]);
+        }
+    }
+    return loglikelihood;
+}
+
+
 template<typename T>
 void shapeScoring(
     const Corpus& corpus,
@@ -188,22 +227,18 @@ void shapeScoring(
 
     std::chrono::time_point<std::chrono::system_clock> partStartTimePoint = std::chrono::system_clock::now();
 
-    std::vector<double> dictShapeCount(shapeDict.size(), 0);
-    size_t multinoteCount = 0;
+    std::vector<double> shapeFreq(shapeDict.size(), 0);
     if (!isDefaultScoring) {
-        #pragma omp parallel for reduction(+: multinoteCount)
-        for (int i = 0; i < corpus.piecesMN.size(); ++i) {
-            for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-                // ignore drum?
-                if (corpus.piecesTP[i][j] == 128 && ignoreDrum) continue;
-                multinoteCount += corpus.piecesMN[i][j].size();
-                for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
-                    dictShapeCount[corpus.piecesMN[i][j][k].getShapeIndex()] += 1;
-                }
-            }
+        std::vector<size_t> shapeCounts = getShapeCounts(corpus, ignoreDrum);
+        if (shapeCounts.size() < shapeDict.size()) {
+            shapeCounts.resize(shapeDict.size());
         }
-        for (int a = 0; a < dictShapeCount.size(); ++a) {
-            dictShapeCount[a] /= multinoteCount;
+        size_t totalCount = 0;
+        for (int i = 0; i < shapeCounts.size(); ++i) {
+            totalCount += shapeCounts[i];
+        }
+        for (int i = 0; i < shapeFreq.size(); ++i) {
+            shapeFreq[i] = ((double) shapeCounts[i]) / totalCount;
         }
     }
 
@@ -253,8 +288,8 @@ void shapeScoring(
                     else {
                         unsigned int lShapeIndex = corpus.piecesMN[i][j][k].getShapeIndex(),
                                      rShapeIndex = corpus.piecesMN[i][j][k+n].getShapeIndex();
-                        tempScoreDiff[s] += 1.0 / (dictShapeCount[lShapeIndex] + dictShapeCount[rShapeIndex]);
-                        // shapeScoreParallel[thread_num][s] += 1.0 / (dictShapeCount[lShapeIndex] + dictShapeCount[rShapeIndex]);
+                        tempScoreDiff[s] += 1.0 / (shapeFreq[lShapeIndex] + shapeFreq[rShapeIndex]);
+                        // shapeScoreParallel[thread_num][s] += 1.0 / (shapeFreq[lShapeIndex] + shapeFreq[rShapeIndex]);
                     }
                 }
             }

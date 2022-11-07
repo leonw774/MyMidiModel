@@ -130,16 +130,16 @@ int main(int argc, char *argv[]) {
 
     std::vector<std::pair<Shape, unsigned int>> shapeScoreFreq;
     std::vector<std::pair<Shape, double>> shapeScoreWPlike;
-    double neighborUpdatingTime, findBestShapeTime, mergeTime;
-    std::cout << "Iter, Avg neighbor number, Found shapes count, Shape, Score, Multinote count, Iteration time, Neighbor update time, Find best shape time, Merge time" << std::endl;
+    std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint;
+    std::chrono::time_point<std::chrono::system_clock>partStartTimePoint;
+    double findBestShapeTime, mergeTime;
+    std::cout << "Iter, Avg neighbor number, Found shapes count, Shape, Score, Multinote count, NLL, Iteration time, Find best shape time, Merge time" << std::endl;
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
         if (!verbose && iterCount != 0) 
             std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
         std::cout << iterCount;
-        std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint = std::chrono::system_clock::now();
-        std::chrono::time_point<std::chrono::system_clock>partStartTimePoint = std::chrono::system_clock::now();
+        iterStartTimePoint = std::chrono::system_clock::now();
         size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth, ignoreDrum); 
-        neighborUpdatingTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
         // clac shape scores
         Shape maxScoreShape;
@@ -236,13 +236,12 @@ int main(int argc, char *argv[]) {
                 sort(corpus.piecesMN[i][j].begin(), corpus.piecesMN[i][j].end());
             }
         }
-        
+        double negLoglikelihood = -calculateLogLikelihood(corpus, ignoreDrum);
         multinoteCount = corpus.getMultiNoteCount();
         mergeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
-        std::cout << multinoteCount << ", ";
+        std::cout << multinoteCount << ", " << negLoglikelihood << ", ";
         std::cout << (std::chrono::system_clock::now() - iterStartTimePoint) / onSencondDur << ", "
-            << neighborUpdatingTime << ", "
             << findBestShapeTime << ", "
             << mergeTime;
         if (verbose) std::cout << std::endl;
