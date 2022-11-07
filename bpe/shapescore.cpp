@@ -201,7 +201,13 @@ double calculateShapeEntropy(const Corpus& corpus, bool ignoreDrum) {
     for (int i = 0; i < shapeFreq.size(); ++i) {
         if (shapeCounts[i] != 0) {
             shapeFreq[i] = ((double) shapeCounts[i]) / totalCount;
-            entropy -= shapeFreq[i] * log2(shapeFreq[i]);
+            if (shapeFreq[i] != 0) {
+                entropy -= shapeFreq[i] * log2(shapeFreq[i]);
+            }
+            else { // should be zero, but freq too small
+                entropy = -std::numeric_limits<float>::infinity();
+                break;
+            }
         }
     }
     return entropy;
@@ -233,19 +239,37 @@ double calculateOtherAttributeEntropy(const Corpus& corpus, int maxDur, bool ign
     for (int i = 0; i < pitchFreq.size(); ++i) {
         if (pitchCounts[i] != 0) {
             pitchFreq[i] = ((double) pitchCounts[i]) / totalCount;
-            totalEntropy -= pitchFreq[i] * log2(pitchFreq[i]);
+            if (pitchFreq[i] != 0) {
+                totalEntropy -= pitchFreq[i] * log2(pitchFreq[i]);
+            }
+            else {
+                totalEntropy = -std::numeric_limits<float>::infinity();
+                return totalEntropy;
+            }
         }
     }
     for (int i = 0; i < unitFreq.size(); ++i) {
         if (unitCounts[i] != 0) {
             unitFreq[i] = ((double) unitFreq[i]) / totalCount;
-            totalEntropy -= unitFreq[i] * log2(unitFreq[i]);
+            if (unitFreq[i] != 0) {
+                totalEntropy -= unitFreq[i] * log2(unitFreq[i]);
+            }
+            else {
+                totalEntropy = -std::numeric_limits<float>::infinity();
+                return totalEntropy;
+            }
         }
     }
     for (int i = 0; i < velocityFreq.size(); ++i) {
         if (velocityCount[i] != 0) {
             velocityFreq[i] = ((double) velocityFreq[i]) / totalCount;
-            totalEntropy -= velocityFreq[i] * log2(velocityFreq[i]);
+            if (velocityFreq[i] != 0) {
+                totalEntropy -= velocityFreq[i] * log2(velocityFreq[i]);
+            }
+            else {
+                totalEntropy = -std::numeric_limits<float>::infinity();
+                return totalEntropy;
+            }
         }
     }
     return totalEntropy;
