@@ -209,7 +209,7 @@ double calculateShapeEntropy(const Corpus& corpus, bool ignoreDrum) {
 
 
 double calculateAllAttributeEntropy(const Corpus& corpus, bool ignoreDrum) {
-    std::map<std::array<unsigned int, 4>, unsigned int> allAttrCount;
+    std::map<std::array<uint64_t>, unsigned int> allAttrCount;
     size_t totalCount = 0;
     // array of shape index, pitch, unit, velocity
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
@@ -218,12 +218,11 @@ double calculateAllAttributeEntropy(const Corpus& corpus, bool ignoreDrum) {
             if (corpus.piecesTP[i][j] == 128 && ignoreDrum) continue;
             totalCount += corpus.piecesMN[i][j].size();
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
-                allAttrCount[std::array<unsigned int, 4>({
-                    corpus.piecesMN[i][j][k].getShapeIndex(),
-                    corpus.piecesMN[i][j][k].pitch,
-                    corpus.piecesMN[i][j][k].unit,
-                    corpus.piecesMN[i][j][k].vel
-                })] += 1;
+                uint64_t key = corpus.piecesMN[i][j][k].getShapeIndex();
+                key |= ((uint64_t) corpus.piecesMN[i][j][k].pitch) << 16;
+                key |= ((uint64_t) corpus.piecesMN[i][j][k].unit)  << 24;
+                key |= ((uint64_t) corpus.piecesMN[i][j][k].vel)   << 32;
+                allAttrCount[key] += 1;
             }
         }
     }
