@@ -208,45 +208,33 @@ double calculateShapeEntropy(const Corpus& corpus, bool ignoreDrum) {
 }
 
 
-double calculateOtherAttributeEntropy(const Corpus& corpus, int maxDur, bool ignoreDrum) {
-    std::vector<size_t> pitchCounts(128, 0), unitCounts(maxDur, 0), velocityCount(128, 0);
+double calculateAllAttributeEntropy(const Corpus& corpus, bool ignoreDrum) {
+    std::map<std::array<unsigned int, 4>, unsigned int> allAttrCount;
+    size_t totalCount = 0;
+    // array of shape index, pitch, unit, velocity
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drum?
             if (corpus.piecesTP[i][j] == 128 && ignoreDrum) continue;
+            totalCount += corpus.piecesMN[i][j].size();
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
-                pitchCounts[corpus.piecesMN[i][j][k].pitch] += 1;
-                unitCounts[corpus.piecesMN[i][j][k].unit] += 1;
-                velocityCount[corpus.piecesMN[i][j][k].vel] += 1;
+                allAttrCount[std::array<unsigned int, 4>({
+                    corpus.piecesMN[i][j][k].getShapeIndex(),
+                    corpus.piecesMN[i][j][k].pitch,
+                    corpus.piecesMN[i][j][k].unit,
+                    corpus.piecesMN[i][j][k].vel
+                })] += 1;
             }
         }
     }
-    size_t totalCount = 0;
-    for (int i = 0; i < pitchCounts.size(); ++i) {
-        totalCount += pitchCounts[i];
-    }
-    double logTotlaCount = log2(totalCount);
 
-    std::vector<double> pitchFreq(128, 0.0),
-                        unitFreq(maxDur, 0.0),
-                        velocityFreq(128, 0.0);
-    double totalEntropy = 0, entropy = 0;
-    for (int i = 0; i < pitchFreq.size(); ++i) {
-        if (pitchCounts[i] != 0) {
-            totalEntropy -= pitchCounts[i] * ((log2(pitchCounts[i]) - logTotlaCount) / totalCount);
-        }
+    double logTotlaCount = log2(totalCount);
+    double entropy = 0;
+    for (auto it = allAttrCount.begin(); it != allAttrCount.end(); ++it) {
+        unsigned int count = it->second;
+        entropy -= count * ((log2(count) - logTotlaCount) / totalCount);
     }
-    for (int i = 0; i < unitFreq.size(); ++i) {
-        if (unitCounts[i] != 0) {
-            totalEntropy -= unitCounts[i] * ((log2(unitCounts[i]) - logTotlaCount) / totalCount);
-        }
-    }
-    for (int i = 0; i < velocityFreq.size(); ++i) {
-        if (velocityCount[i] != 0) {
-            totalEntropy -= velocityCount[i] * ((log2(velocityCount[i]) - logTotlaCount) / totalCount);
-        }
-    }
-    return totalEntropy;
+    return entropy;
 }
 
 

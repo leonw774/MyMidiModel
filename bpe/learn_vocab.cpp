@@ -117,14 +117,14 @@ int main(int argc, char *argv[]) {
     drumMultinoteCount = corpus.getMultiNoteCount(true);
     double startAvgMulpi = calculateAvgMulpiSize(corpus, ignoreDrum, false);
     double startShapeEntropy = calculateShapeEntropy(corpus, ignoreDrum);
-    double startTotalEntropy = calculateOtherAttributeEntropy(corpus, maxDur, ignoreDrum);
+    double startAllEntropy = calculateAllAttributeEntropy(corpus, ignoreDrum);
     double avgMulpi = startAvgMulpi;
 
     std::cout << "Start Multinote count: " << multinoteCount
         << ", Drum's multinote count: " << drumMultinoteCount
         << ", Start average mulpi: " << avgMulpi
         << ", Start shape entropy: " << startShapeEntropy
-        << ", Start all attribute entropy: " << startShapeEntropy + startTotalEntropy
+        << ", Start all attribute entropy: " << startAllEntropy
         << ", Reading used time: " << (std::chrono::system_clock::now() - ioStartTimePoint) / onSencondDur << std::endl;
 
     if (multinoteCount == 0 || (multinoteCount == drumMultinoteCount && ignoreDrum)) {
@@ -241,11 +241,11 @@ int main(int argc, char *argv[]) {
             }
         }
         double shapeEntropy = calculateShapeEntropy(corpus, ignoreDrum);
-        double otherAttributeEntropy = calculateOtherAttributeEntropy(corpus, maxDur, ignoreDrum);
+        double AllAttributeEntropy = calculateAllAttributeEntropy(corpus, ignoreDrum);
         multinoteCount = corpus.getMultiNoteCount();
         mergeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
 
-        std::cout << multinoteCount << ", " << shapeEntropy << ", " << shapeEntropy + otherAttributeEntropy << ", ";
+        std::cout << multinoteCount << ", " << shapeEntropy << ", " << AllAttributeEntropy << ", ";
         std::cout << (std::chrono::system_clock::now() - iterStartTimePoint) / onSencondDur << ", "
             << findBestShapeTime << ", "
             << mergeTime;

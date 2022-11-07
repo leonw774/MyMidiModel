@@ -16,7 +16,7 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreDrum, bool ignoreS
 
 double calculateShapeEntropy(const Corpus& corpus, bool ignoreDrum);
 
-double calculateOtherAttributeEntropy(const Corpus& corpus, int maxDur, bool ignoreDrum);
+double calculateAllAttributeEntropy(const Corpus& corpus, bool ignoreDrum);
 
 template<typename T>
 void shapeScoring(
