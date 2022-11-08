@@ -93,7 +93,8 @@ class CorpusReader:
             return result
         else:
             self.file.seek(self.line_pos[index])
-            result = self.file.read(self.line_pos[index+1]-self.line_pos[index])
+            # minus one to remove \n at the end
+            result = self.file.read(self.line_pos[index+1]-self.line_pos[index]-1)
             return result
 
 TOKEN_ATTR_INDEX = {
