@@ -3,6 +3,7 @@ import io
 from itertools import repeat
 from multiprocessing import Pool
 import sys
+from traceback import format_exc
 
 from tqdm import tqdm
 
@@ -16,12 +17,14 @@ def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -
         a_midi = piece_to_midi(a_piece, nth)
     except:
         print(f'exception in piece_to_midi of {a_corpus_dir} piece #{piece_index}')
+        print(format_exc())
         return False
 
     try:
         b_midi = piece_to_midi(b_piece, nth)
     except:
         print(f'exception in piece_to_midi of {b_corpus_dir} piece #{piece_index}')
+        print(format_exc())
         return False
 
     if any(
