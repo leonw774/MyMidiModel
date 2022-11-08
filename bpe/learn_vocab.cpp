@@ -36,7 +36,10 @@ int main(int argc, char *argv[]) {
     }
     if (argc - nonOptStartIndex != 7) {
         std::cout << "Bad number of non-optional arguments: " << argc - nonOptStartIndex << " != 7\n";
-        std::cout << "./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
+        for (int i = 0; i < argc; ++i) {
+            std::cout << argv[i] << " ";
+        }
+        std::cout << "\n./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[nonOptStartIndex]);
