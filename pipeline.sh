@@ -60,11 +60,11 @@ if [ $BPE_ITER -ne 0 ]; then
             if [ "$yn" == "${yn#[Yy]}" ]; then 
             # this grammar (the #[] operator) means that, in the variable $yn, any Y or y in 1st position will be dropped if they exist.
                 # enter this block if yn != [Yy]
-                rm -f "${CORPUS_DIR_PATH_WITH_BPE}/*"
-            else
                 DO_BPE=false
                 DO_MIDI_TO_TEXT=false
                 echo "Learn bpe vocab is skipped" | tee -a $LOG_PATH
+            else
+                rm -f "${CORPUS_DIR_PATH_WITH_BPE}/*"
             fi
         fi
     fi
@@ -103,7 +103,7 @@ if [ "$DO_BPE" == true ]; then
     cp "${CORPUS_DIR_PATH}/pathlist" $CORPUS_DIR_PATH_WITH_BPE
 
     # run learn_vocab
-    bpe/learn_vocab $BPE_VERBOSE $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SCORING $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT | tee -a $LOG_PATH
+    bpe/learn_vocab $BPE_DOLOG $BPE_CLEARLINE $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $SCORING $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT | tee -a $LOG_PATH
     
     BPE_EXIT_CODE=${PIPESTATUS[0]}
     if [ $BPE_EXIT_CODE -ne 0 ]; then
