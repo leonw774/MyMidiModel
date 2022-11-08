@@ -297,7 +297,7 @@ void shapeScoring(
     std::vector<unsigned int> samplePieceIndices;
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         if (samplingRate != 1.0) {
-            if ((double) rand() / RAND_MAX > samplingRate) continue;
+            if (((double) rand()) / RAND_MAX > samplingRate) continue;
         }
         samplePieceIndices.push_back(i);
     }

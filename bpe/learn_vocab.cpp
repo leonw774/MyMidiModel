@@ -27,16 +27,16 @@ int main(int argc, char *argv[]) {
                 if (isprint(optopt)) {
                     std::cout << "Bad argument: " << argv[optopt] << "\n";
                 }
-                std::cout << "./learn_vocab [-log] [-clearline] [-xcludedrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
+                std::cout << "./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
                 return 1;
             default:
-                std::cout << "./learn_vocab [-log] [-clearline] [-xcludedrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
+                std::cout << "./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
                 exit(1);
         }
     }
     if (argc - nonOptStartIndex != 7) {
         std::cout << "Bad number of non-optional arguments: " << argc - nonOptStartIndex << " != 7\n";
-        std::cout << "./learn_vocab [-log] [-clearline] [-xcludedrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
+        std::cout << "./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[nonOptStartIndex]);

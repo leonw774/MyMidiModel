@@ -27,16 +27,16 @@ int main(int argc, char *argv[]) {
                 if (isprint(optopt)) {
                     std::cout << "Bad argument: " << argv[optopt] << "\n";
                 }
-                std::cout << "./apply_vocab [-log] [-clearline] [-xcludeDrum] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
+                std::cout << "./apply_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
                 return 1;
             default:
-                std::cout << "./apply_vocab [-log] [-clearline] [-xcludeDrum] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
+                std::cout << "./apply_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
                 exit(1);
         }
     }
     if (argc - nonOptStartIndex != 3) {
         std::cout << "Bad number of non-optional arguments: " << argc - nonOptStartIndex << " != 3\n";
-        std::cout << "./apply_vocab [-log] [-clearline] [-xcludeDrum] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
+        std::cout << "./apply_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[nonOptStartIndex]);
