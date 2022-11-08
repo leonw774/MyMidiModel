@@ -515,7 +515,7 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error: bool = False)
     midi = MidiFile(ticks_per_beat=nth//4)
 
     text_list = piece.split(' ')
-    assert text_list[0] == 'BOS' and text_list[-1] == 'EOS', 'No BOS and EOS at start and end'
+    assert text_list[0] == 'BOS' and text_list[-1] == 'EOS', f'No BOS and EOS at start and end, instead: {text_list[0]} and {text_list[-1]}'
 
     cur_time = 0
     is_head = True
