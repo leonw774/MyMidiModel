@@ -68,13 +68,13 @@ def parse_index_string(index_str_list: list, corpus_length: int) -> set:
                 b = corpus_length + b
             if e < 0:
                 e = corpus_length + e
-            print(b, e)
+            # print(b, e)
             indices_to_extract.update(list(range(b, e))) # implies b <= e
         else:
             i = int(index_str)
             if i < 0:
                 i = corpus_length + i
-            print(i)
+            # print(i)
             indices_to_extract.add(i)
     return set(indices_to_extract)
 
