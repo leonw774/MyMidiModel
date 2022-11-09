@@ -79,24 +79,24 @@ class MidiDataset(Dataset):
         for text, index in self.vocabs.events.text2id.items():
             if text[0] == 'N' or text[0] == 'S':
                 self._note_ids.append(index)
-            elif text[0] == 'P':
-                self._position_ids.append(index)
             elif text[0] == 'T':
                 self._tempo_ids.add(index)
+            elif text[0] == 'P':
+                self._position_ids.append(index)
             elif text[0] == 'M':
                 self._measure_ids.add(index)
             elif text[0] == 'R':
                 self._track_ids.add(index)
-        if use_permutable_subseq_loss:
+        if use_permutable_subseq_loss or permute_mps:
             self._mps_seperators = set([
                 self._bos_id,
                 self._eos_id,
                 self.vocabs.events.text2id['R0'],
                 self._pad_id,
             ])
+            self._mps_seperators.update(self._track_ids)
             self._mps_seperators.update(self._measure_ids)
             self._mps_seperators.update(self._position_ids)
-            self._mps_seperators.update(self._track_ids)
             self._mps_seperators = np.sort(np.array(list(self._mps_seperators)))
         # numpy.isin can work on set, turn it into sorted 1d array helps search speed
         self._note_ids = np.sort(np.array(self._note_ids))
@@ -112,7 +112,7 @@ class MidiDataset(Dataset):
         for filenum in tqdm(range(self.number_of_pieces)):
             filename = str(filenum)
 
-            if use_permutable_subseq_loss:
+            if use_permutable_subseq_loss or permute_mps:
                 # find all seperater's index
                 mps_sep_indices = np.flatnonzero(np.isin(self.pieces[filename][:, 0], self._mps_seperators))
                 for i in range(mps_sep_indices.shape[0] - 1):
@@ -200,23 +200,25 @@ class MidiDataset(Dataset):
                 slice_track_begin = 1 if begin_index == 0 else 0
                 inv_perm_array = np.empty(track_count, dtype=np.int32)
                 inv_perm_array[perm_array-1] = (np.arange(track_count) + 1)
-                track_permuted_ins = np.empty(track_count)
+                track_permuted_ins = np.empty(track_count, dtype=np.int16)
                 track_permuted_ins = self.pieces[str(filenum)][inv_perm_array, ins_col_index]
                 sliced_array[slice_track_begin:slice_body_begin, ins_col_index] = track_permuted_ins[max(0, begin_index-1):]
 
+        mps_sep_indices_list = []
         if self.permute_mps:
             mps_tokens_ranges = []
-            start = None
-            is_note = np.isin(sliced_array[:, 0], self._note_ids)
-            for i in range(1, sliced_array.shape[0]):
-                if (not is_note[i-1]) and (is_note[i]):
-                    start = i
-                if start is not None and (is_note[i-1]) and (not is_note[i]):
-                    if i - start > 1:
-                        mps_tokens_ranges.append((start, i))
-                    start = None
-            if start is not None and sliced_array.shape[0] - start > 1:
-                mps_tokens_ranges.append((start, sliced_array.shape[0]))
+            mps_sep_indices_list = [
+                i - begin_index
+                for i in self._file_mps_sep_indices[filenum]
+                if begin_index <= i < end_index
+            ]
+            mps_sep_indices_and_two_ends = [0] + mps_sep_indices_list + [sliced_array.shape[0]]
+            for i in range(len(mps_sep_indices_and_two_ends)-1):
+                start = mps_sep_indices_and_two_ends[i]
+                end = mps_sep_indices_and_two_ends[i+1]
+                if end - start >= 2:
+                    mps_tokens_ranges.append((start, end))
+
             # print(mps_tokens_ranges)
             for start, end in mps_tokens_ranges:
                 p = np.random.permutation(end-start) + start
@@ -224,11 +226,12 @@ class MidiDataset(Dataset):
 
         # a numpy array of sequences sep indices would also be returned if self.use_permutable_subseq_loss
         if self.use_permutable_subseq_loss:
-            mps_sep_indices_list = [
-                i - begin_index
-                for i in self._file_mps_sep_indices[filenum]
-                if begin_index <= i < end_index
-            ]
+            if len(mps_sep_indices_list) == 0:
+                mps_sep_indices_list = [
+                    i - begin_index
+                    for i in self._file_mps_sep_indices[filenum]
+                    if begin_index <= i < end_index
+                ]
             mps_sep_indices = np.array(
                 mps_sep_indices_list,
                 dtype=np.int16

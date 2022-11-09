@@ -426,7 +426,7 @@ def get_input_array_debug_string(input_array: np.ndarray, mps_sep_indices, vocab
     reconstructed_text_list = array_to_text_list(input_array, vocabs=vocabs)
     if mps_sep_indices is None:
         mps_sep_indices = []
-    debug_str = 'evt  pit  dur  vel  trn  ins  pos  mea  tmp  tis  reconstructed_text\n'
+    debug_str = ' evt  pit  dur  vel  trn  ins  pos  mea  tmp  tis  reconstructed_text\n'
     debug_str += (
         '\n'.join([
             ' '.join([f'{s:>4}' for s in a.split()])

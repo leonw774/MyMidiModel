@@ -10,7 +10,7 @@ dataset = MidiDataset(
     data_dir_path='data/corpus/test_midis_nth96_r32_d96_v4_t24_200_1_posattribute',
     max_seq_length=16, # to be printed on screen, so small
     use_permutable_subseq_loss=False,
-    permute_mps=False,
+    permute_mps=True,
     permute_track_number=True
 )
 vocabs_dict = dataset.vocabs
