@@ -198,7 +198,7 @@ class MidiDataset(Dataset):
             # permute head's track instruments with the inverse of the permutation array
             if slice_body_begin > 0:
                 slice_track_begin = 1 if begin_index == 0 else 0
-                inv_perm_array = np.empty(track_count, dtype=np.int32)
+                inv_perm_array = np.empty(track_count, dtype=np.int16)
                 inv_perm_array[perm_array-1] = (np.arange(track_count) + 1)
                 track_permuted_ins = np.empty(track_count, dtype=np.int16)
                 track_permuted_ins = self.pieces[str(filenum)][inv_perm_array, ins_col_index]

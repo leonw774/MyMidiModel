@@ -15,7 +15,7 @@ import torch
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.data import random_split, DataLoader
 from torch.optim import Adam, lr_scheduler
-from torch.profiler import profile, record_function, ProfilerActivity
+# from torch.profiler import profile, record_function, ProfilerActivity
 import torchinfo
 # import torchviz
 
@@ -206,8 +206,8 @@ def log_loss(
         cur_step: int,
         start_time: float,
         scheduler: lr_scheduler.LambdaLR,
-        train_loss_list: list,
-        valid_loss_list: list,
+        train_loss_list: List[List[float]],
+        valid_loss_list: List[List[float]],
         loss_file: TextIOWrapper):
     avg_train_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
     avg_valid_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*valid_loss_list) ]
@@ -226,7 +226,7 @@ def log_loss(
         loss_file.write(f'{cur_step}, {time()-start_time}, {lr:.6f}, {avg_train_losses_str}, {avg_valid_losses_str}\n')
 
 
-def valid(model, valid_dataloader, args):
+def valid(model: MyMidiTransformer, valid_dataloader: DataLoader, args: Namespace) -> List[List[float]]:
     model.eval()
     loss_list = []
     for batch_seqs, batch_mps_sep_indices in tqdm(valid_dataloader):
@@ -239,7 +239,7 @@ def valid(model, valid_dataloader, args):
         else:
             head_losses = calc_losses(prediction, batch_target_seqs)
         # print(torch.cuda.memory_allocated()/1e6, 'MB')
-        loss_list.append([float(hl) for hl in head_losses])
+        loss_list.append([hl.item() for hl in head_losses])
         torch.cuda.empty_cache()
     return loss_list
 
@@ -333,6 +333,7 @@ def main():
 
     # make dataset
     complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args))
+    logging.info('Made MidiDataset')
     train_ratio, valid_ratio = args.train_args.split_ratio
     if train_ratio == valid_ratio == -1:
         raise ValueError('split_ratio (-1, -1) is not allowed')
@@ -344,6 +345,8 @@ def main():
     train_len = int(len(complete_dataset) * train_ratio / (train_ratio + valid_ratio))
     valid_len = len(complete_dataset) - train_len
     train_dataset, valid_dataset = random_split(complete_dataset, (train_len, valid_len))
+    logging.info('Legnth of training set: %d', len(train_dataset))
+    logging.info('Legnth of validation set: %d', len(valid_dataset))
     # cannot handle multiprocessing if use npz mmap
     if not isinstance(complete_dataset.pieces, dict):
         args.dataloader_worker_number = 1
@@ -351,7 +354,7 @@ def main():
         dataset=train_dataset,
         num_workers=args.dataloader_worker_number,
         batch_size=args.train_args.batch_size,
-        shuffle=False, # shuffle would use A LOT of memory
+        shuffle=False, # no need to shuffle because random_split did
         collate_fn=collate_mididataset
     )
     valid_dataloader = DataLoader(
@@ -361,8 +364,7 @@ def main():
         shuffle=False,
         collate_fn=collate_mididataset
     )
-    logging.info('Legnth of training set: %d', len(train_dataloader))
-    logging.info('Legnth of validation set: %d', len(valid_dataloader))
+    logging.info('Made DataLoaders')
     # make optimizer
     optimizer = Adam(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-9)
     scheduler = lr_scheduler.LambdaLR(
@@ -388,6 +390,7 @@ def main():
         logging.info('Training: %d/%d', start_step, args.train_args.steps)
         model.train()
         train_loss_list = []
+        train_loss_list: List[List[float]]
         forward_time = 0
         backward_time = 0
         for _ in tqdm(range(args.train_args.validation_interval)):
@@ -414,7 +417,7 @@ def main():
                     # print('\ncalc_losses use time:', time() - start_backward_time)
         # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=32))
 
-            train_loss_list.append([float(hl) for hl in head_losses])
+            train_loss_list.append([hl.item() for hl in head_losses])
             loss = torch.sum(torch.stack(head_losses))
             # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
             # dot.render(filename='lossbackward_mps', format='png')
@@ -425,7 +428,7 @@ def main():
             optimizer.step()
             scheduler.step()
             # print('loss + back propagate use time:', time() - start_backward_time)
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache() # use only when oom did happen
             backward_time += time() - start_backward_time
 
 
