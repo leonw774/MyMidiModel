@@ -1,7 +1,8 @@
 import bisect
 import os
 import sys
-from typing import Iterable, List, Tuple, Union
+from typing import List, Tuple, Union
+from time import time
 import zipfile
 
 import numpy as np
@@ -181,12 +182,12 @@ class MidiDataset(Dataset):
 
             # use self._piece_body_start_index to know how many tracks there are in this piece
             track_count = self._piece_body_start_index[filenum] - 1
-            body_begin_in_slice = self._piece_body_start_index[filenum] - begin_index
-            body_begin_in_slice = max(0, body_begin_in_slice)
+            slice_body_begin = self._piece_body_start_index[filenum] - begin_index
+            slice_body_begin = max(0, slice_body_begin)
             # add one because there is a padding token at the beginning of the vocab
             perm_array = np.random.permutation(track_count) + 1
             # view body's track number col
-            body_trn_column = sliced_array[body_begin_in_slice:, TOKEN_ATTR_INDEX['trn']]
+            body_trn_column = sliced_array[slice_body_begin:, TOKEN_ATTR_INDEX['trn']]
             body_trn_column_expand = np.asarray([
                 (body_trn_column == i + 1) for i in range(track_count)
             ])
@@ -194,13 +195,14 @@ class MidiDataset(Dataset):
             ins_col_index = TOKEN_ATTR_INDEX['ins']
             for i in range(track_count):
                 body_trn_column[body_trn_column_expand[i]] = perm_array[i]
-            # permute head's track instruments
-            if body_begin_in_slice > 0:
-                track_begin_in_slice = 1 if begin_index == 0 else 0
-                track_token_perm_ins = [0] * track_count
-                for i in range(1, track_count+1):
-                    track_token_perm_ins[perm_array[i-1]-1] = self.pieces[str(filenum)][i, ins_col_index]
-                sliced_array[track_begin_in_slice:body_begin_in_slice, ins_col_index] = track_token_perm_ins[max(0, begin_index-1):]
+            # permute head's track instruments with the inverse of the permutation array
+            if slice_body_begin > 0:
+                slice_track_begin = 1 if begin_index == 0 else 0
+                inv_perm_array = np.empty(track_count, dtype=np.int32)
+                inv_perm_array[perm_array-1] = (np.arange(track_count) + 1)
+                track_permuted_ins = np.empty(track_count)
+                track_permuted_ins = self.pieces[str(filenum)][inv_perm_array, ins_col_index]
+                sliced_array[slice_track_begin:slice_body_begin, ins_col_index] = track_permuted_ins[max(0, begin_index-1):]
 
         if self.permute_mps:
             mps_tokens_ranges = []
