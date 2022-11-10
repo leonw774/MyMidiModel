@@ -421,7 +421,7 @@ def main():
             try:
                 batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
             except StopIteration:
-                train_dataloader_iter = iter(train_dataloader)
+                valid_dataloader_iter = iter(valid_dataloader)
                 batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
             batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
             batch_target_seqs = (model.to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
