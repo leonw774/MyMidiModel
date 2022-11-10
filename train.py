@@ -385,11 +385,11 @@ def main():
             batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
             batch_target_seqs = (model.to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
 
-            start_forward_time = time()
+            # start_forward_time = time()
             prediction = model(batch_input_seqs)
-            forward_time += time() - start_forward_time
+            # forward_time += time() - start_forward_time
 
-            start_backward_time = time()
+            # start_backward_time = time()
         # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
             if args.data_args.use_permutable_subseq_loss:
                 head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
@@ -411,13 +411,13 @@ def main():
             scheduler.step()
             # print('loss + back propagate use time:', time() - start_backward_time)
             # torch.cuda.empty_cache() # use only when oom did happen
-            backward_time += time() - start_backward_time
-        print('Forward time', forward_time, 'Backward time', backward_time)
+            # backward_time += time() - start_backward_time
+        # print('Forward time', forward_time, 'Backward time', backward_time)
 
         print('Validation')
         model.eval()
         valid_loss_list = []
-        for _ in tqdm(range(args.validation_steps)):
+        for _ in tqdm(range(args.train_args.validation_steps)):
             try:
                 batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
             except StopIteration:
