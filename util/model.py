@@ -153,12 +153,12 @@ class MyMidiTransformer(nn.Module):
 
         if self.use_linear_attn:
             # in fast_transformer's FullMask class, 0 is masked, 1 is keep
-            length_mask = FullMask(mask=x[..., 0].ne(0).bool().to(x.device))
             causal_mask = self.causal_mask
+            length_mask = FullMask(mask=x[..., 0].ne(0).bool().to(x.device))
         else:
             # in pytorch's official implementation, True is masked, False is keep
-            length_mask = x[..., 0].eq(0).to(x.device)
             causal_mask = self.causal_mask[:x.shape[1], :x.shape[1]].to(x.device)
+            length_mask = x[..., 0].eq(0).to(x.device)
 
         x = self.transformer_encoder(
             x,

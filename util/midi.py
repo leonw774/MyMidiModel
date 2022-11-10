@@ -502,6 +502,11 @@ def handle_note_continuation(
             pending_cont_notes[pending_cont_time][info] = [onset]
         # print(cur_time, 'onset', onset, 'append', pending_cont_notes)
     else:
+        # assert 0 <= pitch < 128
+        if not (0 <= pitch < 128):
+            # when using BPE, sometimes model will generated the combination that
+            # the relative_pitch + base_pitch exceeds limit
+            return None
         return Note(
             start=onset,
             end=cur_time+duration,
@@ -542,7 +547,8 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error: bool = False)
                 track_numbers_list = list(track_program_mapping.keys())
                 track_numbers_list.sort()
                 # track number must at least be a permutation of 1, ..., n
-                assert track_numbers_list == list(range(len(track_numbers_list))), 'Track numbers are not consecutive integers starting from 1'
+                assert track_numbers_list == list(range(len(track_numbers_list))),\
+                    'Track numbers are not consecutive integers starting from 1'
                 for track_number in track_numbers_list:
                     program = track_program_mapping[track_number]
                     midi.instruments.append(

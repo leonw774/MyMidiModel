@@ -10,10 +10,7 @@ from util.model import MyMidiTransformer, generate_sample
 
 def read_args():
     parser = ArgumentParser()
-    parser.add_argument(
-        'model_file_path',
-        type=str
-    )
+
     parser.add_argument(
         '--primer', '-p',
         type=str,
@@ -42,13 +39,6 @@ def read_args():
             If use "tokens", primer will be the first PRIMER_LENGTH tokens of the piece.'
     )
     parser.add_argument(
-        'output_file_path',
-        type=str,
-        help='The path of generated MIDI file(s).\n\
-            If SAMPLE_NUMBER == 1 (default), the path will be "{OUTPUT_FILE_PATH}.mid".\n\
-            If SAMPLE_NUMBER > 1, the paths will be "{OUTPUT_FILE_PATH}_{i}.mid", where i is 1 ~ SAMPLE_NUMBER.'
-    )
-    parser.add_argument(
         '--sample-number', '-n',
         type=int,
         default=1,
@@ -58,7 +48,6 @@ def read_args():
         '--output-txt', '-t',
         action='store_true'
     )
-
     parser.add_argument(
         '--max-generation-step', '--step',
         type=int,
@@ -73,9 +62,27 @@ def read_args():
             The generation ends when its trying times pass this limit.'
     )
     parser.add_argument(
+        '--use-device',
+        type=str,
+        choices=['cpu', 'cuda'],
+        default='cuda',
+        help='What device the model would be on.'
+    )
+    parser.add_argument(
         '--print-exception',
         action='store_true',
         help='When model fail to generate next toke that satisfy the rule. Print out the exception message.'
+    )
+    parser.add_argument(
+        'model_file_path',
+        type=str
+    )
+    parser.add_argument(
+        'output_file_path',
+        type=str,
+        help='The path of generated MIDI file(s).\n\
+            If SAMPLE_NUMBER == 1 (default), the path will be "{OUTPUT_FILE_PATH}.mid".\n\
+            If SAMPLE_NUMBER > 1, the paths will be "{OUTPUT_FILE_PATH}_{i}.mid", where i is 1 ~ SAMPLE_NUMBER.'
     )
 
     return parser.parse_args()
@@ -103,6 +110,14 @@ def main():
     model = torch.load(args.model_file_path)
     assert isinstance(model, MyMidiTransformer)
     nth = model.vocabs.paras['nth']
+
+    # device
+    if not args.use_device.startswith('cuda') and args.use_device != 'cpu':
+        raise ValueError(f'Bad device name {args.use_device}')
+    if not torch.cuda.is_available():
+        args.use_device = 'cpu'
+    if args.use_device.startswith('cuda'):
+        model = model.to(args.use_device)
 
     # primer
     primer_seq = None

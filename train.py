@@ -6,6 +6,7 @@ import logging
 import os
 import shutil
 from time import strftime, time
+from traceback import format_exc
 from typing import List, Dict
 
 import numpy as np 
@@ -101,44 +102,41 @@ def parse_args():
     )
     train_parser.add_argument(
         '--steps',
-        type=int,
-        default=100000
+        type=int
     )
     train_parser.add_argument(
         '--validation-interval',
         type=int,
-        default=1000
+    )
+    train_parser.add_argument(
+        '--validation-steps',
+        type=int,
     )
     train_parser.add_argument(
         "--grad-norm-clip",
-        default=1.0,
-        type=float
+        type=float,
+        default=1.0
     )
     train_parser.add_argument(
         '--learning-rate', '--lr',
         dest='learning_rate',
-        type=float,
-        default=5.0e-3
+        type=float
     )
     train_parser.add_argument(
         '--lr-warmup-steps',
-        type=int,
-        default=4000
+        type=int
     )
     train_parser.add_argument(
         '--lr-decay-end-steps',
-        type=int,
-        default=16000
+        type=int
     )
     train_parser.add_argument(
         '--lr-decay-end-ratio',
-        type=float,
-        default=0.3 # approx. 1 - sqrt(2)^-1
+        type=float
     )
     train_parser.add_argument(
         '--early-stop',
         type=int,
-        default=10,
         help='If this value <= 0, no early stoping will perform.'
     )
 
@@ -225,23 +223,6 @@ def log_loss(
     if loss_file:
         loss_file.write(f'{cur_step}, {time()-start_time}, {lr:.6f}, {avg_train_losses_str}, {avg_valid_losses_str}\n')
 
-
-def valid(model: MyMidiTransformer, valid_dataloader: DataLoader, args: Namespace) -> List[List[float]]:
-    model.eval()
-    loss_list = []
-    for batch_seqs, batch_mps_sep_indices in tqdm(valid_dataloader):
-        batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
-        batch_target_seqs = (model.to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
-        prediction = model(batch_input_seqs)
-
-        if args.data_args.use_permutable_subseq_loss:
-            head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
-        else:
-            head_losses = calc_losses(prediction, batch_target_seqs)
-        # print(torch.cuda.memory_allocated()/1e6, 'MB')
-        loss_list.append([hl.item() for hl in head_losses])
-        torch.cuda.empty_cache()
-    return loss_list
 
 def main():
     args = parse_args()
@@ -380,6 +361,7 @@ def main():
     # training start
     logging.info('Begin training')
     train_dataloader_iter = iter(train_dataloader)
+    valid_dataloader_iter = iter(valid_dataloader)
     complete_train_loss_list = []
     complete_valid_loss_list = []
     min_avg_valid_loss = float('inf')
@@ -430,11 +412,26 @@ def main():
             # print('loss + back propagate use time:', time() - start_backward_time)
             # torch.cuda.empty_cache() # use only when oom did happen
             backward_time += time() - start_backward_time
-
-
         print('Forward time', forward_time, 'Backward time', backward_time)
+
         print('Validation')
-        valid_loss_list = valid(model, valid_dataloader, args)
+        model.eval()
+        valid_loss_list = []
+        for _ in tqdm(range(args.validation_steps)):
+            try:
+                batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
+            except StopIteration:
+                train_dataloader_iter = iter(train_dataloader)
+                batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
+            batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
+            batch_target_seqs = (model.to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
+            prediction = model(batch_input_seqs)
+
+            if args.data_args.use_permutable_subseq_loss:
+                head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
+            else:
+                head_losses = calc_losses(prediction, batch_target_seqs)
+            valid_loss_list.append([hl.item() for hl in head_losses])
 
         complete_train_loss_list.extend(train_loss_list)
         complete_valid_loss_list.extend(valid_loss_list)
@@ -448,9 +445,13 @@ def main():
         uncond_gen_text_list = generate_sample(model, args.data_args.max_seq_length)
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
         open(os.path.join(ckpt_dir_path, f'{cur_step}.txt'), 'w+', encoding='utf8').write(uncond_gen_piece)
-        piece_to_midi(uncond_gen_piece, vocabs.paras['nth']).dump(
-            os.path.join(ckpt_dir_path, f'{cur_step}.mid')
-        )
+        midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'])
+        try:
+            midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}.mid'))
+        except Exception as e:
+            print('Error when dumping a MidiFile object')
+            print(format_exc())
+            print(repr(e))
 
         if args.train_args.early_stop > 0:
             avg_valid_loss = sum([sum(valid_head_losses) for valid_head_losses in valid_loss_list]) / len(valid_loss_list)
