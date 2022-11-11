@@ -475,17 +475,31 @@ def main():
     # evaluation
     logging.info('Generating unconditional generation sample for evaluation')
     best_model = torch.load(os.path.join(args.model_dir_path, 'best_model.pt'))
+    uncond_gen_piece_list = []
+    uncond_gen_start_time = time()
+    uncond_gen_total_token_length = 0
+    for _ in range(args.eval_sample_number):
+        uncond_gen_text_list = generate_sample(best_model, args.data_args.max_seq_length)
+        uncond_gen_total_token_length += len(uncond_gen_text_list)
+        uncond_gen_piece = ' '.join(uncond_gen_text_list)
+        uncond_gen_piece_list.append(uncond_gen_piece)
+    logging.info(
+        'Done. Generating %d pieces with max_length %d takes %.3f seconds',
+        args.eval_sample_number,
+        args.data_args.max_seq_length,
+        time() - uncond_gen_start_time
+    )
+    logging.info('Avg. tokens# in the samples are %.3f', uncond_gen_total_token_length / args.eval_sample_number)
+
     eval_sample_features_per_piece = []
     eval_sample_features_per_piece: List[ Dict[str, float] ]
-    for i in range(args.eval_sample_number):
-        uncond_gen_text_list = generate_sample(best_model, args.data_args.max_seq_length)
-        uncond_gen_piece = ' '.join(uncond_gen_text_list)
-        eval_sample_features_per_piece.append(
-            piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=int(10e6))
-        )
+    for i, uncond_gen_piece in enumerate(uncond_gen_piece_list):
         open(os.path.join(eval_dir_path, f'{i}'), 'w+', encoding='utf8').write(uncond_gen_piece)
         piece_to_midi(uncond_gen_piece, vocabs.paras['nth']).dump(
             os.path.join(eval_dir_path, f'{i}.mid')
+        )
+        eval_sample_features_per_piece.append(
+            piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=int(10e6))
         )
 
     eval_sample_features = {
