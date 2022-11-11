@@ -147,6 +147,8 @@ int main(int argc, char *argv[]) {
     std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint;
     std::chrono::time_point<std::chrono::system_clock>partStartTimePoint;
     double findBestShapeTime, mergeTime;
+    double shapeEntropy = 0.0;
+    double allEntropy = 0.0;
     if (doLog) {
         std::cout << "Iter, Avg neighbor number, Found shapes count, Shape, Score, "
                   << "Multinote count, Shape entropy, All attribute entropy, "
@@ -261,11 +263,11 @@ int main(int argc, char *argv[]) {
             }
         }
         if (doLog) {
-            double shapeEntropy = calculateShapeEntropy(corpus, excludeDrum);
-            double AllAttributeEntropy = calculateAllAttributeEntropy(corpus, excludeDrum);
+            shapeEntropy = calculateShapeEntropy(corpus, excludeDrum);
+            allEntropy = calculateAllAttributeEntropy(corpus, excludeDrum);
             multinoteCount = corpus.getMultiNoteCount();
             mergeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
-            std::cout << multinoteCount << ", " << shapeEntropy << ", " << AllAttributeEntropy << ", ";
+            std::cout << multinoteCount << ", " << shapeEntropy << ", " << allEntropy << ", ";
             std::cout << (std::chrono::system_clock::now() - iterStartTimePoint) / onSencondDur << ", "
                     << findBestShapeTime << ", "
                     << mergeTime;
@@ -280,8 +282,10 @@ int main(int argc, char *argv[]) {
             std::cout << '\n';
         }
         avgMulpi = calculateAvgMulpiSize(corpus, excludeDrum);
-        std::cout << "Ending multinote count: " << multinoteCount
-            << ", Ending average mulpi: " << avgMulpi
+        std::cout << "End multinote count: " << multinoteCount
+            << ", End average mulpi: " << avgMulpi
+            << ", End shape entropy: " << shapeEntropy
+            << ", End all attribute entropy: " << allEntropy
             << ", Multinote reduce rate: " << 1 - (double) multinoteCount / startMultinoteCount
             << ", Average mulpi reduce rate: " << 1 - avgMulpi / startAvgMulpi << std::endl;
     }

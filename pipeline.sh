@@ -46,7 +46,7 @@ DO_MIDI_TO_TEXT=true
 DO_BPE=false
 if [ $BPE_ITER -ne 0 ]; then
     DO_BPE=true
-    CORPUS_DIR_PATH_WITH_BPE="${CORPUS_DIR_PATH}_bpe${BPE_ITER}_${SCORING}_${MERGE_CONDITION}_${SAMPLE_RATE}"
+    CORPUS_DIR_PATH_WITH_BPE="${CORPUS_DIR_PATH}_bpe${BPE_ITER}_${SCORE_FUNC}_${MERGE_CONDITION}_${SAMPLE_RATE}"
     if [ -d $CORPUS_DIR_PATH_WITH_BPE ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/corpus" ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/shape_vocab" ]; then
         if [ -n "${USE_EXISTED}" ]; then
             echo "BPE Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already has corpus and shape_vocab file." | tee -a $LOG_PATH

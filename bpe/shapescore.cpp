@@ -179,10 +179,11 @@ std::vector<size_t> getShapeCounts(const Corpus& corpus, bool excludeDrum = fals
             // ignore drum?
             if (corpus.piecesTP[i][j] == 128 && excludeDrum) continue;
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
-                if (corpus.piecesMN[i][j][k].getShapeIndex() >= shapeCounts.size()) {
-                    shapeCounts.resize(corpus.piecesMN[i][j][k].getShapeIndex() + 1, 0);
+                unsigned int shapeIndex = corpus.piecesMN[i][j][k].getShapeIndex();
+                if (shapeIndex >= shapeCounts.size()) {
+                    shapeCounts.resize(shapeIndex + 1, 0);
                 }
-                shapeCounts[corpus.piecesMN[i][j][k].getShapeIndex()] += 1;
+                shapeCounts[shapeIndex] += 1;
             }
         }
     }
@@ -280,17 +281,17 @@ void shapeScoring(
     std::chrono::time_point<std::chrono::system_clock> partStartTimePoint = std::chrono::system_clock::now();
 
     std::vector<double> shapeFreq(shapeDict.size(), 0);
+    size_t totalMultiNoteCount = 0;
     if (!isFreqScore) {
         std::vector<size_t> shapeCounts = getShapeCounts(corpus, excludeDrum);
         if (shapeCounts.size() < shapeDict.size()) {
             shapeCounts.resize(shapeDict.size(), 0);
         }
-        size_t totalCount = 0;
         for (int i = 0; i < shapeCounts.size(); ++i) {
-            totalCount += shapeCounts[i];
+            totalMultiNoteCount += shapeCounts[i];
         }
         for (int i = 0; i < shapeFreq.size(); ++i) {
-            shapeFreq[i] = ((double) shapeCounts[i]) / totalCount;
+            shapeFreq[i] = ((double) shapeCounts[i]) / totalMultiNoteCount;
         }
     }
 
@@ -340,7 +341,7 @@ void shapeScoring(
                     else {
                         unsigned int lShapeIndex = corpus.piecesMN[i][j][k].getShapeIndex(),
                                      rShapeIndex = corpus.piecesMN[i][j][k+n].getShapeIndex();
-                        tempScoreDiff[s] += 1.0 / (shapeFreq[lShapeIndex] + shapeFreq[rShapeIndex]);
+                        tempScoreDiff[s] += 1 / (shapeFreq[lShapeIndex] * shapeFreq[rShapeIndex]);
                         // shapeScoreParallel[thread_num][s] += 1.0 / (shapeFreq[lShapeIndex] + shapeFreq[rShapeIndex]);
                     }
                 }
