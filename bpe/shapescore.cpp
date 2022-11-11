@@ -179,8 +179,8 @@ std::vector<size_t> getShapeCounts(const Corpus& corpus, bool excludeDrum = fals
             // ignore drum?
             if (corpus.piecesTP[i][j] == 128 && excludeDrum) continue;
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
-                if (corpus.piecesMN[i][j][k].getShapeIndex() >= shapeCounts.size() - 1) {
-                    shapeCounts.resize(corpus.piecesMN[i][j][k].getShapeIndex() + 1);
+                if (corpus.piecesMN[i][j][k].getShapeIndex() >= shapeCounts.size()) {
+                    shapeCounts.resize(corpus.piecesMN[i][j][k].getShapeIndex() + 1, 0);
                 }
                 shapeCounts[corpus.piecesMN[i][j][k].getShapeIndex()] += 1;
             }
@@ -266,24 +266,24 @@ void shapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
     std::vector<std::pair<Shape, T>>& shapeScore,
-    const std::string& scoringMethod,
+    const std::string& scoreFunc,
     const std::string& mergeCoundition,
     double samplingRate,
     bool excludeDrum
 ) {
     if (samplingRate <= 0 || 1 < samplingRate) {
-        throw std::runtime_error("samplingRate in oursShapeCounting not in range (0, 1]");
+        throw std::runtime_error("samplingRate in shapeScoring not in range (0, 1]");
     }
-    bool isDefaultScoring = (scoringMethod == "default");
+    bool isFreqScore = (scoreFunc == "freq");
     bool isOursMerge = (mergeCoundition == "ours");
 
     std::chrono::time_point<std::chrono::system_clock> partStartTimePoint = std::chrono::system_clock::now();
 
     std::vector<double> shapeFreq(shapeDict.size(), 0);
-    if (!isDefaultScoring) {
+    if (!isFreqScore) {
         std::vector<size_t> shapeCounts = getShapeCounts(corpus, excludeDrum);
         if (shapeCounts.size() < shapeDict.size()) {
-            shapeCounts.resize(shapeDict.size());
+            shapeCounts.resize(shapeDict.size(), 0);
         }
         size_t totalCount = 0;
         for (int i = 0; i < shapeCounts.size(); ++i) {
@@ -333,7 +333,7 @@ void shapeScoring(
                     );
                     // empty shape is bad shape
                     if (s.size() == 0) continue;
-                    if (isDefaultScoring) {
+                    if (isFreqScore) {
                         // shapeScoreParallel[thread_num][s] += 1;
                         tempScoreDiff[s] += 1;
                     }

@@ -27,10 +27,10 @@ int main(int argc, char *argv[]) {
                 if (isprint(optopt)) {
                     std::cout << "Bad argument: " << argv[optopt] << "\n";
                 }
-                std::cout << "./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
+                std::cout << "./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit" << std::endl;
                 return 1;
             default:
-                std::cout << "./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
+                std::cout << "./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit" << std::endl;
                 exit(1);
         }
     }
@@ -39,13 +39,13 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < argc; ++i) {
             std::cout << argv[i] << " ";
         }
-        std::cout << "\n./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoring mergeCondition samplingRate minScoreLimit" << std::endl;
+        std::cout << "\n./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit" << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[nonOptStartIndex]);
     std::string outCorpusDirPath(argv[nonOptStartIndex+1]);
     int bpeIter = atoi(argv[nonOptStartIndex+2]);
-    std::string scoring(argv[nonOptStartIndex+3]);
+    std::string scoreFunc(argv[nonOptStartIndex+3]);
     std::string mergeCondition(argv[nonOptStartIndex+4]);
     double samplingRate = atof(argv[nonOptStartIndex+5]);
     double minScoreLimit = atof(argv[nonOptStartIndex+6]);
@@ -54,8 +54,8 @@ int main(int argc, char *argv[]) {
         std::cout << "Error: bpeIter <= 0 or > 2045: " << bpeIter << std::endl;
         return 1;
     }
-    if (scoring != "default" && scoring != "wplike") {
-        std::cout << "Error: scoring is not ( default | wplike ): " << scoring << std::endl;
+    if (scoreFunc != "freq" && scoreFunc != "wplike") {
+        std::cout << "Error: scoreFunc is not ( default | wplike ): " << scoreFunc << std::endl;
         return 1;
     }
     if (mergeCondition != "ours" && mergeCondition != "mulpi") {
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
         << "outCorpusDirPath: " << outCorpusDirPath << '\n'
         << "bpeIter: " << bpeIter << '\n'
-        << "scoring: " << scoring << '\n'
+        << "scoreFunc: " << scoreFunc << '\n'
         << "mergeCondition: " << mergeCondition << '\n'
         << "samplingRate: " << samplingRate << '\n'
         << "minScoreLimit: " << minScoreLimit << '\n'
@@ -164,8 +164,8 @@ int main(int argc, char *argv[]) {
         // clac shape scores
         Shape maxScoreShape;
         partStartTimePoint = std::chrono::system_clock::now();
-        if (scoring == "default") {
-            shapeScoring<unsigned int>(corpus, shapeDict, shapeScoreFreq, scoring, mergeCondition, samplingRate, excludeDrum);
+        if (scoreFunc == "freq") {
+            shapeScoring<unsigned int>(corpus, shapeDict, shapeScoreFreq, scoreFunc, mergeCondition, samplingRate, excludeDrum);
             std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScoreFreq);
             if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
             shapeScoreFreq.clear();
         }
         else {
-            shapeScoring<double>(corpus, shapeDict, shapeScoreWPlike, scoring, mergeCondition, samplingRate, excludeDrum);
+            shapeScoring<double>(corpus, shapeDict, shapeScoreWPlike, scoreFunc, mergeCondition, samplingRate, excludeDrum);
             std::pair<Shape, double> maxValPair = findMaxValPair(shapeScoreWPlike);
             if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";

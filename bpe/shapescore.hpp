@@ -23,7 +23,7 @@ void shapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
     std::vector<std::pair<Shape, T>>& shapeScore,
-    const std::string& scoringMethod,
+    const std::string& scoreFunc,
     const std::string& mergeCoundition,
     double samplingRate,
     bool excludeDrum
