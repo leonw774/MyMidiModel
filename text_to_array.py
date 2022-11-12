@@ -72,7 +72,7 @@ def main():
             level=loglevel,
             format='%(message)s'
         )
-    logging.info(strftime('==== text_to_array.py start at %Y%m%d-%H%M$%S ===='))
+    logging.info(strftime('==== text_to_array.py start at %Y%m%d-%H%M%S ===='))
 
     if not os.path.isdir(args.corpus_dir_path):
         logging.info('%s does not exist', args.corpus_dir_path)
@@ -144,7 +144,7 @@ def main():
         logging.info('Write npys end. time: %.3f', time()-start_time)
         # zip all the npy files into one file with '.npz' extension
         start_time = time()
-        logging.info('Begin zipping npys')
+        logging.info('Zipping npys')
         shutil.make_archive(npy_dir_path, 'zip', root_dir=npy_dir_path)
         os.rename(npy_zip_path, npz_path)
         # delete the npys
@@ -170,99 +170,112 @@ def main():
                     for origi, debug in zip(original_text_list, debug_str_list)
                 ]
                 f.write('\n'.join(merged_lines))
-    # with CorpusIterator exit
 
-    start_time = time()
-    logging.info('Making statistics')
-    logging.getLogger('matplotlib.font_manager').disabled = True
-    logging.getLogger('matplotlib.pyplot').disabled = True
-    distributions = {
-        'track_number': Counter(),
-        'instrument': Counter(),
-        'token_type': Counter(),
-    }
-    number_per_piece = {
-        'note' : list(),
-        'token': list()
-    }
-    with CorpusReader(args.corpus_dir_path) as corpus_reader:
+        start_time = time()
+        logging.info('Making statistics')
+        logging.getLogger('matplotlib.font_manager').disabled = True
+        logging.getLogger('matplotlib.pyplot').disabled = True
+        token_types = [
+            'multinote', 'tempo', 'position', 'measure', 'track', 'all'
+        ]
+
+        distributions = {
+            'instrument': Counter(),
+            'tokens_number': {
+                t: list() for t in token_types
+            }
+        }
         for piece in corpus_reader:
-            distributions['track_number'][piece.count(' R')] += 1
             head_end = piece.find(' M') # find first occurence of measure token
             tracks_text = piece[4:head_end]
             track_tokens = tracks_text.split()
             for track_token in track_tokens:
                 instrument_id = b36str2int(track_token.split(':')[1])
                 distributions['instrument'][instrument_id] += 1
-            note_token_number = piece.count(' N')
-            distributions['token_type']['note'] += note_token_number
-            distributions['token_type']['position'] += piece.count(' P')
-            distributions['token_type']['tempo'] += piece.count(' T')
-            distributions['token_type']['measure'] += piece.count(' M')
-            distributions['token_type']['track'] += piece.count(' R')
-            number_per_piece['note'].append(note_token_number)
-            number_per_piece['token'].append(piece.count(" ") + 1)
 
-    number_per_piece_description = dict()
-    note_number_desciption = dict(Series(number_per_piece['note']).dropna().describe())
-    note_number_desciption: Dict[str, np.float64]
-    number_per_piece_description['note'] = {
-        k:float(v) for k, v in note_number_desciption.items()
-    }
-    token_number_desciption = dict(Series(number_per_piece['token']).dropna().describe())
-    token_number_desciption: Dict[str, np.float64]
-    number_per_piece_description['token']  = {
-        k:float(v) for k, v in token_number_desciption.items()
-    }
+            multinote_number = piece.count(' N') + piece.count(' S')
+            tempo_number = piece.count(' T')
+            position_number = piece.count(' P')
+            measure_number = piece.count(' M')
+            track_number = piece.count(' R')
+            all_token_number = piece.count(' ') + 1
+            numbers = [multinote_number, tempo_number, position_number, measure_number, track_number, all_token_number]
+            for i, token_type in enumerate(token_types):
+                distributions['tokens_number'][token_type].append(numbers[i])
+    # with CorpuesReader exit
+
+    descriptions = dict()
+    for token_type, numbers_per_piece in distributions['tokens_number'].items():
+        numbers_per_piece: list
+        d: Dict[str, np.float64] = dict(Series(numbers_per_piece).dropna().describe())
+        descriptions[token_type] = {
+            k: float(v) for k, v in d.items()
+        }
 
     stats_dir_path = os.path.join(args.corpus_dir_path, 'stats')
     if not os.path.exists(stats_dir_path):
         os.mkdir(stats_dir_path)
 
     # draw graph for each value
-    for k, counter in distributions.items():
-        plt.figure(figsize=(16.8, 6.4))
-        plt.title(k + ' distribution')
-        if k == 'instrument':
-            instrument_count = [0] * 129
-            for p in counter:
-                instrument_count[p] = counter[p]
-            plt.xticks(rotation=90, fontsize='small')
-            plt.subplots_adjust(left=0.075, right=1-0.025, bottom=0.25)
-            plt.bar(INSTRUMENT_NAMES, instrument_count)
-        elif k == 'token_type_distribution':
-            plt.barh(list(counter.keys()), list(counter.values()))
-        else:
-            plt.bar(list(counter.keys()), list(counter.values()))
+    plt.figure(figsize=(16.8, 6.4))
+    plt.title('instrument distribution')
+    plt.xticks(rotation=90, fontsize='small')
+    plt.subplots_adjust(left=0.075, right=1-0.025, bottom=0.25)
+    instrument_count = [0] * 129
+    for program, count in distributions['instrument'].items():
+        instrument_count[program] = count
+    plt.bar(INSTRUMENT_NAMES, instrument_count)
+    plt.savefig(os.path.join(stats_dir_path, 'instrument_distribution.png'))
+    plt.clf()
 
-    for k, description in number_per_piece.items():
-        plt.title(k + ' number per piece')
-        plt.text(
-            x=0.01,
-            y=0.5,
-            s='\n'.join([f'{e}={round(v, 3)}' for e, v in number_per_piece_description[k].items()]),
-            transform=plt.gcf().transFigure
-        )
-        plt.subplots_adjust(left=0.125)
-        plt.hist(description, 100)
-        plt.yscale('log')
+    plt.figure(figsize=(16.8, 6.4))
+    plt.title('track_number distribution')
+    plt.xticks(rotation=90, fontsize='small')
+    plt.text(
+        x=0.01,
+        y=0.5,
+        s='\n'.join([f'{e}={round(v, 3)}' for e, v in descriptions['track'].items()]),
+        transform=plt.gcf().transFigure
+    )
+    plt.subplots_adjust(left=0.125)
+    plt.hist(distributions['tokens_number']['track'], bins=max(distributions['tokens_number']['track']))
+    plt.savefig(os.path.join(stats_dir_path, f'number_of_track_distribution.png'))
+    plt.clf()
 
-        plt.savefig(os.path.join(stats_dir_path, f'{k}.png'))
-        plt.clf()
+    plt.figure(figsize=(16.8, 6.4))
+    plt.title('number of note/multinote tokens')
+    plt.text(
+        x=0.01,
+        y=0.5,
+        s='\n'.join([f'{e}={round(v, 3)}' for e, v in descriptions['multinote'].items()]),
+        transform=plt.gcf().transFigure
+    )
+    plt.subplots_adjust(left=0.125)
+    multinote_numbers_per_piece = distributions['tokens_number']['multinote']
+    plt.hist(multinote_numbers_per_piece, bins=min(100, len(multinote_numbers_per_piece)))
+    plt.yscale('log')
+    plt.savefig(os.path.join(stats_dir_path, 'number_of_note_multinote_tokens_distribution.png'))
+    plt.clf()
 
-    distributions = {
-        k: dict(counter)
-        for k, counter in distributions.items()
-    }
-    text_stats = {
-        'distribution' : distributions,
-        'number_per_piece_description': number_per_piece_description
+    plt.figure(figsize=(16.8, 6.4))
+    plt.title('token types distribution')
+    token_number_sum = [
+        sum(distributions['tokens_number'][t])
+        for t in token_types[:-1] # not use 'all'
+    ]
+    plt.barh(token_types[:-1], token_number_sum)
+    plt.savefig(os.path.join(stats_dir_path, 'token_types_distribution.png'))
+    plt.clf()
+
+    stats_dict = {
+        'distribution': distributions,
+        'descriptions': descriptions
     }
     with open(os.path.join(stats_dir_path, 'stats.json'), 'w+', encoding='utf8') as statfile:
-        json.dump(text_stats, statfile)
+        json.dump(stats_dict, statfile)
     logging.info('Dumped stats.json at %s', os.path.join(stats_dir_path, 'stats.json'))
     logging.info('Make statistics time: %.3f', time()-start_time)
-    
+
     logging.info('==== text_to_array.py exited ====')
     return 0
 
