@@ -10,11 +10,11 @@ def main(corpus_dir_path, log_file_path):
     with open(log_file_path, 'r', encoding='utf8') as logfile:
         log_texts = logfile.read()
     # raise ValueError if not found
-    scoring_index = log_texts.index('scoring: ')
-    if log_texts[scoring_index + 9] == 'd':
-        scoring = 'default'
+    score_func_index = log_texts.index('scoreFunc: ')
+    if log_texts[score_func_index + 9] == 'd':
+        score_func = 'freq'
     else:
-        scoring = 'wplike'
+        score_func = 'wplike'
     total_used_time_start_pos = log_texts.index('Total used time: ')
     total_used_time_end_pos = (log_texts[total_used_time_start_pos:]).index('\n') + total_used_time_start_pos
     total_used_time_text = log_texts[total_used_time_start_pos:total_used_time_end_pos]

@@ -28,6 +28,39 @@ unsigned int gcd(unsigned int* arr, unsigned int size) {
     return g;
 }
 
+/*  
+    Do merging O(logt) in time, t is arraySize
+    A merge between two counter with size of A and B takes $\sum_{i=A}^{A+B} \log{i}$ time
+    Since $\int_A^{A+B} \log{x} dx = (A+B)\log{A+B} - A\log{A} - B$
+    We could say a merge is O(n logn), where n is number of elements to count
+    so that the total time complexity is O(n logn logt)
+
+    This function alters the input array.
+    The return index is the index of the counter merged all other counters. 
+ */
+template <typename T, typename S>
+int mergeCounters(std::map<T, S> counterArray[], size_t arraySize) {
+    std::vector<int> mergingMapIndices;
+    for (int i = 0; i < arraySize; ++i) {
+        mergingMapIndices.push_back(i);
+    }
+    while (mergingMapIndices.size() > 1) {
+        #pragma omp parallel for
+        // count from back to not disturb the index number when erasing
+        for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
+            int a = mergingMapIndices[i];
+            int b = mergingMapIndices[i-1];
+            for (auto it = counterArray[a].cbegin(); it != counterArray[a].cend(); it++) {
+                counterArray[b][it->first] += it->second;
+            }
+        }
+        for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
+            mergingMapIndices.erase(mergingMapIndices.begin()+i);
+        }
+    }
+    return mergingMapIndices[0];
+}
+
 
 size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit, bool excludeDrum) {
     size_t totalNeighborNumber = 0;
@@ -173,21 +206,42 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool excludeDrum, bool ignore
 
 
 std::vector<size_t> getShapeCounts(const Corpus& corpus, bool excludeDrum = false) {
-    std::vector<size_t> shapeCounts = {0, 0}; 
+    unsigned int max_thread_num = omp_get_max_threads();
+    std::vector<size_t> shapeCountsParallel[max_thread_num];
+    for (int i = 0; i < max_thread_num; ++i) {
+        shapeCountsParallel[i].resize(MultiNote::shapeIndexLimit);
+    }
+    #pragma omp parallel for
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+        int thread_num = omp_get_thread_num();
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // ignore drum?
             if (corpus.piecesTP[i][j] == 128 && excludeDrum) continue;
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
-                unsigned int shapeIndex = corpus.piecesMN[i][j][k].getShapeIndex();
-                if (shapeIndex >= shapeCounts.size()) {
-                    shapeCounts.resize(shapeIndex + 1, 0);
-                }
-                shapeCounts[shapeIndex] += 1;
+                shapeCountsParallel[thread_num][corpus.piecesMN[i][j][k].getShapeIndex()] += 1;
             }
         }
     }
-    return shapeCounts;
+    // mergeCounters, but for vectors
+    std::vector<int> mergingMapIndices;
+    for (int i = 0; i < max_thread_num; ++i) {
+        mergingMapIndices.push_back(i);
+    }
+    while (mergingMapIndices.size() > 1) {
+        #pragma omp parallel for
+        // count from back to not disturb the index number when erasing
+        for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
+            int a = mergingMapIndices[i];
+            int b = mergingMapIndices[i-1];
+            for (int i = 0; i < MultiNote::shapeIndexLimit; ++i) {
+                shapeCountsParallel[b][i] += shapeCountsParallel[a][i];
+            }
+        }
+        for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
+            mergingMapIndices.erase(mergingMapIndices.begin()+i);
+        }
+    }
+    return shapeCountsParallel[mergingMapIndices[0]];
 }
 
 
@@ -230,31 +284,10 @@ double calculateAllAttributeEntropy(const Corpus& corpus, bool excludeDrum) {
             }
         }
     }
-    // merge parrallel maps
-    std::vector<int> mergingMapIndices;
-    for (int i = 0; i < max_thread_num; ++i) {
-        mergingMapIndices.push_back(i);
-    }
-    // do merging in O(logt) time, t is max_thread_num
-    // so that the total time is O(log(t) * log(n))
-    while (mergingMapIndices.size() > 1) {
-        #pragma omp parallel for
-        for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
-            int a = mergingMapIndices[i];
-            int b = mergingMapIndices[i-1];
-            for (auto it = allAttrCountParallel[a].cbegin(); it != allAttrCountParallel[a].cend(); it++) {
-                allAttrCountParallel[b][it->first] += it->second;
-            }
-        }
-        for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
-            mergingMapIndices.erase(mergingMapIndices.begin()+i);
-        }
-        // count from back to not disturb the index number when erasing
-    }
-    int lastIndex = mergingMapIndices[0];
+    int mergedIndex = mergeCounters(allAttrCountParallel, max_thread_num);
     double logTotlaCount = log2(totalCount);
     double entropy = 0;
-    for (auto it = allAttrCountParallel[lastIndex].begin(); it != allAttrCountParallel[lastIndex].end(); ++it) {
+    for (auto it = allAttrCountParallel[mergedIndex].begin(); it != allAttrCountParallel[mergedIndex].end(); ++it) {
         unsigned int count = it->second;
         entropy -= count * ((log2(count) - logTotlaCount) / totalCount);
     }
@@ -278,7 +311,7 @@ void shapeScoring(
     bool isFreqScore = (scoreFunc == "freq");
     bool isOursMerge = (mergeCoundition == "ours");
 
-    std::chrono::time_point<std::chrono::system_clock> partStartTimePoint = std::chrono::system_clock::now();
+    // std::chrono::time_point<std::chrono::system_clock> partStartTimePoint = std::chrono::system_clock::now();
 
     std::vector<double> shapeFreq(shapeDict.size(), 0);
     size_t totalMultiNoteCount = 0;
@@ -352,31 +385,10 @@ void shapeScoring(
         }
     }
     // std::cout << " shape scoring time=" << (std::chrono::system_clock::now() - partStartTimePoint) / std::chrono::duration<double>(1) << ' ';
-    partStartTimePoint = std::chrono::system_clock::now();
-    // merge parrallel maps
-    std::vector<int> mergingMapIndices;
-    for (int i = 0; i < max_thread_num; ++i) {
-        mergingMapIndices.push_back(i);
-    }
-    // do merging in O(logt) time, t is max_thread_num
-    // so that the total time is O(log(t) * log(n))
-    while (mergingMapIndices.size() > 1) {
-        #pragma omp parallel for
-        for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
-            int a = mergingMapIndices[i];
-            int b = mergingMapIndices[i-1];
-            for (auto it = shapeScoreParallel[a].cbegin(); it != shapeScoreParallel[a].cend(); it++) {
-                shapeScoreParallel[b][it->first] += it->second;
-            }
-        }
-        for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
-            mergingMapIndices.erase(mergingMapIndices.begin()+i);
-        }
-        // count from back to not disturb the index number when erasing
-    }
-    int lastIndex = mergingMapIndices[0];
-    shapeScore.reserve(shapeScoreParallel[lastIndex].size());
-    shapeScore.assign(shapeScoreParallel[lastIndex].cbegin(), shapeScoreParallel[lastIndex].cend());
+    // partStartTimePoint = std::chrono::system_clock::now();
+    int mergedIndex = mergeCounters(shapeScoreParallel, max_thread_num);
+    shapeScore.reserve(shapeScoreParallel[mergedIndex].size());
+    shapeScore.assign(shapeScoreParallel[mergedIndex].cbegin(), shapeScoreParallel[mergedIndex].cend());
     // std::cout << "merge mp result time=" << (std::chrono::system_clock::now() - partStartTimePoint) / std::chrono::duration<double>(1);
 }
 

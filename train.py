@@ -464,7 +464,7 @@ def main():
                 early_stop_counter = 0
                 min_avg_valid_loss = avg_valid_loss
                 shutil.copyfile(ckpt_model_file_path, os.path.join(args.model_dir_path, 'best_model.pt'))
-                print('New best model.')
+                logging.info('New best model.')
     # training end
 
     # remove all checkpoints

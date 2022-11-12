@@ -74,6 +74,8 @@ struct MultiNote {
     // onset:      Low 20 bits. If nth is 96, 0xfffff of 96th notes is 182 minutes in speed of 240 beat per minute,
     //             which is enough for almost all music.
     uint32_t shapeIndexAndOnset;
+    static const unsigned int shapeIndexLimit = 0xfff;
+    static const unsigned int onsetLimit = 0xfffff;
     uint8_t pitch;
     uint8_t unit; // time unit of shape
     uint8_t vel;
