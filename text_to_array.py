@@ -239,7 +239,7 @@ def main():
     )
     plt.subplots_adjust(left=0.125)
     plt.hist(distributions['tokens_number']['track'], bins=max(distributions['tokens_number']['track']))
-    plt.savefig(os.path.join(stats_dir_path, f'number_of_track_distribution.png'))
+    plt.savefig(os.path.join(stats_dir_path, 'number_of_track_distribution.png'))
     plt.clf()
 
     plt.figure(figsize=(16.8, 6.4))

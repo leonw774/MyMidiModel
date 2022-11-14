@@ -263,10 +263,10 @@ int main(int argc, char *argv[]) {
             }
         }
         if (doLog) {
+            mergeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
             shapeEntropy = calculateShapeEntropy(corpus, excludeDrum);
             allEntropy = calculateAllAttributeEntropy(corpus, excludeDrum);
             multinoteCount = corpus.getMultiNoteCount();
-            mergeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
             std::cout << multinoteCount << ", " << shapeEntropy << ", " << allEntropy << ", ";
             std::cout << (std::chrono::system_clock::now() - iterStartTimePoint) / onSencondDur << ", "
                     << findBestShapeTime << ", "
