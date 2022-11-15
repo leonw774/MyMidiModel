@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Output merged corpus file: " << outCorpusFilePath << '\n'
         << "Reading input files" << std::endl;
 
-    std::chrono::duration<double> onSencondDur = std::chrono::duration<double>(1);
+    std::chrono::duration<double> oneSencondDur = std::chrono::duration<double>(1);
     std::chrono::time_point<std::chrono::system_clock> programStartTimePoint = std::chrono::system_clock::now();
     std::chrono::time_point<std::chrono::system_clock> ioStartTimePoint = std::chrono::system_clock::now();
 
@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Start multinote count: " << multinoteCount
         << ", Drum's multinote count: " << drumMultinoteCount
         << ", Start average mulpi: " << avgMulpi
-        << ", Reading used time: " <<  (std::chrono::system_clock::now() - ioStartTimePoint) / onSencondDur << std::endl;
+        << ", Reading used time: " <<  (std::chrono::system_clock::now() - ioStartTimePoint) / oneSencondDur << std::endl;
 
     if (multinoteCount == 0 || multinoteCount == drumMultinoteCount) {
         std::cout << "No notes to merge. Exited." << std::endl;
@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
     std::vector<std::pair<Shape, double>> shapeScoreWPlike;
     std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint;
     std::chrono::time_point<std::chrono::system_clock>partStartTimePoint;
-    double mergeTime;
+    double iterTime, mergeTime, metricsTime = 0.0;
     if (doLog) {
         std::cout << "Index, Avg neighbor number, Shape, "
                   << "Multinote count, Shape entropy, All attribute entropy, "
@@ -244,15 +244,17 @@ int main(int argc, char *argv[]) {
                 sort(corpus.piecesMN[i][j].begin(), corpus.piecesMN[i][j].end());
             }
         }
+        mergeTime = (std::chrono::system_clock::now() - partStartTimePoint) / oneSencondDur;
+        iterTime = (std::chrono::system_clock::now() - iterStartTimePoint) / oneSencondDur;
         if (doLog) {
+            partStartTimePoint = std::chrono::system_clock::now();
             double shapeEntropy = calculateShapeEntropy(corpus, excludeDrum);
             double AllAttributeEntropy = calculateAllAttributeEntropy(corpus, excludeDrum);
             multinoteCount = corpus.getMultiNoteCount();
-            mergeTime = (std::chrono::system_clock::now() - partStartTimePoint) / onSencondDur;
-            
+            // To exclude the time used on calculating metrics
+            metricsTime += (std::chrono::system_clock::now() - partStartTimePoint) / oneSencondDur;
             std::cout << multinoteCount << ", " << shapeEntropy << ", " << AllAttributeEntropy << ", ";
-            std::cout << (std::chrono::system_clock::now() - iterStartTimePoint) / onSencondDur << ", "
-                    << mergeTime;
+            std::cout << iterTime << ", " << mergeTime;
             if (clearLine)  std::cout << std::endl;
             else            std::cout.flush();
         }
@@ -277,7 +279,7 @@ int main(int argc, char *argv[]) {
     ioStartTimePoint = std::chrono::system_clock::now();
     std::cout << "Writing merged corpus file" << std::endl;
     writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum, positionMethod);
-    std::cout << "Writing done. Writing used time: " << (std::chrono::system_clock::now() - ioStartTimePoint) / onSencondDur << '\n'
-        << "Total used time: " << (std::chrono::system_clock::now() - programStartTimePoint) / onSencondDur << std::endl;
+    std::cout << "Writing done. Writing used time: " << (std::chrono::system_clock::now() - ioStartTimePoint) / oneSencondDur << '\n'
+        << "Total used time: " << (std::chrono::system_clock::now() - programStartTimePoint) / oneSencondDur - metricsTime << std::endl;
     return 0;
 }
