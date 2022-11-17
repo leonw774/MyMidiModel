@@ -143,21 +143,22 @@ def main():
         existing_file_paths = []
         if os.path.exists(npy_dir_path):
             existing_file_paths.append(npy_dir_path)
+            shutil.rmtree(npy_dir_path)
         if os.path.exists(npy_zip_path):
             existing_file_paths.append(npy_zip_path)
+            os.remove(npy_zip_path)
         if len(existing_file_paths) != 0:
             print(f'Find existing intermidiate file(s): {" ".join(existing_file_paths)}. Removed.')
-            shutil.rmtree(npy_dir_path)
-            os.remove(npy_zip_path)
 
         os.makedirs(npy_dir_path)
-        arg_dict_list = [
-            {'text_list': p.split(), 'vocabs': vocabs, 'i': i}
-            for i, p in enumerate(corpus_reader)
-        ]
         array_list = []
         with Pool(args.mp_worker_number) as p:
-            array_list = list(tqdm(p.imap(mp_handler, arg_dict_list)))
+            array_list = list(tqdm(
+                p.imap(mp_handler, ( # generator
+                    {'text_list': p.split(), 'vocabs': vocabs, 'i': i}
+                    for i, p in enumerate(corpus_reader)
+                ))
+            ))
 
         for i, array in enumerate(array_list):
             if array.size != 0:
