@@ -28,6 +28,9 @@ def to_shape_vocab_file_path(corpus_dir_path: str) -> str:
 def to_vocabs_file_path(corpus_dir_path: str) -> str:
     return os.path.join(corpus_dir_path, 'vocabs.json')
 
+def to_arrays_file_path(corpus_dir_path: str) -> str:
+    return os.path.join(corpus_dir_path, 'arrays.npz')
+
 def dump_corpus_paras(aras_dict: dict) -> str:
     return yaml.dump(aras_dict)
 
@@ -419,7 +422,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
     return plt.gcf()
 
 
-def get_input_array_debug_string(input_array: np.ndarray, mps_sep_indices, vocabs: Vocabs):
+def get_input_array_format_string(input_array: np.ndarray, mps_sep_indices, vocabs: Vocabs):
     array_text_byteio = io.BytesIO()
     np.savetxt(array_text_byteio, input_array, fmt='%d')
     array_savetxt_list = array_text_byteio.getvalue().decode().split('\n')

@@ -17,10 +17,11 @@ from util.vocabs import build_vocabs
 from util.corpus import (
     to_shape_vocab_file_path,
     to_vocabs_file_path,
+    to_arrays_file_path,
     get_corpus_paras,
     CorpusReader,
     text_list_to_array,
-    get_input_array_debug_string,
+    get_input_array_format_string,
 )
 
 
@@ -85,15 +86,15 @@ def main():
             bpe_shapes_list = vocabs_file.read().splitlines()
 
     vocab_path = to_vocabs_file_path(args.corpus_dir_path)
-    npz_path = os.path.join(args.corpus_dir_path, 'arrays.npz')
+    npz_path = to_arrays_file_path(args.corpus_dir_path)
     if os.path.isfile(vocab_path) and os.path.isfile(npz_path):
         if args.use_existed:
-            logging.info('Corpus directory: %s already has vocabs file and array file.', args.corpus_dir_path)
+            logging.info('Corpus directory: %s already has vocabs file and arrays file.', args.corpus_dir_path)
             logging.info('Flag --use-existed is set')
             logging.info('==== text_to_array.py exited ====')
             return 0
         else:
-            logging.info('Corpus directory: %s already has vocabs file and array file. Remove? (y=remove/n=exit)', args.corpus_dir_path)
+            logging.info('Corpus directory: %s already has vocabs file and arrays file. Remove? (y=remove/n=exit)', args.corpus_dir_path)
             while True:
                 i = input()
                 if i == 'y':
@@ -160,7 +161,7 @@ def main():
             debug_txt_path = os.path.join(args.corpus_dir_path, 'text_to_array_debug.txt')
             print(f'Write debug file: {debug_txt_path}')
 
-            debug_str = get_input_array_debug_string(array_data, None, vocabs)
+            debug_str = get_input_array_format_string(array_data, None, vocabs)
             debug_str_list = debug_str.splitlines()
             original_text_list = [f'{"original_text":<50} '] + original_text_list
 
