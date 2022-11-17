@@ -108,7 +108,7 @@ def parse_args():
     )
     main_parser.add_argument(
         '-w', '--workers',
-        dest='mp_work_number',
+        dest='mp_worker_number',
         type=int,
         default=1,
         help='The number of worker for multiprocessing. Default is %(default)s. \
@@ -178,7 +178,7 @@ def loop_func(
 def mp_func(
         midi_file_path_list: list,
         out_file: TextIOWrapper,
-        mp_work_number: int,
+        mp_worker_number: int,
         args_dict: dict):
 
     args_dict_list = list()
@@ -187,12 +187,12 @@ def mp_func(
         a['midi_file_path'] = midi_file_path
         a['n'] = n
         args_dict_list.append(a)
-    logging.info('Start pool with %d workers', mp_work_number)
+    logging.info('Start pool with %d workers', mp_worker_number)
 
     token_number_list = []
     good_path_list = []
     bad_reasons = Counter()
-    with Pool(mp_work_number) as p:
+    with Pool(mp_worker_number) as p:
         compressed_piece_list = list(tqdm(
             p.imap(handler, args_dict_list),
             total=len(args_dict_list)
@@ -301,7 +301,7 @@ def main():
     # write main corpus file
     with open(to_corpus_file_path(args.output_dir_path), 'w+', encoding='utf8') as out_corpus_file:
         handler_args_dict = vars(args.handler_args)
-        if args.mp_work_number <= 1:
+        if args.mp_worker_number <= 1:
             token_number_list, good_path_list = loop_func(file_path_list, out_corpus_file, handler_args_dict)
         else:
             mp_worker_number = min(cpu_count(), args.mp_worker_number)
