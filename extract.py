@@ -23,7 +23,7 @@ def read_args():
         help=
 '''Required at least one indexing string.
 An indexing string is in the form of "INDEX" or "BEGIN:END".
-Indexing strings are seperated by commas, surrounded by double-quotes.
+Multiple indexing strings are seperated by commas, surrounded by double-quotes.
 The former form specifies a index number to be extracted.
 The latter form specifies that the indices from BEGIN (inclusive) to END (exclusive) are to be extracted.
 If any number A < 0, it will be replaced to CORPUS_LENGTH - A.

@@ -172,8 +172,9 @@ int main(int argc, char *argv[]) {
     for (int shapeIndex = 2; shapeIndex < shapeDict.size(); ++shapeIndex) {
         iterStartTimePoint = std::chrono::system_clock::now();
         if (doLog) {
-            if (!clearLine && shapeIndex != 2) 
+            if (!clearLine && shapeIndex != 2) {
                 std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
+            }
             std::cout << shapeIndex;
         }
         size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth, excludeDrum);

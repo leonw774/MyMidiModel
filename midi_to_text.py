@@ -39,8 +39,8 @@ def parse_args():
         '--max-duration',
         dest='max_duration',
         type=int,
-        default=4,
-        help='Max length of duration in unit of quarter note (beat). Default is %(default)s.'
+        default=96,
+        help='Max length of duration in unit of nth note. Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--velocity-step',
@@ -63,10 +63,11 @@ def parse_args():
         dest='position_method',
         type=str,
         choices=['event', 'attribute'],
-        default='attribute',
+        default='event',
         help="Could be 'event' or 'attribute'. \
             'attribute' means position info is part of the note token. \
-            'event' means position info will be its own event token."
+            'event' means position info will be its own event token. \
+            Default is %(default)s"
     )
     handler_args_parser.add_argument(
         '--use-continuing-note',
@@ -113,8 +114,8 @@ def parse_args():
             If this number is 1 or below, multiprocessing would not be used.'
     )
     main_parser.add_argument(
-        '-o', '--output-path',
-        dest='output_path',
+        '-o', '--output-dir-path',
+        dest='output_dir_path',
         type=str,
         help='The path of the directory for the corpus.'
     )
@@ -125,7 +126,6 @@ def parse_args():
     )
     args = dict()
     args['handler_args'], others = handler_args_parser.parse_known_args()
-    args['handler_args'].tempo_quantization = tuple(args['handler_args'].tempo_quantization)
     args.update(vars(
         main_parser.parse_known_args(others)[0]
     ))
@@ -238,9 +238,9 @@ def main():
     ])
     logging.info(corpus_paras_str)
 
-    # check if output_path is a directory
-    if os.path.isdir(args.output_path):
-        corpus_file_path = to_corpus_file_path(args.output_path)
+    # check if output_dir_path is a directory
+    if os.path.isdir(args.output_dir_path):
+        corpus_file_path = to_corpus_file_path(args.output_dir_path)
         if os.path.exists(corpus_file_path):
             if args.use_existed:
                 logging.info('Output corpus path: %s already has file.', corpus_file_path)
@@ -252,21 +252,24 @@ def main():
                 while True:
                     i = input()
                     if i == 'y':
-                        os.remove(to_corpus_file_path(args.output_path))
-                        os.remove(to_paras_file_path(args.output_path))
-                        os.remove(to_pathlist_file_path(args.output_path))
+                        if os.path.exists(to_corpus_file_path(args.output_dir_path)):
+                            os.remove(to_corpus_file_path(args.output_dir_path))
+                        if os.path.exists(to_paras_file_path(args.output_dir_path)):
+                            os.remove(to_paras_file_path(args.output_dir_path))
+                        if os.path.exists(to_pathlist_file_path(args.output_dir_path)):
+                            os.remove(to_pathlist_file_path(args.output_dir_path))
                         break
                     if i == 'n':
                         logging.info('==== midi_to_text.py exited ====')
                         return 0
                     print('(y/n):')
         else:
-            logging.info('Output directory: %s already existed, but no corpus files.', args.output_path)
-    elif os.path.isfile(args.output_path):
-        logging.info('Output directory path: %s is a file.', args.output_path)
+            logging.info('Output directory: %s already existed, but no corpus files.', args.output_dir_path)
+    elif os.path.isfile(args.output_dir_path):
+        logging.info('Output directory path: %s is a file.', args.output_dir_path)
         return 1
     else:
-        os.makedirs(args.output_path)
+        os.makedirs(args.output_dir_path)
 
     start_time = time()
     file_path_list = list()
@@ -291,11 +294,11 @@ def main():
     file_path_list.sort()
 
     # write parameter file
-    with open(to_paras_file_path(args.output_path), 'w+', encoding='utf8') as out_paras_file:
+    with open(to_paras_file_path(args.output_dir_path), 'w+', encoding='utf8') as out_paras_file:
         out_paras_file.write(dump_corpus_paras(corpus_paras_dict))
 
     # write main corpus file
-    with open(to_corpus_file_path(args.output_path), 'w+', encoding='utf8') as out_corpus_file:
+    with open(to_corpus_file_path(args.output_dir_path), 'w+', encoding='utf8') as out_corpus_file:
         if args.mp_work_number <= 1:
             token_number_list, good_path_list = loop_func(file_path_list, out_corpus_file, vars(args.handler_args))
         else:
@@ -306,12 +309,12 @@ def main():
         logging.info('Average tokens: %.3f per file', sum(token_number_list)/len(token_number_list))
     else:
         logging.info('No midi file is processed')
-        shutil.rmtree(args.output_path)
-        logging.info('Removed output directory: %s', args.output_path)
+        shutil.rmtree(args.output_dir_path)
+        logging.info('Removed output directory: %s', args.output_dir_path)
         return 1
     logging.info('Process time: %.3f', time()-start_time)
 
-    with open(to_pathlist_file_path(args.output_path), 'w+', encoding='utf8') as good_path_list_file:
+    with open(to_pathlist_file_path(args.output_dir_path), 'w+', encoding='utf8') as good_path_list_file:
         good_path_list_file.write('\n'.join(good_path_list))
         good_path_list_file.close()
 

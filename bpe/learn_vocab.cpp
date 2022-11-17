@@ -157,8 +157,9 @@ int main(int argc, char *argv[]) {
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
         iterStartTimePoint = std::chrono::system_clock::now();
         if (doLog) {
-            if (clearLine && iterCount != 0) 
+            if (clearLine && iterCount != 0) {
                 std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
+            }
             std::cout << iterCount;
         }
         size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth, excludeDrum); 

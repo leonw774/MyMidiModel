@@ -109,6 +109,8 @@ def quantize_tempo(tempo: int, tempo_quantization: Tuple[int, int, int]) -> int:
     t = min(tempo_quantization[1], max(tempo_quantization[0], t))
     return t
 
+CLIP_MASK = 1 << 29 - 1
+TIME_LIMIT = 1 << 20 - 1
 
 def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_cont_note: bool) -> list:
     """
@@ -117,17 +119,17 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
     """
     half_vel_step = velocity_step // 2
 
-    # sometimes mido gives weird value to note.start and note.end
-    # there are some those extra 1s near bit 30~32 that makes the while loop hangs forever
-    # so we have to limit the duration, note.start and note.end under a certain threshold
-    bit_clip = 1 << 20
-    clip_mask = bit_clip - 1
+    # sometimes mido/miditoolkit gives weird value to note.start and note.end
+    # there are some those extra 1s in some more significant bits that makes the while loop hangs forever
     for track in midi.instruments:
-        for note in track.notes:
-            if note.start > bit_clip:
-                note.start &= clip_mask
-            if note.end > bit_clip:
-                note.end &= clip_mask
+        for i, note in enumerate(track.notes):
+            if note.start > CLIP_MASK:
+                # print(bin(note.start))
+                track.notes[i].start &= CLIP_MASK
+            if note.end > CLIP_MASK:
+                # print(bin(note.start))
+                track.notes[i].end &= CLIP_MASK
+            assert note.end <= TIME_LIMIT and note.start <= TIME_LIMIT, 'Note time too large, likely corrupted'
 
     note_token_list = [
         NoteToken(
@@ -150,6 +152,11 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
     for i in range(note_list_length):
         note_token = note_token_list[i]
         if note_token.duration > max_duration:
+            # if note_token.duration > max_duration * 20:
+            #     print(bin(note_token.onset))
+            #     print(bin(note_token.duration))
+            #     print(bin(note_token.onset+note_token.duration))
+            #     print('---')
             cur_dur = note_token.duration
             cur_onset = note_token.onset
             while cur_dur > 0:
@@ -457,7 +464,6 @@ def midi_to_text_list(
     for i, track in enumerate(midi.instruments):
         if track.is_drum:
             midi.instruments[i].program = 128
-
     token_list = midi_to_token_list(midi, nth, max_duration, velocity_step, use_cont_note, tempo_quantization, position_method)
 
     text_list = list(map(token_to_str, token_list))
@@ -503,7 +509,7 @@ def handle_note_continuation(
         # print(cur_time, 'onset', onset, 'append', pending_cont_notes)
     else:
         # assert 0 <= pitch < 128
-        if not (0 <= pitch < 128):
+        if not 0 <= pitch < 128:
             # when using BPE, sometimes model will generated the combination that
             # the relative_pitch + base_pitch exceeds limit
             return None
@@ -620,8 +626,9 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error: bool = False)
         else:
             raise ValueError(f'Bad token string: {text}')
 
-    if len(pending_cont_notes) > 0:
-        # because with bpe, sometimes a note will appears earlier than the continuing note it is going to be appending to
+    try_count = 0
+    while len(pending_cont_notes) > 0 and try_count < 4:
+        # with multinote, sometimes a note will appears earlier than the continuing note it is going to be appending to
         while True:
             adding_note_count = 0
             for track_number, inst in enumerate(midi.instruments):
@@ -629,8 +636,10 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error: bool = False)
                 notes_to_add = []
                 for n in inst.notes:
                     if n.start in pending_cont_notes:
+                        print('a')
                         info = (n.pitch, n.velocity, track_number)
                         if info in pending_cont_notes[n.start]:
+                            print('b')
                             notes_to_remove.append(n)
                             new_note = handle_note_continuation(
                                 False,
@@ -645,6 +654,7 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error: bool = False)
                     inst.notes.append(n)
             if adding_note_count == 0:
                 break
+        try_count += 1
 
     if not ignore_panding_note_error:
         assert len(pending_cont_notes) == 0, f'There are unclosed continuing notes: {pending_cont_notes}'

@@ -86,8 +86,8 @@ def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -
                 # diff_note_starts = ab_note_start_union.difference(a_track_note_starts.intersection(b_track_note_starts))
                 # diff_note_ends = ab_note_start_union.difference(a_track_note_ends.intersection(b_track_note_ends))
                 # print(
-                #     f'notes starts difference: {len(diff_note_starts)} / ({len(a_track_note_starts)} + {len(b_track_note_starts)})',
-                #     f'\nnotes end difference: {len(diff_note_ends)} / ({len(a_track_note_ends)} + {len(b_track_note_ends)})\n'
+                #     f'note starts diffs: {len(diff_note_starts)} / ({len(a_track_note_starts)} + {len(b_track_note_starts)})',
+                #     f'\nnote end diffs: {len(diff_note_ends)} / ({len(a_track_note_ends)} + {len(b_track_note_ends)})\n'
                 # )
                 # print(f'diff_note_starts\n{diff_note_starts}')
                 # print(f'diff_note_ends\n{diff_note_ends}', )
