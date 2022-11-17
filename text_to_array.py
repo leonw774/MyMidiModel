@@ -135,7 +135,7 @@ def main():
         logging.info(summary_string)
 
         start_time = time()
-        logging.info('Begin write npy')
+        logging.info('Begin Make npys')
 
         # handle existed files/dirs
         npy_dir_path = os.path.join(args.corpus_dir_path, 'arrays')
@@ -153,18 +153,20 @@ def main():
         os.makedirs(npy_dir_path)
         array_list = []
         with Pool(args.mp_worker_number) as p:
-            array_list = list(tqdm(
-                p.imap(mp_handler, ( # generator
-                    {'text_list': p.split(), 'vocabs': vocabs, 'i': i}
-                    for i, p in enumerate(corpus_reader)
-                ))
-            ))
+            array_list = list(
+                tqdm(
+                    p.imap(
+                        mp_handler, ({'text_list': p.split(), 'vocabs': vocabs, 'i': i} for i, p in enumerate(corpus_reader))
+                    ),
+                    total=len(corpus_reader)
+                )
+            )
 
         for i, array in enumerate(array_list):
             if array.size != 0:
                 np.save(os.path.join(npy_dir_path, str(i)), array)
 
-        logging.info('Write npys end. time: %.3f', time()-start_time)
+        logging.info('Make npys end. time: %.3f', time()-start_time)
         # zip all the npy files into one file with '.npz' extension
         start_time = time()
         logging.info('Zipping npys')
