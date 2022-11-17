@@ -10,7 +10,7 @@ from tqdm import tqdm
 from util.midi import piece_to_midi
 from util.corpus import CorpusReader, get_corpus_paras
 
-MP_WORKER_NUMBER = 16
+MP_WORKER_NUMBER = 24
 
 def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -> bool:
     try:

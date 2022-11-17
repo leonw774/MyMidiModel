@@ -1,16 +1,17 @@
+from argparse import ArgumentParser, Namespace
+from collections import Counter
 import glob
 from io import TextIOWrapper
 import logging
 import os
+from multiprocessing import Pool
 import shutil
 import sys
-import zlib
-from argparse import ArgumentParser, Namespace
-from collections import Counter
-from multiprocessing import Pool
 from time import time, strftime
 from traceback import format_exc
+import zlib
 
+from psutil import cpu_count
 from tqdm import tqdm
 
 from util.midi import midi_to_text_list
@@ -193,7 +194,7 @@ def mp_func(
     bad_reasons = Counter()
     with Pool(mp_work_number) as p:
         compressed_piece_list = list(tqdm(
-            p.imap(handler, args_dict_list),
+            p.map(handler, args_dict_list),
             total=len(args_dict_list)
         ))
     logging.info('Multi-processing end. Object size: %d bytes', sum(sys.getsizeof(cp) for cp in compressed_piece_list))
@@ -299,10 +300,12 @@ def main():
 
     # write main corpus file
     with open(to_corpus_file_path(args.output_dir_path), 'w+', encoding='utf8') as out_corpus_file:
+        handler_args_dict = vars(args.handler_args)
         if args.mp_work_number <= 1:
-            token_number_list, good_path_list = loop_func(file_path_list, out_corpus_file, vars(args.handler_args))
+            token_number_list, good_path_list = loop_func(file_path_list, out_corpus_file, handler_args_dict)
         else:
-            token_number_list, good_path_list = mp_func(file_path_list, out_corpus_file, args.mp_work_number, vars(args.handler_args))
+            mp_worker_number = min(cpu_count(), args.mp_worker_number)
+            token_number_list, good_path_list = mp_func(file_path_list, out_corpus_file, mp_worker_number, handler_args_dict)
 
     logging.info('Processed %d files', len(token_number_list))
     if len(token_number_list) > 0:

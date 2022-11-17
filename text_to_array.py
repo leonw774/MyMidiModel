@@ -1,11 +1,12 @@
+from argparse import ArgumentParser
 from collections import Counter
 import json
 import logging
+from multiprocessing import Pool
 import os
 import shutil
-from argparse import ArgumentParser
 from time import strftime, time
-from typing import Dict
+from typing import Dict, List
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -13,7 +14,7 @@ from pandas import Series
 from tqdm import tqdm
 
 from util.tokens import b36str2int, INSTRUMENT_NAMES
-from util.vocabs import build_vocabs
+from util.vocabs import build_vocabs, Vocabs
 from util.corpus import (
     to_shape_vocab_file_path,
     to_vocabs_file_path,
@@ -25,6 +26,17 @@ from util.corpus import (
 )
 
 
+def mp_handler(args_dict):
+    i = args_dict['i']
+    args_dict.pop('i')
+    try:
+        a = text_list_to_array(**args_dict)
+        return a
+    except:
+        print(f'Error at piece #{i}')
+        return np.empty(shape=(0,))
+
+
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
@@ -33,6 +45,11 @@ def parse_args():
         default=0,
         help='The number of iteration the BPE algorithm did. Default is %(default)s.\
             If the number is integer that greater than 0, it implicated that BPE was performed.'
+    )
+    parser.add_argument(
+        '--mp-worker-number',
+        type=int,
+        default=1
     )
     parser.add_argument(
         '--log',
@@ -134,13 +151,17 @@ def main():
             os.remove(npy_zip_path)
 
         os.makedirs(npy_dir_path)
-        for i, p in tqdm(enumerate(corpus_reader), total=len(corpus_reader)):
-            try:
-                array = text_list_to_array(p.split(), vocabs)
-            except Exception as e:
-                print(f'piece #{i}')
-                raise e
-            np.save(os.path.join(npy_dir_path, str(i)), array)
+        arg_dict_list = [
+            {'text_list': p.split(), 'vocabs': vocabs, 'i': i}
+            for i, p in enumerate(corpus_reader)
+        ]
+        array_list = []
+        with Pool(args.mp_worker_number) as p:
+            array_list = list(tqdm(p.map(mp_handler, arg_dict_list)))
+
+        for i, array in enumerate(array_list):
+            if array.size != 0:
+                np.save(os.path.join(npy_dir_path, str(i)), array)
 
         logging.info('Write npys end. time: %.3f', time()-start_time)
         # zip all the npy files into one file with '.npz' extension
