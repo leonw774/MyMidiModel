@@ -167,7 +167,7 @@ int main(int argc, char *argv[]) {
         Shape maxScoreShape;
         partStartTimePoint = std::chrono::system_clock::now();
         if (scoreFunc == "freq") {
-            shapeScoring<unsigned int>(corpus, shapeDict, shapeScoreFreq, scoreFunc, mergeCondition, samplingRate, excludeDrum);
+            shapeScoreFreq = shapeScoring<unsigned int>(corpus, shapeDict, scoreFunc, mergeCondition, samplingRate, excludeDrum);
             std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScoreFreq);
             if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
@@ -180,10 +180,9 @@ int main(int argc, char *argv[]) {
                         << "\"" << shape2str(maxScoreShape) << "\", "
                         << maxValPair.second << ", ";
             }
-            shapeScoreFreq.clear();
         }
         else {
-            shapeScoring<double>(corpus, shapeDict, shapeScoreWPlike, scoreFunc, mergeCondition, samplingRate, excludeDrum);
+            shapeScoreWPlike = shapeScoring<double>(corpus, shapeDict, scoreFunc, mergeCondition, samplingRate, excludeDrum);
             std::pair<Shape, double> maxValPair = findMaxValPair(shapeScoreWPlike);
             if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
@@ -196,7 +195,6 @@ int main(int argc, char *argv[]) {
                         << "\"" << shape2str(maxScoreShape) << "\", "
                         << maxValPair.second << ", ";
             }
-            shapeScoreWPlike.clear();
         }
         findBestShapeTime = (std::chrono::system_clock::now() - partStartTimePoint) / oneSencondDur;
 

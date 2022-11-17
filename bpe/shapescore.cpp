@@ -296,10 +296,9 @@ double calculateAllAttributeEntropy(const Corpus& corpus, bool excludeDrum) {
 
 
 template<typename T>
-void shapeScoring(
+std::vector<std::pair<Shape, T>> shapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::vector<std::pair<Shape, T>>& shapeScore,
     const std::string& scoreFunc,
     const std::string& mergeCoundition,
     double samplingRate,
@@ -312,6 +311,7 @@ void shapeScoring(
     bool isOursMerge = (mergeCoundition == "ours");
 
     // std::chrono::time_point<std::chrono::system_clock> partStartTimePoint = std::chrono::system_clock::now();
+    std::vector<std::pair<Shape, T>> shapeScore;
 
     std::vector<double> shapeFreq(shapeDict.size(), 0);
     size_t totalMultiNoteCount = 0;
@@ -390,6 +390,7 @@ void shapeScoring(
     shapeScore.reserve(shapeScoreParallel[mergedIndex].size());
     shapeScore.assign(shapeScoreParallel[mergedIndex].cbegin(), shapeScoreParallel[mergedIndex].cend());
     // std::cout << "merge mp result time=" << (std::chrono::system_clock::now() - partStartTimePoint) / std::chrono::duration<double>(1);
+    return shapeScore;
 }
 
 template<typename T>
@@ -411,9 +412,9 @@ std::pair<Shape, T> findMaxValPair(const std::vector<std::pair<Shape, T>>& shape
 // use <double> when scoringMethod is "wplike"
 
 template
-void shapeScoring<unsigned int>(const Corpus& corpus,
+std::vector<std::pair<Shape, unsigned int>> shapeScoring<unsigned int>(
+    const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::vector<std::pair<Shape, unsigned int>>& shapeScore,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate,
@@ -421,9 +422,9 @@ void shapeScoring<unsigned int>(const Corpus& corpus,
 );
 
 template
-void shapeScoring<double>(const Corpus& corpus,
+std::vector<std::pair<Shape, double>> shapeScoring<double>(
+    const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    std::vector<std::pair<Shape, double>>& shapeScore,
     const std::string& scoringMethod,
     const std::string& mergeCoundition,
     double samplingRate,
