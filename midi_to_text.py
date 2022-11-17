@@ -138,7 +138,7 @@ def handler(args_dict: dict):
     try:
         text_list = midi_to_text_list(**args_dict)
         piece_bytes = ' '.join(text_list).encode()
-        # return compressed text because memory usage issue
+        # return compressed text because memory issue
         return zlib.compress(piece_bytes)
     except KeyboardInterrupt as e:
         raise e
@@ -194,7 +194,7 @@ def mp_func(
     bad_reasons = Counter()
     with Pool(mp_work_number) as p:
         compressed_piece_list = list(tqdm(
-            p.map(handler, args_dict_list),
+            p.imap(handler, args_dict_list),
             total=len(args_dict_list)
         ))
     logging.info('Multi-processing end. Object size: %d bytes', sum(sys.getsizeof(cp) for cp in compressed_piece_list))

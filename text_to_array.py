@@ -157,7 +157,7 @@ def main():
         ]
         array_list = []
         with Pool(args.mp_worker_number) as p:
-            array_list = list(tqdm(p.map(mp_handler, arg_dict_list)))
+            array_list = list(tqdm(p.imap(mp_handler, arg_dict_list)))
 
         for i, array in enumerate(array_list):
             if array.size != 0:
