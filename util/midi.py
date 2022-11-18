@@ -451,11 +451,11 @@ def midi_to_text_list(
     # start_time = time()
     try:
         midi = MidiFile(midi_file_path)
-    except:
-        raise RuntimeError('miditoolkit failed to parse the file')
+    except Exception as e:
+        raise RuntimeError('miditoolkit failed to parse the file') from e
     assert len(midi.instruments) > 0, 'No tracks in MidiFile'
-    for i in range(len(midi.instruments)):
-        midi.instruments[i].remove_invalid_notes(verbose=False)
+    for inst in midi.instruments:
+        inst.remove_invalid_notes(verbose=False)
     # print('original ticks per beat:', midi.ticks_per_beat)
     quantize_to_nth(midi, nth)
 
@@ -636,10 +636,8 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error: bool = False)
                 notes_to_add = []
                 for n in inst.notes:
                     if n.start in pending_cont_notes:
-                        print('a')
                         info = (n.pitch, n.velocity, track_number)
                         if info in pending_cont_notes[n.start]:
-                            print('b')
                             notes_to_remove.append(n)
                             new_note = handle_note_continuation(
                                 False,

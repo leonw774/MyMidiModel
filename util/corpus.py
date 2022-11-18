@@ -355,7 +355,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
             if len(note_attr) == 5:
                 cur_time = note_attr[4] + cur_measure_onset
                 note_attr = note_attr[:4]
-            pitch, duration, velocity, track_number = note_attr
+            pitch, duration, _, track_number = note_attr
             if track_number in drum_tracks:
                 current_axis.add_patch(
                     Ellipse(

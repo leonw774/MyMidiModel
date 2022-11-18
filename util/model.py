@@ -1,11 +1,10 @@
 from typing import List
-from time import time
+# from time import time
 
-import numpy as np
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
-from torch.profiler import record_function
+# from torch.profiler import record_function
 
 from fast_transformers.builders import TransformerEncoderBuilder
 from fast_transformers.masking import FullMask
@@ -235,11 +234,12 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
                 output_seq = model.to_output_attrs(input_seq)
                 text_list = try_text_list
                 break
-            except Exception as e:
+            except (AssertionError, ValueError) as e:
                 if print_exception:
                     print(repr(e))
                 try_count += 1
                 continue # keep sampling until no error
+
         # end while
         # print(text_list)
         if try_count == try_count_limit:

@@ -187,11 +187,11 @@ def main():
 
             debug_str = get_input_array_format_string(array_data, None, vocabs)
             debug_str_list = debug_str.splitlines()
-            original_text_list = [f'{"original_text":<50} '] + original_text_list
+            original_text_list = ['original_text'] + original_text_list
 
             with open(debug_txt_path, 'w+', encoding='utf8') as f:
                 merged_lines = [
-                    f'{origi:<50} {debug}'
+                    f'{origi:<49} {debug}'
                     for origi, debug in zip(original_text_list, debug_str_list)
                 ]
                 f.write('\n'.join(merged_lines))
