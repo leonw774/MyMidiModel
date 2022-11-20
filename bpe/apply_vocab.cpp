@@ -265,7 +265,7 @@ int main(int argc, char *argv[]) {
         }
     }
     if (doLog) {
-        if (!clearLine) {
+        if (clearLine) {
             std::cout << '\n';
         }
         avgMulpi = calculateAvgMulpiSize(corpus, excludeDrum);
