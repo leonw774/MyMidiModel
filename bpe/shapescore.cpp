@@ -114,6 +114,10 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
     Shape pairShape;
     bool badShape = false;
 
+    // if (rmn.getOnset() < lmn.getOnset()) {
+    //     throw std::runtime_error("right multi-note has smaller onset than left multi-note");
+    // }
+
     unsigned int unitAndOnsets[rightSize+2];
     for (int i = 0; i < rightSize; ++i) {
         unitAndOnsets[i] = rShape[i].getRelOnset() * rmn.unit + rmn.getOnset() - lmn.getOnset();

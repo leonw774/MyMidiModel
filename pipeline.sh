@@ -120,7 +120,7 @@ if [ "$DO_BPE" == true ]; then
     # check if tokenized corpus is equal to original corpus
     python3 verify_corpus_equality.py $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE | tee -a $LOG_PATH
     VERIFY_EXIT_CODE=${PIPESTATUS[0]}
-    test $VERIFY_EXIT_CODE -ne 0 && echo "Corpus equality verification failed. pipeline.sh exit." && exit 1
+    test $VERIFY_EXIT_CODE -ne 0 && { echo "Corpus equality verification failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 fi
 
 if [ $BPE_ITER -ne 0 ]; then

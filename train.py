@@ -373,8 +373,8 @@ def main():
         model.train()
         train_loss_list = []
         train_loss_list: List[List[float]]
-        forward_time = 0
-        backward_time = 0
+        # forward_time = 0
+        # backward_time = 0
         for _ in tqdm(range(args.train_args.validation_interval)):
             try:
                 batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)

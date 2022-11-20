@@ -606,12 +606,11 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error: bool = False)
             shape_string, *other_attr = text[1:].split(':')
             relnote_list = []
             for s in shape_string[:-1].split(';'):
-                is_cont = (s[-1] == '~')
-                if is_cont:
-                    relnote = [b36str2int(a) for a in s[:-1].split(',')]
+                is_cont = ()
+                if s[-1] == '~':
+                    relnote = [True] + [b36str2int(a) for a in s[:-1].split(',')]
                 else:
-                    relnote = [b36str2int(a) for a in s.split(',')]
-                relnote = [is_cont] + relnote
+                    relnote = [False] + [b36str2int(a) for a in s.split(',')]
                 relnote_list.append(relnote)
             base_pitch, time_unit, velocity, track_number, *position = (b36str2int(x) for x in other_attr)
             assert track_number in track_program_mapping, 'Note not in used track'
