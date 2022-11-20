@@ -107,49 +107,53 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
 }
 
 Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const std::vector<Shape>& shapeDict) {
+    if (rmn.getOnset() < lmn.getOnset()) {
+        throw std::runtime_error("right multi-note has smaller onset than left multi-note");
+    }
     Shape lShape = shapeDict[lmn.getShapeIndex()],
           rShape = shapeDict[rmn.getShapeIndex()];
     int leftSize = lShape.size(), rightSize = rShape.size();
     int pairSize = leftSize + rightSize;
+    unsigned int leftUnit = lmn.unit;
+    unsigned int rightUnit = rmn.unit;
     Shape pairShape;
     bool badShape = false;
 
-    if (rmn.getOnset() < lmn.getOnset()) {
-        throw std::runtime_error("right multi-note has smaller onset than left multi-note");
-    }
-
     unsigned int unitAndOnsets[rightSize+2];
     for (int i = 0; i < rightSize; ++i) {
-        unitAndOnsets[i] = rShape[i].getRelOnset() * rmn.unit + rmn.getOnset() - lmn.getOnset();
+        unitAndOnsets[i] = rShape[i].getRelOnset() * rightUnit + rmn.getOnset() - lmn.getOnset();
     }
     unitAndOnsets[rightSize] = lmn.unit;
     unitAndOnsets[rightSize+1] = rmn.unit;
     unsigned int newUnit = gcd(unitAndOnsets, rightSize+2);
     // check to prevent overflow, because RelNote's onset is stored in uint8
+    // if overflowed, return empty shape
     for (int i = 0; i < rightSize; ++i) {
         if (unitAndOnsets[i] / newUnit > RelNote::onsetLimit) {
-            badShape = true;
-            break;
+            return Shape();
         }
     }
-    if (badShape)
-        // return empty shape
-        return pairShape;
+    for (int i = 0; i < leftSize; ++i) {
+        if (lShape[i].getRelOnset() * leftUnit / newUnit > RelNote::onsetLimit) {
+            return Shape();
+        }
+    }
     pairShape.resize(pairSize);
     for (int i = 0; i < pairSize; ++i) {
+        unsigned int temp = 0;
         if (i < leftSize) {
             if (i != 0) {
-                pairShape[i].setRelOnset(lShape[i].getRelOnset() * lmn.unit / newUnit);
+                pairShape[i].setRelOnset(lShape[i].getRelOnset() * leftUnit / newUnit);
                 pairShape[i].relPitch = lShape[i].relPitch;
             }
-            pairShape[i].relDur = lShape[i].relDur * lmn.unit / newUnit;
+            pairShape[i].relDur = lShape[i].relDur * leftUnit / newUnit;
             pairShape[i].setCont(lShape[i].isCont());
         }
         else {
             int j = i - leftSize;
             pairShape[i].setRelOnset(unitAndOnsets[j] / newUnit);
             pairShape[i].relPitch = rShape[j].relPitch + rmn.pitch - lmn.pitch;
-            pairShape[i].relDur = rShape[j].relDur * rmn.unit / newUnit;
+            pairShape[i].relDur = rShape[j].relDur * rightUnit / newUnit;
             pairShape[i].setCont(rShape[j].isCont());
         }
     }
@@ -369,7 +373,7 @@ std::vector<std::pair<Shape, T>> shapeScoring(
                         corpus.piecesMN[i][j][k+n],
                         shapeDict
                     );
-                    // empty shape is bad shape
+                    // empty shape mean overflow happened
                     if (s.size() == 0) continue;
                     if (isFreqScore) {
                         // shapeScoreParallel[thread_num][s] += 1;
