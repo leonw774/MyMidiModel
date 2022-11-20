@@ -167,6 +167,7 @@ int main(int argc, char *argv[]) {
     std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint;
     std::chrono::time_point<std::chrono::system_clock>partStartTimePoint;
     double iterTime, mergeTime, metricsTime = 0.0;
+    double shapeEntropy = 0.0, allEntropy = 0.0;
     if (doLog) {
         std::cout << "Index, Avg neighbor number, Shape, "
                   << "Multinote count, Shape entropy, All attribute entropy, "
@@ -199,7 +200,7 @@ int main(int argc, char *argv[]) {
             #pragma omp parallel for
             for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
                 // ignore drum
-                if (corpus.piecesTP[i][j] == 128) continue;
+                if (corpus.piecesTP[i][j] == 128 && excludeDrum) continue;
                 // for each multinote
                 for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                     // for each neighbor
@@ -207,9 +208,9 @@ int main(int argc, char *argv[]) {
                         if (k + n >= corpus.piecesMN[i][j].size()) {
                             continue;
                         }
-                        if (corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel
-                                || corpus.piecesMN[i][j][k].vel == 0
-                                || corpus.piecesMN[i][j][k+n].vel == 0) {
+                        if (corpus.piecesMN[i][j][k].vel == 0
+                            || corpus.piecesMN[i][j][k+n].vel == 0
+                            || corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel) {
                             continue;
                         }
                         // if (shapeDict[corpus.piecesMN[i][j][k].getShapeIndex()].size()
@@ -253,15 +254,15 @@ int main(int argc, char *argv[]) {
         iterTime = (std::chrono::system_clock::now() - iterStartTimePoint) / oneSencondDur;
         if (doLog) {
             partStartTimePoint = std::chrono::system_clock::now();
-            double shapeEntropy = calculateShapeEntropy(corpus, excludeDrum);
-            double AllAttributeEntropy = calculateAllAttributeEntropy(corpus, excludeDrum);
+            shapeEntropy = calculateShapeEntropy(corpus, excludeDrum);
+            allEntropy = calculateAllAttributeEntropy(corpus, excludeDrum);
             multinoteCount = corpus.getMultiNoteCount();
             // To exclude the time used on calculating metrics
             metricsTime += (std::chrono::system_clock::now() - partStartTimePoint) / oneSencondDur;
-            std::cout << multinoteCount << ", " << shapeEntropy << ", " << AllAttributeEntropy << ", ";
+            std::cout << multinoteCount << ", " << shapeEntropy << ", " << allEntropy << ", ";
             std::cout << iterTime << ", " << mergeTime;
-            if (clearLine)  std::cout << std::endl;
-            else            std::cout.flush();
+            if (clearLine)  std::cout.flush();
+            else            std::cout << std::endl;
         }
     }
     if (doLog) {
@@ -271,6 +272,8 @@ int main(int argc, char *argv[]) {
         avgMulpi = calculateAvgMulpiSize(corpus, excludeDrum);
         std::cout << "Ending multinote count: " << multinoteCount
             << ", Ending average mulpi: " << avgMulpi
+            << ", End shape entropy: " << shapeEntropy
+            << ", End all attribute entropy: " << allEntropy
             << ", Multinote reduce rate: " << 1 - (double) multinoteCount / startMultinoteCount
             << ", Average mulpi reduce rate: " << 1 - avgMulpi / startAvgMulpi << std::endl;
     }

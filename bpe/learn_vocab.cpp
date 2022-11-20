@@ -147,8 +147,7 @@ int main(int argc, char *argv[]) {
     std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint;
     std::chrono::time_point<std::chrono::system_clock>partStartTimePoint;
     double iterTime, findBestShapeTime, mergeTime, metricsTime = 0.0;
-    double shapeEntropy = 0.0;
-    double allEntropy = 0.0;
+    double shapeEntropy = 0.0, allEntropy = 0.0;
     if (doLog) {
         std::cout << "Iter, Avg neighbor number, Found shapes count, Shape, Score, "
                   << "Multinote count, Shape entropy, All attribute entropy, "
