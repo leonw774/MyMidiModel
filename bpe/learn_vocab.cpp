@@ -196,6 +196,13 @@ int main(int argc, char *argv[]) {
                         << maxValPair.second << ", ";
             }
         }
+        // check if shape has repeated relnote
+        for (int i = 1; i < maxScoreShape.size(); ++i) {
+            if (maxScoreShape[i] == maxScoreShape[i-1]) {
+                std::cout << "Found invalid shape: " << shape2str(maxScoreShape) << "\n";
+                return 1;
+            } 
+        }
         findBestShapeTime = (std::chrono::system_clock::now() - partStartTimePoint) / oneSencondDur;
 
         unsigned int newShapeIndex = shapeDict.size();
@@ -250,7 +257,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 // "delete" multinotes with vel == 0
-                // to prevent that back() is also to be removed, we iterate from back to front
+                // because back() could also to be removed, we iterate from back to front
                 for (int k = corpus.piecesMN[i][j].size() - 1; k >= 0; --k) {
                     if (corpus.piecesMN[i][j][k].vel == 0) {
                         corpus.piecesMN[i][j][k] = corpus.piecesMN[i][j].back();

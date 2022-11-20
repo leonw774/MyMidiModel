@@ -114,9 +114,9 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
     Shape pairShape;
     bool badShape = false;
 
-    // if (rmn.getOnset() < lmn.getOnset()) {
-    //     throw std::runtime_error("right multi-note has smaller onset than left multi-note");
-    // }
+    if (rmn.getOnset() < lmn.getOnset()) {
+        throw std::runtime_error("right multi-note has smaller onset than left multi-note");
+    }
 
     unsigned int unitAndOnsets[rightSize+2];
     for (int i = 0; i < rightSize; ++i) {
@@ -412,14 +412,14 @@ std::pair<Shape, T> findMaxValPair(const std::vector<std::pair<Shape, T>>& shape
 }
 
 // instantiate function
-// use <unsigned int> when scoringMethod is "default"
-// use <double> when scoringMethod is "wplike"
+// use <unsigned int> when scoreFunc is "freq"
+// use <double> when scoreFunc is "wplike"
 
 template
 std::vector<std::pair<Shape, unsigned int>> shapeScoring<unsigned int>(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    const std::string& scoringMethod,
+    const std::string& scoreFunc,
     const std::string& mergeCoundition,
     double samplingRate,
     bool excludeDrum
@@ -429,7 +429,7 @@ template
 std::vector<std::pair<Shape, double>> shapeScoring<double>(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    const std::string& scoringMethod,
+    const std::string& scoreFunc,
     const std::string& mergeCoundition,
     double samplingRate,
     bool excludeDrum
