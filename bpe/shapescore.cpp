@@ -276,7 +276,7 @@ double calculateAllAttributeEntropy(const Corpus& corpus, bool excludeDrum) {
     std::map<uint64_t, unsigned int> allAttrCountParallel[max_thread_num];
     size_t totalCount = 0;
     // array of shape index, pitch, unit, velocity
-    #pragma omp parallel for
+    #pragma omp parallel for reduction(+: totalCount)
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         int thread_num = omp_get_thread_num();
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
@@ -403,10 +403,10 @@ std::vector<std::pair<Shape, T>> shapeScoring(
 
 template<typename T>
 std::pair<Shape, T> findMaxValPair(const std::vector<std::pair<Shape, T>>& shapeScore) {
-    #pragma omp declare reduction(maxsecond : std::pair<Shape, T> : omp_out = omp_in.second > omp_out.second ? omp_in : omp_out)
+    #pragma omp declare reduction(maxsecond: std::pair<Shape, T> : omp_out = omp_in.second > omp_out.second ? omp_in : omp_out)
     std::pair<Shape, T> maxSecondPair;
     maxSecondPair.second = 0;
-    #pragma omp parallel for reduction(maxsecond : maxSecondPair)
+    #pragma omp parallel for reduction(maxsecond: maxSecondPair)
     for (int i = 0; i < shapeScore.size(); ++i) {
         if (shapeScore[i].second > maxSecondPair.second) {
             maxSecondPair = shapeScore[i];
