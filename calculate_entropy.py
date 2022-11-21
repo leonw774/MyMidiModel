@@ -32,14 +32,8 @@ def main():
             for array in tqdm(npz_obj.values()):
                 total_token_count += array.shape[0]
                 for token in array:
-                    t = tuple(map(int, token))
-                    # because array is int16, we can put 3 of them into a basic python int type (int64)
-                    if len(t) == 9:
-                        t = ((t[0] | t[1] << 16 | t[2] << 32), (t[3] | t[4] << 16 | t[5] << 32), (t[6] | t[7] << 16 | t[8] << 32))
-                    if len(t) > 6:
-                        t = ((t[0] | t[1] << 16 | t[2] << 32), (t[3] | t[4] << 16 | t[5] << 32), *t[6:])
-                    elif len(t) > 3:
-                        t = ((t[0] | t[1] << 16 | t[2] << 32), *t[3:])
+                    # use string instead of int tuple to save space
+                    t = ':'.join(map(str, [t for t in token]))
                     entropy_counter[t] += 1
         entropy = 0
         for v in entropy_counter.values():
