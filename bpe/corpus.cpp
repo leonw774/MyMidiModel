@@ -102,17 +102,11 @@ unsigned int findMaxRelOffset(const Shape& s) {
 ********/
 
 MultiNote::MultiNote(bool isCont, uint32_t o, uint8_t p, uint8_t d, uint8_t v) {
-    if (o > 0x0fffffu) {
-        throw std::runtime_error("MultiNote onset exceed 0x0fffffu limit.");
+    if (o > onsetLimit) {
+        throw std::runtime_error("MultiNote onset exceed limit.");
     }
-    if (isCont) {
-        // shape index = 1 -> {RelNote(1, 0, 0, 1)}
-        shapeIndexAndOnset = 0x100000u | (o & 0x0fffffu);
-    }
-    else {
-        // shape index = 0 -> {RelNote(0, 0, 0, 1)}
-        shapeIndexAndOnset = (o & 0x0fffffu);
-    }
+    shapeIndex = isCont ? 1 : 0;
+    onset = o;
     pitch = p;
     unit = d;
     vel = v;
@@ -120,16 +114,16 @@ MultiNote::MultiNote(bool isCont, uint32_t o, uint8_t p, uint8_t d, uint8_t v) {
 }
 
 bool MultiNote::operator < (const MultiNote& rhs) const {
-    if ((shapeIndexAndOnset & 0x0fffffu) == rhs.getOnset()) {
+    if (onset == rhs.onset) {
         return pitch < rhs.pitch;
     }
-    return (shapeIndexAndOnset & 0x0fffffu) < rhs.getOnset();
+    return onset < rhs.onset;
 }
 
 void printTrack(const Track& track, const std::vector<Shape>& shapeDict, const size_t begin, const size_t length) {
     for (int i = begin; i < begin + length; ++i) {
-        std::cout << i << " - Shape=" << shape2str(shapeDict[track[i].getShapeIndex()]);
-        std::cout << " onset=" << (int) track[i].getOnset()
+        std::cout << i << " - Shape=" << shape2str(shapeDict[track[i].shapeIndex]);
+        std::cout << " onset=" << (int) track[i].onset
                 << " basePitch=" << (int) track[i].pitch
                 << " timeUnit=" << (int) track[i].unit
                 << " velocity=" << (int) track[i].vel;
@@ -409,8 +403,8 @@ void writeOutputCorpusFile(
             for (int j = 0; j < curPieceTrackNum; ++j) {
                 if (trackEnd[j]) continue;
                 uint8_t tmp = corpus.piecesMN[i][j][trackCurIdx[j]].pitch;
-                if (minTrackOnset > corpus.piecesMN[i][j][trackCurIdx[j]].getOnset()) {
-                    minTrackOnset = corpus.piecesMN[i][j][trackCurIdx[j]].getOnset();
+                if (minTrackOnset > corpus.piecesMN[i][j][trackCurIdx[j]].onset) {
+                    minTrackOnset = corpus.piecesMN[i][j][trackCurIdx[j]].onset;
                     minTrackIdx = j;
                 }
             }
@@ -443,7 +437,7 @@ void writeOutputCorpusFile(
             }
             else {
                 const MultiNote& curMN = corpus.piecesMN[i][minTrackIdx][trackCurIdx[minTrackIdx]];
-                // std::cout << "MN " << i << "," << minTrackIdx << "," << trackCurIdx[minTrackIdx] << ", onset=" << curMN.getOnset() << std::endl;
+                // std::cout << "MN " << i << "," << minTrackIdx << "," << trackCurIdx[minTrackIdx] << ", onset=" << curMN.onset << std::endl;
                 if (positionMethod == "event") {
                     if (prevPosEventOnset < (int) minTrackOnset) {
                         outCorpusFile << "P" << itob36str(minTrackOnset - curMeasureStart) << " ";
@@ -451,7 +445,7 @@ void writeOutputCorpusFile(
                     }
                 }
                 std::string shapeStr;
-                unsigned int shapeIndex = curMN.getShapeIndex();
+                unsigned int shapeIndex = curMN.shapeIndex;
                 if (shapeIndex == 0) {
                     shapeStr = "N";
                 }

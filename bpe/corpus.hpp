@@ -69,13 +69,14 @@ std::vector<Shape> getDefaultShapeDict();
 
 
 struct MultiNote {
-    // shapeIndex: High 12 bits. The index of shape in the shapeDict. 0: DEFAULT_SHAPE_END, 1: DEFAULT_SHAPE_CONT
-    //             This mean bpeIter cannot be greater than 0xfff - 2 = 2045
-    // onset:      Low 20 bits. If nth is 96, 0xfffff of 96th notes is 182 minutes in speed of 240 beat per minute,
+    // shapeIndex: Use 16 bits. The index of shape in the shapeDict. 0: DEFAULT_SHAPE_END, 1: DEFAULT_SHAPE_CONT
+    //             This mean bpeIter cannot be greater than 0xffff - 2 = 65534
+    uint16_t shapeIndex;
+    // onset:      Use 32 bits. If nth is 96, 0xffffffff of 96th notes is 728 minutes in speed of 240 beat per minute,
     //             which is enough for almost all music.
-    uint32_t shapeIndexAndOnset;
-    static const unsigned int shapeIndexLimit = 0xfff;
-    static const unsigned int onsetLimit = 0xfffff;
+    uint32_t onset;
+    static const unsigned int shapeIndexLimit = 0xffff - 2;
+    static const unsigned int onsetLimit = 0xffffffff;
     uint8_t pitch;
     uint8_t unit; // time unit of shape
     uint8_t vel;
@@ -99,24 +100,6 @@ struct MultiNote {
 
     bool operator < (const MultiNote& rhs) const;
 };
-
-// inline method should be implemented in header
-
-inline unsigned int MultiNote::getShapeIndex() const {
-    return shapeIndexAndOnset >> 20;
-}
-
-inline void MultiNote::setShapeIndex(unsigned int s) {
-    shapeIndexAndOnset = (shapeIndexAndOnset & 0x0fffffu) | (s << 20);
-}
-
-inline unsigned int MultiNote::getOnset() const {
-    return shapeIndexAndOnset & 0x0fffffu;
-}
-
-inline void MultiNote::setOnset(unsigned int o) {
-    shapeIndexAndOnset = ((shapeIndexAndOnset >> 20) << 20) | (o & 0x0fffffu);
-}
 
 typedef std::vector<MultiNote> Track;
 

@@ -74,14 +74,14 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
             // for each multinote
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // printTrack(corpus.piecesMN[i][j], shapeDict, k, 1);
-                unsigned int onsetTime = corpus.piecesMN[i][j][k].getOnset();
-                unsigned int maxRelOffset = findMaxRelOffset(shapeDict[corpus.piecesMN[i][j][k].getShapeIndex()]);
-                unsigned int offsetTime = corpus.piecesMN[i][j][k].getOnset() + maxRelOffset * corpus.piecesMN[i][j][k].unit;
+                unsigned int onsetTime = corpus.piecesMN[i][j][k].onset;
+                unsigned int maxRelOffset = findMaxRelOffset(shapeDict[corpus.piecesMN[i][j][k].shapeIndex]);
+                unsigned int offsetTime = corpus.piecesMN[i][j][k].onset + maxRelOffset * corpus.piecesMN[i][j][k].unit;
                 unsigned int immdAfterOnset = -1;
                 int n = 1;
                 while (k+n < corpus.piecesMN[i][j].size() && n < MultiNote::neighborLimit) {
                     // overlapping
-                    unsigned int nOnsetTime = (corpus.piecesMN[i][j][k+n]).getOnset();
+                    unsigned int nOnsetTime = (corpus.piecesMN[i][j][k+n]).onset;
                     if (nOnsetTime < offsetTime) { 
                         n++;
                     }
@@ -107,11 +107,11 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
 }
 
 Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const std::vector<Shape>& shapeDict) {
-    if (rmn.getOnset() < lmn.getOnset()) {
+    if (rmn.onset < lmn.onset) {
         throw std::runtime_error("right multi-note has smaller onset than left multi-note");
     }
-    Shape lShape = shapeDict[lmn.getShapeIndex()],
-          rShape = shapeDict[rmn.getShapeIndex()];
+    Shape lShape = shapeDict[lmn.shapeIndex],
+          rShape = shapeDict[rmn.shapeIndex];
     int leftSize = lShape.size(), rightSize = rShape.size();
     int pairSize = leftSize + rightSize;
     unsigned int leftUnit = lmn.unit;
@@ -121,7 +121,7 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
 
     unsigned int unitAndOnsets[rightSize+2];
     for (int i = 0; i < rightSize; ++i) {
-        unitAndOnsets[i] = rShape[i].getRelOnset() * rightUnit + rmn.getOnset() - lmn.getOnset();
+        unitAndOnsets[i] = rShape[i].getRelOnset() * rightUnit + rmn.onset - lmn.onset;
     }
     unitAndOnsets[rightSize] = lmn.unit;
     unitAndOnsets[rightSize+1] = rmn.unit;
@@ -182,14 +182,14 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool excludeDrum, bool ignore
                 // update measureCursor
                 while (measureCursor < corpus.piecesTS[i].size() - 1) {
                     if (!corpus.piecesTS[i][measureCursor].getT()) {
-                        if (corpus.piecesMN[i][j][k].getOnset() < corpus.piecesTS[i][measureCursor+1].onset) {
+                        if (corpus.piecesMN[i][j][k].onset < corpus.piecesTS[i][measureCursor+1].onset) {
                             break;
                         }
                     }
                     measureCursor++;
                 }
 
-                uint64_t key = corpus.piecesMN[i][j][k].getOnset();
+                uint64_t key = corpus.piecesMN[i][j][k].onset;
                 key |= ((uint64_t) corpus.piecesMN[i][j][k].unit) << 32;
                 key |= ((uint64_t) corpus.piecesMN[i][j][k].vel) << 40;
                 thisTrackMulpiSizes[key] += 1;
@@ -226,7 +226,7 @@ std::vector<size_t> getShapeCounts(const Corpus& corpus, bool excludeDrum = fals
             // ignore drum?
             if (corpus.piecesTP[i][j] == 128 && excludeDrum) continue;
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
-                shapeCountsParallel[thread_num][corpus.piecesMN[i][j][k].getShapeIndex()] += 1;
+                shapeCountsParallel[thread_num][corpus.piecesMN[i][j][k].shapeIndex] += 1;
             }
         }
     }
@@ -284,7 +284,7 @@ double calculateAllAttributeEntropy(const Corpus& corpus, bool excludeDrum) {
             if (corpus.piecesTP[i][j] == 128 && excludeDrum) continue;
             totalCount += corpus.piecesMN[i][j].size();
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
-                uint64_t key = corpus.piecesMN[i][j][k].getShapeIndex();
+                uint64_t key = corpus.piecesMN[i][j][k].shapeIndex;
                 key |= ((uint64_t) corpus.piecesMN[i][j][k].pitch) << 16;
                 key |= ((uint64_t) corpus.piecesMN[i][j][k].unit)  << 24;
                 key |= ((uint64_t) corpus.piecesMN[i][j][k].vel)   << 32;
@@ -364,7 +364,7 @@ std::vector<std::pair<Shape, T>> shapeScoring(
                         if (corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel) continue;
                     }
                     else {
-                        if (corpus.piecesMN[i][j][k].getOnset() != corpus.piecesMN[i][j][k+n].getOnset()) break;
+                        if (corpus.piecesMN[i][j][k].onset != corpus.piecesMN[i][j][k+n].onset) break;
                         if (corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel) continue;
                         if (corpus.piecesMN[i][j][k].unit != corpus.piecesMN[i][j][k+n].unit) continue;
                     }
@@ -380,8 +380,8 @@ std::vector<std::pair<Shape, T>> shapeScoring(
                         tempScoreDiff[s] += 1;
                     }
                     else {
-                        unsigned int lShapeIndex = corpus.piecesMN[i][j][k].getShapeIndex(),
-                                     rShapeIndex = corpus.piecesMN[i][j][k+n].getShapeIndex();
+                        unsigned int lShapeIndex = corpus.piecesMN[i][j][k].shapeIndex,
+                                     rShapeIndex = corpus.piecesMN[i][j][k+n].shapeIndex;
                         tempScoreDiff[s] += 1 / (shapeFreq[lShapeIndex] * shapeFreq[rShapeIndex]);
                         // shapeScoreParallel[thread_num][s] += 1.0 / (shapeFreq[lShapeIndex] + shapeFreq[rShapeIndex]);
                     }

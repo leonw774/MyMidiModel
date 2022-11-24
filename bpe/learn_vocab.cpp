@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
     double samplingRate = atof(argv[nonOptStartIndex+5]);
     double minScoreLimit = atof(argv[nonOptStartIndex+6]);
     
-    if (bpeIter <= 0 || 2045 < bpeIter) {
+    if (bpeIter <= 0 || MultiNote::shapeIndexLimit < bpeIter) {
         std::cout << "Error: bpeIter <= 0 or > 2045: " << bpeIter << std::endl;
         return 1;
     }
@@ -244,11 +244,11 @@ int main(int argc, char *argv[]) {
                             // change left multinote to merged multinote
                             // because the relnotes are sorted in same way as multinotes,
                             // the first relnote in the new shape is correspond to the first relnote in left multinote's original shape
-                            uint8_t newUnit = shapeDict[corpus.piecesMN[i][j][k].getShapeIndex()][0].relDur * corpus.piecesMN[i][j][k].unit / maxScoreShape[0].relDur;
+                            uint8_t newUnit = shapeDict[corpus.piecesMN[i][j][k].shapeIndex][0].relDur * corpus.piecesMN[i][j][k].unit / maxScoreShape[0].relDur;
                             // unit cannot be greater than max_duration
                             if (newUnit > maxDur) break;
                             corpus.piecesMN[i][j][k].unit = newUnit;
-                            corpus.piecesMN[i][j][k].setShapeIndex(newShapeIndex);
+                            corpus.piecesMN[i][j][k].shapeIndex = newShapeIndex;
 
                             // mark right multinote to be removed by have vel set to 0
                             corpus.piecesMN[i][j][k+n].vel = 0;

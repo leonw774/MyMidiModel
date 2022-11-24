@@ -109,8 +109,7 @@ def quantize_tempo(tempo: int, tempo_quantization: Tuple[int, int, int]) -> int:
     t = min(tempo_quantization[1], max(tempo_quantization[0], t))
     return t
 
-CLIP_MASK = 1 << 29 - 1
-TIME_LIMIT = 1 << 20 - 1
+NOTE_ONSET_LIMIT = 0x7FFFFFFF # 2^30 - 1
 
 def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_cont_note: bool) -> list:
     """
@@ -119,17 +118,12 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
     """
     half_vel_step = velocity_step // 2
 
-    # sometimes mido/miditoolkit gives weird value to note.start and note.end
-    # there are some those extra 1s in some more significant bits that makes the while loop hangs forever
     for track in midi.instruments:
         for i, note in enumerate(track.notes):
-            if note.start > CLIP_MASK:
-                # print(bin(note.start))
-                track.notes[i].start &= CLIP_MASK
-            if note.end > CLIP_MASK:
-                # print(bin(note.start))
-                track.notes[i].end &= CLIP_MASK
-            assert note.end <= TIME_LIMIT and note.start <= TIME_LIMIT, 'Note time too large, likely corrupted'
+            # sometimes mido/miditoolkit gives weird value to note.start and note.end that
+            # some extra 1s appears in significant bits which makes the while loop hangs forever
+            # sometimes the file itself is corrupted
+            assert note.start <= NOTE_ONSET_LIMIT or note.end <= NOTE_ONSET_LIMIT, 'note.start/end too large, likely corrupted'
 
     note_token_list = [
         NoteToken(
