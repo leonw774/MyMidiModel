@@ -230,8 +230,8 @@ int main(int argc, char *argv[]) {
                             || corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel) {
                             continue;
                         }
-                        // if (shapeDict[corpus.piecesMN[i][j][k].getShapeIndex()].size()
-                        //         + shapeDict[corpus.piecesMN[i][j][k+n].getShapeIndex()].size()
+                        // if (shapeDict[corpus.piecesMN[i][j][k].shapeIndex].size()
+                        //         + shapeDict[corpus.piecesMN[i][j][k+n].shapeIndex].size()
                         //         != maxScoreShape.size()) {
                         //     continue;
                         // }

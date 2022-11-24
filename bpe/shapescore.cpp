@@ -315,6 +315,9 @@ std::vector<std::pair<Shape, T>> shapeScoring(
     if (samplingRate <= 0 || 1 < samplingRate) {
         throw std::runtime_error("samplingRate in shapeScoring not in range (0, 1]");
     }
+    if (scoreFunc != "freq" && scoreFunc != "wplike") {
+        throw std::runtime_error("scoreFunc in shapeScoring not \"freq\" or \"wplike\"");
+    }
     bool isFreqScore = (scoreFunc == "freq");
     bool isOursMerge = (mergeCoundition == "ours");
 
