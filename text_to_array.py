@@ -135,7 +135,7 @@ def main():
         logging.info(summary_string)
 
         start_time = time()
-        logging.info('Begin Make npys')
+        logging.info('Begin make npys')
 
         # handle existed files/dirs
         npy_dir_path = os.path.join(args.corpus_dir_path, 'arrays')

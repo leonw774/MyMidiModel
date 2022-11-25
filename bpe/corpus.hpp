@@ -69,14 +69,14 @@ std::vector<Shape> getDefaultShapeDict();
 
 
 struct MultiNote {
-    // shapeIndex: Use 16 bits. The index of shape in the shapeDict. 0: DEFAULT_SHAPE_END, 1: DEFAULT_SHAPE_CONT
-    //             This mean bpeIter cannot be greater than 0xffff - 2 = 65534
-    uint16_t shapeIndex;
     // onset:      Use 32 bits. If nth is 96, 0xffffffff of 96th notes is 728 minutes in speed of 240 beat per minute,
     //             which is enough for almost all music.
     uint32_t onset;
-    static const unsigned int shapeIndexLimit = 0xffff - 2;
-    static const unsigned int onsetLimit = 0xffffffff;
+    static const uint32_t onsetLimit = 0xffffffff;
+    // shapeIndex: Use 16 bits. The index of shape in the shapeDict. 0: DEFAULT_SHAPE_END, 1: DEFAULT_SHAPE_CONT
+    //             This mean bpeIter cannot be greater than 0xffff - 2 = 65534
+    uint16_t shapeIndex;
+    static const uint16_t shapeIndexLimit = 0xffff - 2;
     uint8_t pitch;
     uint8_t unit; // time unit of shape
     uint8_t vel;

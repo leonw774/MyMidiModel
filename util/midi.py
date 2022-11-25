@@ -109,7 +109,13 @@ def quantize_tempo(tempo: int, tempo_quantization: Tuple[int, int, int]) -> int:
     t = min(tempo_quantization[1], max(tempo_quantization[0], t))
     return t
 
-NOTE_ONSET_LIMIT = 0x7FFFFFFF # 2^30 - 1
+NOTE_TIME_LIMIT = 0x1FFFFF # 2^21 - 1
+# In midi format, time-delta is representated in variable-length bytes
+# the format is 1xxxxxxx 1xxxxxxx ... 0xxxxxxx, the msb of each byte is 1 if it is not the last byte
+# in this format, three bytes can represent up to 2^21 - 1
+# when nth is 96, in tempo of bpm 240, 2^21 - 1 ticks is 364 minute
+NOTE_DURATION_LIMIT = 0x3FFFF # 2^18 - 1
+# if a note has duration > 45-ish minute, we think the file is likely corrupted
 
 def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_cont_note: bool) -> list:
     """
@@ -121,9 +127,10 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
     for track in midi.instruments:
         for i, note in enumerate(track.notes):
             # sometimes mido/miditoolkit gives weird value to note.start and note.end that
-            # some extra 1s appears in significant bits which makes the while loop hangs forever
-            # sometimes the file itself is corrupted
-            assert note.start <= NOTE_ONSET_LIMIT or note.end <= NOTE_ONSET_LIMIT, 'note.start/end too large, likely corrupted'
+            # some extra 1s appears in significant bits
+            # sometimes the file itself is corrupted already
+            assert note.start <= NOTE_TIME_LIMIT and note.end <= NOTE_TIME_LIMIT, 'note start/end too large, likely corrupted'
+            assert note.end - note.start <= NOTE_DURATION_LIMIT, 'note duration too large, likely corrupted'
 
     note_token_list = [
         NoteToken(
