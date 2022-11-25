@@ -142,7 +142,7 @@ def handler(args_dict: dict):
         return zlib.compress(piece_bytes)
     except KeyboardInterrupt as e:
         raise e
-    except Exception as e:
+    except BaseException as e:
         logging.debug('%d pid: %d file path: %s', n, os.getpid(), args_dict['midi_file_path'])
         logging.debug(format_exc())
         # if not (repr(e).startswith('Assert') or repr(e).startswith('Runtime')):

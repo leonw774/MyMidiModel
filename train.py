@@ -448,7 +448,7 @@ def main():
         midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'])
         try:
             midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}.mid'))
-        except Exception as e:
+        except BaseException as e:
             print('Error when dumping a MidiFile object')
             print(format_exc())
             print(repr(e))
