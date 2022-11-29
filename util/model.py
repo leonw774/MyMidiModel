@@ -32,7 +32,7 @@ class MyMidiTransformer(nn.Module):
             embedding_dim: int,
             input_no_tempo: bool,
             input_no_time_signature: bool,
-            embedding_dropout_rate=0.1
+            embedding_dropout_rate=0.2
             ) -> None:
         super().__init__()
 
@@ -136,7 +136,7 @@ class MyMidiTransformer(nn.Module):
 
     def forward(self, x):
         # x has shape: (batch_size, seq_size, in_attr_number)
-        x = sum(
+        emb_sum = sum(
             emb(x[..., i]) for i, emb in enumerate(self.embeddings)
         )
         # emb_sum = None
@@ -144,12 +144,11 @@ class MyMidiTransformer(nn.Module):
         #     emb_i = emb(x[..., i])
         #     # to deal with sparisity of non-padding tokens in some attribute
         #     emb_mask = emb_i.ne(0).float().unsqueeze(dim=-1).to(x.device)
-        #     if emb_sum:
+        #     if emb_sum is not None:
         #         emb_sum += emb_mask * emb_i
         #     else:
         #         emb_sum = emb_mask * emb_i
-        x = self.embedding_dropout(x)
-
+        emb_sum_dropout = self.embedding_dropout(emb_sum)
         if self.use_linear_attn:
             # in fast_transformer's FullMask class, 0 is masked, 1 is keep
             causal_mask = self.causal_mask
@@ -159,14 +158,15 @@ class MyMidiTransformer(nn.Module):
             causal_mask = self.causal_mask[:x.shape[1], :x.shape[1]].to(x.device)
             length_mask = x[..., 0].eq(0).to(x.device)
 
-        x = self.transformer_encoder(
-            x,
+        transformer_output = self.transformer_encoder(
+            emb_sum_dropout,
             causal_mask,
             length_mask
         )
         logits = tuple(
-            logit(x) for logit in self.logits
+            logit(transformer_output) for logit in self.logits
         )
+        # assert all(not torch.isnan(lg).any() for lg in logits), [torch.isnan(lg).nonzero(as_tuple=True) for lg in logits]
         return logits
 
 def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temperature=1.0, try_count_limit=1000, print_exception=False) -> list:

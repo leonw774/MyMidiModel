@@ -6,7 +6,7 @@ import zipfile
 
 import numpy as np
 import psutil
-from torch import from_numpy, Tensor
+from torch import from_numpy, isnan, isinf, Tensor
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm

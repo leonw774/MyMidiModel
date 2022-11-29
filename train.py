@@ -386,6 +386,7 @@ def main():
             batch_target_seqs = (model.to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
             # start_forward_time = time()
             prediction = model(batch_input_seqs)
+            # assert all(not torch.isnan(head).any() for head in prediction), [torch.isnan(head).nonzero(as_tuple=True) for head in prediction]
             # forward_time += time() - start_forward_time
             # start_backward_time = time()
         # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
@@ -396,8 +397,9 @@ def main():
                 head_losses = calc_losses(prediction, batch_target_seqs)
                     # print('\ncalc_losses use time:', time() - start_backward_time)
         # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=32))
-
+            # assert all(not torch.isnan(hl).any() for hl in head_losses), [torch.isnan(head).nonzero(as_tuple=True) for hl in head_losses]
             train_loss_list.append([hl.item() for hl in head_losses])
+            # print(train_loss_list[-1])
             loss = torch.sum(torch.stack(head_losses))
             # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
             # dot.render(filename='lossbackward_mps', format='png')
