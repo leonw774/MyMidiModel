@@ -305,7 +305,7 @@ def main():
         input_size=[
             (args.train_args.batch_size, args.data_args.max_seq_length, len(model.input_attrs_indices))
         ],
-        dtypes=[torch.long, torch.bool],
+        dtypes=[torch.long],
         device=args.use_device,
         verbose=0
     ))
@@ -386,7 +386,7 @@ def main():
             batch_target_seqs = (model.to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
             # start_forward_time = time()
             prediction = model(batch_input_seqs)
-            # assert all(not torch.isnan(head).any() for head in prediction), [torch.isnan(head).nonzero(as_tuple=True) for head in prediction]
+            # assert all(not torch.isnan(h).any() for h in prediction), [torch.isnan(h).nonzero() for h in prediction]
             # forward_time += time() - start_forward_time
             # start_backward_time = time()
         # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
@@ -397,7 +397,7 @@ def main():
                 head_losses = calc_losses(prediction, batch_target_seqs)
                     # print('\ncalc_losses use time:', time() - start_backward_time)
         # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=32))
-            # assert all(not torch.isnan(hl).any() for hl in head_losses), [torch.isnan(head).nonzero(as_tuple=True) for hl in head_losses]
+            # assert all(not torch.isnan(hl).any() for hl in head_losses), [torch.isnan(head).nonzero() for hl in head_losses]
             train_loss_list.append([hl.item() for hl in head_losses])
             # print(train_loss_list[-1])
             loss = torch.sum(torch.stack(head_losses))
@@ -417,7 +417,7 @@ def main():
         print('Validation')
         model.eval()
         valid_loss_list = []
-        for _ in tqdm(range(args.train_args.validation_steps)):
+        for _ in tqdm(range(min(args.train_args.validation_steps, len(valid_dataloader)))):
             try:
                 batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
             except StopIteration:
