@@ -384,11 +384,9 @@ def main():
 
             batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
             batch_target_seqs = (model.to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
-
             # start_forward_time = time()
             prediction = model(batch_input_seqs)
             # forward_time += time() - start_forward_time
-
             # start_backward_time = time()
         # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
             if args.data_args.use_permutable_subseq_loss:
@@ -448,7 +446,7 @@ def main():
         midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'])
         try:
             midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}.mid'))
-        except BaseException as e:
+        except Exception as e:
             print('Error when dumping a MidiFile object')
             print(format_exc())
             print(repr(e))
