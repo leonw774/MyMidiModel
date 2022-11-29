@@ -274,8 +274,8 @@ double calculateShapeEntropy(const Corpus& corpus, bool excludeDrum) {
 double calculateAllAttributeEntropy(const Corpus& corpus, bool excludeDrum) {
     unsigned int max_thread_num = omp_get_max_threads();
     std::map<uint64_t, unsigned int> allAttrCountParallel[max_thread_num];
+    // key is made of shape index, pitch, unit and velocity
     size_t totalCount = 0;
-    // array of shape index, pitch, unit, velocity
     #pragma omp parallel for reduction(+: totalCount)
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         int thread_num = omp_get_thread_num();
