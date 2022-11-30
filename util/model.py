@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 # from time import time
 
 import torch
@@ -169,10 +169,19 @@ class MyMidiTransformer(nn.Module):
         # assert all(not torch.isnan(lg).any() for lg in logits), [torch.isnan(lg).nonzero(as_tuple=True) for lg in logits]
         return logits
 
-def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temperature=1.0, try_count_limit=1000, print_exception=False) -> list:
+def generate_sample(
+        model: MyMidiTransformer,
+        steps: int,
+        start_seq: Union[Tensor, None] = None,
+        temperature: float = 1.0,
+        try_count_limit: int = 1000,
+        print_exception: bool = False,
+        ignore_pending_note_error: bool = True
+        ) -> list:
     """
         Expect start_seq to be Tensor with shape: (1, seq_size, complete_attr_number) or None
-        - if start_seq is None, will use `text_list_to_array([BEGIN_TOKEN_STR])` as start_seq
+        If start_seq is None, will use `text_list_to_array([BEGIN_TOKEN_STR])` as start_seq
+        ignore_pending_note_error is default to be True, otherwise model cannot generate continuing note
         return the text list of the generated piece
     """
     if start_seq is not None:
@@ -226,7 +235,11 @@ def generate_sample(model: MyMidiTransformer, steps: int, start_seq = None, temp
             try:
                 # format checking
                 # have to append EOS at the end to not raise error
-                piece_to_midi(' '.join(try_text_list + [END_TOKEN_STR]), model.vocabs.paras['nth'])
+                piece_to_midi(
+                    piece=' '.join(try_text_list + [END_TOKEN_STR]),
+                    nth=model.vocabs.paras['nth'],
+                    ignore_panding_note_error=ignore_pending_note_error
+                )
                 # format checking and position, tempo, measure_number calculation
                 input_seq = torch.from_numpy(
                     text_list_to_array(try_text_list, vocabs=model.vocabs)

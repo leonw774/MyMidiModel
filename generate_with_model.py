@@ -130,10 +130,9 @@ def main():
                 with CorpusReader(args.primer) as corpus_reader:
                     piece = next(iter(corpus_reader)) # get first piece
                 primer_text_list = piece.split()
-            except:
+            except Exception as e:
                 print('Failed to parse primer as corpus: following exception raised')
-                print(format_exc())
-                exit()
+                raise e
 
         if args.unit == 'measure':
             m_count = 0
