@@ -206,7 +206,7 @@ def log_loss(
         scheduler: lr_scheduler.LambdaLR,
         train_loss_list: List[List[float]],
         valid_loss_list: List[List[float]],
-        loss_file: TextIOWrapper):
+        loss_file_path: str):
     avg_train_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
     avg_valid_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*valid_loss_list) ]
     avg_train_losses_str = ', '.join([f'{l:.4f}' for l in avg_train_losses])
@@ -220,8 +220,9 @@ def log_loss(
         'Avg. train losses: %s Avg. accum. train loss: %.4f \nAvg. valid losses: %s Avg. accum. valid loss: %.4f',
         avg_train_losses_str, sum(avg_train_losses), avg_valid_losses_str, sum(avg_valid_losses)
     )
-    if loss_file:
-        loss_file.write(f'{cur_step}, {time()-start_time}, {lr:.6f}, {avg_train_losses_str}, {avg_valid_losses_str}\n')
+    if loss_file_path:
+        with open(loss_file_path, 'a', encoding='utf8') as loss_file:
+            loss_file.write(f'{cur_step}, {time()-start_time}, {lr:.6f}, {avg_train_losses_str}, {avg_valid_losses_str}\n')
 
 
 def main():
@@ -276,15 +277,15 @@ def main():
 
     # loss csv file is in the checkpoint directory
     loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
-    loss_file = open(loss_file_path, 'w+', encoding='utf8')
-    loss_csv_head = 'step, time, learning_rate, '
-    loss_csv_head += ', '.join(
-        ['train_' + n for n in OUTPUT_ATTR_NAME]
-            + ['train_total']
-            + ['valid_' + n for n in OUTPUT_ATTR_NAME]
-            + ['valid_total']
-    )
-    loss_file.write(loss_csv_head+'\n')
+    with open(loss_file_path, 'w+', encoding='utf8') as loss_file:
+        loss_csv_head = 'step, time, learning_rate, '
+        loss_csv_head += ', '.join(
+            ['train_' + n for n in OUTPUT_ATTR_NAME]
+                + ['train_total']
+                + ['valid_' + n for n in OUTPUT_ATTR_NAME]
+                + ['valid_total']
+        )
+        loss_file.write(loss_csv_head+'\n')
     logging.info('Created loss.csv file at %s', loss_file_path)
 
     # make model
@@ -436,7 +437,7 @@ def main():
         complete_train_loss_list.extend(train_loss_list)
         complete_valid_loss_list.extend(valid_loss_list)
         cur_step = start_step + args.train_args.validation_interval
-        log_loss(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_file)
+        log_loss(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_file_path)
 
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
         torch.save(model, ckpt_model_file_path)
@@ -444,7 +445,8 @@ def main():
         print('Generating unconditional generation sample for checkpoint')
         uncond_gen_text_list = generate_sample(model, args.data_args.max_seq_length)
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
-        open(os.path.join(ckpt_dir_path, f'{cur_step}.txt'), 'w+', encoding='utf8').write(uncond_gen_piece)
+        with open(os.path.join(ckpt_dir_path, f'{cur_step}.txt'), 'w+', encoding='utf8') as uncond_file:
+            uncond_file.write(uncond_gen_piece)
         midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'])
         try:
             midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}.mid'))
