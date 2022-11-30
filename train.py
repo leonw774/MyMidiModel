@@ -36,8 +36,7 @@ def parse_args():
     data_parser = ArgumentParser()
     data_parser.add_argument(
         '--max-seq-length',
-        type=int,
-        default=2048
+        type=int
     )
     data_parser.add_argument(
         '--use-permutable-subseq-loss',
@@ -63,18 +62,15 @@ def parse_args():
     )
     model_parser.add_argument(
         '--layers-number',
-        type=int,
-        default=12
+        type=int
     )
     model_parser.add_argument(
         '--attn-heads-number',
-        type=int,
-        default=8
+        type=int
     )
     model_parser.add_argument(
         '--embedding-dim',
-        type=int,
-        default=512
+        type=int
     )
     model_parser.add_argument(
         '--input-no-tempo',
