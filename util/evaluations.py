@@ -19,6 +19,7 @@ def _entropy(x: list) -> float:
     entropy = -sum([
         i * log(i)
         for i in norm_x
+        if i != 0
     ])
     return entropy
 
@@ -35,6 +36,7 @@ def _kl_divergence(true, pred):
         entropy = -sum([
             p * log(q/p)
             for p, q in zip(norm_true, norm_pred)
+            if p != 0 and q != 0
         ])
         return entropy
     elif isinstance(true, dict) and isinstance(pred, dict):
@@ -47,8 +49,9 @@ def _kl_divergence(true, pred):
         norm_true = {k: true[k]/sum_true for k in true}
         norm_pred = {k: pred[k]/sum_pred for k in pred}
         entropy = -sum([
-            norm_true[x] * log(norm_pred.get(x, 0)/norm_true[x])
+            norm_true[x] * log(norm_pred[x]/norm_true[x])
             for x in norm_true
+            if norm_true[x] != 0 and x in norm_pred
         ])
         return entropy
     else:
@@ -56,7 +59,7 @@ def _kl_divergence(true, pred):
 
 
 def _overlapping_area(true, pred):
-    pass
+    raise NotImplementedError()
 
 
 def random_sample_from_piece(piece: str, sample_measure_number: int):

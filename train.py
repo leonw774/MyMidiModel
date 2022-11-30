@@ -1,6 +1,5 @@
 from argparse import ArgumentParser, Namespace
 import glob
-from io import TextIOWrapper
 import json
 import logging
 import os
@@ -492,7 +491,7 @@ def main():
     eval_sample_features_per_piece = []
     eval_sample_features_per_piece: List[ Dict[str, float] ]
     for i, uncond_gen_piece in enumerate(uncond_gen_piece_list):
-        open(os.path.join(eval_dir_path, f'{i}'), 'w+', encoding='utf8').write(uncond_gen_piece)
+        open(os.path.join(eval_dir_path, f'{i}.txt'), 'w+', encoding='utf8').write(uncond_gen_piece)
         piece_to_midi(uncond_gen_piece, vocabs.paras['nth']).dump(
             os.path.join(eval_dir_path, f'{i}.mid')
         )
