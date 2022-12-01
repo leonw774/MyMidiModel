@@ -217,7 +217,10 @@ def log_loss(
     )
     if loss_file_path:
         with open(loss_file_path, 'a', encoding='utf8') as loss_file:
-            loss_file.write(f'{cur_step}, {time()-start_time}, {lr:.6f}, {avg_train_losses_str}, {avg_valid_losses_str}\n')
+            loss_file.write(
+                f'{cur_step}, {time()-start_time}, {lr:.6f}, ' 
+                + f'{avg_train_losses_str}, {sum(avg_train_losses)}, {avg_valid_losses_str}, {sum(avg_valid_losses)}\n'
+            )
 
 
 def main():
@@ -270,21 +273,25 @@ def main():
     if args.use_device.type == 'cuda':
         logging.info('Torch sees %d CUDA devices. Using device #%d', torch.cuda.device_count(), torch.cuda.current_device())
 
+    vocabs = get_corpus_vocabs(args.corpus_dir_path)
+
     # loss csv file is in the checkpoint directory
     loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
     with open(loss_file_path, 'w+', encoding='utf8') as loss_file:
         loss_csv_head = 'step, time, learning_rate, '
+        train_output_attr_name = ['train_' + n for n in OUTPUT_ATTR_NAME]
+        valid_output_attr_name = ['valid_' + n for n in OUTPUT_ATTR_NAME]
+        if vocabs.paras['position_method'] == 'event':
+            train_output_attr_name = train_output_attr_name[-1]
+            valid_output_attr_name = train_output_attr_name[-1]
         loss_csv_head += ', '.join(
-            ['train_' + n for n in OUTPUT_ATTR_NAME]
-                + ['train_total']
-                + ['valid_' + n for n in OUTPUT_ATTR_NAME]
-                + ['valid_total']
+            train_output_attr_name + ['train_total']
+            + valid_output_attr_name + ['valid_total']
         )
         loss_file.write(loss_csv_head+'\n')
     logging.info('Created loss.csv file at %s', loss_file_path)
 
     # make model
-    vocabs = get_corpus_vocabs(args.corpus_dir_path)
     model = MyMidiTransformer(
         vocabs=vocabs,
         max_seq_length=args.data_args.max_seq_length,
@@ -442,8 +449,8 @@ def main():
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
         with open(os.path.join(ckpt_dir_path, f'{cur_step}.txt'), 'w+', encoding='utf8') as uncond_file:
             uncond_file.write(uncond_gen_piece)
-        midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'])
         try:
+            midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_panding_note_error=True)
             midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}.mid'))
         except Exception as e:
             print('Error when dumping a MidiFile object')
