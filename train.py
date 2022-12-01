@@ -204,22 +204,22 @@ def log_loss(
         loss_file_path: str):
     avg_train_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
     avg_valid_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*valid_loss_list) ]
-    avg_train_losses_str = ', '.join([f'{l:.4f}' for l in avg_train_losses])
-    avg_valid_losses_str = ', '.join([f'{l:.4f}' for l in avg_valid_losses])
+    avg_train_losses_str = ', '.join([f'{l:.6f}' for l in avg_train_losses])
+    avg_valid_losses_str = ', '.join([f'{l:.6f}' for l in avg_valid_losses])
     lr = scheduler.get_last_lr()[0]
     logging.info(
         'Time: %d, Learning rate: %.6f',
         time()-start_time, lr
     )
     logging.info(
-        'Avg. train losses: %s Avg. accum. train loss: %.4f \nAvg. valid losses: %s Avg. accum. valid loss: %.4f',
+        'Avg. train losses: %s Avg. accum. train loss: %.6f \nAvg. valid losses: %s Avg. accum. valid loss: %.6f',
         avg_train_losses_str, sum(avg_train_losses), avg_valid_losses_str, sum(avg_valid_losses)
     )
     if loss_file_path:
         with open(loss_file_path, 'a', encoding='utf8') as loss_file:
             loss_file.write(
-                f'{cur_step}, {time()-start_time}, {lr:.6f}, ' 
-                + f'{avg_train_losses_str}, {sum(avg_train_losses)}, {avg_valid_losses_str}, {sum(avg_valid_losses)}\n'
+                f'{cur_step}, {time()-start_time:.6f}, {lr:.6f}, '
+                + f'{avg_train_losses_str}, {sum(avg_train_losses):.6f}, {avg_valid_losses_str}, {sum(avg_valid_losses):.6f}\n'
             )
 
 
