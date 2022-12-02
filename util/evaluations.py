@@ -96,7 +96,7 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int) -> Dict[str, 
         - instrumentation self-similarity
         - grooving self-similarity
     '''
-    midi = piece_to_midi(piece, nth)
+    midi = piece_to_midi(piece, nth, ignore_pending_note_error=True)
     pitch_histogram = [0] * 128
     durations = []
     velocities = []

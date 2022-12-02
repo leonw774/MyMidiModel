@@ -102,7 +102,7 @@ def build_vocabs(
 
     event_shape_tokens = ['N', 'N~'] + bpe_shapes_list
 
-    event_track_tokens = [
+    event_track_instrument_tokens = [
         'R'+int2b36str(i) for i in range(paras['max_track_number'])
     ]
     event_position_tokens = (
@@ -121,7 +121,7 @@ def build_vocabs(
     # place padding token in front so that they have same index across all vocabulary
     event_tokens = (
         [PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR]
-        + event_shape_tokens + event_track_tokens + event_position_tokens + event_measure_time_sig_tokens + event_tempo_tokens
+        + event_shape_tokens + event_track_instrument_tokens + event_position_tokens + event_measure_time_sig_tokens + event_tempo_tokens
     )
 
     max_duration = paras['max_duration']

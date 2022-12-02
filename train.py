@@ -338,12 +338,12 @@ def main():
     logging.info('Legnth of validation set: %d', len(valid_dataset))
 
     # get random conditional primer from complete_dataset
-    cond_primer_index = np.random.randint(len(complete_dataset))
+    cond_primer_index = np.random.randint(len(complete_dataset.pieces))
     cond_primer_array = complete_dataset.pieces[str(cond_primer_index)]
     cond_primer_text_list = array_to_text_list(cond_primer_array, vocabs)
     cond_primer_text_list = get_first_k_measures(cond_primer_text_list, args.ckpt_cond_primer_measures)
-    cond_primer_array = text_list_to_array(cond_primer_text_list, vocabs)
-    cond_primer_array = torch.from_numpy(cond_primer_array)
+    cond_primer_array = text_list_to_array(cond_primer_text_list, vocabs).astype(np.int32)
+    cond_primer_array = torch.from_numpy(np.expand_dims(cond_primer_array, axis=0))
 
     # cannot handle multiprocessing if use npz mmap
     if not isinstance(complete_dataset.pieces, dict):
@@ -464,18 +464,17 @@ def main():
         with open(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
             uncond_file.write(uncond_gen_piece)
         try:
-            midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_panding_note_error=True)
+            midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
             midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.mid'))
         except Exception:
             print('Error when dumping uncond gen MidiFile object')
             print(format_exc())
-
         cond_gen_text_list = generate_sample(model, args.data_args.max_seq_length, start_seq=cond_primer_array)
         cond_gen_piece = ' '.join(cond_gen_text_list)
         with open(os.path.join(ckpt_dir_path, f'{cur_step}_cond.txt'), 'w+', encoding='utf8') as cond_file:
             cond_file.write(cond_gen_piece)
         try:
-            midiobj = piece_to_midi(cond_gen_piece, vocabs.paras['nth'], ignore_panding_note_error=True)
+            midiobj = piece_to_midi(cond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
             midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_cond.mid'))
         except Exception:
             print('Error when dumping cond gen MidiFile object')
@@ -523,7 +522,7 @@ def main():
     eval_sample_features_per_piece: List[ Dict[str, float] ]
     for i, uncond_gen_piece in enumerate(uncond_gen_piece_list):
         open(os.path.join(eval_dir_path, f'{i}.txt'), 'w+', encoding='utf8').write(uncond_gen_piece)
-        piece_to_midi(uncond_gen_piece, vocabs.paras['nth']).dump(
+        piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True).dump(
             os.path.join(eval_dir_path, f'{i}.mid')
         )
         eval_sample_features_per_piece.append(

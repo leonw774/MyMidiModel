@@ -6,21 +6,26 @@ from torch import nn, Tensor
 import torch.nn.functional as F
 # from torch.profiler import record_function
 
-from fast_transformers.builders import TransformerEncoderBuilder
-from fast_transformers.masking import FullMask
-from fast_transformers.feature_maps import ActivationFunctionFeatureMap
+try:
+    from fast_transformers.builders import TransformerEncoderBuilder
+    from fast_transformers.masking import FullMask
+    from fast_transformers.feature_maps import ActivationFunctionFeatureMap
+
+    def my_elu_function(x):
+        return F.elu(x) + 1
+
+    # becasuse the elu feature map implemented in fast_transformers use lambda function
+    # have to rewrite it to be pickle-able
+    MY_ELU_FEATURE_MAP = ActivationFunctionFeatureMap.factory(my_elu_function)
+
+except ImportError:
+    pass
 
 from .vocabs import Vocabs
 from .corpus import TOKEN_ATTR_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, array_to_text_list, text_list_to_array
 from .midi import piece_to_midi
-from .tokens import PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR
+from .tokens import PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR, b36str2int
 
-# becasuse the elu feature map implemented in fast_transformers use lambda function
-# have to rewrite it to pickle-able
-def my_elu_function(x):
-    return F.elu(x) + 1
-
-MY_ELU_FEATURE_MAP = ActivationFunctionFeatureMap.factory(my_elu_function)
 
 class MyMidiTransformer(nn.Module):
     def __init__(self,
@@ -169,6 +174,62 @@ class MyMidiTransformer(nn.Module):
         # assert all(not torch.isnan(lg).any() for lg in logits), [torch.isnan(lg).nonzero(as_tuple=True) for lg in logits]
         return logits
 
+
+def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str], vocabs: Vocabs):
+    """
+        Set to large negtive numeric value the logits of the attribute values that would definitily raise exception
+        if the next token in context_text_list has them
+    """
+    assert len(context_text_list) > 0, 'Empty context_text_list'
+    assert len(logits) == len(OUTPUT_ATTR_NAME) or len(logits) == len(OUTPUT_ATTR_NAME) - 1, 'Bad logits'
+    large_neg_value = -1e8
+
+    # adjust event attribute logit
+    multinote_indices = set()
+    tempo_indices = set()
+    track_instrument_indices = set()
+    for t, i in vocabs.events.text2id.items():
+        if t[0] == 'N' or t[0] == 'S':
+            multinote_indices.add(i)
+        elif t[0] == 'T':
+            tempo_indices.add(i)
+        elif t[0] == 'R':
+            track_instrument_indices.add(i)
+    bos_index = vocabs.events.text2id[BEGIN_TOKEN_STR]
+    # BOS token is redundent, will not be used in generation
+    logits[TOKEN_ATTR_INDEX['evt']][bos_index] = large_neg_value
+
+    is_head = context_text_list[-1][0] == 'B' or context_text_list[-1][0] == 'R'
+    if is_head:
+        # if the section is head, then multi-note and tempo token are not allowed
+        for i in multinote_indices.union(tempo_indices):
+            logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+    else:
+        # if the section is body, then the next token's event at least can not be track-instrument
+        for i in track_instrument_indices:
+            logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+        if context_text_list[-1][0] == 'M':
+            # if the last token in context_text_list token is measure, the next token's event can not be multi-note
+            for i in multinote_indices:
+                logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+
+    # adjust track attribute logit
+    if not is_head:
+        # if the section is body, then only allow the defined track
+        max_track_number = max([
+            b36str2int(t[1:t.index(':')])
+            for t in context_text_list
+            if t[0] == 'R'
+        ])
+        # start from max_track_number+1+1
+        # first +1 is because index 0 is padding
+        # second +1 is because we reset any index > max_track_number+1
+        for i in range(max_track_number+1+1, vocabs.track_numbers.size):
+            logits[TOKEN_ATTR_INDEX['trn']][i] = large_neg_value
+
+    return logits
+
+
 def generate_sample(
         model: MyMidiTransformer,
         steps: int,
@@ -213,6 +274,9 @@ def generate_sample(
             # l has shape (1, sequence_length, attr_vocab_size)
             for l in logits
         ]
+
+        last_logits = adjust_logits_with_context(last_logits, text_list, model.vocabs)
+
         # print('\n'.join([repr(logit) for logit in last_logits]))
         try_count = 0
         while try_count < try_count_limit:
@@ -238,7 +302,7 @@ def generate_sample(
                 piece_to_midi(
                     piece=' '.join(try_text_list + [END_TOKEN_STR]),
                     nth=model.vocabs.paras['nth'],
-                    ignore_panding_note_error=ignore_pending_note_error
+                    ignore_pending_note_error=ignore_pending_note_error
                 )
                 # format checking and position, tempo, measure_number calculation
                 input_seq = torch.from_numpy(

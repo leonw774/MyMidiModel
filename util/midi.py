@@ -522,7 +522,7 @@ def handle_note_continuation(
     return None
 
 
-def piece_to_midi(piece: str, nth: int, ignore_panding_note_error: bool = False) -> MidiFile:
+def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False) -> MidiFile:
     # tick time == nth time
     midi = MidiFile(ticks_per_beat=nth//4)
 
@@ -654,7 +654,7 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error: bool = False)
                 break
         try_count += 1
 
-    if not ignore_panding_note_error:
+    if not ignore_pending_note_error:
         assert len(pending_cont_notes) == 0, f'There are unclosed continuing notes: {pending_cont_notes}'
     else:
     # handle unclosed continuing notes

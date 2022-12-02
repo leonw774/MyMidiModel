@@ -110,7 +110,7 @@ def main():
                 continue
 
             if args.extract_midi:
-                midi = piece_to_midi(piece, corpus_paras['nth'], ignore_panding_note_error=False)
+                midi = piece_to_midi(piece, corpus_paras['nth'], ignore_pending_note_error=False)
                 midi.dump(f'{args.output_path}_{i}.mid')
 
             if args.extract_txt:
