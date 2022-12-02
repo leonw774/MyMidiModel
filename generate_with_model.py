@@ -1,10 +1,9 @@
 from argparse import ArgumentParser, Namespace
-from traceback import format_exc
 
 import torch
 
-from util.tokens import b36str2int, BEGIN_TOKEN_STR, END_TOKEN_STR
-from util.midi import midi_to_text_list, piece_to_midi
+from util.tokens import BEGIN_TOKEN_STR, END_TOKEN_STR
+from util.midi import midi_to_text_list, piece_to_midi, get_first_k_measures, get_first_k_nths
 from util.corpus import CorpusReader, text_list_to_array
 from util.model import MyMidiTransformer, generate_sample
 
@@ -87,6 +86,7 @@ def read_args():
 
     return parser.parse_args()
 
+
 def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_file_path: str):
     gen_text_list = generate_sample(
         model,
@@ -135,64 +135,14 @@ def main():
                 raise e
 
         if args.unit == 'measure':
-            m_count = 0
-            end_index = 0
-            for i, text in enumerate(primer_text_list):
-                if text[0] == 'M':
-                    m_count += 1
-                if m_count > args.primer_length:
-                    end_index = i
-                    break
-            if end_index == 0:
-                raise ValueError('Primer piece is shorter than PRIMER_LENGTH in MEASURE unit.')
-            primer_text_list = primer_text_list[:end_index]
+            primer_text_list = get_first_k_measures(primer_text_list, args.primer_length)
 
         elif args.unit == 'nth':
-            cur_time = 0
-            cur_measure_onset = 0
-            cur_measure_length = 0
-            end_index = 0
-            for i, text in enumerate(primer_text_list):
-                typename = text[0]
-                if typename == 'M':
-                    numer, denom = (b36str2int(x) for x in text[1:].split('/'))
-                    cur_measure_onset += cur_measure_length
-                    cur_time = cur_measure_onset
-                    cur_measure_length = round(nth * numer / denom)
-
-                elif typename == 'P':
-                    position = b36str2int(text[1:])
-                    cur_time = position + cur_measure_onset
-
-                elif typename == 'T':
-                    if ':' in text[1:]:
-                        tempo, position = (b36str2int(x) for x in text[1:].split(':'))
-                        cur_time = position + cur_measure_onset
-
-                elif typename == 'N':
-                    is_cont = (text[1] == '~')
-                    if is_cont:
-                        note_attr = tuple(b36str2int(x) for x in text[3:].split(':'))
-                    else:
-                        note_attr = tuple(b36str2int(x) for x in text[2:].split(':'))
-                    if len(note_attr) == 5:
-                        cur_time = note_attr[4] + cur_measure_onset
-
-                elif typename == 'S':
-                    shape_string, *other_attr = text[1:].split(':')
-                    note_attr = tuple(b36str2int(x) for x in other_attr)
-                    if len(note_attr) == 5:
-                        cur_time = note_attr[4] + cur_measure_onset
-
-                if cur_time > args.primer_length:
-                    end_index = i
-            if end_index == 0:
-                raise ValueError('Primer piece is shorter than PRIMER_LENGTH in NTH unit.')
-            primer_text_list = primer_text_list[:end_index]
+            primer_text_list = get_first_k_nths(primer_text_list, nth, args.primer_length)
 
         else: # args.unit == 'token'
             if len(primer_text_list) < args.primer_length:
-                raise ValueError('Primer piece is shorter than PRIMER_LENGTH in TOKEN unit.')
+                raise ValueError(f'primer_text_list has less than primer_length={args.primer_length} tokens.')
             primer_text_list = primer_text_list[:args.primer_length]
 
         primer_seq = text_list_to_array(primer_text_list, vocabs=model.vocabs)

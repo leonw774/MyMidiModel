@@ -8,7 +8,7 @@ from time import strftime, time
 from traceback import format_exc
 from typing import List, Dict
 
-import numpy as np 
+import numpy as np
 from pandas import Series
 from tqdm import tqdm
 import torch
@@ -20,8 +20,8 @@ import torchinfo
 # import torchviz
 
 
-from util.midi import piece_to_midi
-from util.corpus import COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, get_corpus_vocabs
+from util.midi import piece_to_midi, get_first_k_measures
+from util.corpus import COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, get_corpus_vocabs, array_to_text_list, text_list_to_array
 from util.dataset import MidiDataset, collate_mididataset
 from util.model import (
     MyMidiTransformer,
@@ -156,6 +156,11 @@ def parse_args():
         '--eval-sample-number',
         type=int,
         default=64
+    )
+    global_parser.add_argument(
+        '--ckpt-cond-primer-measures',
+        type=int,
+        default=4
     )
     global_parser.add_argument(
         '--model-dir-path',
@@ -331,6 +336,14 @@ def main():
     train_dataset, valid_dataset = random_split(complete_dataset, (train_len, valid_len))
     logging.info('Legnth of training set: %d', len(train_dataset))
     logging.info('Legnth of validation set: %d', len(valid_dataset))
+
+    # get random conditional primer from complete_dataset
+    cond_primer_index = np.random.randint(len(complete_dataset))
+    cond_primer_array = complete_dataset.pieces[str(cond_primer_index)]
+    cond_primer_text_list = array_to_text_list(cond_primer_array, vocabs)
+    cond_primer_text_list = get_first_k_measures(cond_primer_text_list, args.ckpt_cond_primer_measures)
+    cond_primer_array = text_list_to_array(cond_primer_text_list, vocabs)
+
     # cannot handle multiprocessing if use npz mmap
     if not isinstance(complete_dataset.pieces, dict):
         args.dataloader_worker_number = 1
@@ -444,18 +457,28 @@ def main():
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
         torch.save(model, ckpt_model_file_path)
 
-        print('Generating unconditional generation sample for checkpoint')
+        print('Generating conditional and unconditional sample for checkpoint')
         uncond_gen_text_list = generate_sample(model, args.data_args.max_seq_length)
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
-        with open(os.path.join(ckpt_dir_path, f'{cur_step}.txt'), 'w+', encoding='utf8') as uncond_file:
+        with open(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
             uncond_file.write(uncond_gen_piece)
         try:
             midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_panding_note_error=True)
-            midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}.mid'))
-        except Exception as e:
-            print('Error when dumping a MidiFile object')
+            midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.mid'))
+        except Exception:
+            print('Error when dumping uncond gen MidiFile object')
             print(format_exc())
-            print(repr(e))
+
+        cond_gen_text_list = generate_sample(model, args.data_args.max_seq_length, start_seq=torch.from_numpy(cond_primer_array))
+        cond_gen_piece = ' '.join(cond_gen_text_list)
+        with open(os.path.join(ckpt_dir_path, f'{cur_step}_cond.txt'), 'w+', encoding='utf8') as cond_file:
+            cond_file.write(cond_gen_piece)
+        try:
+            midiobj = piece_to_midi(cond_gen_piece, vocabs.paras['nth'], ignore_panding_note_error=True)
+            midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_cond.mid'))
+        except Exception:
+            print('Error when dumping cond gen MidiFile object')
+            print(format_exc())
 
         if args.train_args.early_stop > 0:
             avg_valid_loss = sum([sum(valid_head_losses) for valid_head_losses in valid_loss_list]) / len(valid_loss_list)

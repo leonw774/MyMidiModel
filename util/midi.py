@@ -665,3 +665,62 @@ def piece_to_midi(piece: str, nth: int, ignore_panding_note_error: bool = False)
                     n = Note(velocity=velocity, pitch=pitch, start=onset, end=offset)
                     midi.instruments[track_number].notes.append(n)
     return midi
+
+
+def get_first_k_measures(text_list: str, k):
+    m_count = 0
+    end_index = 0
+    for i, text in enumerate(text_list):
+        if text[0] == 'M':
+            m_count += 1
+        if m_count > k:
+            end_index = i
+            break
+    if end_index == 0:
+        raise ValueError(f'Music of text_list is shorter than k={k} measure unit.')
+    return text_list[:end_index]
+
+
+def get_first_k_nths(text_list: str, nth, k):
+    cur_time = 0
+    cur_measure_onset = 0
+    cur_measure_length = 0
+    end_index = 0
+    for i, text in enumerate(text_list):
+        typename = text[0]
+        if typename == 'M':
+            numer, denom = (b36str2int(x) for x in text[1:].split('/'))
+            cur_measure_onset += cur_measure_length
+            cur_time = cur_measure_onset
+            cur_measure_length = round(nth * numer / denom)
+
+        elif typename == 'P':
+            position = b36str2int(text[1:])
+            cur_time = position + cur_measure_onset
+
+        elif typename == 'T':
+            if ':' in text[1:]:
+                tempo, position = (b36str2int(x) for x in text[1:].split(':'))
+                cur_time = position + cur_measure_onset
+
+        elif typename == 'N':
+            is_cont = (text[1] == '~')
+            if is_cont:
+                note_attr = tuple(b36str2int(x) for x in text[3:].split(':'))
+            else:
+                note_attr = tuple(b36str2int(x) for x in text[2:].split(':'))
+            if len(note_attr) == 5:
+                cur_time = note_attr[4] + cur_measure_onset
+
+        elif typename == 'S':
+            shape_string, *other_attr = text[1:].split(':')
+            note_attr = tuple(b36str2int(x) for x in other_attr)
+            if len(note_attr) == 5:
+                cur_time = note_attr[4] + cur_measure_onset
+
+        if cur_time > k:
+            end_index = i
+    if end_index == 0:
+        raise ValueError(f'Music in text_list is shorter than k={k} nth unit.')
+    return text_list[:end_index]
+

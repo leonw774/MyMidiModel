@@ -219,25 +219,26 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
     return x
 
 
-def array_to_text_list(data, vocabs: Vocabs, is_output=False):
+def array_to_text_list(array, vocabs: Vocabs, is_output=False):
     """
         Inverse of text_list_to_array.
+        Expect array to be numpy-like array
     """
     position_method = vocabs.paras['position_method']
-    assert len(data.shape) == 2 and data.shape[0] > 0, f'bad numpy array shape: {data.shape}'
+    assert len(array.shape) == 2 and array.shape[0] > 0, f'bad numpy array shape: {array.shape}'
     if is_output:
         if position_method == 'event':
-            assert data.shape[1] == len(OUTPUT_ATTR_NAME) - 1, f'bad numpy array shape: {data.shape}'
+            assert array.shape[1] == len(OUTPUT_ATTR_NAME) - 1, f'bad numpy array shape: {array.shape}'
         else:
-            assert data.shape[1] == len(OUTPUT_ATTR_NAME), f'bad numpy array shape: {data.shape}'
+            assert array.shape[1] == len(OUTPUT_ATTR_NAME), f'bad numpy array shape: {array.shape}'
     else:
-        assert data.shape[1] == len(COMPLETE_ATTR_NAME), f'bad numpy array shape: {data.shape}'
+        assert array.shape[1] == len(COMPLETE_ATTR_NAME), f'bad numpy array shape: {array.shape}'
 
 
     text_list = []
-    for i in range(data.shape[0]):
+    for i in range(array.shape[0]):
         # in json, key can only be string
-        event_text = vocabs.events.id2text[data[i][TOKEN_ATTR_INDEX['evt']]]
+        event_text = vocabs.events.id2text[array[i][TOKEN_ATTR_INDEX['evt']]]
         typename = event_text[0]
 
         if typename == 'B' or typename == 'E':
@@ -245,7 +246,7 @@ def array_to_text_list(data, vocabs: Vocabs, is_output=False):
 
         elif typename == 'R':
             # track token has instrument attribute
-            token_text = event_text + ':' + vocabs.instruments.id2text[data[i][TOKEN_ATTR_INDEX['ins']]]
+            token_text = event_text + ':' + vocabs.instruments.id2text[array[i][TOKEN_ATTR_INDEX['ins']]]
             text_list.append(token_text)
 
         elif typename == 'M':
@@ -259,16 +260,16 @@ def array_to_text_list(data, vocabs: Vocabs, is_output=False):
 
         elif typename == 'N' or typename == 'S':
             # subtract one because there is padding token at the beginning of the vocab
-            track_number = data[i][TOKEN_ATTR_INDEX['trn']] - 1
+            track_number = array[i][TOKEN_ATTR_INDEX['trn']] - 1
             token_text = (
                 event_text + ':'
-                + vocabs.pitchs.id2text[data[i][TOKEN_ATTR_INDEX['pit']]] + ':'
-                + vocabs.durations.id2text[data[i][TOKEN_ATTR_INDEX['dur']]] + ':'
-                + vocabs.velocities.id2text[data[i][TOKEN_ATTR_INDEX['vel']]] + ':'
+                + vocabs.pitchs.id2text[array[i][TOKEN_ATTR_INDEX['pit']]] + ':'
+                + vocabs.durations.id2text[array[i][TOKEN_ATTR_INDEX['dur']]] + ':'
+                + vocabs.velocities.id2text[array[i][TOKEN_ATTR_INDEX['vel']]] + ':'
                 + int2b36str(track_number)
             )
             if position_method == 'attribute':
-                token_text += ':' + vocabs.positions.id2text[data[i][TOKEN_ATTR_INDEX['pos']]]
+                token_text += ':' + vocabs.positions.id2text[array[i][TOKEN_ATTR_INDEX['pos']]]
             text_list.append(token_text)
         elif event_text == PADDING_TOKEN_STR:
             pass
