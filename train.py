@@ -343,6 +343,7 @@ def main():
     cond_primer_text_list = array_to_text_list(cond_primer_array, vocabs)
     cond_primer_text_list = get_first_k_measures(cond_primer_text_list, args.ckpt_cond_primer_measures)
     cond_primer_array = text_list_to_array(cond_primer_text_list, vocabs)
+    cond_primer_array = torch.from_numpy(cond_primer_array)
 
     # cannot handle multiprocessing if use npz mmap
     if not isinstance(complete_dataset.pieces, dict):
@@ -469,7 +470,7 @@ def main():
             print('Error when dumping uncond gen MidiFile object')
             print(format_exc())
 
-        cond_gen_text_list = generate_sample(model, args.data_args.max_seq_length, start_seq=torch.from_numpy(cond_primer_array))
+        cond_gen_text_list = generate_sample(model, args.data_args.max_seq_length, start_seq=cond_primer_array)
         cond_gen_piece = ' '.join(cond_gen_text_list)
         with open(os.path.join(ckpt_dir_path, f'{cur_step}_cond.txt'), 'w+', encoding='utf8') as cond_file:
             cond_file.write(cond_gen_piece)
