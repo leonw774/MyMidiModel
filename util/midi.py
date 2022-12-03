@@ -129,8 +129,8 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
             # sometimes mido/miditoolkit gives weird value to note.start and note.end that
             # some extra 1s appears in significant bits
             # sometimes the file itself is corrupted already
-            assert note.start <= NOTE_TIME_LIMIT and note.end <= NOTE_TIME_LIMIT, 'note start/end too large, likely corrupted'
-            assert note.end - note.start <= NOTE_DURATION_LIMIT, 'note duration too large, likely corrupted'
+            assert note.start <= NOTE_TIME_LIMIT and note.end <= NOTE_TIME_LIMIT, 'Note start/end too large, likely corrupted'
+            assert note.end - note.start <= NOTE_DURATION_LIMIT, 'Note duration too large, likely corrupted'
 
     note_token_list = [
         NoteToken(
@@ -468,7 +468,16 @@ def midi_to_text_list(
     token_list = midi_to_token_list(midi, nth, max_duration, velocity_step, use_cont_note, tempo_quantization, position_method)
 
     text_list = list(map(token_to_str, token_list))
-    # text = ' '.join(map(str, text_list))
+
+    consecutive_measure_token_count = 0
+    for t in text_list:
+        if t[0] == 'M':
+            consecutive_measure_token_count += 1
+        elif t[0] == 'N':
+            consecutive_measure_token_count = 0
+        if consecutive_measure_token_count >= 64:
+            raise AssertionError('Very long silence detected, likely corrupted')
+
     return text_list
 
 
