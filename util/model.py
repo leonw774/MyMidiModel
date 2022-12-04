@@ -37,7 +37,7 @@ class MyMidiTransformer(nn.Module):
             embedding_dim: int,
             input_no_tempo: bool,
             input_no_time_signature: bool,
-            embedding_dropout_rate=0.2
+            embedding_dropout_rate=0.1
             ) -> None:
         super().__init__()
 

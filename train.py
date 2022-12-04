@@ -115,7 +115,10 @@ def parse_args():
     train_parser.add_argument(
         "--grad-norm-clip",
         type=float,
-        default=1.0
+        default=1.0,
+        help='Set the max_norm of nn.util.clip_grad_norm_(). \
+            If this value is zero, gradient clipping will not be used. \
+            Default is %(desult)s.'
     )
     train_parser.add_argument(
         '--learning-rate', '--lr',
@@ -369,7 +372,7 @@ def main():
     )
     logging.info('Made DataLoaders')
     # make optimizer
-    optimizer = AdamW(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-9)
+    optimizer = AdamW(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-8)
     scheduler = lr_scheduler.LambdaLR(
         optimizer,
         lr_lambda=lambda step: lr_warmup_and_linear_decay(
@@ -428,7 +431,8 @@ def main():
             optimizer.zero_grad()
             loss.backward()
             # print(torch.cuda.memory_allocated()/1e6, 'MB')
-            clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
+            if args.train_args.grad_norm_clip > 0:
+                clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
             optimizer.step()
             scheduler.step()
             # print('loss + back propagate use time:', time() - start_backward_time)
