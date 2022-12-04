@@ -531,12 +531,16 @@ def main():
     eval_sample_features_per_piece: List[ Dict[str, float] ]
     for i, uncond_gen_piece in enumerate(uncond_gen_piece_list):
         open(os.path.join(eval_dir_path, f'{i}.txt'), 'w+', encoding='utf8').write(uncond_gen_piece)
-        piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True).dump(
-            os.path.join(eval_dir_path, f'{i}.mid')
-        )
-        eval_sample_features_per_piece.append(
-            piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=int(10e6))
-        )
+        try:
+            piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True).dump(
+                os.path.join(eval_dir_path, f'{i}.mid')
+            )
+            eval_sample_features_per_piece.append(
+                piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=int(10e6))
+            )
+        except (AssertionError, ValueError):
+            print('Error when dumping eval uncond gen MidiFile object')
+            print(format_exc())
 
     eval_sample_features = {
         fname: [
