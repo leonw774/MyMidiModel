@@ -172,10 +172,12 @@ class MidiDataset(Dataset):
         # assume instrument vocabulary is 0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
         if pitch_augment != 0:
             sliced_augmentable_pitches = self._augmentable_pitches[filenum][begin_index:end_index]
-            min_pitch = np.min( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
-            max_pitch = np.max( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
-            if min_pitch >= 1 and max_pitch <= 128:
-                (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] += pitch_augment
+            # yes, sometimes the sliced array does not contain any pitch-augmentable token
+            if np.any(sliced_augmentable_pitches):
+                min_pitch = np.min( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
+                max_pitch = np.max( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
+                if min_pitch >= 1 and max_pitch <= 128:
+                    (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] += pitch_augment
 
         # shift down measure number so that it didn't exceed max_seq_length
         min_measure_num = sliced_array[0, TOKEN_ATTR_INDEX['mea']]
