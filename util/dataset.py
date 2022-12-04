@@ -155,8 +155,13 @@ class MidiDataset(Dataset):
 
         # pitch augmentation
         # assume pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
+        # assume instrument vocabulary is 0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
         if pitch_augment != 0:
             valid_pitches = (sliced_array[:, TOKEN_ATTR_INDEX['pit']]) != 0
+            # the pitch attribute of drums / percussion instrument does not means actual note pitch
+            # but different percussion sound
+            not_percussion_notes = (sliced_array[:, TOKEN_ATTR_INDEX['ins']]) != 129
+            valid_pitches = np.logical_and(valid_pitches, not_percussion_notes)
             min_pitch = np.min( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[valid_pitches] ) + pitch_augment
             max_pitch = np.max( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[valid_pitches] ) + pitch_augment
             if min_pitch >= 1 and max_pitch <= 128:
