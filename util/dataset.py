@@ -34,6 +34,19 @@ class MidiDataset(Dataset):
               in the sequence before returning in `__getitem__`
             - permute_track_number: Permute all the track numbers, as data augmentation
         """
+
+        self.vocabs = get_corpus_vocabs(data_dir_path)
+        assert max_seq_length >= 0
+        self.max_seq_length = max_seq_length
+        assert isinstance(use_permutable_subseq_loss, bool)
+        self.use_permutable_subseq_loss = use_permutable_subseq_loss
+        assert isinstance(permute_mps, bool)
+        self.permute_mps = permute_mps
+        assert isinstance(permute_track_number, bool)
+        self.permute_track_number = permute_track_number
+        assert pitch_augmentation >= 0
+        self.pitch_augmentation = pitch_augmentation
+
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
         print('Reading', npz_path)
         available_memory_size = psutil.virtual_memory().available
@@ -52,16 +65,9 @@ class MidiDataset(Dataset):
                 str(filenum): npz_file[str(filenum)]
                 for filenum in tqdm(range(len(npz_file)))
             }
-        print('Processing')
-
-        self.vocabs = get_corpus_vocabs(data_dir_path)
-        self.max_seq_length = max_seq_length
-        self.use_permutable_subseq_loss = use_permutable_subseq_loss
-        self.permute_mps = permute_mps
-        self.permute_track_number = permute_track_number
-        self.pitch_augmentation = pitch_augmentation
         self.number_of_pieces = len(self.pieces)
 
+        print('Processing')
         # Seperators are:
         # EOS, BOS, PADDING, first track token (R0), measure tokens (M\w+), position tokens (P\w+)
         # stores their index in event vocab, empty when `use_permutable_subseq_loss` is not True
@@ -107,17 +113,25 @@ class MidiDataset(Dataset):
         self._piece_lengths = [0] * self.number_of_pieces
         self._piece_body_start_index = [0] * self.number_of_pieces
         self._file_mps_sep_indices = [[] for _ in range(self.number_of_pieces)]
+        self._augmentable_pitches = [np.empty((0,), dtype=np.bool8) for _ in range(self.number_of_pieces)]
         cur_index = 0
         for filenum in tqdm(range(self.number_of_pieces)):
             filename = str(filenum)
 
             if use_permutable_subseq_loss or permute_mps:
                 # find all seperater's index
-                mps_sep_indices = np.flatnonzero(np.isin(self.pieces[filename][:, 0], self._mps_seperators))
+                mps_sep_indices = np.flatnonzero(np.isin(self.pieces[filename][:, TOKEN_ATTR_INDEX['evt']], self._mps_seperators))
                 for i in range(mps_sep_indices.shape[0] - 1):
                     self._file_mps_sep_indices[filenum].append(mps_sep_indices[i])
                     if mps_sep_indices[i+1] != mps_sep_indices[i] + 1:
                         self._file_mps_sep_indices[filenum].append(mps_sep_indices[i] + 1)
+
+            if self.pitch_augmentation != 0:
+                is_multinote_token = (self.pieces[filename][:, TOKEN_ATTR_INDEX['pit']]) != 0
+                # the pitch attribute of drums / percussion instrument does not means actual note pitch
+                # but different percussion sound
+                not_percussion_notes = (self.pieces[filename][:, TOKEN_ATTR_INDEX['ins']]) != 129
+                self._augmentable_pitches[filenum] = np.logical_and(is_multinote_token, not_percussion_notes)
 
             cur_piece_lengths = self.pieces[filename].shape[0]
             self._piece_lengths[filenum] = cur_piece_lengths
@@ -157,15 +171,11 @@ class MidiDataset(Dataset):
         # assume pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
         # assume instrument vocabulary is 0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
         if pitch_augment != 0:
-            valid_pitches = (sliced_array[:, TOKEN_ATTR_INDEX['pit']]) != 0
-            # the pitch attribute of drums / percussion instrument does not means actual note pitch
-            # but different percussion sound
-            not_percussion_notes = (sliced_array[:, TOKEN_ATTR_INDEX['ins']]) != 129
-            valid_pitches = np.logical_and(valid_pitches, not_percussion_notes)
-            min_pitch = np.min( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[valid_pitches] ) + pitch_augment
-            max_pitch = np.max( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[valid_pitches] ) + pitch_augment
+            sliced_augmentable_pitches = self._augmentable_pitches[filenum][begin_index:end_index]
+            min_pitch = np.min( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
+            max_pitch = np.max( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
             if min_pitch >= 1 and max_pitch <= 128:
-                (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[valid_pitches] += pitch_augment
+                (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] += pitch_augment
 
         # shift down measure number so that it didn't exceed max_seq_length
         min_measure_num = sliced_array[0, TOKEN_ATTR_INDEX['mea']]
