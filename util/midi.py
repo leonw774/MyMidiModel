@@ -709,7 +709,7 @@ def get_first_k_nths(text_list: str, nth, k):
 
         elif typename == 'T':
             if ':' in text[1:]:
-                tempo, position = (b36str2int(x) for x in text[1:].split(':'))
+                _tempo, position = (b36str2int(x) for x in text[1:].split(':'))
                 cur_time = position + cur_measure_onset
 
         elif typename == 'N':
@@ -722,7 +722,7 @@ def get_first_k_nths(text_list: str, nth, k):
                 cur_time = note_attr[4] + cur_measure_onset
 
         elif typename == 'S':
-            shape_string, *other_attr = text[1:].split(':')
+            _shape_string, *other_attr = text[1:].split(':')
             note_attr = tuple(b36str2int(x) for x in other_attr)
             if len(note_attr) == 5:
                 cur_time = note_attr[4] + cur_measure_onset
@@ -732,4 +732,3 @@ def get_first_k_nths(text_list: str, nth, k):
     if end_index == 0:
         raise ValueError(f'Music in text_list is shorter than k={k} nth unit.')
     return text_list[:end_index]
-

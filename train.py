@@ -14,7 +14,7 @@ from tqdm import tqdm
 import torch
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.data import random_split, DataLoader
-from torch.optim import Adam, lr_scheduler
+from torch.optim import Adam, AdamW, lr_scheduler
 # from torch.profiler import profile, record_function, ProfilerActivity
 import torchinfo
 # import torchviz
@@ -48,6 +48,11 @@ def parse_args():
     data_parser.add_argument(
         '--permute-track-number',
         action='store_true'
+    )
+    data_parser.add_argument(
+        '--pitch-augmentation',
+        type=int,
+        default=0
     )
     data_parser.add_argument(
         '--sample-from-start',
@@ -364,7 +369,7 @@ def main():
     )
     logging.info('Made DataLoaders')
     # make optimizer
-    optimizer = Adam(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-9)
+    optimizer = AdamW(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-9)
     scheduler = lr_scheduler.LambdaLR(
         optimizer,
         lr_lambda=lambda step: lr_warmup_and_linear_decay(

@@ -8,10 +8,12 @@ from util.dataset import MidiDataset, collate_mididataset
 
 dataset = MidiDataset(
     data_dir_path='data/corpus/test_midis_nth96_r32_d96_v4_t24_200_1_posattribute',
-    max_seq_length=16, # to be printed on screen, so small
+    max_seq_length=20, # to be printed on screen, so small
     use_permutable_subseq_loss=False,
     permute_mps=True,
-    permute_track_number=True
+    permute_track_number=True,
+    pitch_augmentation=3,
+    sample_from_start=True
 )
 vocabs_dict = dataset.vocabs
 print('max_seq_length', dataset.max_seq_length)

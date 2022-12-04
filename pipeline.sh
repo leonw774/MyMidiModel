@@ -164,7 +164,7 @@ if [ -f "./set_cuda_device_env_var.sh" ]; then
     source ./set_cuda_device_env_var.sh
     # expecting "export CUDA_VISIBLE_DEVICES=..." 
 fi
-python3 train.py --max-seq-length $MAX_SEQ_LENGTH $TRAIN_OTHER_ARGUMENTS \
+python3 train.py --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation $PITCH_AUGMENTATION $TRAIN_OTHER_ARGUMENTS \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
     --batch-size $BATCH_SIZE --steps $STEPS --grad-norm-clip $GRAD_NORM_CLIP \
     --split-ratio $SPLIT_RATIO --validation-interval $VALIDATION_INTERVAL --validation-steps $VALIDATION_STEPS --early-stop $EARLY_STOP \
