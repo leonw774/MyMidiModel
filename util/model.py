@@ -182,6 +182,7 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
     """
     assert len(context_text_list) > 0, 'Empty context_text_list'
     assert len(logits) == len(OUTPUT_ATTR_NAME) or len(logits) == len(OUTPUT_ATTR_NAME) - 1, 'Bad logits'
+    position_method_is_event = len(logits) == len(OUTPUT_ATTR_NAME) - 1
     large_neg_value = -1e8
 
     # adjust event attribute logit
@@ -208,8 +209,9 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
         # if the section is body, then the next token's event at least can not be track-instrument
         for i in track_instrument_indices:
             logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
-        if context_text_list[-1][0] == 'M':
-            # if the last token in context_text_list token is measure, the next token's event can not be multi-note
+        if context_text_list[-1][0] == 'M' and position_method_is_event:
+            # if the last token in context_text_list token is measure and position method is event
+            # then the next token's event can not be multi-note
             for i in multinote_indices:
                 logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
 

@@ -1,11 +1,18 @@
 #!/bin/bash
 
-# experiments on training model design
-./pipeline.sh lmd_full_posevent no_bpe default_linear --use-existed
-./pipeline.sh lmd_full_posevent no_bpe permute_data_linear --use-existed
-./pipeline.sh lmd_full_posevent no_bpe permute_data+loss_linear --use-existed
+# basic config
+./pipeline.sh lmd_full_posevent no_bpe permute_data_small_linear --use-existed
+./pipeline.sh snd_posevent      no_bpe permute_data_small_linear --use-existed
 
-# experiment on input data design
-./pipeline.sh lmd_full_posattr no_bpe default_linear --use-existed
-./pipeline.sh lmd_full_posattr no_bpe permute_data_linear --use-existed
-./pipeline.sh lmd_full_posattr no_bpe permute_data+loss_linear --use-existed
+# experiments on BPE usage
+./pipeline.sh lmd_full_posevent ours_sample1.0 permute_data_small_linear --use-existed
+./pipeline.sh snd_posevent      ours_sample1.0 permute_data_small_linear --use-existed
+
+# experiments on set loss
+./pipeline.sh lmd_full_posevent ours_sample1.0 permute_data+loss_small_linear --use-existed
+./pipeline.sh snd_posevent      ours_sample1.0 permute_data+loss_small_linear --use-existed
+
+# experiment on input data design (??)
+# - posevent -> posattr
+# - no_time_signature & no_tempo in input array
+

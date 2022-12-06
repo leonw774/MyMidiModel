@@ -219,10 +219,11 @@ def log_loss(
     avg_valid_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*valid_loss_list) ]
     avg_train_losses_str = ', '.join([f'{l:.6f}' for l in avg_train_losses])
     avg_valid_losses_str = ', '.join([f'{l:.6f}' for l in avg_valid_losses])
+    gpu_alloc_mem_bytes = torch.cuda.memory_allocated(0)
     lr = scheduler.get_last_lr()[0]
     logging.info(
-        'Time: %d, Learning rate: %.6f',
-        time()-start_time, lr
+        'Time: %d, GPU Memory allocated: %d, Learning rate: %.6f',
+        time()-start_time, gpu_alloc_mem_bytes, lr
     )
     logging.info(
         'Avg. train losses: %s Avg. accum. train loss: %.6f \nAvg. valid losses: %s Avg. accum. valid loss: %.6f',
@@ -231,7 +232,7 @@ def log_loss(
     if loss_file_path:
         with open(loss_file_path, 'a', encoding='utf8') as loss_file:
             loss_file.write(
-                f'{cur_step}, {time()-start_time:.6f}, {lr:.6f}, '
+                f'{cur_step}, {gpu_alloc_mem_bytes}, {time()-start_time:.6f}, {lr:.6f}, '
                 + f'{avg_train_losses_str}, {sum(avg_train_losses):.6f}, {avg_valid_losses_str}, {sum(avg_valid_losses):.6f}\n'
             )
 
@@ -291,7 +292,7 @@ def main():
     # loss csv file is in the checkpoint directory
     loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
     with open(loss_file_path, 'w+', encoding='utf8') as loss_file:
-        loss_csv_head = 'step, time, learning_rate, '
+        loss_csv_head = 'step, time, gpu_memory_allocated, learning_rate, '
         train_output_attr_name = ['train_' + n for n in OUTPUT_ATTR_NAME]
         valid_output_attr_name = ['valid_' + n for n in OUTPUT_ATTR_NAME]
         if vocabs.paras['position_method'] == 'event':
@@ -327,6 +328,7 @@ def main():
     ))
     logging.info(summary_str)
     model = model.to(args.use_device)
+    logging.info('Model uses %.3f MB of GPU memory', torch.cuda.memory_allocated(0) / 1e6)
 
     # make dataset
     complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args))
