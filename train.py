@@ -158,7 +158,7 @@ def parse_args():
     global_parser.add_argument(
         '--data-parallel-devices',
         type=int,
-        nargs='?',
+        nargs='*',
         default=[],
         const=[]
     )
