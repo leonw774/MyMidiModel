@@ -159,8 +159,6 @@ def parse_args():
         '--data-parallel-devices',
         type=int,
         nargs='*',
-        default=[],
-        const=[]
     )
     global_parser.add_argument(
         '--log',
@@ -250,7 +248,10 @@ def main():
         args.use_device = 'cpu'
     args.use_device = torch.device(args.use_device)
     if args.use_device.type == 'cuda':
-        logging.info('Torch sees %d CUDA devices. Current device is #%d', torch.cuda.device_count(), torch.cuda.current_device())
+        logging.info(
+            'Torch sees %d CUDA devices. Current device is #%d',
+            torch.cuda.device_count(), torch.cuda.current_device()
+        )
 
     # root logger
     if args.log_file_path != '':
@@ -335,7 +336,7 @@ def main():
 
     # data parallel
     # although distributed data parallel is faster, but is harder to rewrite the script
-    # so data parallel is enough
+    # at least we have more RAM
     if len(args.data_parallel_devices) > 0:
         logging.info('Use DataParallel on device %s', ','.join(args.data_parallel))
         model = torch.nn.parallel.DataParallel(model, device_ids=args.data_parallel)
