@@ -1,3 +1,4 @@
+import bisect
 import itertools
 from math import log, isnan
 import random
@@ -138,14 +139,9 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int) -> Dict[str, 
     instrumentation_per_bar = np.zeros(shape=(len(measure_onsets), 129), dtype=np.bool8)
     grooving_per_bar = np.zeros(shape=(len(measure_onsets), max_position), dtype=np.bool8)
     for track in midi.instruments:
-        measure_index = 0
         for note in track.notes:
-            # update measure index
-            while measure_index < len(measure_onsets) - 1:
-                if note.start >= measure_onsets[measure_index+1]:
-                    measure_index += 1
-                else:
-                    break
+            # find measure index so that the measure has the largest onset while smaller than note.start
+            measure_index = bisect.bisect_right(measure_onsets, note.start) - 1
             instrumentation_per_bar[measure_index, track.program] |= True
             position = note.start - measure_onsets[measure_index]
             grooving_per_bar[measure_index, position] |= True

@@ -14,7 +14,7 @@ from tqdm import tqdm
 import torch
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.data import random_split, DataLoader
-from torch.optim import Adam, AdamW, lr_scheduler
+from torch.optim import AdamW, lr_scheduler
 # from torch.profiler import profile, record_function, ProfilerActivity
 import torchinfo
 # import torchviz
@@ -156,6 +156,12 @@ def parse_args():
         default='cuda'
     )
     global_parser.add_argument(
+        '--data-parallel',
+        type=int,
+        nargs='?',
+        default=[]
+    )
+    global_parser.add_argument(
         '--log',
         dest='log_file_path',
         default='',
@@ -239,8 +245,6 @@ def log_loss(
 
 def main():
     args = parse_args()
-    if not args.use_device.startswith('cuda') and args.use_device != 'cpu':
-        raise ValueError(f'Bad device name {args.use_device}')
     if not torch.cuda.is_available():
         args.use_device = 'cpu'
     args.use_device = torch.device(args.use_device)
@@ -284,9 +288,6 @@ def main():
     logging.info(train_args_str)
     logging.info(args_str)
 
-    if args.use_device.type == 'cuda':
-        logging.info('Torch sees %d CUDA devices. Using device #%d', torch.cuda.device_count(), torch.cuda.current_device())
-
     vocabs = get_corpus_vocabs(args.corpus_dir_path)
 
     # loss csv file is in the checkpoint directory
@@ -316,6 +317,9 @@ def main():
         f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(COMPLETE_ATTR_NAME, model.embedding_vocabs_size))
     ]))
 
+    if args.use_device.type == 'cuda':
+        logging.info('Torch sees %d CUDA devices. Using device #%d', torch.cuda.device_count(), torch.cuda.current_device())
+
     # use torchinfo
     summary_str = str(torchinfo.summary(
         model,
@@ -328,7 +332,12 @@ def main():
     ))
     logging.info(summary_str)
     model = model.to(args.use_device)
-    logging.info('Model uses %.3f MB of GPU memory', torch.cuda.memory_allocated(0) / 1e6)
+
+    # data parallel
+    # although distributed data parallel is faster, but is harder to rewrite the script
+    # so data parallel is enough
+    if len(args.data_parallel) > 0:
+        model = torch.nn.parallel.DataParallel(model, device_ids=args.data_parallel)
 
     # make dataset
     complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args))

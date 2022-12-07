@@ -358,7 +358,8 @@ def calc_losses(pred_logit: List[Tensor], target_logit: Tensor) -> List[Tensor]:
     # loss = sum(head_losses)
     # return loss
 
-
+# NOTE: this function is VERY SLOW since it has three level of for-loops and does cross_entropy with O(N^2) data worst case
+# How can I make it faster?
 def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor, batched_mps_indices: List):
     """
         pred_logit is a list
