@@ -159,7 +159,8 @@ def parse_args():
         '--data-parallel',
         type=int,
         nargs='?',
-        default=[]
+        default=[],
+        const=[]
     )
     global_parser.add_argument(
         '--log',
