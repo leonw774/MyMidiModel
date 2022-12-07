@@ -169,7 +169,7 @@ python3 train.py --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation $PITCH_AU
     --batch-size $BATCH_SIZE --steps $STEPS --grad-norm-clip $GRAD_NORM_CLIP \
     --split-ratio $SPLIT_RATIO --validation-interval $VALIDATION_INTERVAL --validation-steps $VALIDATION_STEPS --early-stop $EARLY_STOP \
     --lr $LEARNING_RATE --lr-warmup-steps $LEARNING_RATE_WARMUP_STEPS --lr-decay-end-steps $LEARNING_RATE_DECAY_END_STEPS --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
-    --use-device $USE_DEVICE --data-parallel $DATA_PARALLEL --log $LOG_PATH --model-dir-path $MODEL_DIR_PATH $CORPUS_DIR_PATH
+    --use-device $USE_DEVICE --data-parallel-devices $DATA_PARALLEL_DEVICES --log $LOG_PATH --model-dir-path $MODEL_DIR_PATH $CORPUS_DIR_PATH
 
 test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
