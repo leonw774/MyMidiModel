@@ -247,11 +247,6 @@ def main():
     if not torch.cuda.is_available():
         args.use_device = 'cpu'
     args.use_device = torch.device(args.use_device)
-    if args.use_device.type == 'cuda':
-        logging.info(
-            'Torch sees %d CUDA devices. Current device is #%d',
-            torch.cuda.device_count(), torch.cuda.current_device()
-        )
 
     # root logger
     if args.log_file_path != '':
@@ -310,6 +305,12 @@ def main():
         loss_file.write(loss_csv_head+'\n')
     logging.info('Created loss.csv file at %s', loss_file_path)
 
+    if args.use_device.type == 'cuda':
+        logging.info(
+            'Torch sees %d CUDA devices. Current device is #%d',
+            torch.cuda.device_count(), torch.cuda.current_device()
+        )
+
     # make model
     model = MyMidiTransformer(
         vocabs=vocabs,
@@ -333,13 +334,7 @@ def main():
     ))
     logging.info(summary_str)
     model = model.to(args.use_device)
-
-    # data parallel
-    # although distributed data parallel is faster, but is harder to rewrite the script
-    # at least we have more RAM
-    if len(args.data_parallel_devices) > 0:
-        logging.info('Use DataParallel on device %s', ','.join(map(str, args.data_parallel_devices)))
-        model = torch.nn.parallel.DataParallel(model, device_ids=args.data_parallel_devices)
+    to_output_attrs = model.to_output_attrs
 
     # make dataset
     complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args))
@@ -396,6 +391,14 @@ def main():
         )
     )
 
+    # data parallel
+    # although distributed data parallel is faster, but is harder to rewrite the script
+    # at least we have more RAM
+    use_dp = len(args.data_parallel_devices) > 0
+    if use_dp:
+        logging.info('Use DataParallel on device %s', ','.join(map(str, args.data_parallel_devices)))
+        model = torch.nn.parallel.DataParallel(model, device_ids=args.data_parallel_devices)
+
     # training start
     logging.info('Begin training')
     train_dataloader_iter = iter(train_dataloader)
@@ -421,7 +424,7 @@ def main():
                 batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
 
             batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
-            batch_target_seqs = (model.to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
+            batch_target_seqs = (to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
             # start_forward_time = time()
             prediction = model(batch_input_seqs)
             # assert all(not torch.isnan(h).any() for h in prediction), [torch.isnan(h).nonzero() for h in prediction]
@@ -463,7 +466,7 @@ def main():
                 valid_dataloader_iter = iter(valid_dataloader)
                 batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
             batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
-            batch_target_seqs = (model.to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
+            batch_target_seqs = (to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
             prediction = model(batch_input_seqs)
 
             if args.data_args.use_permutable_subseq_loss:
@@ -478,10 +481,16 @@ def main():
         log_loss(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_file_path)
 
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
-        torch.save(model, ckpt_model_file_path)
+        if use_dp:
+            torch.save(model.module, ckpt_model_file_path)
+        else:
+            torch.save(model, ckpt_model_file_path)
 
         print('Generating conditional and unconditional sample for checkpoint')
-        uncond_gen_text_list = generate_sample(model, args.data_args.max_seq_length)
+        uncond_gen_text_list = generate_sample(
+            model.module if use_dp else model,
+            steps=args.data_args.max_seq_length
+        )
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
         with open(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
             uncond_file.write(uncond_gen_piece)
@@ -491,7 +500,11 @@ def main():
         except Exception:
             print('Error when dumping uncond gen MidiFile object')
             print(format_exc())
-        cond_gen_text_list = generate_sample(model, args.data_args.max_seq_length, start_seq=cond_primer_array)
+        cond_gen_text_list = generate_sample(
+            model.module if use_dp else model,
+            steps=args.data_args.max_seq_length,
+            start_seq=cond_primer_array
+        )
         cond_gen_piece = ' '.join(cond_gen_text_list)
         with open(os.path.join(ckpt_dir_path, f'{cur_step}_cond.txt'), 'w+', encoding='utf8') as cond_file:
             cond_file.write(cond_gen_piece)
