@@ -338,6 +338,7 @@ def main():
     # although distributed data parallel is faster, but is harder to rewrite the script
     # so data parallel is enough
     if len(args.data_parallel) > 0:
+        logging.info('Use DataParallel on device %s', ','.join(args.data_parallel))
         model = torch.nn.parallel.DataParallel(model, device_ids=args.data_parallel)
 
     # make dataset
