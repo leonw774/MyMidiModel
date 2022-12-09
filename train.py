@@ -441,7 +441,7 @@ def main():
             # assert all(not torch.isnan(hl).any() for hl in head_losses), [torch.isnan(head).nonzero() for hl in head_losses]
             train_loss_list.append([hl.item() for hl in head_losses])
             # print(train_loss_list[-1])
-            loss = torch.sum(torch.stack(head_losses))
+            loss = torch.mean(torch.stack(head_losses))
             # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
             # dot.render(filename='lossbackward_mps', format='png')
             optimizer.zero_grad()

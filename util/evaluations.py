@@ -133,7 +133,16 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int) -> Dict[str, 
         if text[0] == 'M':
             measure_onsets.append(measure_onsets[-1] + cur_measure_length)
             numer, denom = (b36str2int(x) for x in text[1:].split('/'))
-            cur_measure_length = round(nth * numer * (4 / denom))
+            cur_measure_length = round(nth * numer / denom)
+
+    # because sometime the last note "in" the measure does not really IN the measure
+    end_note_onset = max(
+        note.start
+        for track in midi.instruments
+        for note in track.notes
+    )
+    while measure_onsets[-1] < end_note_onset:
+        measure_onsets.append(measure_onsets[-1] + cur_measure_length)
 
     max_position = get_largest_possible_position(nth)
     instrumentation_per_bar = np.zeros(shape=(len(measure_onsets), 129), dtype=np.bool8)
@@ -144,7 +153,7 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int) -> Dict[str, 
             measure_index = bisect.bisect_right(measure_onsets, note.start) - 1
             instrumentation_per_bar[measure_index, track.program] |= True
             position = note.start - measure_onsets[measure_index]
-            assert position < max_position, (measure_index, measure_onsets[measure_index-1:measure_index+1], note.start)
+            assert position < max_position, (measure_index, measure_onsets[measure_index-1:measure_index+2], note.start)
             grooving_per_bar[measure_index, position] |= True
 
     pairs = list(itertools.combinations(range(len(measure_onsets)), 2))
