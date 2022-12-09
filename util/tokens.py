@@ -96,7 +96,7 @@ def token_to_str(token: namedtuple) -> str:
 
     if type_priority == TYPE_PRIORITY['NoteToken']:
         # event:pitch:duration:velocity:track:instrument(:position)
-        # negtive duration means is_cont==True
+        # negative duration means is_cont==True
         text = 'N' if token.duration > 0 else 'N~'
         text += ( f':{int2b36str(token.pitch)}'
                 + f':{int2b36str(abs(token.duration))}'

@@ -144,6 +144,7 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int) -> Dict[str, 
             measure_index = bisect.bisect_right(measure_onsets, note.start) - 1
             instrumentation_per_bar[measure_index, track.program] |= True
             position = note.start - measure_onsets[measure_index]
+            assert position < max_position, (measure_index, measure_index, measure_onsets[measure_index], note.start)
             grooving_per_bar[measure_index, position] |= True
 
     pairs = list(itertools.combinations(range(len(measure_onsets)), 2))

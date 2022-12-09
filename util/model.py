@@ -177,7 +177,7 @@ class MyMidiTransformer(nn.Module):
 
 def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str], vocabs: Vocabs):
     """
-        Set to large negtive numeric value the logits of the attribute values that would definitily raise exception
+        Set to large negative numeric value the logits of the attribute values that would definitily raise exception
         if the next token in context_text_list has them
     """
     assert len(context_text_list) > 0, 'Empty context_text_list'
@@ -349,8 +349,10 @@ def calc_losses(pred_logit: List[Tensor], target_logit: Tensor) -> List[Tensor]:
     target_logit = target_logit.long()
     head_losses = [
         F.cross_entropy(
+        # F.nll_loss(
             input=pred_attr_logit.transpose(1, 2), # (batch_size, attr_vocab_size, seq_size)
-            target=target_logit[..., k] # (batch_size, seq_size)
+            target=target_logit[..., k], # (batch_size, seq_size)
+            ignore_index=0 # assume padding is index 0
         )
         for k, pred_attr_logit in enumerate(pred_logit)
     ]
@@ -444,6 +446,7 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
             F.cross_entropy(
                 input=seq_flatten_pred_logits[k], # shape = (seq_mps_flatten_size, attr_vocabs_size)
                 target=seq_flatten_target_logits[:, k], # shape = (seq_mps_flatten_size, )
+                ignore_index=0, # assume padding is index 0
                 reduction='none' # return shape (seq_mps_flatten_size, )
             )
             for k in range(out_attr_number)

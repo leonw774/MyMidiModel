@@ -114,13 +114,16 @@ class MidiDataset(Dataset):
         self._piece_body_start_index = [0] * self.number_of_pieces
         self._file_mps_sep_indices = [[] for _ in range(self.number_of_pieces)]
         self._augmentable_pitches = [np.empty((0,), dtype=np.bool8) for _ in range(self.number_of_pieces)]
+        pitch_augmentation_factor = self.pitch_augmentation * 2 + 1 # length of (-pa, ..., -1, 0, 1, ..., pa)
         cur_index = 0
         for filenum in tqdm(range(self.number_of_pieces)):
             filename = str(filenum)
 
             if use_permutable_subseq_loss or permute_mps:
                 # find all seperater's index
-                mps_sep_indices = np.flatnonzero(np.isin(self.pieces[filename][:, TOKEN_ATTR_INDEX['evt']], self._mps_seperators))
+                mps_sep_indices = np.flatnonzero(
+                    np.isin(self.pieces[filename][:, TOKEN_ATTR_INDEX['evt']], self._mps_seperators)
+                )
                 for i in range(mps_sep_indices.shape[0] - 1):
                     self._file_mps_sep_indices[filenum].append(mps_sep_indices[i])
                     if mps_sep_indices[i+1] != mps_sep_indices[i] + 1:
@@ -133,15 +136,16 @@ class MidiDataset(Dataset):
                 not_percussion_notes = (self.pieces[filename][:, TOKEN_ATTR_INDEX['ins']]) != 129
                 self._augmentable_pitches[filenum] = np.logical_and(is_multinote_token, not_percussion_notes)
 
-            cur_piece_lengths = self.pieces[filename].shape[0]
+            cur_piece_lengths = int(self.pieces[filename].shape[0])
             self._piece_lengths[filenum] = cur_piece_lengths
 
-            if cur_piece_lengths > max_seq_length and not sample_from_start:
-                cur_index += cur_piece_lengths - max_seq_length + 1 * (self.pitch_augmentation * 2 + 1)
+            if not sample_from_start:
+                cur_index += cur_piece_lengths * pitch_augmentation_factor
             else:
-                cur_index += 1 * (self.pitch_augmentation * 2 + 1)
+                cur_index += pitch_augmentation_factor
             self._filenum_indices[filenum] = cur_index
         self._max_index = cur_index
+        self._pitch_augmentation_factor = pitch_augmentation_factor
         # cast self._filenum_indices from list of tuples into np array to save space
         self_size = sum(
             sys.getsizeof(getattr(self, attr_name))
@@ -157,13 +161,17 @@ class MidiDataset(Dataset):
         #     else:
         #         break
         filenum = bisect.bisect_left(self._filenum_indices, index)
-        begin_index_augmented = index if filenum == 0 else index - self._filenum_indices[filenum-1] - 1
-        begin_index, pitch_augment = divmod(begin_index_augmented, (self.pitch_augmentation * 2 + 1))
-        pitch_augment -= self.pitch_augmentation
+        end_index_and_pitch_augmented = index if filenum == 0 else index - self._filenum_indices[filenum-1] - 1
+        end_index, pitch_augment = divmod(end_index_and_pitch_augmented, self._pitch_augmentation_factor)
+        if end_index < self.max_seq_length:
+            begin_index = 0
+        else:
+            begin_index = end_index - self.max_seq_length
         if self._piece_lengths[filenum] <= self.max_seq_length:
             end_index = self._piece_lengths[filenum]
         else:
             end_index = begin_index + self.max_seq_length
+        pitch_augment -= self.pitch_augmentation
         sliced_array = np.array(self.pieces[str(filenum)][begin_index:end_index]) # copy
         sliced_array = sliced_array.astype(np.int32) # was int16 to save space but torch ask for int
 

@@ -213,10 +213,11 @@ def lr_warmup_and_linear_decay(step_num: int, warmup_steps: int, decay_end_ratio
     return 1 - r * (1 - decay_end_ratio)
 
 
-def log_loss(
+def log_metrics(
         cur_step: int,
         start_time: float,
         scheduler: lr_scheduler.LambdaLR,
+        gpu_mem_alloc_bytes: int,
         train_loss_list: List[List[float]],
         valid_loss_list: List[List[float]],
         loss_file_path: str):
@@ -224,11 +225,10 @@ def log_loss(
     avg_valid_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*valid_loss_list) ]
     avg_train_losses_str = ', '.join([f'{l:.6f}' for l in avg_train_losses])
     avg_valid_losses_str = ', '.join([f'{l:.6f}' for l in avg_valid_losses])
-    gpu_alloc_mem_bytes = torch.cuda.memory_allocated(0)
     lr = scheduler.get_last_lr()[0]
     logging.info(
-        'Time: %d, GPU Memory allocated: %d, Learning rate: %.6f',
-        time()-start_time, gpu_alloc_mem_bytes, lr
+        'Time: %d, GPU Mem.: %.3f MB, Learning rate: %.6f',
+        time()-start_time, gpu_mem_alloc_bytes/1e6, lr
     )
     logging.info(
         'Avg. train losses: %s Avg. accum. train loss: %.6f \nAvg. valid losses: %s Avg. accum. valid loss: %.6f',
@@ -237,7 +237,7 @@ def log_loss(
     if loss_file_path:
         with open(loss_file_path, 'a', encoding='utf8') as loss_file:
             loss_file.write(
-                f'{cur_step}, {gpu_alloc_mem_bytes}, {time()-start_time:.6f}, {lr:.6f}, '
+                f'{cur_step}, {time()-start_time:.6f}, {gpu_mem_alloc_bytes} {lr:.6f}, '
                 + f'{avg_train_losses_str}, {sum(avg_train_losses):.6f}, {avg_valid_losses_str}, {sum(avg_valid_losses):.6f}\n'
             )
 
@@ -292,7 +292,7 @@ def main():
     # loss csv file is in the checkpoint directory
     loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
     with open(loss_file_path, 'w+', encoding='utf8') as loss_file:
-        loss_csv_head = 'step, time, gpu_memory_allocated, learning_rate, '
+        loss_csv_head = 'step, time, gpu_memory_allocated_bytes, learning_rate, '
         train_output_attr_name = ['train_' + n for n in OUTPUT_ATTR_NAME]
         valid_output_attr_name = ['valid_' + n for n in OUTPUT_ATTR_NAME]
         if vocabs.paras['position_method'] == 'event':
@@ -478,7 +478,15 @@ def main():
         complete_train_loss_list.extend(train_loss_list)
         complete_valid_loss_list.extend(valid_loss_list)
         cur_step = start_step + args.train_args.validation_interval
-        log_loss(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_file_path)
+
+        gpu_mem_alloc_bytes = -1
+        if len(args.data_parallel_devices) == 0:
+            gpu_mem_alloc_bytes = torch.cuda.memory_allocated(0)
+        else:
+            gpu_mem_alloc_bytes = sum(
+                map(torch.cuda.memory_allocated, args.data_parallel_devices)
+            )
+        log_metrics(cur_step, start_time, scheduler, gpu_mem_alloc_bytes, train_loss_list, valid_loss_list, loss_file_path)
 
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
         if use_dp:
