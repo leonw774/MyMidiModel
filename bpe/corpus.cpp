@@ -124,9 +124,9 @@ void printTrack(const Track& track, const std::vector<Shape>& shapeDict, const s
     for (int i = begin; i < begin + length; ++i) {
         std::cout << i << " - Shape=" << shape2str(shapeDict[track[i].shapeIndex]);
         std::cout << " onset=" << (int) track[i].onset
-                << " basePitch=" << (int) track[i].pitch
-                << " timeUnit=" << (int) track[i].unit
-                << " velocity=" << (int) track[i].vel;
+                  << " basePitch=" << (int) track[i].pitch
+                  << " timeUnit=" << (int) track[i].unit
+                  << " velocity=" << (int) track[i].vel;
         std::cout << " neighbor=" << (int) track[i].neighbor << std::endl;
     }
 }
@@ -263,24 +263,28 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth, std::string position
         unsigned char c = inCorpusFile.get(), i;
         char a[8];
         switch (c) {
-            case 'B': // BOS
+            case BEGIN_TOKEN_STR[0]: // BOS
                 while (inCorpusFile.get() != ' ');
                 corpus.pushNewPiece();
                 curMeasureStart = curMeasureLength = curTime = 0;
                 break;
 
-            case 'E': // EOS
+            case END_TOKEN_STR[0]: // EOS
                 while (inCorpusFile.get() != '\n');
                 break;
 
-            case 'R':
+            case SEP_TOKEN_STR[0]: // SEP
+                while (inCorpusFile.get() != '\n');
+                break;
+
+            case TRACK_EVENTS_CHAR:
                 corpus.piecesMN.back().push_back(Track());
                 while (inCorpusFile.get() != ':');
                 for (i = 0; (a[i] = inCorpusFile.get()) != ' '; ++i); a[i] = '\0';
                 corpus.piecesTP.back().push_back((uint8_t) b36strtoi(a));
                 break;
 
-            case 'M':
+            case MEASURE_EVENTS_CHAR:
                 curMeasureStart += curMeasureLength;
                 uint8_t numer, denom;
                 for (i = 0; (a[i] = inCorpusFile.get()) != '/'; ++i); a[i] = '\0';
@@ -291,7 +295,7 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth, std::string position
                 corpus.piecesTS.back().push_back(TimeStructToken(curMeasureStart, false, numer, denom));
                 break;
 
-            case 'T':
+            case TEMPO_EVENTS_CHAR:
                 if (positionMethod == "event") {
                     for (i = 0; (a[i] = inCorpusFile.get()) != ' '; ++i); a[i] = '\0';
                     corpus.piecesTS.back().push_back(TimeStructToken(curTime, true, b36strtoi(a), 0));
@@ -306,12 +310,12 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth, std::string position
                 }
                 break;
 
-            case 'P':
+            case POSITION_EVENTS_CHAR:
                 for (i = 0; (a[i] = inCorpusFile.get()) != ' '; ++i); a[i] = '\0';
                 curTime = curMeasureStart + b36strtoi(a);
                 break;
 
-            case 'N':
+            case NOTE_EVENTS_CHAR:
                 uint8_t isCont, p, d, v, t;
                 if (isCont = (inCorpusFile.get() == '~')) {
                     inCorpusFile.get();
@@ -361,7 +365,7 @@ void writeShapeVocabFile(std::ostream& vocabOutfile, const std::vector<Shape>& s
     // dont need to write the first 2 default shape
     for (int i = 2; i < shapeDict.size(); ++i) {
         std::stringstream ss;
-        ss << 'S' << shape2str(shapeDict[i]);
+        ss << shape2str(shapeDict[i]);
         vocabOutfile << ss.str() << std::endl;
     }
 }
@@ -378,10 +382,10 @@ void writeOutputCorpusFile(
     int tsCurIdx;
     bool tsEnd;
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
-        outCorpusFile << "BOS ";
+        outCorpusFile << BEGIN_TOKEN_STR << " ";
 
         for (int j = 0; j < corpus.piecesTP[i].size(); ++j) {
-            outCorpusFile << "R" << itob36str(j)
+            outCorpusFile << TRACK_EVENTS_CHAR << itob36str(j)
                 << ":" << itob36str(corpus.piecesTP[i][j]) << " ";
         }
 
@@ -414,18 +418,19 @@ void writeOutputCorpusFile(
                 if (corpus.piecesTS[i][tsCurIdx].getT()) {
                     if (positionMethod == "event") {
                         if (prevPosEventOnset < (int) corpus.piecesTS[i][tsCurIdx].onset) {
-                            outCorpusFile << "P" << itob36str(corpus.piecesTS[i][tsCurIdx].onset - curMeasureStart) << " ";
+                            outCorpusFile << POSITION_EVENTS_CHAR
+                                << itob36str(corpus.piecesTS[i][tsCurIdx].onset - curMeasureStart) << " ";
                             prevPosEventOnset = corpus.piecesTS[i][tsCurIdx].onset;
                         }
-                        outCorpusFile << "T" << itob36str(corpus.piecesTS[i][tsCurIdx].getN()) << " ";
+                        outCorpusFile << TEMPO_EVENTS_CHAR << itob36str(corpus.piecesTS[i][tsCurIdx].getN()) << " ";
                     }
                     else {
-                        outCorpusFile << "T" << itob36str(corpus.piecesTS[i][tsCurIdx].getN())
+                        outCorpusFile << TEMPO_EVENTS_CHAR << itob36str(corpus.piecesTS[i][tsCurIdx].getN())
                             << ":" << itob36str(corpus.piecesTS[i][tsCurIdx].onset - curMeasureStart) << " ";
                     }
                 }
                 else {
-                    outCorpusFile << "M"
+                    outCorpusFile << MEASURE_EVENTS_CHAR
                         << itob36str(corpus.piecesTS[i][tsCurIdx].getN()) << "/"
                         << itob36str(corpus.piecesTS[i][tsCurIdx].getD()) << " ";
                     curMeasureStart = corpus.piecesTS[i][tsCurIdx].onset;
@@ -440,20 +445,20 @@ void writeOutputCorpusFile(
                 // std::cout << "MN " << i << "," << minTrackIdx << "," << trackCurIdx[minTrackIdx] << ", onset=" << curMN.onset << std::endl;
                 if (positionMethod == "event") {
                     if (prevPosEventOnset < (int) minTrackOnset) {
-                        outCorpusFile << "P" << itob36str(minTrackOnset - curMeasureStart) << " ";
+                        outCorpusFile << POSITION_EVENTS_CHAR << itob36str(minTrackOnset - curMeasureStart) << " ";
                         prevPosEventOnset = minTrackOnset;
                     }
                 }
                 std::string shapeStr;
                 unsigned int shapeIndex = curMN.shapeIndex;
                 if (shapeIndex == 0) {
-                    shapeStr = "N";
+                    shapeStr = NOTE_EVENTS_CHAR;
                 }
                 else if (shapeIndex == 1) {
-                    shapeStr = "N~";
+                    shapeStr = CONT_NOTE_EVENTS_STR;
                 }
                 else {
-                    shapeStr = "S" + shape2str(shapeDict[shapeIndex]);
+                    shapeStr = MULTI_NOTE_EVENT_CHAR + shape2str(shapeDict[shapeIndex]);
                 }
                 outCorpusFile << shapeStr << ":" << itob36str(curMN.pitch)
                     << ":" << itob36str(curMN.unit)
@@ -479,6 +484,6 @@ void writeOutputCorpusFile(
             }
         }
 
-        outCorpusFile << "EOS\n";
+        outCorpusFile << END_TOKEN_STR << "\n";
     }
 }

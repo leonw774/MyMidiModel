@@ -4,11 +4,12 @@ _COMMON_FIELD_NAMES = ['onset', 'type_priority']
 TYPE_PRIORITY = {
     'BeginOfScoreToken': 0,
     'TrackToken': 1,
-    'MeasureToken': 2,
-    'PositionToken': 3,
-    'TempoToken': 4,
-    'NoteToken': 5,
-    'EndOfScoreToken': 6,
+    'SectionSeperatorToken': 2,
+    'MeasureToken': 3,
+    'PositionToken': 4,
+    'TempoToken': 5,
+    'NoteToken': 6,
+    'EndOfScoreToken': 7,
 }
 
 BeginOfScoreToken = namedtuple(
@@ -21,7 +22,11 @@ TrackToken = namedtuple(
     _COMMON_FIELD_NAMES+['track_number', 'instrument'],
     defaults=[-1, TYPE_PRIORITY['TrackToken'], -1, -1]
 )
-
+SectionSeperatorToken = namedtuple(
+    'SectionSeperatorToken',
+    _COMMON_FIELD_NAMES,
+    defaults=[-1, TYPE_PRIORITY['SectionSeperatorToken']]
+)
 MeasureToken = namedtuple(
     'MeasureToken',
     _COMMON_FIELD_NAMES+['time_signature'],
@@ -84,11 +89,18 @@ def b36str2int(x: str):
     return int(x, TOKEN_INT2STR_BASE)
 
 
-# pad token have to be the "zero-th" token
-PADDING_TOKEN_STR = '<PAD>'
-BEGIN_TOKEN_STR = 'BOS'
-END_TOKEN_STR = 'EOS'
+# pad token have to be the first token (a.k.a. index 0) in any vocabulary
+PADDING_TOKEN_STR   = 'PAD'
+BEGIN_TOKEN_STR     = 'BOS'
+END_TOKEN_STR       = 'EOS'
+SEP_TOKEN_STR       = 'SEP'
 
+TRACK_EVENTS_CHAR       = 'R'
+MEASURE_EVENTS_CHAR     = 'M'
+POSITION_EVENTS_CHAR    = 'P'
+TEMPO_EVENTS_CHAR       = 'T'
+NOTE_EVENTS_CHAR        = 'N'
+MULTI_NOTE_EVENTS_CHAR  = 'U'
 
 def token_to_str(token: namedtuple) -> str:
     # typename = token.__class__.__name__
@@ -97,7 +109,7 @@ def token_to_str(token: namedtuple) -> str:
     if type_priority == TYPE_PRIORITY['NoteToken']:
         # event:pitch:duration:velocity:track:instrument(:position)
         # negative duration means is_cont==True
-        text = 'N' if token.duration > 0 else 'N~'
+        text = NOTE_EVENTS_CHAR if token.duration > 0 else NOTE_EVENTS_CHAR + '~'
         text += ( f':{int2b36str(token.pitch)}'
                 + f':{int2b36str(abs(token.duration))}'
                 + f':{int2b36str(token.velocity)}'
@@ -107,19 +119,19 @@ def token_to_str(token: namedtuple) -> str:
         return text
 
     elif type_priority == TYPE_PRIORITY['PositionToken']:
-        return f'P{int2b36str(token.position)}'
+        return f'{POSITION_EVENTS_CHAR}{int2b36str(token.position)}'
 
     elif type_priority == TYPE_PRIORITY['MeasureToken']:
-        return f'M{int2b36str(token.time_signature[0])}/{int2b36str(token.time_signature[1])}'
+        return f'{MEASURE_EVENTS_CHAR}{int2b36str(token.time_signature[0])}/{int2b36str(token.time_signature[1])}'
 
     elif type_priority == TYPE_PRIORITY['TempoToken']:
         if token.position == -1:
-            return f'T{int2b36str(token.bpm)}'
-        return f'T{int2b36str(token.bpm)}:{int2b36str(token.position)}'
+            return f'{TEMPO_EVENTS_CHAR}{int2b36str(token.bpm)}'
+        return f'{TEMPO_EVENTS_CHAR}{int2b36str(token.bpm)}:{int2b36str(token.position)}'
 
     elif type_priority == TYPE_PRIORITY['TrackToken']:
         # type-track:instrument
-        return f'R{int2b36str(token.track_number)}:{int2b36str(token.instrument)}'
+        return f'{TRACK_EVENTS_CHAR}{int2b36str(token.track_number)}:{int2b36str(token.instrument)}'
 
     elif type_priority == TYPE_PRIORITY['BeginOfScoreToken']:
         return BEGIN_TOKEN_STR

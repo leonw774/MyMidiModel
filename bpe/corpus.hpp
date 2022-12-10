@@ -14,6 +14,20 @@
 #include <algorithm>
 #include <chrono>
 
+// these setting must correspond to what is defined in util/tokens.py
+#define BEGIN_TOKEN_STR         "BOS"
+#define END_TOKEN_STR           "EOS"
+#define SEP_TOKEN_STR           "SEP"
+#define TRACK_EVENTS_CHAR       'R'
+#define MEASURE_EVENTS_CHAR     'M'
+#define POSITION_EVENTS_CHAR    'P'
+#define TEMPO_EVENTS_CHAR       'T'
+#define NOTE_EVENTS_CHAR        'N'
+#define MULTI_NOTE_EVENT_CHAR   'U'
+
+// for convenience
+#define CONT_NOTE_EVENTS_STR    "N~"
+
 struct RelNote {
     uint8_t isContAndRelOnset;
     int8_t relPitch;

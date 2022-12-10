@@ -1,8 +1,6 @@
 # from util.corpus import CorpusReader # will cause circular import
+import tokens
 from .tokens import (
-    BEGIN_TOKEN_STR,
-    END_TOKEN_STR,
-    PADDING_TOKEN_STR,
     int2b36str,
     get_largest_possible_position,
     SUPPORTED_TIME_SIGNATURES
@@ -93,68 +91,54 @@ def build_vocabs(
     # start_time = time()
 
     # Event tokens include:
-    # - begin-of-score and end-of-score
-    # - shape
+    # - begin-of-score, end-of-score and seperator
+    # - note and multi-note
     # - track and instrument
-    # - positions
+    # - position
     # - measure and time_signature
     # - tempo change
 
-    event_shape_tokens = ['N', 'N~'] + bpe_shapes_list
+    event_note_multi_note_tokens = (
+        [tokens.NOTE_EVENTS_CHAR, tokens.NOTE_EVENTS_CHAR+'~']
+        + [tokens.MULTI_NOTE_EVENTS_CHAR+shape for shape in bpe_shapes_list]
+    )
 
     event_track_instrument_tokens = [
-        'R'+int2b36str(i) for i in range(paras['max_track_number'])
+        tokens.TRACK_EVENTS_CHAR+int2b36str(i) for i in range(paras['max_track_number'])
     ]
     event_position_tokens = (
-        ['P'+int2b36str(i) for i in range(get_largest_possible_position(paras['nth']))]
+        [tokens.POSITION_EVENTS_CHAR+int2b36str(i) for i in range(get_largest_possible_position(paras['nth']))]
         if paras['position_method'] == 'event' else
         []
     )
     event_measure_time_sig_tokens = [
-        f'M{int2b36str(n)}/{int2b36str(d)}' for n, d in SUPPORTED_TIME_SIGNATURES
+        f'{tokens.MEASURE_EVENTS_CHAR}{int2b36str(n)}/{int2b36str(d)}' for n, d in SUPPORTED_TIME_SIGNATURES
     ]
     tempo_min, tempo_max, tempo_step = paras['tempo_quantization']
     event_tempo_tokens = [
-        'T'+int2b36str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
+        tokens.TEMPO_EVENTS_CHAR+int2b36str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
     ]
 
-    # place padding token in front so that they have same index across all vocabulary
+    # padding token HAVE TO be at first
     event_tokens = (
-        [PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR]
-        + event_shape_tokens + event_track_instrument_tokens + event_position_tokens + event_measure_time_sig_tokens + event_tempo_tokens
+        [tokens.PADDING_TOKEN_STR, tokens.BEGIN_TOKEN_STR, tokens.END_TOKEN_STR]
+        + event_note_multi_note_tokens + event_track_instrument_tokens + event_position_tokens
+        + event_measure_time_sig_tokens + event_tempo_tokens
     )
 
     max_duration = paras['max_duration']
-    pitch_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(128)))
-    duration_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(1, max_duration+1)))
-    velocity_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
-    track_number_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(paras['max_track_number'])))
-    instrument_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(129)))
-    position_tokens = [PADDING_TOKEN_STR] + list(map(int2b36str, range(get_largest_possible_position(paras['nth']))))
+    pad_token = [tokens.PADDING_TOKEN_STR]
+    pitch_tokens = pad_token + list(map(int2b36str, range(128)))
+    duration_tokens = pad_token + list(map(int2b36str, range(1, max_duration+1)))
+    velocity_tokens = pad_token + list(map(int2b36str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
+    track_number_tokens = pad_token + list(map(int2b36str, range(paras['max_track_number'])))
+    instrument_tokens = pad_token + list(map(int2b36str, range(129)))
+    position_tokens = pad_token + list(map(int2b36str, range(get_largest_possible_position(paras['nth']))))
 
     token_count_per_piece = []
-    # max_measured_count = 0 # find max measure number in all pieces
-    # corpus_measure_time_sig_tokens = set()
-    # corpus_position_tokens = set() # we want to see how sparse measure and position is
     for piece in corpus_reader:
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
-        # measures_count = 0
-        # measures_set = set()
-        # for t in text_list:
-        #     if t[0] == 'M':
-        #         measures_set.add(t)
-        #         measures_count += 1
-        # max_measured_count = max(max_measured_count, measures_count)
-
-        # corpus_measure_time_sig_tokens.update(measures_set)
-        # if paras['position_method'] == 'event':
-        #     positions = {t[1:] for t in text_list if t[0] == 'P'}
-        # else:
-        #     positions = {t.split(':')[-1] for t in text_list if t[0] == 'N'}
-        # corpus_position_tokens.update(positions)
-    # corpus_measure_time_sig_tokens = list(corpus_measure_time_sig_tokens)
-    # corpus_position_tokens = list(corpus_position_tokens)
 
     summary_string = (
         f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
@@ -174,7 +158,7 @@ def build_vocabs(
     vocabs = Vocabs(
         paras=paras,
         bpe_shapes_list=bpe_shapes_list,
-        padding_token=PADDING_TOKEN_STR,
+        padding_token=tokens.PADDING_TOKEN_STR,
         events=event_tokens,
         pitchs=pitch_tokens,
         durations=duration_tokens,

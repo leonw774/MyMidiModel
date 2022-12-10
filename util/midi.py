@@ -4,8 +4,10 @@ from typing import Tuple, List, Dict, Union
 
 from miditoolkit import MidiFile, Instrument, TempoChange, TimeSignature, Note
 
+import tokens
 from .tokens import (
-    NoteToken, TempoToken, PositionToken, MeasureToken, TrackToken, BeginOfScoreToken, EndOfScoreToken,
+    BeginOfScoreToken, SectionSeperatorToken, EndOfScoreToken,
+    NoteToken, TempoToken, PositionToken, MeasureToken, TrackToken,
     TYPE_PRIORITY,
     is_supported_time_signature,
     token_to_str,
@@ -393,7 +395,7 @@ def get_head_tokens(midi: MidiFile) -> list:
         )
         for i, track in enumerate(midi.instruments)
     ]
-    return [BeginOfScoreToken()] + track_token_list
+    return track_token_list
 
 
 def midi_to_token_list(
@@ -414,7 +416,7 @@ def midi_to_token_list(
     body_token_list.sort()
 
     head_token_list = get_head_tokens(midi)
-    full_token_list = head_token_list + body_token_list + [EndOfScoreToken()]
+    full_token_list = [BeginOfScoreToken()] + head_token_list + [SectionSeperatorToken()] + body_token_list + [EndOfScoreToken()]
 
     return full_token_list
 
@@ -536,7 +538,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
     midi = MidiFile(ticks_per_beat=nth//4)
 
     text_list = piece.split(' ')
-    assert text_list[0] == 'BOS' and text_list[-1] == 'EOS', \
+    assert text_list[0] == tokens.BEGIN_TOKEN_STR and text_list[-1] == tokens.END_TOKEN_STR, \
         f'No BOS and EOS at start and end, instead: {list(text_list[0])} and {list(text_list[-1])}'
 
     cur_time = 0
@@ -548,29 +550,32 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
     track_program_mapping = dict()
     for text in text_list[1:-1]:
         typename = text[0]
-        if typename == 'R':
-            assert is_head, 'R token at body'
+        if typename == tokens.TRACK_EVENTS_CHAR:
+            assert is_head, 'Track token at body'
             track_number, instrument = (b36str2int(x) for x in text[1:].split(':'))
             assert track_number not in track_program_mapping, 'Repeated track number'
             # shoud we use more strict track list?: not allow permutation, just 1, ..., n
             assert track_number == len(track_program_mapping), 'Track number not increasing by one'
             track_program_mapping[track_number] = instrument
 
-        elif typename == 'M':
+        elif typename == tokens.SEP_TOKEN_STR[0]:
+            assert is_head, 'Seperator token in body'
+            is_head = False
+            assert len(track_program_mapping) > 0, 'No track in head'
+            track_numbers_list = list(track_program_mapping.keys())
+            track_numbers_list.sort()
+            # track number must at least be a permutation of 1, ..., n
+            assert track_numbers_list == list(range(len(track_numbers_list))),\
+                'Track numbers are not consecutive integers starting from 1'
+            for track_number in track_numbers_list:
+                program = track_program_mapping[track_number]
+                midi.instruments.append(
+                    Instrument(program=(program%128), is_drum=(program==128), name=f'Track_{track_number}')
+                )
+
+        elif typename == tokens.MEASURE_EVENTS_CHAR:
             # if this is the first measure
-            if is_head:
-                assert len(track_program_mapping) > 0, 'No track in head'
-                track_numbers_list = list(track_program_mapping.keys())
-                track_numbers_list.sort()
-                # track number must at least be a permutation of 1, ..., n
-                assert track_numbers_list == list(range(len(track_numbers_list))),\
-                    'Track numbers are not consecutive integers starting from 1'
-                for track_number in track_numbers_list:
-                    program = track_program_mapping[track_number]
-                    midi.instruments.append(
-                        Instrument(program=(program%128), is_drum=(program==128), name=f'Track_{track_number}')
-                    )
-                is_head = False
+            assert not is_head
 
             numer, denom = (b36str2int(x) for x in text[1:].split('/'))
             cur_measure_onset += cur_measure_length
@@ -581,13 +586,13 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
                 cur_time_signature = (numer, denom)
                 midi.time_signature_changes.append(TimeSignature(numerator=numer, denominator=denom, time=cur_time))
 
-        elif typename == 'P':
-            assert not is_head, 'P token at head'
+        elif typename == tokens.POSITION_EVENTS_CHAR:
+            assert not is_head, 'Position token at head'
             position = b36str2int(text[1:])
             cur_time = position + cur_measure_onset
 
-        elif typename == 'T':
-            assert not is_head, 'T token at head'
+        elif typename == tokens.TEMPO_EVENTS_CHAR:
+            assert not is_head, 'Tempo token at head'
             if ':' in text[1:]:
                 tempo, position = (b36str2int(x) for x in text[1:].split(':'))
                 cur_time = position + cur_measure_onset
@@ -595,8 +600,8 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
             else:
                 midi.tempo_changes.append(TempoChange(tempo=b36str2int(text[1:]), time=cur_time))
 
-        elif typename == 'N':
-            assert not is_head, 'N token at head'
+        elif typename == tokens.NOTE_EVENTS_CHAR:
+            assert not is_head, 'Note token at head'
             is_cont = (text[1] == '~')
             if is_cont:
                 note_attr = tuple(b36str2int(x) for x in text[3:].split(':'))
@@ -611,8 +616,8 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
             if n is not None:
                 midi.instruments[note_attr[3]].notes.append(n)
 
-        elif typename == 'S':
-            assert not is_head, 'S token at head'
+        elif typename == tokens.MULTI_NOTE_EVENTS_CHAR:
+            assert not is_head, 'Multi-note token at head'
             shape_string, *other_attr = text[1:].split(':')
             relnote_list = []
             for s in shape_string[:-1].split(';'):
@@ -623,7 +628,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
                     relnote = [False] + [b36str2int(a) for a in s.split(',')]
                 relnote_list.append(relnote)
             base_pitch, time_unit, velocity, track_number, *position = (b36str2int(x) for x in other_attr)
-            assert track_number in track_program_mapping, 'Note not in used track'
+            assert track_number in track_program_mapping, 'Multi-Note not in used track'
             if len(position) == 1:
                 cur_time = position[0] + cur_measure_onset
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
@@ -666,12 +671,17 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
     if not ignore_pending_note_error:
         assert len(pending_cont_notes) == 0, f'There are unclosed continuing notes: {pending_cont_notes}'
     else:
-    # handle unclosed continuing notes
-        for offset, info_onsets_dict in pending_cont_notes.items():
+    # handle unclosed continuing notes by let them end at the end of last note
+        last_end_time = max(
+            n.end
+            for inst in midi.instruments
+            for n in inst.notes
+        )
+        for info_onsets_dict in pending_cont_notes.values():
             for info, onset_list in info_onsets_dict.items():
                 pitch, velocity, track_number = info
                 for onset in onset_list:
-                    n = Note(velocity=velocity, pitch=pitch, start=onset, end=offset)
+                    n = Note(velocity=velocity, pitch=pitch, start=onset, end=last_end_time)
                     midi.instruments[track_number].notes.append(n)
     return midi
 
@@ -680,7 +690,7 @@ def get_first_k_measures(text_list: str, k):
     m_count = 0
     end_index = 0
     for i, text in enumerate(text_list):
-        if text[0] == 'M':
+        if text[0] == tokens.MEASURE_EVENTS_CHAR:
             m_count += 1
         if m_count > k:
             end_index = i
@@ -697,22 +707,22 @@ def get_first_k_nths(text_list: str, nth, k):
     end_index = 0
     for i, text in enumerate(text_list):
         typename = text[0]
-        if typename == 'M':
+        if typename == tokens.MEASURE_EVENTS_CHAR:
             numer, denom = (b36str2int(x) for x in text[1:].split('/'))
             cur_measure_onset += cur_measure_length
             cur_time = cur_measure_onset
             cur_measure_length = round(nth * numer / denom)
 
-        elif typename == 'P':
+        elif typename == tokens.POSITION_EVENTS_CHAR:
             position = b36str2int(text[1:])
             cur_time = position + cur_measure_onset
 
-        elif typename == 'T':
+        elif typename == tokens.TEMPO_EVENTS_CHAR:
             if ':' in text[1:]:
                 _tempo, position = (b36str2int(x) for x in text[1:].split(':'))
                 cur_time = position + cur_measure_onset
 
-        elif typename == 'N':
+        elif typename == tokens.NOTE_EVENTS_CHAR:
             is_cont = (text[1] == '~')
             if is_cont:
                 note_attr = tuple(b36str2int(x) for x in text[3:].split(':'))
@@ -721,7 +731,7 @@ def get_first_k_nths(text_list: str, nth, k):
             if len(note_attr) == 5:
                 cur_time = note_attr[4] + cur_measure_onset
 
-        elif typename == 'S':
+        elif typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             _shape_string, *other_attr = text[1:].split(':')
             note_attr = tuple(b36str2int(x) for x in other_attr)
             if len(note_attr) == 5:

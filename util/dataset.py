@@ -12,7 +12,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
 from util.corpus import get_corpus_vocabs, TOKEN_ATTR_INDEX
-from util.tokens import BEGIN_TOKEN_STR, END_TOKEN_STR
+import util.tokens as tokens
 
 class MidiDataset(Dataset):
 
@@ -69,41 +69,44 @@ class MidiDataset(Dataset):
 
         print('Processing')
         # Seperators are:
-        # EOS, BOS, PADDING, first track token (R0), measure tokens (M\w+), position tokens (P\w+)
-        # stores their index in event vocab, empty when `use_permutable_subseq_loss` is not True
+        # BOS, EOS, SEP, PADDING, first track (R0), measure tokens (M\w+), position tokens (P\w+)
+        # stores their index in event vocab
+        # _mps_seperators is empty when `use_permutable_subseq_loss` is not True
         self._mps_seperators = list()
-        self._note_ids = list()
-        self._position_ids = list()
-        self._bos_id = self.vocabs.events.text2id[BEGIN_TOKEN_STR]
-        self._eos_id = self.vocabs.events.text2id[END_TOKEN_STR]
+        self._bos_id = self.vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
+        self._sep_id = self.vocabs.events.text2id[tokens.SEP_TOKEN_STR]
+        self._eos_id = self.vocabs.events.text2id[tokens.END_TOKEN_STR]
         # the pad id should be the same across all vocabs (aka zero)
         self._pad_id = self.vocabs.events.text2id[self.vocabs.padding_token]
-        self._tempo_ids = set()
-        self._measure_ids = set()
         self._track_ids = set()
+        self._measure_ids = set()
+        self._tempo_ids = set()
+        self._position_ids = list()
+        self._note_ids = list()
         for text, index in self.vocabs.events.text2id.items():
-            if text[0] == 'N' or text[0] == 'S':
+            if text[0] == tokens.NOTE_EVENTS_CHAR or text[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
                 self._note_ids.append(index)
-            elif text[0] == 'T':
-                self._tempo_ids.add(index)
-            elif text[0] == 'P':
+            elif text[0] == tokens.POSITION_EVENTS_CHAR:
                 self._position_ids.append(index)
-            elif text[0] == 'M':
+            elif text[0] == tokens.MEASURE_EVENTS_CHAR:
                 self._measure_ids.add(index)
-            elif text[0] == 'R':
+            elif text[0] == tokens.TRACK_EVENTS_CHAR:
                 self._track_ids.add(index)
+            elif text[0] == tokens.TEMPO_EVENTS_CHAR:
+                self._tempo_ids.add(index)
         if use_permutable_subseq_loss or permute_mps:
             self._mps_seperators = set([
                 self._bos_id,
                 self._eos_id,
-                self.vocabs.events.text2id['R0'],
+                self._sep_id,
+                self.vocabs.events.text2id[tokens.TRACK_EVENTS_CHAR+'0'],
                 self._pad_id,
             ])
             self._mps_seperators.update(self._track_ids)
             self._mps_seperators.update(self._measure_ids)
             self._mps_seperators.update(self._position_ids)
             self._mps_seperators = np.sort(np.array(list(self._mps_seperators)))
-        # numpy.isin can work on set, turn it into sorted 1d array helps search speed
+        # numpy.isin can work on set, but turn it into sorted 1d array helps search speed
         self._note_ids = np.sort(np.array(self._note_ids))
         self._position_ids = np.sort(np.array(self._position_ids))
 

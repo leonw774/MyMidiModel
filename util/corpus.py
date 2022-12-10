@@ -10,8 +10,9 @@ from matplotlib.figure import Figure
 from tqdm import tqdm
 import yaml
 
+import tokens
+from .tokens import b36str2int, int2b36str
 from .vocabs import Vocabs
-from .tokens import b36str2int, int2b36str, PADDING_TOKEN_STR, BEGIN_TOKEN_STR
 
 def to_paras_file_path(corpus_dir_path: str) -> str:
     return os.path.join(corpus_dir_path, 'paras')
@@ -77,7 +78,7 @@ class CorpusReader:
                 if len(self.line_pos) == 0:
                     tmp_line_pos.append(offset)
                 if len(line) > 1: # not just newline
-                    tmp_length += 1 if line.startswith(BEGIN_TOKEN_STR) else 0
+                    tmp_length += 1 if line.startswith(tokens.BEGIN_TOKEN_STR) else 0
                     yield line[:-1] # remove \n at the end
             self.line_pos = tmp_line_pos
             self.length = tmp_length
@@ -153,10 +154,10 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
         else:
             continue
 
-        if typename == 'B' or typename == 'E':
+        if typename in (tokens.BEGIN_TOKEN_STR[0], tokens.END_TOKEN_STR[0], tokens.SEP_TOKEN_STR[0]):
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
 
-        elif typename == 'R':
+        elif typename == tokens.TRACK_EVENTS_CHAR:
             event_text, instrument = text.split(':')
             track_number = event_text[1:]
             tracks_count += 1
@@ -164,7 +165,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
             x[i][TOKEN_ATTR_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
             x[i][TOKEN_ATTR_INDEX['ins']] = vocabs.instruments.text2id[instrument]
 
-        elif typename == 'M':
+        elif typename == tokens.MEASURE_EVENTS_CHAR:
             cur_position_id = vocabs.positions.text2id['0']
             cur_time_sig_id = vocabs.time_signatures.text2id[text]
             cur_measure_number += 1
@@ -175,7 +176,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
             x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
             x[i][TOKEN_ATTR_INDEX['tis']] = cur_time_sig_id
 
-        elif typename == 'T':
+        elif typename == tokens.TEMPO_EVENTS_CHAR:
             event_text, *attr = text = text.split(':')
             cur_tempo_id = vocabs.tempos.text2id[event_text]
             if position_method == 'attribute':
@@ -189,7 +190,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
             x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
             x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
 
-        elif typename == 'P':
+        elif typename == tokens.POSITION_EVENTS_CHAR:
             cur_position_id = vocabs.positions.text2id[text[1:]]
             cur_position_cursor = i
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
@@ -198,7 +199,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
             x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
             x[i][TOKEN_ATTR_INDEX['tis']] = cur_time_sig_id
 
-        elif typename == 'N' or typename == 'S':
+        elif typename == tokens.NOTE_EVENTS_CHAR or typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             event_text, *attr = text.split(':')
             if position_method == 'attribute':
                 cur_position_id = vocabs.positions.text2id[attr[4]]
@@ -225,14 +226,14 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
         Expect array to be numpy-like array
     """
     position_method = vocabs.paras['position_method']
-    assert len(array.shape) == 2 and array.shape[0] > 0, f'bad numpy array shape: {array.shape}'
+    assert len(array.shape) == 2 and array.shape[0] > 0, f'Bad numpy array shape: {array.shape}'
     if is_output:
         if position_method == 'event':
-            assert array.shape[1] == len(OUTPUT_ATTR_NAME) - 1, f'bad numpy array shape: {array.shape}'
+            assert array.shape[1] == len(OUTPUT_ATTR_NAME) - 1, f'Bad numpy array shape: {array.shape}'
         else:
-            assert array.shape[1] == len(OUTPUT_ATTR_NAME), f'bad numpy array shape: {array.shape}'
+            assert array.shape[1] == len(OUTPUT_ATTR_NAME), f'Bad numpy array shape: {array.shape}'
     else:
-        assert array.shape[1] == len(COMPLETE_ATTR_NAME), f'bad numpy array shape: {array.shape}'
+        assert array.shape[1] == len(COMPLETE_ATTR_NAME), f'Bad numpy array shape: {array.shape}'
 
 
     text_list = []
@@ -241,24 +242,24 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
         event_text = vocabs.events.id2text[array[i][TOKEN_ATTR_INDEX['evt']]]
         typename = event_text[0]
 
-        if typename == 'B' or typename == 'E':
+        if event_text in (tokens.BEGIN_TOKEN_STR, tokens.SEP_TOKEN_STR, tokens.END_TOKEN_STR):
             text_list.append(event_text) # no additional attribute needed
 
-        elif typename == 'R':
+        elif typename == tokens.TRACK_EVENTS_CHAR:
             # track token has instrument attribute
             token_text = event_text + ':' + vocabs.instruments.id2text[array[i][TOKEN_ATTR_INDEX['ins']]]
             text_list.append(token_text)
 
-        elif typename == 'M':
+        elif typename == tokens.MEASURE_EVENTS_CHAR:
             text_list.append(event_text)
 
-        elif typename == 'T':
+        elif typename == tokens.TEMPO_EVENTS_CHAR:
             text_list.append(event_text)
 
-        elif typename == 'P':
+        elif typename == tokens.POSITION_EVENTS_CHAR:
             text_list.append(event_text)
 
-        elif typename == 'N' or typename == 'S':
+        elif typename == tokens.NOTE_EVENTS_CHAR or typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             # subtract one because there is padding token at the beginning of the vocab
             track_number = array[i][TOKEN_ATTR_INDEX['trn']] - 1
             token_text = (
@@ -271,7 +272,7 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
             if position_method == 'attribute':
                 token_text += ':' + vocabs.positions.id2text[array[i][TOKEN_ATTR_INDEX['pos']]]
             text_list.append(token_text)
-        elif event_text == PADDING_TOKEN_STR:
+        elif event_text == tokens.PADDING_TOKEN_STR:
             pass
         else:
             raise ValueError(f'unknown typename of event_text: {event_text}')
@@ -292,7 +293,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
     # know how long this piece is and draw measure lines
     for text in text_list[1:-1]:
         typename = text[0]
-        if typename == 'M':
+        if typename == tokens.MEASURE_EVENTS_CHAR:
             numer, denom = (b36str2int(x) for x in text[1:].split('/'))
             cur_measure_onset += cur_measure_length
             cur_measure_length = round(nth * numer / denom)
@@ -319,7 +320,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
             if instrument == 128:
                 drum_tracks.add(track_number)
 
-        elif typename == 'M':
+        elif typename == tokens.MEASURE_EVENTS_CHAR:
             if is_head:
                 track_colors = [
                     PIANOROLL_TRACK_COLORMAP(i / total_track_number, alpha=0.5)
@@ -335,11 +336,11 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
             # draw measure line between itself and the next measure
             plt.axvline(x=cur_time, ymin=0, ymax=128, color=PIANOROLL_MEASURELINE_COLOR, linewidth=0.5, zorder=0)
 
-        elif typename == 'P':
+        elif typename == tokens.POSITION_EVENTS_CHAR:
             position = b36str2int(text[1:])
             cur_time = position + cur_measure_onset
 
-        elif typename == 'T':
+        elif typename == tokens.TEMPO_EVENTS_CHAR:
             if ':' in text[1:]:
                 tempo, position = (b36str2int(x) for x in text[1:].split(':'))
                 cur_time = position + cur_measure_onset
@@ -347,7 +348,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
                 tempo = b36str2int(text[1:])
             plt.annotate(xy=(cur_time+0.05, 0.95), text=f'bpm={tempo}', xycoords=('data', 'axes fraction'))
 
-        elif typename == 'N':
+        elif typename == tokens.NOTE_EVENTS_CHAR:
             is_cont = (text[1] == '~')
             if is_cont:
                 note_attr = tuple(b36str2int(x) for x in text[3:].split(':'))
@@ -372,7 +373,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
                     )
                 )
 
-        elif typename == 'S':
+        elif typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             shape_string, *other_attr = text[1:].split(':')
             relnote_list = []
             for s in shape_string[:-1].split(';'):
@@ -383,7 +384,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
                     relnote = [b36str2int(a) for a in s.split(',')]
                 relnote = [is_cont] + relnote
                 relnote_list.append(relnote)
-            base_pitch, time_unit, velocity, track_number, *position = (b36str2int(x) for x in other_attr)
+            base_pitch, time_unit, _velocity, track_number, *position = (b36str2int(x) for x in other_attr)
             if len(position) == 1:
                 cur_time = position[0] + cur_measure_onset
             prev_pitch = -1
