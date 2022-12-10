@@ -13,8 +13,9 @@ import numpy as np
 from pandas import Series
 from tqdm import tqdm
 
-from util.tokens import b36str2int, INSTRUMENT_NAMES
-from util.vocabs import build_vocabs, Vocabs
+import util.tokens as tokens
+from util.tokens import b36str2int
+from util.vocabs import build_vocabs
 from util.corpus import (
     to_shape_vocab_file_path,
     to_vocabs_file_path,
@@ -211,18 +212,18 @@ def main():
             }
         }
         for piece in corpus_reader:
-            head_end = piece.find(' M') # find first occurence of measure token
+            head_end = piece.find(' '+tokens.MEASURE_EVENTS_CHAR) # find first occurence of measure token
             tracks_text = piece[4:head_end]
             track_tokens = tracks_text.split()
             for track_token in track_tokens:
                 instrument_id = b36str2int(track_token.split(':')[1])
                 distributions['instrument'][instrument_id] += 1
 
-            multinote_number = piece.count(' N') + piece.count(' S')
-            tempo_number = piece.count(' T')
-            position_number = piece.count(' P')
-            measure_number = piece.count(' M')
-            track_number = piece.count(' R')
+            multinote_number = piece.count(' '+tokens.NOTE_EVENTS_CHAR) + piece.count(' '+tokens.MULTI_NOTE_EVENTS_CHAR)
+            tempo_number = piece.count(' '+tokens.TEMPO_EVENTS_CHAR)
+            position_number = piece.count(' '+tokens.POSITION_EVENTS_CHAR)
+            measure_number = piece.count(' '+tokens.MEASURE_EVENTS_CHAR)
+            track_number = piece.count(' '+tokens.TRACK_EVENTS_CHAR)
             all_token_number = piece.count(' ') + 1
             numbers = [multinote_number, tempo_number, position_number, measure_number, track_number, all_token_number]
             for i, token_type in enumerate(token_types):
@@ -249,7 +250,7 @@ def main():
     instrument_count = [0] * 129
     for program, count in distributions['instrument'].items():
         instrument_count[program] = count
-    plt.bar(INSTRUMENT_NAMES, instrument_count)
+    plt.bar(tokens.INSTRUMENT_NAMES, instrument_count)
     plt.savefig(os.path.join(stats_dir_path, 'instrument_distribution.png'))
     plt.clf()
 

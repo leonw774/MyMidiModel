@@ -6,7 +6,7 @@ from typing import Dict
 
 import numpy as np
 
-from .tokens import get_largest_possible_position, b36str2int
+from .tokens import get_largest_possible_position, b36str2int, MEASURE_EVENTS_CHAR
 from .midi import piece_to_midi
 
 
@@ -73,7 +73,7 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
     measure_indices = [
         i
         for i, t in enumerate(text_list)
-        if t[0] == 'M'
+        if t[0] == MEASURE_EVENTS_CHAR
     ]
     if len(measure_indices) < sample_measure_number:
         raise AssertionError('piece has fewer measure than sample_measure_number')
@@ -130,7 +130,7 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int) -> Dict[str, 
     measure_onsets = [0]
     cur_measure_length = 0
     for text in piece.split(' '):
-        if text[0] == 'M':
+        if text[0] == MEASURE_EVENTS_CHAR:
             measure_onsets.append(measure_onsets[-1] + cur_measure_length)
             numer, denom = (b36str2int(x) for x in text[1:].split('/'))
             cur_measure_length = round(nth * numer / denom)
