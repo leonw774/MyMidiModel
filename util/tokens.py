@@ -136,6 +136,9 @@ def token_to_str(token: namedtuple) -> str:
     elif type_priority == TYPE_PRIORITY['BeginOfScoreToken']:
         return BEGIN_TOKEN_STR
 
+    elif type_priority == TYPE_PRIORITY['SectionSeperatorToken']:
+        return SEP_TOKEN_STR
+
     elif type_priority == TYPE_PRIORITY['EndOfScoreToken']:
         return END_TOKEN_STR
 
