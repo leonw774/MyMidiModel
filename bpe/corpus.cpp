@@ -389,6 +389,8 @@ void writeOutputCorpusFile(
                 << ":" << itob36str(corpus.piecesTP[i][j]) << " ";
         }
 
+        outCorpusFile << SEP_TOKEN_STR << " ";
+
         int curMeasureStart = 0;
         int prevPosEventOnset = -1;
         unsigned int curPieceTrackNum = corpus.piecesMN[i].size();
