@@ -212,7 +212,7 @@ def main():
             }
         }
         for piece in corpus_reader:
-            head_end = piece.find(' '+tokens.MEASURE_EVENTS_CHAR) # find first occurence of measure token
+            head_end = piece.find(tokens.SEP_TOKEN_STR) # find separator
             tracks_text = piece[4:head_end]
             track_tokens = tracks_text.split()
             for track_token in track_tokens:
