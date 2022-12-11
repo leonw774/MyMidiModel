@@ -10,7 +10,7 @@ from matplotlib.figure import Figure
 from tqdm import tqdm
 import yaml
 
-import tokens
+from . import tokens
 from .tokens import b36str2int, int2b36str
 from .vocabs import Vocabs
 

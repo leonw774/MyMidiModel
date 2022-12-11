@@ -4,7 +4,7 @@ from typing import Tuple, List, Dict, Union
 
 from miditoolkit import MidiFile, Instrument, TempoChange, TimeSignature, Note
 
-import tokens
+from . import tokens
 from .tokens import (
     BeginOfScoreToken, SectionSeperatorToken, EndOfScoreToken,
     NoteToken, TempoToken, PositionToken, MeasureToken, TrackToken,

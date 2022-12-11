@@ -1,5 +1,5 @@
 # from util.corpus import CorpusReader # will cause circular import
-import tokens
+from . import tokens
 from .tokens import (
     int2b36str,
     get_largest_possible_position,

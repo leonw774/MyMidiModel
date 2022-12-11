@@ -11,8 +11,8 @@ from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
-from util.corpus import get_corpus_vocabs, TOKEN_ATTR_INDEX
-import util.tokens as tokens
+from . import tokens
+from .corpus import get_corpus_vocabs, TOKEN_ATTR_INDEX
 
 class MidiDataset(Dataset):
 
