@@ -154,7 +154,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
         else:
             continue
 
-        if typename in (tokens.BEGIN_TOKEN_STR[0], tokens.END_TOKEN_STR[0], tokens.SEP_TOKEN_STR[0]):
+        if text in tokens.SPECIAL_TOKENS_STR:
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
 
         elif typename == tokens.TRACK_EVENTS_CHAR:
@@ -242,7 +242,7 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
         event_text = vocabs.events.id2text[array[i][TOKEN_ATTR_INDEX['evt']]]
         typename = event_text[0]
 
-        if event_text in (tokens.BEGIN_TOKEN_STR, tokens.SEP_TOKEN_STR, tokens.END_TOKEN_STR):
+        if event_text in tokens.SPECIAL_TOKENS_STR:
             text_list.append(event_text) # no additional attribute needed
 
         elif typename == tokens.TRACK_EVENTS_CHAR:

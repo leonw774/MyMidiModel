@@ -121,8 +121,7 @@ def build_vocabs(
 
     # padding token HAVE TO be at first
     event_tokens = (
-        [tokens.PADDING_TOKEN_STR, tokens.BEGIN_TOKEN_STR, tokens.END_TOKEN_STR]
-        + event_note_multi_note_tokens + event_track_instrument_tokens + event_position_tokens
+        tokens.SPECIAL_TOKENS_STR + + event_note_multi_note_tokens + event_track_instrument_tokens + event_position_tokens
         + event_measure_time_sig_tokens + event_tempo_tokens
     )
 
