@@ -274,7 +274,7 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth, std::string position
                 break;
 
             case SEP_TOKEN_STR[0]: // SEP
-                while (inCorpusFile.get() != '\n');
+                while (inCorpusFile.get() != ' ');
                 break;
 
             case TRACK_EVENTS_CHAR:
