@@ -459,21 +459,22 @@ def main():
         print('Validation')
         model.eval()
         valid_loss_list = []
-        for _ in tqdm(range(min(args.train_args.validation_steps, len(valid_dataloader)))):
-            try:
-                batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
-            except StopIteration:
-                valid_dataloader_iter = iter(valid_dataloader)
-                batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
-            batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
-            batch_target_seqs = (to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
-            prediction = model(batch_input_seqs)
+        with torch.no_grad():
+            for _ in tqdm(range(min(args.train_args.validation_steps, len(valid_dataloader)))):
+                try:
+                    batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
+                except StopIteration:
+                    valid_dataloader_iter = iter(valid_dataloader)
+                    batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
+                batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
+                batch_target_seqs = (to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
+                prediction = model(batch_input_seqs)
 
-            if args.data_args.use_permutable_subseq_loss:
-                head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
-            else:
-                head_losses = calc_losses(prediction, batch_target_seqs)
-            valid_loss_list.append([hl.item() for hl in head_losses])
+                if args.data_args.use_permutable_subseq_loss:
+                    head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
+                else:
+                    head_losses = calc_losses(prediction, batch_target_seqs)
+                valid_loss_list.append([hl.item() for hl in head_losses])
 
         complete_train_loss_list.extend(train_loss_list)
         complete_valid_loss_list.extend(valid_loss_list)

@@ -268,66 +268,68 @@ def generate_sample(
     end_with_end_token = False
     # print(seq.shape)
     # for _ in tqdm(range(steps)):
-    for _ in range(steps):
-        clipped_seq = input_seq[:, -model.max_seq_length:]
-        logits = model(clipped_seq.to(model_device))
-        last_logits = [
-            l[0, -1, :].to('cpu') # back to cpu, if was cuda (likely)
-            # l has shape (1, sequence_length, attr_vocab_size)
-            for l in logits
-        ]
-
-        last_logits = adjust_logits_with_context(last_logits, text_list, model.vocabs)
-
-        # print('\n'.join([repr(logit) for logit in last_logits]))
-        try_count = 0
-        while try_count < try_count_limit:
-            sampled_attrs = [
-                torch.multinomial(F.softmax(l / temperature, dim=0), 1)
-                for l in last_logits # l has shape (1, attr_vocab_size)
+    with torch.no_grad():
+        for _ in range(steps):
+            clipped_seq = input_seq[:, -model.max_seq_length:]
+            logits = model(clipped_seq.to(model_device))
+            last_logits = [
+                l[0, -1, :].to('cpu') # back to cpu, if was cuda (likely)
+                # l has shape (1, sequence_length, attr_vocab_size)
+                for l in logits
             ]
-            # print(sampled_attrs)
-            try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, attr_num)
-            # print([ model.vocabs.to_dict()[OUTPUT_ATTR_NAME[i]]['id2text'][int(f)] for i, f in enumerate(try_token[0]) ])
-            try_token = torch.unsqueeze(try_token, dim=0) # shape = (1, 1, attr_num)
-            try_seq = torch.cat((output_seq, try_token), dim=1)
-            try_text_list = array_to_text_list(try_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=True)
-            # print(try_text_list)
-            if try_text_list[-1] == END_TOKEN_STR:
-                text_list = try_text_list
-                # if sampled EOS, then dont check. just end
+
+            last_logits = adjust_logits_with_context(last_logits, text_list, model.vocabs)
+
+            # print('\n'.join([repr(logit) for logit in last_logits]))
+            try_count = 0
+            while try_count < try_count_limit:
+                sampled_attrs = [
+                    torch.multinomial(F.softmax(l / temperature, dim=0), 1)
+                    for l in last_logits # l has shape (1, attr_vocab_size)
+                ]
+                # print(sampled_attrs)
+                try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, attr_num)
+                # print([ model.vocabs.to_dict()[OUTPUT_ATTR_NAME[i]]['id2text'][int(f)] for i, f in enumerate(try_token[0]) ])
+                try_token = torch.unsqueeze(try_token, dim=0) # shape = (1, 1, attr_num)
+                try_seq = torch.cat((output_seq, try_token), dim=1)
+                try_text_list = array_to_text_list(try_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=True)
+                # print(try_text_list)
+                if try_text_list[-1] == END_TOKEN_STR:
+                    text_list = try_text_list
+                    # if sampled EOS, then dont check. just end
+                    break
+
+                try:
+                    # format checking
+                    # have to append EOS at the end to not raise error
+                    piece_to_midi(
+                        piece=' '.join(try_text_list + [END_TOKEN_STR]),
+                        nth=model.vocabs.paras['nth'],
+                        ignore_pending_note_error=ignore_pending_note_error
+                    )
+                    # format checking and position, tempo, measure_number calculation
+                    input_seq = torch.from_numpy(
+                        text_list_to_array(try_text_list, vocabs=model.vocabs)
+                    ).unsqueeze(0).int()
+                    output_seq = model.to_output_attrs(input_seq)
+                    text_list = try_text_list
+                    break
+                except (AssertionError, ValueError) as e:
+                    if print_exception:
+                        print(repr(e))
+                    try_count += 1
+                    continue # keep sampling until no error
+
+            # end while try
+            # print(text_list)
+            if try_count == try_count_limit:
                 break
 
-            try:
-                # format checking
-                # have to append EOS at the end to not raise error
-                piece_to_midi(
-                    piece=' '.join(try_text_list + [END_TOKEN_STR]),
-                    nth=model.vocabs.paras['nth'],
-                    ignore_pending_note_error=ignore_pending_note_error
-                )
-                # format checking and position, tempo, measure_number calculation
-                input_seq = torch.from_numpy(
-                    text_list_to_array(try_text_list, vocabs=model.vocabs)
-                ).unsqueeze(0).int()
-                output_seq = model.to_output_attrs(input_seq)
-                text_list = try_text_list
+            if text_list[-1] == END_TOKEN_STR:
+                end_with_end_token = True
                 break
-            except (AssertionError, ValueError) as e:
-                if print_exception:
-                    print(repr(e))
-                try_count += 1
-                continue # keep sampling until no error
-
-        # end while
-        # print(text_list)
-        if try_count == try_count_limit:
-            break
-
-        if text_list[-1] == END_TOKEN_STR:
-            end_with_end_token = True
-            break
-    # end for each step
+        # end for each step
+    # end with torch.no_grad
 
     if not end_with_end_token:
         text_list.append(END_TOKEN_STR)
