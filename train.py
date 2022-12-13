@@ -379,6 +379,7 @@ def main():
         collate_fn=collate_mididataset
     )
     logging.info('Made DataLoaders')
+
     # make optimizer
     optimizer = AdamW(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-8)
     scheduler = lr_scheduler.LambdaLR(

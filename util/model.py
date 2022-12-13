@@ -187,33 +187,45 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
 
     # adjust event attribute logit
     multinote_indices = set()
-    tempo_indices = set()
+    measure_indices = set()
     track_instrument_indices = set()
+    tempo_indices = set()
     for t, i in vocabs.events.text2id.items():
-        if t[0] == 'N' or t[0] == 'S':
+        if t[0] == tokens.NOTE_EVENTS_CHAR or t[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
             multinote_indices.add(i)
-        elif t[0] == 'T':
+        elif t[0] == tokens.MEASURE_EVENTS_CHAR:
+            measure_indices.add(i)
+        elif t[0] == tokens.TEMPO_EVENTS_CHAR:
             tempo_indices.add(i)
-        elif t[0] == 'R':
+        elif t[0] == tokens.TRACK_EVENTS_CHAR:
             track_instrument_indices.add(i)
-    bos_index = vocabs.events.text2id[BEGIN_TOKEN_STR]
+    bos_index = vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
+    sep_inex = vocabs.events.text2id[tokens.SEP_TOKEN_STR]
     # BOS token is redundent, will not be used in generation
     logits[TOKEN_ATTR_INDEX['evt']][bos_index] = large_neg_value
 
-    is_head = context_text_list[-1][0] == 'B' or context_text_list[-1][0] == 'R'
+    is_head = context_text_list[-1] == tokens.BEGIN_TOKEN_STR or context_text_list[-1][0] == tokens.TRACK_EVENTS_CHAR
+    is_sep = context_text_list[-1] == tokens.SEP_TOKEN_STR
     if is_head:
-        # if the section is head, then multi-note and tempo token are not allowed
-        for i in multinote_indices.union(tempo_indices):
-            logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+        # if the section is head, then only track-instrument and separater allowed
+        for i in range(vocabs.events.size):
+            if i not in track_instrument_indices or i != sep_inex:
+                logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+    elif is_sep:
+        # if is separater, then only measure tokens are allowed
+        for i in range(vocabs.events.size):
+            if i not in measure_indices:
+                logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
     else:
         # if the section is body, then the next token's event at least can not be track-instrument
         for i in track_instrument_indices:
             logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
-        if context_text_list[-1][0] == 'M' and position_method_is_event:
+        if context_text_list[-1][0] == tokens.MEASURE_EVENTS_CHAR and position_method_is_event:
             # if the last token in context_text_list token is measure and position method is event
-            # then the next token's event can not be multi-note
-            for i in multinote_indices:
+            # then the next token's event can not be multi-note or tempo
+            for i in multinote_indices.union(tempo_indices):
                 logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+
 
     # adjust track attribute logit
     if not is_head:
