@@ -49,26 +49,31 @@ class MidiDataset(Dataset):
         self.pitch_augmentation = pitch_augmentation
 
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
-        print('Reading', npz_path)
+        if verbose:
+            print('Reading', npz_path)
         available_memory_size = psutil.virtual_memory().available
         npz_zipinfo_list = zipfile.ZipFile(npz_path).infolist()
         array_memory_size = sum([zinfo.file_size for zinfo in npz_zipinfo_list])
-        print('available_memory_size:', available_memory_size, 'array_memory_size:', array_memory_size)
+        if verbose:
+            print('available_memory_size:', available_memory_size, 'array_memory_size:', array_memory_size)
         if array_memory_size >= available_memory_size - 4e9: # keep 4G for other things
             # load from disk every time indexing
-            print('Memory size not enough, using NPZ mmap.')
+            if verbose:
+                print('Memory size not enough, using NPZ mmap.')
             self.pieces = np.load(npz_path)
         else:
             # load into memory to be faster
-            print('Loading arrays to memory')
+            if verbose:
+                print('Loading arrays to memory')
             npz_file = np.load(npz_path)
             self.pieces = {
                 str(filenum): npz_file[str(filenum)]
-                for filenum in tqdm(range(len(npz_file)))
+                for filenum in tqdm(range(len(npz_file)), disable=not verbose)
             }
         self.number_of_pieces = len(self.pieces)
 
-        print('Processing')
+        if verbose:
+            print('Processing')
         # Seperators are:
         # BOS, EOS, SEP, PADDING, first track (R0), measure tokens (M\w+), position tokens (P\w+)
         # stores their index in event vocab
@@ -120,7 +125,7 @@ class MidiDataset(Dataset):
         self._augmentable_pitches = [np.empty((0,), dtype=np.bool8) for _ in range(self.number_of_pieces)]
         pitch_augmentation_factor = self.pitch_augmentation * 2 + 1 # length of (-pa, ..., -1, 0, 1, ..., pa)
         cur_index = 0
-        for filenum in tqdm(range(self.number_of_pieces)):
+        for filenum in tqdm(range(self.number_of_pieces), disable=not verbose):
             filename = str(filenum)
 
             if use_permutable_subseq_loss or permute_mps:
