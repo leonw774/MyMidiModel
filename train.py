@@ -523,7 +523,7 @@ def main():
         unwrapped_model = None
         if args.use_parallel:
             accelerator.wait_for_everyone()
-            unwrapped_model = accelerator.unwrap_model()
+            unwrapped_model = accelerator.unwrap_model(model)
             accelerator.save(unwrapped_model, ckpt_model_file_path) # don't need is_main_process
         else:
             torch.save(model, ckpt_model_file_path)
