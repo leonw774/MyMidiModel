@@ -393,6 +393,7 @@ def main():
 
     # move things to devices
     if args.use_parallel:
+        model = model.to(accelerator.device)
         model, train_dataloader, valid_dataloader = accelerator.prepare(
             model, train_dataloader, valid_dataloader
         )
