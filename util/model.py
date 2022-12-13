@@ -21,10 +21,11 @@ try:
 except ImportError:
     pass
 
+from . import tokens
+from .tokens import b36str2int
+from .midi import piece_to_midi
 from .vocabs import Vocabs
 from .corpus import TOKEN_ATTR_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, array_to_text_list, text_list_to_array
-from .midi import piece_to_midi
-from .tokens import PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR, b36str2int
 
 
 class MyMidiTransformer(nn.Module):
@@ -41,7 +42,7 @@ class MyMidiTransformer(nn.Module):
             ) -> None:
         super().__init__()
 
-        assert vocabs.events.text2id[PADDING_TOKEN_STR] == 0
+        assert vocabs.events.text2id[tokens.PADDING_TOKEN_STR] == 0
 
         self.vocabs = vocabs
         self.max_seq_length = max_seq_length
@@ -68,7 +69,7 @@ class MyMidiTransformer(nn.Module):
             nn.Embedding(
                 num_embeddings=vsize,
                 embedding_dim=embedding_dim,
-                padding_idx=vocabs.events.text2id[PADDING_TOKEN_STR]
+                padding_idx=vocabs.events.text2id[tokens.PADDING_TOKEN_STR]
                 # [...] the embedding vector at padding_idx will default to all zeros [...]
             )
             for vsize in self.embedding_vocabs_size
@@ -180,32 +181,43 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
 
     # adjust event attribute logit
     multinote_indices = set()
-    tempo_indices = set()
+    measure_indices = set()
     track_instrument_indices = set()
+    tempo_indices = set()
     for t, i in vocabs.events.text2id.items():
-        if t[0] == 'N' or t[0] == 'S':
+        if t[0] == tokens.NOTE_EVENTS_CHAR or t[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
             multinote_indices.add(i)
-        elif t[0] == 'T':
+        elif t[0] == tokens.MEASURE_EVENTS_CHAR:
+            measure_indices.add(i)
+        elif t[0] == tokens.TEMPO_EVENTS_CHAR:
             tempo_indices.add(i)
-        elif t[0] == 'R':
+        elif t[0] == tokens.TRACK_EVENTS_CHAR:
             track_instrument_indices.add(i)
-    bos_index = vocabs.events.text2id[BEGIN_TOKEN_STR]
+    bos_index = vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
+    sep_inex = vocabs.events.text2id[tokens.SEP_TOKEN_STR]
     # BOS token is redundent, will not be used in generation
     logits[TOKEN_ATTR_INDEX['evt']][bos_index] = large_neg_value
 
-    is_head = context_text_list[-1][0] == 'B' or context_text_list[-1][0] == 'R'
+    is_head = context_text_list[-1] == tokens.BEGIN_TOKEN_STR or context_text_list[-1][0] == tokens.TRACK_EVENTS_CHAR
+    is_sep = context_text_list[-1] == tokens.SEP_TOKEN_STR
     if is_head:
-        # if the section is head, then multi-note and tempo token are not allowed
-        for i in multinote_indices.union(tempo_indices):
-            logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+        # if the section is head, then only track-instrument and separater allowed
+        for i in range(vocabs.events.size):
+            if i not in track_instrument_indices or i != sep_inex:
+                logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+    elif is_sep:
+        # if is separater, then only measure tokens are allowed
+        for i in range(vocabs.events.size):
+            if i not in measure_indices:
+                logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
     else:
         # if the section is body, then the next token's event at least can not be track-instrument
         for i in track_instrument_indices:
             logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
-        if context_text_list[-1][0] == 'M' and position_method_is_event:
+        if context_text_list[-1][0] == tokens.MEASURE_EVENTS_CHAR and position_method_is_event:
             # if the last token in context_text_list token is measure and position method is event
-            # then the next token's event can not be multi-note
-            for i in multinote_indices:
+            # then the next token's event can not be multi-note or tempo
+            for i in multinote_indices.union(tempo_indices):
                 logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
 
     # adjust track attribute logit
@@ -214,7 +226,7 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
         max_track_number = max([
             b36str2int(t[1:t.index(':')])
             for t in context_text_list
-            if t[0] == 'R'
+            if t[0] == tokens.TRACK_EVENTS_CHAR
         ])
         # start from max_track_number+1+1
         # first +1 is because index 0 is padding
@@ -247,7 +259,7 @@ def generate_sample(
         elif start_seq.shape[0] != 1 or start_seq.shape[2] != len(COMPLETE_ATTR_NAME):
             raise AssertionError(exception_msg)
     else:
-        start_seq = torch.from_numpy(text_list_to_array([BEGIN_TOKEN_STR], model.vocabs)).unsqueeze(0).int()
+        start_seq = torch.from_numpy(text_list_to_array([tokens.BEGIN_TOKEN_STR], model.vocabs)).unsqueeze(0).int()
 
     # get model device
     model_device = next(model.parameters()).device
@@ -287,7 +299,7 @@ def generate_sample(
                 try_seq = torch.cat((output_seq, try_token), dim=1)
                 try_text_list = array_to_text_list(try_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=True)
                 # print(try_text_list)
-                if try_text_list[-1] == END_TOKEN_STR:
+                if try_text_list[-1] == tokens.END_TOKEN_STR:
                     text_list = try_text_list
                     # if sampled EOS, then dont check. just end
                     break
@@ -296,7 +308,7 @@ def generate_sample(
                     # format checking
                     # have to append EOS at the end to not raise error
                     piece_to_midi(
-                        piece=' '.join(try_text_list + [END_TOKEN_STR]),
+                        piece=' '.join(try_text_list + [tokens.END_TOKEN_STR]),
                         nth=model.vocabs.paras['nth'],
                         ignore_pending_note_error=ignore_pending_note_error
                     )
@@ -318,14 +330,14 @@ def generate_sample(
             if try_count == try_count_limit:
                 break
 
-            if text_list[-1] == END_TOKEN_STR:
+            if text_list[-1] == tokens.END_TOKEN_STR:
                 end_with_end_token = True
                 break
         # end for each step
     # end with torch.no_grad
 
     if not end_with_end_token:
-        text_list.append(END_TOKEN_STR)
+        text_list.append(tokens.END_TOKEN_STR)
 
     model.train(training_state)
     return text_list
