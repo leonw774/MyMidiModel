@@ -24,7 +24,8 @@ class MidiDataset(Dataset):
             permute_mps: bool = False,
             permute_track_number: bool = False,
             pitch_augmentation: int = 0,
-            sample_from_start: bool = True
+            sample_from_start: bool = True,
+            verbose: bool = False
         ) -> None:
         """
             Parameters:

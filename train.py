@@ -248,6 +248,8 @@ def main():
         args.use_device = 'cpu'
         args.use_parallel = False
     args.use_device = torch.device(args.use_device)
+    accelerator = accelerate.Accelerator() if args.use_parallel else None
+    IS_MAIN_PROCESS = accelerator.is_main_process if args.use_parallel else True
 
     # root logger
     if args.log_file_path != '':
@@ -265,28 +267,29 @@ def main():
             level=logging.INFO,
             format='%(message)s'
         )
-    logging.info(strftime('=== train.py start at %Y%m%d-%H%M%S ==='))
+    if IS_MAIN_PROCESS:
+        logging.info(strftime('=== train.py start at %Y%m%d-%H%M%S ==='))
 
-    if not os.path.isdir(args.model_dir_path):
-        logging.info('Invalid model dir path: %s', args.model_dir_path)
-        return 1
-    ckpt_dir_path = os.path.join(args.model_dir_path, 'ckpt')
-    if not os.path.isdir(ckpt_dir_path):
-        logging.info('Invalid model ckpt dir path: %s', ckpt_dir_path)
-        return 1
-    eval_dir_path = os.path.join(args.model_dir_path, 'eval_samples')
-    if not os.path.isdir(eval_dir_path):
-        logging.info('Invalid model eval samples dir path: %s', eval_dir_path)
-        return 1
+        if not os.path.isdir(args.model_dir_path):
+            logging.info('Invalid model dir path: %s', args.model_dir_path)
+            return 1
+        ckpt_dir_path = os.path.join(args.model_dir_path, 'ckpt')
+        if not os.path.isdir(ckpt_dir_path):
+            logging.info('Invalid model ckpt dir path: %s', ckpt_dir_path)
+            return 1
+        eval_dir_path = os.path.join(args.model_dir_path, 'eval_samples')
+        if not os.path.isdir(eval_dir_path):
+            logging.info('Invalid model eval samples dir path: %s', eval_dir_path)
+            return 1
 
-    data_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.data_args).items()])
-    model_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.model_args).items()])
-    train_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.train_args).items()])
-    args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args).items() if not isinstance(v, Namespace)])
-    logging.info(data_args_str)
-    logging.info(model_args_str)
-    logging.info(train_args_str)
-    logging.info(args_str)
+        data_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.data_args).items()])
+        model_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.model_args).items()])
+        train_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.train_args).items()])
+        args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args).items() if not isinstance(v, Namespace)])
+        logging.info(data_args_str)
+        logging.info(model_args_str)
+        logging.info(train_args_str)
+        logging.info(args_str)
 
     vocabs = get_corpus_vocabs(args.corpus_dir_path)
 
@@ -304,17 +307,20 @@ def main():
             + valid_output_attr_name + ['valid_total']
         )
         loss_file.write(loss_csv_head+'\n')
-    logging.info('Created loss.csv file at %s', loss_file_path)
+    if IS_MAIN_PROCESS:
+        logging.info('Created loss.csv file at %s', loss_file_path)
 
     if args.use_device.type == 'cuda':
-        logging.info(
-            'Torch sees %d CUDA devices. Current device is #%d',
-            torch.cuda.device_count(), torch.cuda.current_device()
-        )
+        if IS_MAIN_PROCESS:
+            logging.info(
+                'Torch sees %d CUDA devices. Current device is #%d',
+                torch.cuda.device_count(), torch.cuda.current_device()
+            )
 
     # make dataset
-    complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args))
-    logging.info('Made MidiDataset')
+    complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args), verbose=IS_MAIN_PROCESS)
+    if IS_MAIN_PROCESS:
+        logging.info('Made MidiDataset')
     train_ratio, valid_ratio = args.train_args.split_ratio
     if train_ratio == valid_ratio == -1:
         raise ValueError('split_ratio (-1, -1) is not allowed')
@@ -326,8 +332,9 @@ def main():
     train_len = int(len(complete_dataset) * train_ratio / (train_ratio + valid_ratio))
     valid_len = len(complete_dataset) - train_len
     train_dataset, valid_dataset = random_split(complete_dataset, (train_len, valid_len))
-    logging.info('Legnth of training set: %d', len(train_dataset))
-    logging.info('Legnth of validation set: %d', len(valid_dataset))
+    if IS_MAIN_PROCESS:
+        logging.info('Legnth of training set: %d', len(train_dataset))
+        logging.info('Legnth of validation set: %d', len(valid_dataset))
 
     # get random conditional primer from complete_dataset
     cond_primer_index = np.random.randint(len(complete_dataset.pieces))
@@ -355,7 +362,8 @@ def main():
         shuffle=False,
         collate_fn=collate_mididataset
     )
-    logging.info('Made DataLoaders')
+    if IS_MAIN_PROCESS:
+        logging.info('Made DataLoaders')
 
     # make model
     model = MyMidiTransformer(
@@ -364,27 +372,28 @@ def main():
         **vars(args.model_args)
     )
     model_output_attrs_indices = model.output_attrs_indices
-    logging.info('Embedding size:')
-    logging.info('\n'.join([
-        f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(COMPLETE_ATTR_NAME, model.embedding_vocabs_size))
-    ]))
+    if IS_MAIN_PROCESS:
+        logging.info('Embedding size:')
+        logging.info('\n'.join([
+            f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(COMPLETE_ATTR_NAME, model.embedding_vocabs_size))
+        ]))
 
     # use torchinfo
-    summary_str = str(torchinfo.summary(
-        model,
-        input_size=[
-            (args.train_args.batch_size, args.data_args.max_seq_length, len(model.input_attrs_indices))
-        ],
-        dtypes=[torch.long],
-        device=args.use_device,
-        verbose=0
-    ))
-    logging.info(summary_str)
+    if IS_MAIN_PROCESS:
+        summary_str = str(torchinfo.summary(
+            model,
+            input_size=[
+                (args.train_args.batch_size, args.data_args.max_seq_length, len(model.input_attrs_indices))
+            ],
+            dtypes=[torch.long],
+            device=args.use_device,
+            verbose=0
+        ))
+        logging.info(summary_str)
 
     # make optimizer
     optimizer = AdamW(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-8)
 
-    accelerator = accelerate.Accelerator() if args.use_parallel else None
     # move things to devices
     if args.use_parallel:
         model, optimizer, train_dataloader, valid_dataloader = accelerator.prepare(
@@ -406,7 +415,8 @@ def main():
     )
 
     # training start
-    logging.info('Begin training')
+    if IS_MAIN_PROCESS:
+        logging.info('Begin training')
     train_dataloader_iter = iter(train_dataloader)
     valid_dataloader_iter = iter(valid_dataloader)
     complete_train_loss_list = []
@@ -416,13 +426,14 @@ def main():
 
     start_time = time()
     for start_step in range(0, args.train_args.steps, args.train_args.validation_interval):
-        logging.info('Training: %d/%d', start_step, args.train_args.steps)
+        if IS_MAIN_PROCESS:
+            logging.info('Training: %d/%d', start_step, args.train_args.steps)
         model.train()
         train_loss_list = []
         train_loss_list: List[List[float]]
         # forward_time = 0
         # backward_time = 0
-        for _ in tqdm(range(args.train_args.validation_interval)):
+        for _ in tqdm(range(args.train_args.validation_interval), disable=not IS_MAIN_PROCESS):
             try:
                 batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
             except StopIteration:
@@ -477,14 +488,18 @@ def main():
         model.eval()
         valid_loss_list = []
         with torch.no_grad():
-            for _ in tqdm(range(min(args.train_args.validation_steps, len(valid_dataloader)))):
+            for _ in tqdm(range(min(args.train_args.validation_steps, len(valid_dataloader))), disable=not IS_MAIN_PROCESS):
                 try:
                     batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
                 except StopIteration:
                     valid_dataloader_iter = iter(valid_dataloader)
                     batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
-                batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
-                batch_target_seqs = (to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
+                
+                batch_input_seqs = batch_seqs[:, :-1]
+                batch_target_seqs = batch_seqs[:, 1:, model_output_attrs_indices]
+                if not args.use_parallel:
+                    batch_input_seqs = batch_input_seqs.to(args.use_device)
+                    batch_target_seqs = batch_target_seqs.to(args.use_device)
                 prediction = model(batch_input_seqs)
 
                 if args.data_args.use_permutable_subseq_loss:
@@ -511,12 +526,11 @@ def main():
         if args.use_parallel:
             accelerator.wait_for_everyone()
             unwrapped_model = accelerator.unwrap_model()
-            accelerator.save(unwrapped_model, ckpt_model_file_path)
+            accelerator.save(unwrapped_model, ckpt_model_file_path) # don't need IS_MAIN_PROCESS
         else:
             torch.save(model, ckpt_model_file_path)
 
-        is_main_process = accelerator.is_main_process if args.use_parallel else True
-        if is_main_process:
+        if IS_MAIN_PROCESS:
             log_metrics(cur_step, start_time, scheduler, gpu_mem_alloc_bytes, train_loss_list, valid_loss_list, loss_file_path)
             print('Generating conditional and unconditional sample for checkpoint')
             uncond_gen_text_list = generate_sample(
@@ -564,62 +578,64 @@ def main():
         accelerate.end_training()
 
     # remove all checkpoints
-    ckpt_file_paths = glob.glob(os.path.join(ckpt_dir_path, '*.pt'), recursive=True)
-    for ckpt_file_path in ckpt_file_paths:
-        os.remove(ckpt_file_path)
+    if IS_MAIN_PROCESS:
+        ckpt_file_paths = glob.glob(os.path.join(ckpt_dir_path, '*.pt'), recursive=True)
+        for ckpt_file_path in ckpt_file_paths:
+            os.remove(ckpt_file_path)
 
     # evaluation
-    logging.info('Generating unconditional generation sample for evaluation')
-    best_model = torch.load(os.path.join(args.model_dir_path, 'best_model.pt'))
-    uncond_gen_piece_list = []
-    uncond_gen_start_time = time()
-    uncond_gen_total_token_length = 0
-    for _ in range(args.eval_sample_number):
-        uncond_gen_text_list = generate_sample(best_model, args.data_args.max_seq_length)
-        uncond_gen_total_token_length += len(uncond_gen_text_list)
-        uncond_gen_piece = ' '.join(uncond_gen_text_list)
-        uncond_gen_piece_list.append(uncond_gen_piece)
-    logging.info(
-        'Done. Generating %d pieces with max_length %d takes %.3f seconds',
-        args.eval_sample_number,
-        args.data_args.max_seq_length,
-        time() - uncond_gen_start_time
-    )
-    logging.info('Avg. tokens# in the samples are %.3f', uncond_gen_total_token_length / args.eval_sample_number)
+    if IS_MAIN_PROCESS:
+        logging.info('Generating unconditional generation sample for evaluation')
+        best_model = torch.load(os.path.join(args.model_dir_path, 'best_model.pt'))
+        uncond_gen_piece_list = []
+        uncond_gen_start_time = time()
+        uncond_gen_total_token_length = 0
+        for _ in range(args.eval_sample_number):
+            uncond_gen_text_list = generate_sample(best_model, args.data_args.max_seq_length)
+            uncond_gen_total_token_length += len(uncond_gen_text_list)
+            uncond_gen_piece = ' '.join(uncond_gen_text_list)
+            uncond_gen_piece_list.append(uncond_gen_piece)
+        logging.info(
+            'Done. Generating %d pieces with max_length %d takes %.3f seconds',
+            args.eval_sample_number,
+            args.data_args.max_seq_length,
+            time() - uncond_gen_start_time
+        )
+        logging.info('Avg. tokens# in the samples are %.3f', uncond_gen_total_token_length / args.eval_sample_number)
 
-    eval_sample_features_per_piece = []
-    eval_sample_features_per_piece: List[ Dict[str, float] ]
-    for i, uncond_gen_piece in enumerate(uncond_gen_piece_list):
-        open(os.path.join(eval_dir_path, f'{i}.txt'), 'w+', encoding='utf8').write(uncond_gen_piece)
-        try:
-            piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True).dump(
-                os.path.join(eval_dir_path, f'{i}.mid')
-            )
-            eval_sample_features_per_piece.append(
-                piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=int(10e6))
-            )
-        except (AssertionError, ValueError):
-            print('Error when dumping eval uncond gen MidiFile object')
-            print(format_exc())
+        eval_sample_features_per_piece = []
+        eval_sample_features_per_piece: List[ Dict[str, float] ]
+        for i, uncond_gen_piece in enumerate(uncond_gen_piece_list):
+            open(os.path.join(eval_dir_path, f'{i}.txt'), 'w+', encoding='utf8').write(uncond_gen_piece)
+            try:
+                piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True).dump(
+                    os.path.join(eval_dir_path, f'{i}.mid')
+                )
+                eval_sample_features_per_piece.append(
+                    piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=int(10e6))
+                )
+            except (AssertionError, ValueError):
+                print('Error when dumping eval uncond gen MidiFile object')
+                print(format_exc())
 
-    eval_sample_features = {
-        fname: [
-            fs[fname]
-            for fs in eval_sample_features_per_piece
-        ]
-        for fname in EVAL_FEATURE_NAMES
-    }
-
-    eval_sample_features_stats = dict()
-    for fname in EVAL_FEATURE_NAMES:
-        fname_description = dict(Series(eval_sample_features[fname]).dropna().describe())
-        fname_description: Dict[str, np.float64]
-        eval_sample_features_stats[fname] = {
-            k : float(v) for k, v in fname_description.items()
+        eval_sample_features = {
+            fname: [
+                fs[fname]
+                for fs in eval_sample_features_per_piece
+            ]
+            for fname in EVAL_FEATURE_NAMES
         }
-    with open(os.path.join(args.model_dir_path, 'eval_sample_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
-        json.dump(eval_sample_features_stats, eval_stat_file)
-    logging.info('==== train.py exit ====')
+
+        eval_sample_features_stats = dict()
+        for fname in EVAL_FEATURE_NAMES:
+            fname_description = dict(Series(eval_sample_features[fname]).dropna().describe())
+            fname_description: Dict[str, np.float64]
+            eval_sample_features_stats[fname] = {
+                k : float(v) for k, v in fname_description.items()
+            }
+        with open(os.path.join(args.model_dir_path, 'eval_sample_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
+            json.dump(eval_sample_features_stats, eval_stat_file)
+        logging.info('==== train.py exit ====')
     return 0
 
 
