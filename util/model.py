@@ -132,13 +132,6 @@ class MyMidiTransformer(nn.Module):
                 num_layers=layers_number
             )
 
-    # batched_seq_complete_attrs has shape: (batch_size, seq_size, complete_attr_num)
-    def to_input_attrs(self, batched_seq_complete_attrs):
-        return batched_seq_complete_attrs[..., self.input_attrs_indices]
-
-    def to_output_attrs(self, batched_seq_complete_attrs):
-        return batched_seq_complete_attrs[..., self.output_attrs_indices]
-
     def forward(self, x):
         # x has shape: (batch_size, seq_size, in_attr_number)
         emb_sum = sum(

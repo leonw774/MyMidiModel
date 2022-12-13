@@ -364,7 +364,7 @@ def main():
         max_seq_length=args.data_args.max_seq_length,
         **vars(args.model_args)
     )
-    to_output_attrs = model.to_output_attrs
+    model_output_attrs_indices = model.output_attrs_indices
     logging.info('Embedding size:')
     logging.info('\n'.join([
         f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(COMPLETE_ATTR_NAME, model.embedding_vocabs_size))
@@ -390,6 +390,7 @@ def main():
         model, optimizer, train_dataloader, valid_dataloader = accelerator.prepare(
             model, optimizer, train_dataloader, valid_dataloader
         )
+        print = accelerator.print()
     else:
         model = model.to(args.use_device)
 
@@ -428,8 +429,12 @@ def main():
                 train_dataloader_iter = iter(train_dataloader)
                 batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
 
-            batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
-            batch_target_seqs = (to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
+            # batch_seqs has shape: (batch_size, seq_size, complete_attr_num)
+            batch_input_seqs = batch_seqs[:, :-1]
+            batch_target_seqs = batch_seqs[:, 1:, model_output_attrs_indices]
+            if not args.use_parallel:
+                batch_input_seqs = batch_input_seqs.to(args.use_device)
+                batch_target_seqs = batch_target_seqs.to(args.use_device)
             # start_forward_time = time()
             prediction = model(batch_input_seqs)
             # assert all(not torch.isnan(h).any() for h in prediction), [torch.isnan(h).nonzero() for h in prediction]
@@ -499,22 +504,23 @@ def main():
             gpu_mem_alloc_bytes = sum(
                 map(torch.cuda.memory_allocated, args.data_parallel_devices)
             )
-        log_metrics(cur_step, start_time, scheduler, gpu_mem_alloc_bytes, train_loss_list, valid_loss_list, loss_file_path)
 
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
 
-
+        unwrapped_model = None
         if args.use_parallel:
             accelerator.wait_for_everyone()
-            accelerator.save(model, ckpt_model_file_path)
+            unwrapped_model = accelerator.unwrap_model()
+            accelerator.save(unwrapped_model, ckpt_model_file_path)
         else:
             torch.save(model, ckpt_model_file_path)
 
-        print('Generating conditional and unconditional sample for checkpoint')
         is_main_process = accelerator.is_main_process if args.use_parallel else True
         if is_main_process:
+            log_metrics(cur_step, start_time, scheduler, gpu_mem_alloc_bytes, train_loss_list, valid_loss_list, loss_file_path)
+            print('Generating conditional and unconditional sample for checkpoint')
             uncond_gen_text_list = generate_sample(
-                model,
+                unwrapped_model if args.use_parallel else model,
                 steps=args.data_args.max_seq_length
             )
             uncond_gen_piece = ' '.join(uncond_gen_text_list)
@@ -527,7 +533,7 @@ def main():
                 print('Error when dumping uncond gen MidiFile object')
                 print(format_exc())
             cond_gen_text_list = generate_sample(
-                model,
+                unwrapped_model if args.use_parallel else model,
                 steps=args.data_args.max_seq_length,
                 start_seq=cond_primer_array
             )
