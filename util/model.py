@@ -21,10 +21,11 @@ try:
 except ImportError:
     pass
 
+from . import tokens
+from .tokens import b36str2int
+from .midi import piece_to_midi
 from .vocabs import Vocabs
 from .corpus import TOKEN_ATTR_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, array_to_text_list, text_list_to_array
-from .midi import piece_to_midi
-from .tokens import PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR, b36str2int
 
 
 class MyMidiTransformer(nn.Module):
@@ -41,7 +42,7 @@ class MyMidiTransformer(nn.Module):
             ) -> None:
         super().__init__()
 
-        assert vocabs.events.text2id[PADDING_TOKEN_STR] == 0
+        assert vocabs.events.text2id[tokens.PADDING_TOKEN_STR] == 0
 
         self.vocabs = vocabs
         self.max_seq_length = max_seq_length
@@ -68,7 +69,7 @@ class MyMidiTransformer(nn.Module):
             nn.Embedding(
                 num_embeddings=vsize,
                 embedding_dim=embedding_dim,
-                padding_idx=vocabs.events.text2id[PADDING_TOKEN_STR]
+                padding_idx=vocabs.events.text2id[tokens.PADDING_TOKEN_STR]
                 # [...] the embedding vector at padding_idx will default to all zeros [...]
             )
             for vsize in self.embedding_vocabs_size
@@ -266,7 +267,7 @@ def generate_sample(
         elif start_seq.shape[0] != 1 or start_seq.shape[2] != len(COMPLETE_ATTR_NAME):
             raise AssertionError(exception_msg)
     else:
-        start_seq = torch.from_numpy(text_list_to_array([BEGIN_TOKEN_STR], model.vocabs)).unsqueeze(0).int()
+        start_seq = torch.from_numpy(text_list_to_array([tokens.BEGIN_TOKEN_STR], model.vocabs)).unsqueeze(0).int()
 
     # get model device
     model_device = next(model.parameters()).device
@@ -306,7 +307,7 @@ def generate_sample(
                 try_seq = torch.cat((output_seq, try_token), dim=1)
                 try_text_list = array_to_text_list(try_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=True)
                 # print(try_text_list)
-                if try_text_list[-1] == END_TOKEN_STR:
+                if try_text_list[-1] == tokens.END_TOKEN_STR:
                     text_list = try_text_list
                     # if sampled EOS, then dont check. just end
                     break
@@ -315,7 +316,7 @@ def generate_sample(
                     # format checking
                     # have to append EOS at the end to not raise error
                     piece_to_midi(
-                        piece=' '.join(try_text_list + [END_TOKEN_STR]),
+                        piece=' '.join(try_text_list + [tokens.END_TOKEN_STR]),
                         nth=model.vocabs.paras['nth'],
                         ignore_pending_note_error=ignore_pending_note_error
                     )
@@ -337,14 +338,14 @@ def generate_sample(
             if try_count == try_count_limit:
                 break
 
-            if text_list[-1] == END_TOKEN_STR:
+            if text_list[-1] == tokens.END_TOKEN_STR:
                 end_with_end_token = True
                 break
         # end for each step
     # end with torch.no_grad
 
     if not end_with_end_token:
-        text_list.append(END_TOKEN_STR)
+        text_list.append(tokens.END_TOKEN_STR)
 
     model.train(training_state)
     return text_list
