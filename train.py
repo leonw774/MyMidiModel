@@ -391,18 +391,16 @@ def main():
         ))
         logging.info(summary_str)
 
-    # make optimizer
-    optimizer = AdamW(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-8)
-
     # move things to devices
     if args.use_parallel:
-        model, optimizer, train_dataloader, valid_dataloader = accelerator.prepare(
-            model, optimizer, train_dataloader, valid_dataloader
+        model, train_dataloader, valid_dataloader = accelerator.prepare(
+            model, train_dataloader, valid_dataloader
         )
     else:
         model = model.to(args.use_device)
 
-    # set up learning rate scheduler after accelerator so that they use the correct optimizer
+    # make optimizer
+    optimizer = AdamW(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-8)
     scheduler = lr_scheduler.LambdaLR(
         optimizer,
         lr_lambda=lambda step: lr_warmup_and_linear_decay(

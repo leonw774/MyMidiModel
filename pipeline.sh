@@ -163,7 +163,9 @@ test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended${TRAIN_OTHER_ARGUMENTS} to 
 # change CUDA_VISIABLE_DEVICES according to the machine it runs on
 if [ "$USE_PARALLEL" == true ]; then
     LAUNCH_COMMAND="accelerate launch"
-    accelerate config default # you can do `accelerate config` before this script to have your own setting  
+    # you can do `accelerate config` before this script to have your own setting
+    # it is better to set fsdp options
+    accelerate config default
 else
     LAUNCH_COMMAND="python3"
 fi
