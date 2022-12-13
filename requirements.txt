@@ -10,3 +10,4 @@ torchinfo
 torchvision
 tqdm
 pytorch-fast-transformers
+accelerate

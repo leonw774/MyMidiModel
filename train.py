@@ -8,6 +8,7 @@ from time import strftime, time
 from traceback import format_exc
 from typing import List, Dict
 
+import accelerate
 import numpy as np
 from pandas import Series
 from tqdm import tqdm
@@ -156,9 +157,8 @@ def parse_args():
         default='cuda'
     )
     global_parser.add_argument(
-        '--data-parallel-devices',
-        type=int,
-        nargs='*',
+        '--use-parallel',
+        action='store_true'
     )
     global_parser.add_argument(
         '--log',
@@ -246,7 +246,9 @@ def main():
     args = parse_args()
     if not torch.cuda.is_available():
         args.use_device = 'cpu'
+        args.use_parallel = False
     args.use_device = torch.device(args.use_device)
+    accelerator = accelerate.Accelerator() if args.use_parallel else None
 
     # root logger
     if args.log_file_path != '':
@@ -311,31 +313,6 @@ def main():
             torch.cuda.device_count(), torch.cuda.current_device()
         )
 
-    # make model
-    model = MyMidiTransformer(
-        vocabs=vocabs,
-        max_seq_length=args.data_args.max_seq_length,
-        **vars(args.model_args)
-    )
-    logging.info('Embedding size:')
-    logging.info('\n'.join([
-        f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(COMPLETE_ATTR_NAME, model.embedding_vocabs_size))
-    ]))
-
-    # use torchinfo
-    summary_str = str(torchinfo.summary(
-        model,
-        input_size=[
-            (args.train_args.batch_size, args.data_args.max_seq_length, len(model.input_attrs_indices))
-        ],
-        dtypes=[torch.long],
-        device=args.use_device,
-        verbose=0
-    ))
-    logging.info(summary_str)
-    model = model.to(args.use_device)
-    to_output_attrs = model.to_output_attrs
-
     # make dataset
     complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args))
     logging.info('Made MidiDataset')
@@ -361,6 +338,7 @@ def main():
     cond_primer_array = text_list_to_array(cond_primer_text_list, vocabs).astype(np.int32)
     cond_primer_array = torch.from_numpy(np.expand_dims(cond_primer_array, axis=0))
 
+    # make dataloader
     # cannot handle multiprocessing if use npz mmap
     if not isinstance(complete_dataset.pieces, dict):
         args.dataloader_worker_number = 1
@@ -379,8 +357,43 @@ def main():
         collate_fn=collate_mididataset
     )
     logging.info('Made DataLoaders')
+
     # make optimizer
     optimizer = AdamW(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-8)
+
+    # make model
+    model = MyMidiTransformer(
+        vocabs=vocabs,
+        max_seq_length=args.data_args.max_seq_length,
+        **vars(args.model_args)
+    )
+    to_output_attrs = model.to_output_attrs
+    logging.info('Embedding size:')
+    logging.info('\n'.join([
+        f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(COMPLETE_ATTR_NAME, model.embedding_vocabs_size))
+    ]))
+
+    # use torchinfo
+    summary_str = str(torchinfo.summary(
+        model,
+        input_size=[
+            (args.train_args.batch_size, args.data_args.max_seq_length, len(model.input_attrs_indices))
+        ],
+        dtypes=[torch.long],
+        device=args.use_device,
+        verbose=0
+    ))
+    logging.info(summary_str)
+
+    # move things to devices
+    if args.use_parallel:
+        model, optimizer, train_dataloader, valid_dataloader = accelerator.prepare(
+            model, optimizer, train_dataloader, valid_dataloader
+        )
+    else:
+        model = model.to(args.use_device)
+
+    # set up learning rate scheduler after accelerator so that they use the correct optimizer
     scheduler = lr_scheduler.LambdaLR(
         optimizer,
         lr_lambda=lambda step: lr_warmup_and_linear_decay(
@@ -390,14 +403,6 @@ def main():
             args.train_args.lr_decay_end_steps
         )
     )
-
-    # data parallel
-    # although distributed data parallel is faster, but is harder to rewrite the script
-    # at least we have more RAM
-    use_dp = len(args.data_parallel_devices) > 0
-    if use_dp:
-        logging.info('Use DataParallel on device %s', ','.join(map(str, args.data_parallel_devices)))
-        model = torch.nn.parallel.DataParallel(model, device_ids=args.data_parallel_devices)
 
     # training start
     logging.info('Begin training')
@@ -443,14 +448,21 @@ def main():
             # print(train_loss_list[-1])
             loss = torch.mean(torch.stack(head_losses))
             # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
-            # dot.render(filename='lossbackward_mps', format='png')
-            optimizer.zero_grad()
-            loss.backward()
+            # dot.render(filename='lossbackward_mps', format='png')s
+            if args.use_parallel:
+                accelerator.backward(loss)
+            else:
+                loss.backward()
             # print(torch.cuda.memory_allocated()/1e6, 'MB')
             if args.train_args.grad_norm_clip > 0:
-                clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
+                if args.use_parallel:
+                    if accelerator.sync_gradients:
+                        accelerator.clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
+                else:
+                    clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
             optimizer.step()
             scheduler.step()
+            optimizer.zero_grad()
             # print('loss + back propagate use time:', time() - start_backward_time)
             # torch.cuda.empty_cache() # use only when oom did happen
             # backward_time += time() - start_backward_time
@@ -490,53 +502,60 @@ def main():
         log_metrics(cur_step, start_time, scheduler, gpu_mem_alloc_bytes, train_loss_list, valid_loss_list, loss_file_path)
 
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
-        if use_dp:
-            torch.save(model.module, ckpt_model_file_path)
+
+
+        if args.use_parallel:
+            accelerator.wait_for_everyone()
+            accelerator.save(model, ckpt_model_file_path)
         else:
             torch.save(model, ckpt_model_file_path)
 
         print('Generating conditional and unconditional sample for checkpoint')
-        uncond_gen_text_list = generate_sample(
-            model.module if use_dp else model,
-            steps=args.data_args.max_seq_length
-        )
-        uncond_gen_piece = ' '.join(uncond_gen_text_list)
-        with open(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
-            uncond_file.write(uncond_gen_piece)
-        try:
-            midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
-            midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.mid'))
-        except Exception:
-            print('Error when dumping uncond gen MidiFile object')
-            print(format_exc())
-        cond_gen_text_list = generate_sample(
-            model.module if use_dp else model,
-            steps=args.data_args.max_seq_length,
-            start_seq=cond_primer_array
-        )
-        cond_gen_piece = ' '.join(cond_gen_text_list)
-        with open(os.path.join(ckpt_dir_path, f'{cur_step}_cond.txt'), 'w+', encoding='utf8') as cond_file:
-            cond_file.write(cond_gen_piece)
-        try:
-            midiobj = piece_to_midi(cond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
-            midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_cond.mid'))
-        except Exception:
-            print('Error when dumping cond gen MidiFile object')
-            print(format_exc())
+        is_main_process = accelerator.is_main_process if args.use_parallel else True
+        if is_main_process:
+            uncond_gen_text_list = generate_sample(
+                model,
+                steps=args.data_args.max_seq_length
+            )
+            uncond_gen_piece = ' '.join(uncond_gen_text_list)
+            with open(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
+                uncond_file.write(uncond_gen_piece)
+            try:
+                midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
+                midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.mid'))
+            except Exception:
+                print('Error when dumping uncond gen MidiFile object')
+                print(format_exc())
+            cond_gen_text_list = generate_sample(
+                model,
+                steps=args.data_args.max_seq_length,
+                start_seq=cond_primer_array
+            )
+            cond_gen_piece = ' '.join(cond_gen_text_list)
+            with open(os.path.join(ckpt_dir_path, f'{cur_step}_cond.txt'), 'w+', encoding='utf8') as cond_file:
+                cond_file.write(cond_gen_piece)
+            try:
+                midiobj = piece_to_midi(cond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
+                midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_cond.mid'))
+            except Exception:
+                print('Error when dumping cond gen MidiFile object')
+                print(format_exc())
 
-        if args.train_args.early_stop > 0:
-            avg_valid_loss = sum([sum(valid_head_losses) for valid_head_losses in valid_loss_list]) / len(valid_loss_list)
-            if avg_valid_loss >= min_avg_valid_loss:
-                early_stop_counter += 1
-                if early_stop_counter >= args.train_args.early_stop:
-                    logging.info('Early stopped: No improvement for %d validations.', args.train_args.early_stop)
-                    break
-            else:
-                early_stop_counter = 0
-                min_avg_valid_loss = avg_valid_loss
-                shutil.copyfile(ckpt_model_file_path, os.path.join(args.model_dir_path, 'best_model.pt'))
-                logging.info('New best model.')
+            if args.train_args.early_stop > 0:
+                avg_valid_loss = sum([sum(valid_head_losses) for valid_head_losses in valid_loss_list]) / len(valid_loss_list)
+                if avg_valid_loss >= min_avg_valid_loss:
+                    early_stop_counter += 1
+                    if early_stop_counter >= args.train_args.early_stop:
+                        logging.info('Early stopped: No improvement for %d validations.', args.train_args.early_stop)
+                        break
+                else:
+                    early_stop_counter = 0
+                    min_avg_valid_loss = avg_valid_loss
+                    shutil.copyfile(ckpt_model_file_path, os.path.join(args.model_dir_path, 'best_model.pt'))
+                    logging.info('New best model.')
     # training end
+    if args.use_parallel:
+        accelerate.end_training()
 
     # remove all checkpoints
     ckpt_file_paths = glob.glob(os.path.join(ckpt_dir_path, '*.pt'), recursive=True)
