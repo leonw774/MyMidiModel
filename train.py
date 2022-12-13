@@ -248,10 +248,10 @@ def main():
         args.use_device = 'cpu'
         args.use_parallel = False
     args.use_device = torch.device(args.use_device)
-    args.train_args.batch_size //= len(os.getenv('CUDA_VISIBLE_DEVICES').split(',')) if args.use_parallel else 1
 
     accelerator = accelerate.Accelerator() if args.use_parallel else None
-    IS_MAIN_PROCESS = accelerator.is_main_process if args.use_parallel else True
+    is_main_process = accelerator.is_main_process if args.use_parallel else True
+    parallel_devices_count = len(os.getenv('CUDA_VISIBLE_DEVICES').split(',')) if args.use_parallel else 1
 
     # root logger
     if args.log_file_path != '':
@@ -269,7 +269,7 @@ def main():
             level=logging.INFO,
             format='%(message)s'
         )
-    if IS_MAIN_PROCESS:
+    if is_main_process:
         logging.info(strftime('=== train.py start at %Y%m%d-%H%M%S ==='))
 
         if not os.path.isdir(args.model_dir_path):
@@ -309,19 +309,19 @@ def main():
             + valid_output_attr_name + ['valid_total']
         )
         loss_file.write(loss_csv_head+'\n')
-    if IS_MAIN_PROCESS:
+    if is_main_process:
         logging.info('Created loss.csv file at %s', loss_file_path)
 
     if args.use_device.type == 'cuda':
-        if IS_MAIN_PROCESS and not args.use_parallel:
+        if is_main_process and not args.use_parallel:
             logging.info(
                 'Torch sees %d CUDA devices. Current device is #%d',
                 torch.cuda.device_count(), torch.cuda.current_device()
             )
 
     # make dataset
-    complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args), verbose=IS_MAIN_PROCESS)
-    if IS_MAIN_PROCESS:
+    complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args), verbose=is_main_process)
+    if is_main_process:
         logging.info('Made MidiDataset')
     train_ratio, valid_ratio = args.train_args.split_ratio
     if train_ratio == valid_ratio == -1:
@@ -334,7 +334,7 @@ def main():
     train_len = int(len(complete_dataset) * train_ratio / (train_ratio + valid_ratio))
     valid_len = len(complete_dataset) - train_len
     train_dataset, valid_dataset = random_split(complete_dataset, (train_len, valid_len))
-    if IS_MAIN_PROCESS:
+    if is_main_process:
         logging.info('Legnth of training set: %d', len(train_dataset))
         logging.info('Legnth of validation set: %d', len(valid_dataset))
 
@@ -353,18 +353,18 @@ def main():
     train_dataloader = DataLoader(
         dataset=train_dataset,
         num_workers=args.dataloader_worker_number,
-        batch_size=args.train_args.batch_size,
+        batch_size=args.train_args.batch_size // parallel_devices_count,
         shuffle=False, # no need to shuffle because random_split did
         collate_fn=collate_mididataset
     )
     valid_dataloader = DataLoader(
         dataset=valid_dataset,
         num_workers=args.dataloader_worker_number,
-        batch_size=args.train_args.batch_size,
+        batch_size=args.train_args.batch_size // parallel_devices_count,
         shuffle=False,
         collate_fn=collate_mididataset
     )
-    if IS_MAIN_PROCESS:
+    if is_main_process:
         logging.info('Made DataLoaders')
 
     # make model
@@ -374,14 +374,14 @@ def main():
         **vars(args.model_args)
     )
     model_output_attrs_indices = model.output_attrs_indices
-    if IS_MAIN_PROCESS:
+    if is_main_process:
         logging.info('Embedding size:')
         logging.info('\n'.join([
             f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(COMPLETE_ATTR_NAME, model.embedding_vocabs_size))
         ]))
 
     # use torchinfo
-    if IS_MAIN_PROCESS:
+    if is_main_process:
         summary_str = str(torchinfo.summary(
             model,
             input_size=[
@@ -414,7 +414,7 @@ def main():
         model = model.to(args.use_device)
 
     # training start
-    if IS_MAIN_PROCESS:
+    if is_main_process:
         logging.info('Begin training')
     train_dataloader_iter = iter(train_dataloader)
     valid_dataloader_iter = iter(valid_dataloader)
@@ -425,14 +425,14 @@ def main():
 
     start_time = time()
     for start_step in range(0, args.train_args.steps, args.train_args.validation_interval):
-        if IS_MAIN_PROCESS:
+        if is_main_process:
             logging.info('Training: %d/%d', start_step, args.train_args.steps)
         model.train()
         train_loss_list = []
         train_loss_list: List[List[float]]
         # forward_time = 0
         # backward_time = 0
-        for _ in tqdm(range(args.train_args.validation_interval), disable=not IS_MAIN_PROCESS):
+        for _ in tqdm(range(args.train_args.validation_interval), disable=not is_main_process):
             try:
                 batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
             except StopIteration:
@@ -487,7 +487,7 @@ def main():
         model.eval()
         valid_loss_list = []
         with torch.no_grad():
-            for _ in tqdm(range(min(args.train_args.validation_steps, len(valid_dataloader))), disable=not IS_MAIN_PROCESS):
+            for _ in tqdm(range(min(args.train_args.validation_steps, len(valid_dataloader))), disable=not is_main_process):
                 try:
                     batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
                 except StopIteration:
@@ -525,11 +525,11 @@ def main():
         if args.use_parallel:
             accelerator.wait_for_everyone()
             unwrapped_model = accelerator.unwrap_model()
-            accelerator.save(unwrapped_model, ckpt_model_file_path) # don't need IS_MAIN_PROCESS
+            accelerator.save(unwrapped_model, ckpt_model_file_path) # don't need is_main_process
         else:
             torch.save(model, ckpt_model_file_path)
 
-        if IS_MAIN_PROCESS:
+        if is_main_process:
             log_metrics(cur_step, start_time, scheduler, gpu_mem_alloc_bytes, train_loss_list, valid_loss_list, loss_file_path)
             print('Generating conditional and unconditional sample for checkpoint')
             uncond_gen_text_list = generate_sample(
@@ -577,13 +577,13 @@ def main():
         accelerate.end_training()
 
     # remove all checkpoints
-    if IS_MAIN_PROCESS:
+    if is_main_process:
         ckpt_file_paths = glob.glob(os.path.join(ckpt_dir_path, '*.pt'), recursive=True)
         for ckpt_file_path in ckpt_file_paths:
             os.remove(ckpt_file_path)
 
     # evaluation
-    if IS_MAIN_PROCESS:
+    if is_main_process:
         logging.info('Generating unconditional generation sample for evaluation')
         best_model = torch.load(os.path.join(args.model_dir_path, 'best_model.pt'))
         uncond_gen_piece_list = []
