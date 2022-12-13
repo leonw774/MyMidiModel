@@ -163,6 +163,7 @@ test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended${TRAIN_OTHER_ARGUMENTS} to 
 # change CUDA_VISIABLE_DEVICES according to the machine it runs on
 if [ "$USE_PARALLEL" == true ]; then
     NUM_OF_CUDA_VISIBLE_DEVICE=$(echo $CUDA_VISIBLE_DEVICES | tr -cd , | wc -c ;)
+    NUM_OF_CUDA_VISIBLE_DEVICE=$(($NUM_OF_CUDA_VISIBLE_DEVICE+1)) # perform arithmetic expression with $((...))
     LAUNCH_COMMAND="accelerate launch --multi_gpu --num_processes $NUM_OF_CUDA_VISIBLE_DEVICE --num_machine 1"
     accelerate config default
 else
