@@ -248,7 +248,6 @@ def main():
         args.use_device = 'cpu'
         args.use_parallel = False
     args.use_device = torch.device(args.use_device)
-    accelerator = accelerate.Accelerator() if args.use_parallel else None
 
     # root logger
     if args.log_file_path != '':
@@ -385,6 +384,7 @@ def main():
     # make optimizer
     optimizer = AdamW(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-8)
 
+    accelerator = accelerate.Accelerator() if args.use_parallel else None
     # move things to devices
     if args.use_parallel:
         model, optimizer, train_dataloader, valid_dataloader = accelerator.prepare(
