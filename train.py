@@ -358,9 +358,6 @@ def main():
     )
     logging.info('Made DataLoaders')
 
-    # make optimizer
-    optimizer = AdamW(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-8)
-
     # make model
     model = MyMidiTransformer(
         vocabs=vocabs,
@@ -384,6 +381,9 @@ def main():
         verbose=0
     ))
     logging.info(summary_str)
+
+    # make optimizer
+    optimizer = AdamW(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-8)
 
     # move things to devices
     if args.use_parallel:
