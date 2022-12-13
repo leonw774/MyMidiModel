@@ -391,15 +391,6 @@ def main():
         ))
         logging.info(summary_str)
 
-    # move things to devices
-    if args.use_parallel:
-        model = model.to(accelerator.device)
-        model, train_dataloader, valid_dataloader = accelerator.prepare(
-            model, train_dataloader, valid_dataloader
-        )
-    else:
-        model = model.to(args.use_device)
-
     # make optimizer
     optimizer = AdamW(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-8)
     scheduler = lr_scheduler.LambdaLR(
@@ -411,6 +402,14 @@ def main():
             args.train_args.lr_decay_end_steps
         )
     )
+
+    # move things to devices
+    if args.use_parallel:
+        model, optimizer, train_dataloader, valid_dataloader = accelerator.prepare(
+            model, optimizer, train_dataloader, valid_dataloader
+        )
+    else:
+        model = model.to(args.use_device)
 
     # training start
     if IS_MAIN_PROCESS:
