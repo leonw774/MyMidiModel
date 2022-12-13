@@ -483,7 +483,8 @@ def main():
             # backward_time += time() - start_backward_time
         # print('Forward time', forward_time, 'Backward time', backward_time)
 
-        print('Validation')
+        if is_main_process:
+            print('Validation')
         model.eval()
         valid_loss_list = []
         with torch.no_grad():
@@ -519,8 +520,6 @@ def main():
                 map(torch.cuda.memory_allocated, range(torch.cuda.device_count()))
             )
 
-        ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
-
         unwrapped_model = None
         if args.use_parallel:
             accelerator.wait_for_everyone()
@@ -530,6 +529,7 @@ def main():
             torch.save(model, ckpt_model_file_path)
 
         if is_main_process:
+            ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
             log_metrics(cur_step, start_time, scheduler, gpu_mem_alloc_bytes, train_loss_list, valid_loss_list, loss_file_path)
             print('Generating conditional and unconditional sample for checkpoint')
             uncond_gen_text_list = generate_sample(
