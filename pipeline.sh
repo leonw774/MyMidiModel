@@ -161,11 +161,13 @@ test "$LOG_HEAD_LOSSES" == true            && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTH
 test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended${TRAIN_OTHER_ARGUMENTS} to train.py's argument" | tee -a $LOG_PATH ; }
 
 # change CUDA_VISIABLE_DEVICES according to the machine it runs on
-if [ -f "./set_cuda_device_env_var.sh" ]; then
-    source ./set_cuda_device_env_var.sh
-    # expecting "export CUDA_VISIBLE_DEVICES=..." 
+if [ "$USE_PARALLEL" == true ]; then
+    LAUNCH_COMMAND="accelerate launch"
+    accelerate config default # you can do `accelerate config` before this script to have your own setting  
+else
+    LAUNCH_COMMAND="python3"
 fi
-python3 train.py --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation $PITCH_AUGMENTATION $TRAIN_OTHER_ARGUMENTS \
+LAUNCH_COMMAND train.py --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation $PITCH_AUGMENTATION $TRAIN_OTHER_ARGUMENTS \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
     --batch-size $BATCH_SIZE --steps $STEPS --grad-norm-clip $GRAD_NORM_CLIP \
     --split-ratio $SPLIT_RATIO --validation-interval $VALIDATION_INTERVAL --validation-steps $VALIDATION_STEPS --early-stop $EARLY_STOP \
