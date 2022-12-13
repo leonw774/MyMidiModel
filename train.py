@@ -512,11 +512,11 @@ def main():
         cur_step = start_step + args.train_args.validation_interval
 
         gpu_mem_alloc_bytes = -1
-        if len(args.data_parallel_devices) == 0:
+        if parallel_devices_count == 1:
             gpu_mem_alloc_bytes = torch.cuda.memory_allocated(0)
         else:
             gpu_mem_alloc_bytes = sum(
-                map(torch.cuda.memory_allocated, args.data_parallel_devices)
+                map(torch.cuda.memory_allocated, range(torch.cuda.device_count()))
             )
 
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
