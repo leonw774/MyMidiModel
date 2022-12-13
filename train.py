@@ -311,7 +311,7 @@ def main():
         logging.info('Created loss.csv file at %s', loss_file_path)
 
     if args.use_device.type == 'cuda':
-        if IS_MAIN_PROCESS:
+        if IS_MAIN_PROCESS and not args.use_parallel:
             logging.info(
                 'Torch sees %d CUDA devices. Current device is #%d',
                 torch.cuda.device_count(), torch.cuda.current_device()
@@ -399,7 +399,6 @@ def main():
         model, optimizer, train_dataloader, valid_dataloader = accelerator.prepare(
             model, optimizer, train_dataloader, valid_dataloader
         )
-        print = accelerator.print()
     else:
         model = model.to(args.use_device)
 
@@ -494,7 +493,7 @@ def main():
                 except StopIteration:
                     valid_dataloader_iter = iter(valid_dataloader)
                     batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
-                
+
                 batch_input_seqs = batch_seqs[:, :-1]
                 batch_target_seqs = batch_seqs[:, 1:, model_output_attrs_indices]
                 if not args.use_parallel:
