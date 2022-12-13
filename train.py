@@ -248,7 +248,7 @@ def main():
         args.use_device = 'cpu'
         args.use_parallel = False
     args.use_device = torch.device(args.use_device)
-    args.train_args.batch_size /= len(os.getenv('CUDA_VISIBLE_DEVICES').split(',')) if args.use_parallel else 1
+    args.train_args.batch_size //= len(os.getenv('CUDA_VISIBLE_DEVICES').split(',')) if args.use_parallel else 1
 
     accelerator = accelerate.Accelerator() if args.use_parallel else None
     IS_MAIN_PROCESS = accelerator.is_main_process if args.use_parallel else True
