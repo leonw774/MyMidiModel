@@ -133,11 +133,11 @@ class MyMidiTransformer(nn.Module):
                 num_layers=layers_number
             )
 
-    def to_input_attr(self, batch_input_seqs: Tensor) -> Tensor:
+    def to_input_attrs(self, batch_input_seqs: Tensor) -> Tensor:
         # expect batch_input_seqs has shape: (batch_size, seq_size, complete_attr_num)
         return batch_input_seqs[..., self.input_attrs_indices]
 
-    def to_output_attr(self, batch_input_seqs: Tensor) -> Tensor:
+    def to_output_attrs(self, batch_input_seqs: Tensor) -> Tensor:
         # expect batch_input_seqs has shape: (batch_size, seq_size, complete_attr_num)
         return batch_input_seqs[..., self.output_attrs_indices]
 

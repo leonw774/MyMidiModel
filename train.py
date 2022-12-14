@@ -378,6 +378,8 @@ def main():
         logging.info('\n'.join([
             f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(COMPLETE_ATTR_NAME, model.embedding_vocabs_size))
         ]))
+    to_input_attrs = model.to_input_attrs
+    to_output_attrs = model.to_output_attrs
 
     # use torchinfo
     if is_main_process:
@@ -439,8 +441,8 @@ def main():
                 batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
 
             # batch_seqs has shape: (batch_size, seq_size, complete_attr_num)
-            batch_input_seqs = model.to_input_attr(batch_seqs[:, :-1])
-            batch_target_seqs = model.to_output_attr(batch_seqs[:, 1:])
+            batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
+            batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
             if not args.use_parallel:
                 batch_input_seqs = batch_input_seqs.to(args.use_device)
                 batch_target_seqs = batch_target_seqs.to(args.use_device)
@@ -494,8 +496,8 @@ def main():
                     valid_dataloader_iter = iter(valid_dataloader)
                     batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
 
-                batch_input_seqs = model.to_input_attr(batch_seqs[:, :-1])
-                batch_target_seqs = model.to_output_attr(batch_seqs[:, 1:])
+                batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
+                batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
                 if not args.use_parallel:
                     batch_input_seqs = batch_input_seqs.to(args.use_device)
                     batch_target_seqs = batch_target_seqs.to(args.use_device)
