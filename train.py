@@ -217,7 +217,6 @@ def log_metrics(
         cur_step: int,
         start_time: float,
         scheduler: lr_scheduler.LambdaLR,
-        gpu_mem_alloc_bytes: int,
         train_loss_list: List[List[float]],
         valid_loss_list: List[List[float]],
         loss_file_path: str):
@@ -227,8 +226,8 @@ def log_metrics(
     avg_valid_losses_str = ', '.join([f'{l:.6f}' for l in avg_valid_losses])
     lr = scheduler.get_last_lr()[0]
     logging.info(
-        'Time: %d, GPU Mem.: %.3f MB, Learning rate: %.6f',
-        time()-start_time, gpu_mem_alloc_bytes/1e6, lr
+        'Time: %d, Learning rate: %.6f',
+        time()-start_time, lr
     )
     logging.info(
         'Avg. train losses: %s Avg. accum. train loss: %.6f \nAvg. valid losses: %s Avg. accum. valid loss: %.6f',
@@ -237,7 +236,7 @@ def log_metrics(
     if loss_file_path:
         with open(loss_file_path, 'a', encoding='utf8') as loss_file:
             loss_file.write(
-                f'{cur_step}, {time()-start_time:.6f}, {gpu_mem_alloc_bytes} {lr:.6f}, '
+                f'{cur_step}, {time()-start_time:.6f}, {lr:.6f}, '
                 + f'{avg_train_losses_str}, {sum(avg_train_losses):.6f}, {avg_valid_losses_str}, {sum(avg_valid_losses):.6f}\n'
             )
 
@@ -298,7 +297,7 @@ def main():
     # loss csv file is in the checkpoint directory
     loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
     with open(loss_file_path, 'w+', encoding='utf8') as loss_file:
-        loss_csv_head = 'step, time, gpu_memory_allocated_bytes, learning_rate, '
+        loss_csv_head = 'step, time, learning_rate, '
         train_output_attr_name = ['train_' + n for n in OUTPUT_ATTR_NAME]
         valid_output_attr_name = ['valid_' + n for n in OUTPUT_ATTR_NAME]
         if vocabs.paras['position_method'] == 'event':
@@ -513,14 +512,6 @@ def main():
         complete_valid_loss_list.extend(valid_loss_list)
         cur_step = start_step + args.train_args.validation_interval
 
-        gpu_mem_alloc_bytes = -1
-        if parallel_devices_count == 1:
-            gpu_mem_alloc_bytes = torch.cuda.memory_allocated(0)
-        else:
-            gpu_mem_alloc_bytes = sum(
-                map(torch.cuda.memory_allocated, range(torch.cuda.device_count()))
-            )
-
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
         unwrapped_model = None
         if args.use_parallel:
@@ -531,7 +522,7 @@ def main():
             torch.save(model, ckpt_model_file_path)
 
         if is_main_process:
-            log_metrics(cur_step, start_time, scheduler, gpu_mem_alloc_bytes, train_loss_list, valid_loss_list, loss_file_path)
+            log_metrics(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_file_path)
             print('Generating conditional and unconditional sample for checkpoint')
             uncond_gen_text_list = generate_sample(
                 unwrapped_model if args.use_parallel else model,
