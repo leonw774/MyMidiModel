@@ -211,7 +211,7 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
     if is_head:
         # if the section is head, then only track-instrument and separater allowed
         for i in range(vocabs.events.size):
-            if i not in track_instrument_indices or i != sep_inex:
+            if i not in track_instrument_indices and i != sep_inex:
                 logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
     elif is_sep:
         # if is separater, then only measure tokens are allowed
