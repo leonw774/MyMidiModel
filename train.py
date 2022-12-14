@@ -335,6 +335,7 @@ def main():
     logging.info(summary_str)
     model = model.to(args.use_device)
     to_output_attrs = model.to_output_attrs
+    to_input_attrs = model.to_input_attrs
 
     # make dataset
     complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args))
@@ -424,8 +425,10 @@ def main():
                 train_dataloader_iter = iter(train_dataloader)
                 batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
 
-            batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
-            batch_target_seqs = (to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
+            batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
+            batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
+            batch_input_seqs = batch_input_seqs.to(args.use_device)
+            batch_target_seqs = batch_target_seqs.to(args.use_device)
             # start_forward_time = time()
             prediction = model(batch_input_seqs)
             # assert all(not torch.isnan(h).any() for h in prediction), [torch.isnan(h).nonzero() for h in prediction]
@@ -467,8 +470,11 @@ def main():
                 except StopIteration:
                     valid_dataloader_iter = iter(valid_dataloader)
                     batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
-                batch_input_seqs = (batch_seqs[:, :-1]).to(args.use_device)
-                batch_target_seqs = (to_output_attrs(batch_seqs[:, 1:])).to(args.use_device)
+
+                batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
+                batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
+                batch_input_seqs = batch_input_seqs.to(args.use_device)
+                batch_target_seqs = batch_target_seqs.to(args.use_device)
                 prediction = model(batch_input_seqs)
 
                 if args.data_args.use_permutable_subseq_loss:
