@@ -31,6 +31,6 @@ EARLY_STOP=10
 
 # others
 USE_DEVICE='cuda'
-# use accelerate by Huggingface, it will use all GPU visible, so the `export CUDA_VISIBLE_DEVICES` is needed if you don't want to use all the devices
+# use accelerate by Huggingface
 USE_PARALLEL=true
 export CUDA_VISIBLE_DEVICES=0,1,2,3
