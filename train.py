@@ -213,32 +213,28 @@ def lr_warmup_and_linear_decay(step_num: int, warmup_steps: int, decay_end_ratio
     return 1 - r * (1 - decay_end_ratio)
 
 
-def log_metrics(
-        cur_step: int,
-        start_time: float,
-        scheduler: lr_scheduler.LambdaLR,
+def log_losses(
+        start_step: int,
         train_loss_list: List[List[float]],
         valid_loss_list: List[List[float]],
         loss_file_path: str):
     avg_train_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
     avg_valid_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*valid_loss_list) ]
-    avg_train_losses_str = ', '.join([f'{l:.6f}' for l in avg_train_losses])
-    avg_valid_losses_str = ', '.join([f'{l:.6f}' for l in avg_valid_losses])
-    lr = scheduler.get_last_lr()[0]
     logging.info(
-        'Time: %d, Learning rate: %.6f',
-        time()-start_time, lr
-    )
-    logging.info(
-        'Avg. train losses: %s Avg. accum. train loss: %.6f \nAvg. valid losses: %s Avg. accum. valid loss: %.6f',
-        avg_train_losses_str, sum(avg_train_losses), avg_valid_losses_str, sum(avg_valid_losses)
+        'Avg. train head losses: %s Avg. train loss: %.6f \nAvg. valid head losses: %s Avg. valid loss: %.6f',
+        ', '.join([f'{l:.6f}' for l in avg_train_losses]), sum(avg_train_losses) / len(avg_train_losses),
+        ', '.join([f'{l:.6f}' for l in avg_valid_losses]), sum(avg_valid_losses) / len(avg_valid_losses)
     )
     if loss_file_path:
         with open(loss_file_path, 'a', encoding='utf8') as loss_file:
-            loss_file.write(
-                f'{cur_step}, {time()-start_time:.6f}, {lr:.6f}, '
-                + f'{avg_train_losses_str}, {sum(avg_train_losses):.6f}, {avg_valid_losses_str}, {sum(avg_valid_losses):.6f}\n'
-            )
+            for i, (train_head_losses, valid_head_losses) in enumerate(zip(train_loss_list, valid_loss_list)):
+                train_head_losses_str = ', '.join([f'{l:.6f}' for l in train_head_losses])
+                valid_head_losses_str = ', '.join([f'{l:.6f}' for l in valid_head_losses])
+                loss_file.write(
+                    f'{i+start_step}, '
+                    + f'{train_head_losses_str}, {sum(train_head_losses)/len(train_head_losses):.6f}, '
+                    + f'{valid_head_losses_str}, {sum(valid_head_losses)/len(valid_head_losses):.6f}\n'
+                )
 
 
 def main():
@@ -297,15 +293,15 @@ def main():
     # loss csv file is in the checkpoint directory
     loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
     with open(loss_file_path, 'w+', encoding='utf8') as loss_file:
-        loss_csv_head = 'step, time, learning_rate, '
+        loss_csv_head = 'step, '
         train_output_attr_name = ['train_' + n for n in OUTPUT_ATTR_NAME]
         valid_output_attr_name = ['valid_' + n for n in OUTPUT_ATTR_NAME]
         if vocabs.paras['position_method'] == 'event':
             train_output_attr_name = train_output_attr_name[:-1]
             valid_output_attr_name = valid_output_attr_name[:-1]
         loss_csv_head += ', '.join(
-            train_output_attr_name + ['train_total']
-            + valid_output_attr_name + ['valid_total']
+            train_output_attr_name + ['train_avg']
+            + valid_output_attr_name + ['valid_avg']
         )
         loss_file.write(loss_csv_head+'\n')
     if is_main_process:
@@ -522,7 +518,8 @@ def main():
             torch.save(model, ckpt_model_file_path)
 
         if is_main_process:
-            log_metrics(cur_step, start_time, scheduler, train_loss_list, valid_loss_list, loss_file_path)
+            logging.info('Time: %d, Learning rate: %.6f', time()-start_time, scheduler.get_last_lr()[0])
+            log_losses(start_step, train_loss_list, valid_loss_list, loss_file_path)
             print('Generating conditional and unconditional sample for checkpoint')
             uncond_gen_text_list = generate_sample(
                 unwrapped_model if args.use_parallel else model,

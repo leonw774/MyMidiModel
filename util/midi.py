@@ -604,17 +604,17 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
             assert not is_head, 'Note token at head'
             is_cont = (text[1] == '~')
             if is_cont:
-                note_attr = tuple(b36str2int(x) for x in text[3:].split(':'))
+                note_attrs = tuple(b36str2int(x) for x in text[3:].split(':'))
             else:
-                note_attr = tuple(b36str2int(x) for x in text[2:].split(':'))
-            # note_attr = pitch, duration, velocity, track_number, (position)
-            assert note_attr[3] in track_program_mapping, 'Note not in used track'
-            if len(note_attr) == 5:
-                cur_time = note_attr[4] + cur_measure_onset
-                note_attr = note_attr[:4]
-            n = handle_note_continuation(is_cont, note_attr, cur_time, pending_cont_notes)
+                note_attrs = tuple(b36str2int(x) for x in text[2:].split(':'))
+            # note_attrs = pitch, duration, velocity, track_number, (position)
+            assert note_attrs[3] in track_program_mapping, 'Note not in used track'
+            if len(note_attrs) == 5:
+                cur_time = note_attrs[4] + cur_measure_onset
+                note_attrs = note_attrs[:4]
+            n = handle_note_continuation(is_cont, note_attrs, cur_time, pending_cont_notes)
             if n is not None:
-                midi.instruments[note_attr[3]].notes.append(n)
+                midi.instruments[note_attrs[3]].notes.append(n)
 
         elif typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             assert not is_head, 'Multi-note token at head'
@@ -632,9 +632,9 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
             if len(position) == 1:
                 cur_time = position[0] + cur_measure_onset
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
-                note_attr = (base_pitch + rel_pitch, rel_dur * time_unit, velocity, track_number)
+                note_attrs = (base_pitch + rel_pitch, rel_dur * time_unit, velocity, track_number)
                 onset_time = cur_time + rel_onset * time_unit
-                n = handle_note_continuation(is_cont, note_attr, onset_time, pending_cont_notes)
+                n = handle_note_continuation(is_cont, note_attrs, onset_time, pending_cont_notes)
                 if n is not None:
                     midi.instruments[track_number].notes.append(n)
         else:
