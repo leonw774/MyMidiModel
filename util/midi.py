@@ -671,18 +671,26 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
     if not ignore_pending_note_error:
         assert len(pending_cont_notes) == 0, f'There are unclosed continuing notes: {pending_cont_notes}'
     else:
-    # handle unclosed continuing notes by let them end at the end of last note
-        all_notes_end_time = [
-            n.end
-            for inst in midi.instruments
-            for n in inst.notes
-        ]
-        last_end_time = max(all_notes_end_time) if len(all_notes_end_time) > 0 else nth
-        for info_onsets_dict in pending_cont_notes.values():
+        # handle unclosed continuing notes by let them end at the end of last note
+        # all_notes_end_time = [
+        #     n.end
+        #     for inst in midi.instruments
+        #     for n in inst.notes
+        # ]
+        # last_end_time = max(all_notes_end_time) if len(all_notes_end_time) > 0 else nth
+        # for info_onsets_dict in pending_cont_notes.values():
+        #     for info, onset_list in info_onsets_dict.items():
+        #         pitch, velocity, track_number = info
+        #         for onset in onset_list:
+        #             n = Note(velocity=velocity, pitch=pitch, start=onset, end=last_end_time)
+        #             midi.instruments[track_number].notes.append(n)
+
+        # handle unclosed continuing notes by treating them as regular notes that end at their current pending time
+        for pending_time, info_onsets_dict in pending_cont_notes.items():
             for info, onset_list in info_onsets_dict.items():
                 pitch, velocity, track_number = info
                 for onset in onset_list:
-                    n = Note(velocity=velocity, pitch=pitch, start=onset, end=last_end_time)
+                    n = Note(velocity=velocity, pitch=pitch, start=onset, end=pending_time)
                     midi.instruments[track_number].notes.append(n)
     return midi
 
