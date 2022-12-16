@@ -32,5 +32,5 @@ EARLY_STOP=10
 # others
 USE_DEVICE='cuda'
 # use accelerate by Huggingface
-USE_PARALLEL=true
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+USE_PARALLEL=false
+export CUDA_VISIBLE_DEVICES=0
