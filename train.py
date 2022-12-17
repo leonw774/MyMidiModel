@@ -220,21 +220,20 @@ def log_losses(
         loss_file_path: str):
     avg_train_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
     avg_valid_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*valid_loss_list) ]
+    avg_avg_train_losses = sum(avg_train_losses) / len(avg_train_losses)
+    avg_avg_valid_losses = sum(avg_valid_losses) / len(avg_valid_losses)
     logging.info(
         'Avg. train head losses: %s Avg. train loss: %.6f \nAvg. valid head losses: %s Avg. valid loss: %.6f',
-        ', '.join([f'{l:.6f}' for l in avg_train_losses]), sum(avg_train_losses) / len(avg_train_losses),
-        ', '.join([f'{l:.6f}' for l in avg_valid_losses]), sum(avg_valid_losses) / len(avg_valid_losses)
+        ', '.join([f'{l:.6f}' for l in avg_train_losses]), avg_avg_train_losses,
+        ', '.join([f'{l:.6f}' for l in avg_valid_losses]), avg_avg_valid_losses
     )
     if loss_file_path:
         with open(loss_file_path, 'a', encoding='utf8') as loss_file:
-            for i, (train_head_losses, valid_head_losses) in enumerate(zip(train_loss_list, valid_loss_list)):
-                train_head_losses_str = ', '.join([f'{l:.6f}' for l in train_head_losses])
-                valid_head_losses_str = ', '.join([f'{l:.6f}' for l in valid_head_losses])
-                loss_file.write(
-                    f'{i+start_step}, '
-                    + f'{train_head_losses_str}, {sum(train_head_losses)/len(train_head_losses):.6f}, '
-                    + f'{valid_head_losses_str}, {sum(valid_head_losses)/len(valid_head_losses):.6f}\n'
-                )
+            loss_file.write(
+                f'{start_step},'
+                + f'{",".join([f"{l:.6f}" for l in avg_train_losses])},{avg_avg_train_losses},'
+                + f'{",".join([f"{l:.6f}" for l in avg_valid_losses])},{avg_avg_valid_losses}\n'
+            )
 
 
 def main():
@@ -293,13 +292,13 @@ def main():
     # loss csv file is in the checkpoint directory
     loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
     with open(loss_file_path, 'w+', encoding='utf8') as loss_file:
-        loss_csv_head = 'step, '
+        loss_csv_head = 'step,'
         train_output_attr_name = ['train_' + n for n in OUTPUT_ATTR_NAME]
         valid_output_attr_name = ['valid_' + n for n in OUTPUT_ATTR_NAME]
         if vocabs.paras['position_method'] == 'event':
             train_output_attr_name = train_output_attr_name[:-1]
             valid_output_attr_name = valid_output_attr_name[:-1]
-        loss_csv_head += ', '.join(
+        loss_csv_head += ','.join(
             train_output_attr_name + ['train_avg']
             + valid_output_attr_name + ['valid_avg']
         )
@@ -340,6 +339,8 @@ def main():
     cond_primer_text_list = get_first_k_measures(cond_primer_text_list, args.ckpt_cond_primer_measures)
     cond_primer_array = text_list_to_array(cond_primer_text_list, vocabs).astype(np.int32)
     cond_primer_array = torch.from_numpy(np.expand_dims(cond_primer_array, axis=0))
+    if is_main_process:
+        logging.info('Conditional generation primer is #%d', cond_primer_index)
 
     # make dataloader
     # cannot handle multiprocessing if use npz mmap
@@ -455,8 +456,6 @@ def main():
                     # print('\ncalc_losses use time:', time() - start_backward_time)
         # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=32))
             # assert all(not torch.isnan(hl).any() for hl in head_losses), [torch.isnan(head).nonzero() for hl in head_losses]
-            train_loss_list.append([hl.item() for hl in head_losses])
-            # print(train_loss_list[-1])
             loss = torch.mean(torch.stack(head_losses))
             # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
             # dot.render(filename='lossbackward_mps', format='png')s
@@ -471,6 +470,9 @@ def main():
                         accelerator.clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
                 else:
                     clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
+            if is_main_process:
+                train_loss_list.append([hl.item() for hl in head_losses])
+                # print(train_loss_list[-1])
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
@@ -502,7 +504,9 @@ def main():
                     head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
                 else:
                     head_losses = calc_losses(prediction, batch_target_seqs)
-                valid_loss_list.append([hl.item() for hl in head_losses])
+                accelerator.wait_for_everyone()
+                if is_main_process:
+                    valid_loss_list.append([hl.item() for hl in head_losses])
 
         complete_train_loss_list.extend(train_loss_list)
         complete_valid_loss_list.extend(valid_loss_list)
@@ -519,6 +523,7 @@ def main():
 
         if is_main_process:
             logging.info('Time: %d, Learning rate: %.6f', time()-start_time, scheduler.get_last_lr()[0])
+            assert train_loss_list
             log_losses(start_step, train_loss_list, valid_loss_list, loss_file_path)
             print('Generating conditional and unconditional sample for checkpoint')
             uncond_gen_text_list = generate_sample(
