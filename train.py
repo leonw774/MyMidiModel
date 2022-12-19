@@ -568,7 +568,7 @@ def main():
                     logging.info('New best model.')
     # training end
     if args.use_parallel:
-        accelerate.end_training()
+        accelerator.end_training()
 
     # remove all checkpoints
     if is_main_process:
