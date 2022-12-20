@@ -1,5 +1,5 @@
+numpy<=1.22
 miditoolkit
-numpy
 pandas
 scipy
 matplotlib>=3.5
@@ -7,7 +7,6 @@ psutil
 PyYAML
 torch==1.12.1
 torchinfo
-torchvision
 tqdm
 pytorch-fast-transformers
 accelerate

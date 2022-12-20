@@ -24,7 +24,6 @@ class MidiDataset(Dataset):
             permute_mps: bool = False,
             permute_track_number: bool = False,
             pitch_augmentation: int = 0,
-            sample_from_start: bool = True,
             verbose: bool = False
         ) -> None:
         """
@@ -117,7 +116,6 @@ class MidiDataset(Dataset):
         self._position_ids = np.sort(np.array(self._position_ids))
 
         # preprocessing
-        self._sample_from_start = sample_from_start
         self._filenum_indices = [0] * self.number_of_pieces
         self._piece_lengths = [0] * self.number_of_pieces
         self._piece_body_start_index = [0] * self.number_of_pieces
@@ -147,11 +145,7 @@ class MidiDataset(Dataset):
 
             cur_piece_lengths = int(self.pieces[filename].shape[0])
             self._piece_lengths[filenum] = cur_piece_lengths
-
-            if not sample_from_start:
-                cur_index += cur_piece_lengths * pitch_augmentation_factor
-            else:
-                cur_index += pitch_augmentation_factor
+            cur_index += pitch_augmentation_factor
             self._filenum_indices[filenum] = cur_index
         self._max_index = cur_index
         self._pitch_augmentation_factor = pitch_augmentation_factor
@@ -170,25 +164,20 @@ class MidiDataset(Dataset):
         #     else:
         #         break
         filenum = bisect.bisect_left(self._filenum_indices, index)
-        end_index_and_pitch_augmented = index if filenum == 0 else index - self._filenum_indices[filenum-1] - 1
-        end_index, pitch_augment = divmod(end_index_and_pitch_augmented, self._pitch_augmentation_factor)
-        if end_index < self.max_seq_length:
-            begin_index = 0
-        else:
-            begin_index = end_index - self.max_seq_length
+        pitch_augment = index if filenum == 0 else index - self._filenum_indices[filenum-1] - 1
         if self._piece_lengths[filenum] <= self.max_seq_length:
             end_index = self._piece_lengths[filenum]
         else:
-            end_index = begin_index + self.max_seq_length
+            end_index = self.max_seq_length
         pitch_augment -= self.pitch_augmentation
-        sliced_array = np.array(self.pieces[str(filenum)][begin_index:end_index]) # copy
+        sliced_array = np.array(self.pieces[str(filenum)][:end_index]) # copy
         sliced_array = sliced_array.astype(np.int32) # was int16 to save space but torch ask for int
 
         # pitch augmentation
         # assume pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
         # assume instrument vocabulary is 0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
         if pitch_augment != 0:
-            sliced_augmentable_pitches = self._augmentable_pitches[filenum][begin_index:end_index]
+            sliced_augmentable_pitches = self._augmentable_pitches[filenum][:end_index]
             # yes, sometimes the sliced array does not contain any pitch-augmentable token
             if np.any(sliced_augmentable_pitches):
                 min_pitch = np.min( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
@@ -215,7 +204,7 @@ class MidiDataset(Dataset):
 
             # use self._piece_body_start_index to know how many tracks there are in this piece
             track_count = self._piece_body_start_index[filenum] - 1
-            slice_body_begin = self._piece_body_start_index[filenum] - begin_index
+            slice_body_begin = self._piece_body_start_index[filenum]
             slice_body_begin = max(0, slice_body_begin)
             # add one because there is a padding token at the beginning of the vocab
             perm_array = np.random.permutation(track_count) + 1
@@ -230,20 +219,20 @@ class MidiDataset(Dataset):
                 body_trn_column[body_trn_column_expand[i]] = perm_array[i]
             # permute head's track instruments with the inverse of the permutation array
             if slice_body_begin > 0:
-                slice_track_begin = 1 if begin_index == 0 else 0
+                slice_track_begin = 1
                 inv_perm_array = np.empty(track_count, dtype=np.int16)
                 inv_perm_array[perm_array-1] = (np.arange(track_count) + 1)
                 track_permuted_ins = np.empty(track_count, dtype=np.int16)
                 track_permuted_ins = self.pieces[str(filenum)][inv_perm_array, ins_col_index]
-                sliced_array[slice_track_begin:slice_body_begin, ins_col_index] = track_permuted_ins[max(0, begin_index-1):]
+                sliced_array[slice_track_begin:slice_body_begin, ins_col_index] = track_permuted_ins
 
         mps_sep_indices_list = []
         if self.permute_mps:
             mps_tokens_ranges = []
             mps_sep_indices_list = [
-                i - begin_index
+                i
                 for i in self._file_mps_sep_indices[filenum]
-                if begin_index <= i < end_index
+                if i < end_index
             ]
             mps_sep_indices_and_two_ends = [0] + mps_sep_indices_list + [sliced_array.shape[0]]
             for i in range(len(mps_sep_indices_and_two_ends)-1):
@@ -261,9 +250,9 @@ class MidiDataset(Dataset):
         if self.use_permutable_subseq_loss:
             if len(mps_sep_indices_list) == 0:
                 mps_sep_indices_list = [
-                    i - begin_index
+                    i
                     for i in self._file_mps_sep_indices[filenum]
-                    if begin_index <= i < end_index
+                    if i < end_index
                 ]
             mps_sep_indices = np.array(
                 mps_sep_indices_list,
