@@ -13,6 +13,9 @@
 ./pipeline.sh snd_posevent      ours_sample1.0 permute_data+loss_small_linear --use-existed
 
 # experiment on input data design (??)
-# - posevent -> posattr
+# - posevent v.s. posattr
 # - no_time_signature & no_tempo in input array
+
+# experiment on data augmentation (permutation & pitch-shift) (??)
+#
 
