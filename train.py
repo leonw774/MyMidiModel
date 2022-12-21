@@ -176,10 +176,6 @@ def parse_args():
         required=True
     )
     global_parser.add_argument(
-        '--log-head-losses',
-        action='store_true'
-    )
-    global_parser.add_argument(
         'corpus_dir_path',
         type=str
     )
