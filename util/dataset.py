@@ -74,7 +74,7 @@ class MidiDataset(Dataset):
         if verbose:
             print('Processing')
         # Seperators are:
-        # BOS, EOS, SEP, PADDING, first track (R0), measure tokens (M\w+), position tokens (P\w+)
+        # BOS, EOS, SEP, PADDING, first track-instrument token, measure tokens, position tokens and tempo tokens
         # stores their index in event vocab
         # _mps_seperators is empty when `use_permutable_subseq_loss` is not True
         self._mps_seperators = list()
@@ -104,6 +104,7 @@ class MidiDataset(Dataset):
                 self._bos_id,
                 self._eos_id,
                 self._sep_id,
+                self._tempo_ids,
                 self.vocabs.events.text2id[tokens.TRACK_EVENTS_CHAR+'0'],
                 self._pad_id,
             ])
