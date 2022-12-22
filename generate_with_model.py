@@ -42,17 +42,23 @@ def read_args():
         '--sample-number', '-n',
         type=int,
         default=1,
-        help='How many generated sample will created. Default is 1.'
+        help='How many generated sample will created. Default is %(default)s.'
     )
     parser.add_argument(
-        '--output-txt', '-t',
+        '--output-txt', '-o',
         action='store_true'
     )
     parser.add_argument(
         '--max-generation-step', '--step',
         type=int,
         default=1024,
-        help='The maximum TOKENS in each sample would be generated.'
+        help='The maximum TOKENS in each sample would be generated. Default is %(default)s.'
+    )
+    parser.add_argument(
+        '--temparature', '-t',
+        type=float,
+        default=1.0,
+        help='Temparature of softmax before multinomial sampling. Default is %(default)s.'
     )
     parser.add_argument(
         '--try-count-limit',
@@ -60,7 +66,7 @@ def read_args():
         default=1000,
         help='The model may fail to generate next token that satisfy the rule.\
             The generation ends when its trying times pass this limit.\
-            Default is %(default)s'
+            Default is %(default)s.'
     )
     parser.add_argument(
         '--use-device',
@@ -95,6 +101,7 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
         steps=args.max_generation_step,
         start_seq=primer_seq,
         try_count_limit=args.try_count_limit,
+        temperature=args.temparature,
         print_exception=args.print_exception
     )
     if gen_text_list == BEGIN_TOKEN_STR + " " + END_TOKEN_STR:
