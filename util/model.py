@@ -181,6 +181,7 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
     """
         Set to large negative numeric value the logits of the attribute values that would definitily raise exception
         if the next token in context_text_list has them
+        and force the position tokens to be ordered increasingly in time
     """
     assert len(context_text_list) > 0, 'Empty context_text_list'
     assert len(logits) == len(OUTPUT_ATTR_NAME) or len(logits) == len(OUTPUT_ATTR_NAME) - 1, 'Bad logits'
@@ -189,12 +190,15 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
 
     # adjust event attribute logit
     multinote_indices = set()
+    position_indices = set()
     measure_indices = set()
     track_instrument_indices = set()
     tempo_indices = set()
     for t, i in vocabs.events.text2id.items():
         if t[0] == tokens.NOTE_EVENTS_CHAR or t[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
             multinote_indices.add(i)
+        elif t[0] == tokens.POSITION_EVENTS_CHAR:
+            position_indices.add(i)
         elif t[0] == tokens.MEASURE_EVENTS_CHAR:
             measure_indices.add(i)
         elif t[0] == tokens.TEMPO_EVENTS_CHAR:
@@ -227,6 +231,17 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
             # then the next token's event can not be multi-note or tempo
             for i in multinote_indices.union(tempo_indices):
                 logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+ 
+        # this part prohibits the position tokens that is "behind" the current position
+        k = -1
+        while context_text_list[k][0] not in (tokens.POSITION_EVENTS_CHAR, tokens.MEASURE_EVENTS_CHAR):
+            k -= 1
+        if context_text_list[k][0] == tokens.POSITION_EVENTS_CHAR:
+            cur_position = b36str2int(context_text_list[k][1:])
+            for i in range(vocabs.events.size):
+                if i in position_indices:
+                    if b36str2int(vocabs.events.id2text[i][1:]) <= cur_position:
+                        logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
 
     # adjust track attribute logit
     if not is_head:
@@ -249,8 +264,7 @@ def generate_sample(
         model: MyMidiTransformer,
         steps: int,
         start_seq: Union[Tensor, None] = None,
-        temperature_begin: float = 1.0,
-        temperature_end: float = 1.0,
+        temperature: float = 1.0,
         try_count_limit: int = 1000,
         print_exception: bool = False,
         ignore_pending_note_error: bool = True
@@ -284,7 +298,6 @@ def generate_sample(
     # for _ in tqdm(range(steps)):
     with torch.no_grad():
         for n in range(steps):
-            cur_temperature = temperature_begin * (1 - n / steps) + temperature_end * (n / steps)
             clipped_seq = input_seq[:, -model.max_seq_length:]
             logits = model(clipped_seq.to(model_device))
             last_logits = [
@@ -299,7 +312,7 @@ def generate_sample(
             try_count = 0
             while try_count < try_count_limit:
                 sampled_attrs = [
-                    torch.multinomial(F.softmax(l / cur_temperature, dim=0), 1)
+                    torch.multinomial(F.softmax(l / temperature, dim=0), 1)
                     for l in last_logits # l has shape (1, attr_vocab_size)
                 ]
                 # print(sampled_attrs)
