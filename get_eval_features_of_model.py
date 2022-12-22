@@ -65,7 +65,6 @@ def main():
     logging.info('Loading model at %s', os.path.join(args.model_dir_path, 'best_model.pt'))
     best_model: MyMidiTransformer = torch.load(os.path.join(args.model_dir_path, 'best_model.pt'))
     vocabs = best_model.vocabs
-    uncond_gen_piece_list = []
     eval_sample_features_per_piece = []
     eval_sample_features_per_piece: List[ Dict[str, float] ]
     uncond_gen_start_time = time()
@@ -76,7 +75,6 @@ def main():
         uncond_gen_text_list = generate_sample(best_model, best_model.max_seq_length)
         uncond_gen_total_token_length += len(uncond_gen_text_list)
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
-        uncond_gen_piece_list.append(uncond_gen_piece)
 
         # save to disk
         open(os.path.join(eval_dir_path, f'{i}.txt'), 'w+', encoding='utf8').write(uncond_gen_piece)
@@ -116,6 +114,8 @@ def main():
         }
     with open(os.path.join(args.model_dir_path, 'eval_sample_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
         json.dump(eval_sample_features_stats, eval_stat_file)
+    
+    logging.info(strftime('=== get_eval_features_of_model.py exit ==='))
 
 
 if __name__ == '__main__':
