@@ -372,8 +372,7 @@ def calc_losses(pred_logit: List[Tensor], target_logit: Tensor) -> List[Tensor]:
         for k, pred_attr_logit in enumerate(pred_logit)
     ]
     return head_losses
-    # loss = sum(head_losses)
-    # return loss
+
 
 # NOTE: this function is VERY SLOW since it has three level of for-loops and does cross_entropy with O(N^2) data worst case
 # How can I make it faster?

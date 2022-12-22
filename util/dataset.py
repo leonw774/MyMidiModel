@@ -178,21 +178,17 @@ class MidiDataset(Dataset):
         # assume instrument vocabulary is 0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
         if pitch_augment != 0:
             sliced_augmentable_pitches = self._augmentable_pitches[filenum][:end_index]
-            # yes, sometimes the sliced array does not contain any pitch-augmentable token
+            # sometimes the sliced array does not contain any pitch-augmentable token
             if np.any(sliced_augmentable_pitches):
-                min_pitch = np.min( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
-                max_pitch = np.max( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
-                if min_pitch >= 1 and max_pitch <= 128:
-                    (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] += pitch_augment
-
-        # shift down measure number so that it didn't exceed max_seq_length
-        min_measure_num = sliced_array[0, TOKEN_ATTR_INDEX['mea']]
-        if min_measure_num > 1:
-            sliced_array[:, TOKEN_ATTR_INDEX['mea']] -= (min_measure_num - 1)
-        # because EOS also has measure_number = 0
-        if sliced_array[-1, TOKEN_ATTR_INDEX['mea']] < 0:
-            # set EOS measure number back to zero
-            sliced_array[-1, TOKEN_ATTR_INDEX['mea']] = 0
+                if pitch_augment > 0:
+                    max_pitch = np.max( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
+                    if max_pitch > 128:
+                        pitch_augment = 128 - max_pitch
+                else: # pitch_augment < 0
+                    min_pitch = np.min( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
+                    if min_pitch < 1:
+                        pitch_augment = 1 - min_pitch
+                (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] += pitch_augment
 
         if self.permute_track_number:
             # amortize the calculation
@@ -204,12 +200,11 @@ class MidiDataset(Dataset):
 
             # use self._piece_body_start_index to know how many tracks there are in this piece
             track_count = self._piece_body_start_index[filenum] - 1
-            slice_body_begin = self._piece_body_start_index[filenum]
-            slice_body_begin = max(0, slice_body_begin)
+            body_start_index = self._piece_body_start_index[filenum]
             # add one because there is a padding token at the beginning of the vocab
             perm_array = np.random.permutation(track_count) + 1
             # view body's track number col
-            body_trn_column = sliced_array[slice_body_begin:, TOKEN_ATTR_INDEX['trn']]
+            body_trn_column = sliced_array[body_start_index:, TOKEN_ATTR_INDEX['trn']]
             body_trn_column_expand = np.asarray([
                 (body_trn_column == i + 1) for i in range(track_count)
             ])
@@ -218,13 +213,13 @@ class MidiDataset(Dataset):
             for i in range(track_count):
                 body_trn_column[body_trn_column_expand[i]] = perm_array[i]
             # permute head's track instruments with the inverse of the permutation array
-            if slice_body_begin > 0:
-                slice_track_begin = 1
+            if body_start_index > 0:
+                # head_start_index = 1
                 inv_perm_array = np.empty(track_count, dtype=np.int16)
                 inv_perm_array[perm_array-1] = (np.arange(track_count) + 1)
                 track_permuted_ins = np.empty(track_count, dtype=np.int16)
                 track_permuted_ins = self.pieces[str(filenum)][inv_perm_array, ins_col_index]
-                sliced_array[slice_track_begin:slice_body_begin, ins_col_index] = track_permuted_ins
+                sliced_array[1:body_start_index, ins_col_index] = track_permuted_ins
 
         mps_sep_indices_list = []
         if self.permute_mps:

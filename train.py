@@ -548,8 +548,10 @@ def main():
                     shutil.copyfile(ckpt_model_file_path, os.path.join(args.model_dir_path, 'best_model.pt'))
                     logging.info('New best model.')
     # training end
-    if args.use_parallel:
-        accelerator.end_training()
+
+    # Don't need this unless we use trackers in accelerator
+    # if args.use_parallel:
+    #     accelerator.end_training()
 
     # remove all checkpoints
     if is_main_process:

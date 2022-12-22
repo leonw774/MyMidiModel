@@ -47,8 +47,8 @@ def merge_tracks(
 
     if len(midi.instruments) > max_track_number:
         tracks = list(midi.instruments) # shallow copy
-        # place drum track or the most note track at first
-        tracks.sort(key=lambda x: (not x.is_drum, -len(x.notes)))
+        # sort tracks with decreasing note number
+        tracks.sort(key=lambda x: -len(x.notes))
         good_tracks_mapping = dict()
         bad_tracks_mapping = dict()
 

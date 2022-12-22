@@ -12,8 +12,7 @@ dataset = MidiDataset(
     use_permutable_subseq_loss=False,
     permute_mps=True,
     permute_track_number=True,
-    pitch_augmentation=3,
-    sample_from_start=True
+    pitch_augmentation=3
 )
 vocabs_dict = dataset.vocabs
 print('max_seq_length', dataset.max_seq_length)
