@@ -156,6 +156,7 @@ def main():
     else:
         for i in range(1, args.sample_number+1):
             gen_handler(model, primer_seq, args, f'{args.output_file_path}_{i}')
+            print(f'generated {args.output_file_path}_{i}')
 
     return 0
 
