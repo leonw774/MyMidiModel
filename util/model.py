@@ -248,7 +248,7 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
         while context_text_list[k][0] not in (tokens.POSITION_EVENTS_CHAR, tokens.TEMPO_EVENTS_CHAR):
             k -= 1
         if context_text_list[k][0] == tokens.TEMPO_EVENTS_CHAR:
-            for i in multinote_indices.union(tempo_indices):
+            for i in tempo_indices:
                 logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
 
     # adjust track attribute logit
