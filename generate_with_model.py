@@ -149,6 +149,7 @@ def main():
 
         primer_seq = text_list_to_array(primer_text_list, vocabs=model.vocabs)
         primer_seq = np.expand_dims(primer_seq, axis=0)
+        primer_seq = torch.from_numpy(primer_seq)
 
     if args.sample_number == 1:
         gen_handler(model, primer_seq, args, args.output_file_path)
