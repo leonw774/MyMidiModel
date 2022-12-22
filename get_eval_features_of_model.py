@@ -6,9 +6,10 @@ from time import strftime, time
 from traceback import format_exc
 from typing import List, Dict
 
-import torch
 import numpy as np
 from pandas import Series
+import torch
+from tqdm import tqdm
 
 from util.midi import piece_to_midi
 from util.model import MyMidiTransformer, generate_sample
@@ -61,13 +62,14 @@ def main():
         logging.info('Invalid model eval samples dir path: %s', eval_dir_path)
         return 1
 
-    logging.info('Generating unconditional generation sample for evaluation')
+    logging.info('Loading model at %s', os.path.join(args.model_dir_path, 'best_model.pt'))
     best_model: MyMidiTransformer = torch.load(os.path.join(args.model_dir_path, 'best_model.pt'))
     vocabs = best_model.vocabs
     uncond_gen_piece_list = []
     uncond_gen_start_time = time()
     uncond_gen_total_token_length = 0
-    for _ in range(args.eval_sample_number):
+    logging.info('Generating unconditional generation sample for evaluation')
+    for _ in tqdm(range(args.eval_sample_number)):
         uncond_gen_text_list = generate_sample(best_model, best_model.max_seq_length)
         uncond_gen_total_token_length += len(uncond_gen_text_list)
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
@@ -80,6 +82,7 @@ def main():
     )
     logging.info('Avg. tokens# in the samples are %.3f', uncond_gen_total_token_length / args.eval_sample_number)
 
+    logging.info('Dumping unconditional generation sample to %s', eval_dir_path)
     eval_sample_features_per_piece = []
     eval_sample_features_per_piece: List[ Dict[str, float] ]
     for i, uncond_gen_piece in enumerate(uncond_gen_piece_list):
