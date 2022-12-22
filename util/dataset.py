@@ -101,16 +101,16 @@ class MidiDataset(Dataset):
                 self._tempo_ids.add(index)
         if use_permutable_subseq_loss or permute_mps:
             self._mps_seperators = set([
-                self._bos_id,
-                self._eos_id,
-                self._sep_id,
-                self._tempo_ids,
-                self.vocabs.events.text2id[tokens.TRACK_EVENTS_CHAR+'0'],
                 self._pad_id,
+                self._bos_id,
+                self.vocabs.events.text2id[tokens.TRACK_EVENTS_CHAR+'0'],
+                self._sep_id,
+                self._eos_id,
             ])
             self._mps_seperators.update(self._track_ids)
             self._mps_seperators.update(self._measure_ids)
             self._mps_seperators.update(self._position_ids)
+            # self._mps_seperators.update(self._tempo_ids)
             self._mps_seperators = np.sort(np.array(list(self._mps_seperators)))
         # numpy.isin can work on set, but turn it into sorted 1d array helps search speed
         self._note_ids = np.sort(np.array(self._note_ids))

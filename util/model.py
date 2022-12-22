@@ -305,9 +305,8 @@ def generate_sample(
     # print(seq.shape)
     # for _ in tqdm(range(steps)):
     with torch.no_grad():
-        for n in range(steps):
-            clipped_seq = input_seq[:, -model.max_seq_length:]
-            logits = model(clipped_seq.to(model_device))
+        for _ in range(steps):
+            logits = model(input_seq.to(model_device))
             last_logits = [
                 l[0, -1, :].to('cpu') # back to cpu, if was cuda (likely)
                 # l has shape (1, sequence_length, attr_vocab_size)
