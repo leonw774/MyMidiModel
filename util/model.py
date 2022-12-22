@@ -249,7 +249,8 @@ def generate_sample(
         model: MyMidiTransformer,
         steps: int,
         start_seq: Union[Tensor, None] = None,
-        temperature: float = 1.0,
+        temperature_begin: float = 1.0,
+        temperature_end: float = 1.0,
         try_count_limit: int = 1000,
         print_exception: bool = False,
         ignore_pending_note_error: bool = True
@@ -282,7 +283,8 @@ def generate_sample(
     # print(seq.shape)
     # for _ in tqdm(range(steps)):
     with torch.no_grad():
-        for _ in range(steps):
+        for n in range(steps):
+            cur_temperature = temperature_begin * (1 - n / steps) + temperature_end * (n / steps)
             clipped_seq = input_seq[:, -model.max_seq_length:]
             logits = model(clipped_seq.to(model_device))
             last_logits = [
@@ -297,7 +299,7 @@ def generate_sample(
             try_count = 0
             while try_count < try_count_limit:
                 sampled_attrs = [
-                    torch.multinomial(F.softmax(l / temperature, dim=0), 1)
+                    torch.multinomial(F.softmax(l / cur_temperature, dim=0), 1)
                     for l in last_logits # l has shape (1, attr_vocab_size)
                 ]
                 # print(sampled_attrs)

@@ -55,10 +55,11 @@ def read_args():
         help='The maximum TOKENS in each sample would be generated. Default is %(default)s.'
     )
     parser.add_argument(
-        '--temparature', '-t',
+        '--temperatures', '-t',
         type=float,
-        default=1.0,
-        help='Temparature of softmax before multinomial sampling. Default is %(default)s.'
+        default=[1.0, 1.0],
+        nargs=2,
+        help='temperature of softmax before multinomial sampling. Default is %(default)s.'
     )
     parser.add_argument(
         '--try-count-limit',
@@ -101,7 +102,8 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
         steps=args.max_generation_step,
         start_seq=primer_seq,
         try_count_limit=args.try_count_limit,
-        temperature=args.temparature,
+        temperature_begin=args.temperature[0],
+        temperature_end=args.temperature[1],
         print_exception=args.print_exception
     )
     if gen_text_list == BEGIN_TOKEN_STR + " " + END_TOKEN_STR:
