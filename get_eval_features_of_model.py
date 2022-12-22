@@ -66,26 +66,19 @@ def main():
     best_model: MyMidiTransformer = torch.load(os.path.join(args.model_dir_path, 'best_model.pt'))
     vocabs = best_model.vocabs
     uncond_gen_piece_list = []
+    eval_sample_features_per_piece = []
+    eval_sample_features_per_piece: List[ Dict[str, float] ]
     uncond_gen_start_time = time()
     uncond_gen_total_token_length = 0
     logging.info('Generating unconditional generation sample for evaluation')
-    for _ in tqdm(range(args.eval_sample_number)):
+    for i in tqdm(range(args.eval_sample_number)):
+        # generate
         uncond_gen_text_list = generate_sample(best_model, best_model.max_seq_length)
         uncond_gen_total_token_length += len(uncond_gen_text_list)
         uncond_gen_piece = ' '.join(uncond_gen_text_list)
         uncond_gen_piece_list.append(uncond_gen_piece)
-    logging.info(
-        'Done. Generating %d pieces with max_length %d takes %.3f seconds',
-        args.eval_sample_number,
-        best_model.max_seq_length,
-        time() - uncond_gen_start_time
-    )
-    logging.info('Avg. tokens# in the samples are %.3f', uncond_gen_total_token_length / args.eval_sample_number)
 
-    logging.info('Dumping unconditional generation sample to %s', eval_dir_path)
-    eval_sample_features_per_piece = []
-    eval_sample_features_per_piece: List[ Dict[str, float] ]
-    for i, uncond_gen_piece in enumerate(uncond_gen_piece_list):
+        # save to disk
         open(os.path.join(eval_dir_path, f'{i}.txt'), 'w+', encoding='utf8').write(uncond_gen_piece)
         try:
             piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True).dump(
@@ -95,8 +88,16 @@ def main():
                 piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=int(10e6))
             )
         except (AssertionError, ValueError):
-            print('Error when dumping eval uncond gen MidiFile object')
+            print(f'Error when dumping eval uncond gen #{i} MidiFile object')
             print(format_exc())
+
+    logging.info(
+        'Done. Generating %d pieces with max_length %d takes %.3f seconds',
+        args.eval_sample_number,
+        best_model.max_seq_length,
+        time() - uncond_gen_start_time
+    )
+    logging.info('Avg. tokens# in the samples are %.3f', uncond_gen_total_token_length / args.eval_sample_number)
 
     eval_sample_features = {
         fname: [
