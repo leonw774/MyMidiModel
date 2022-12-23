@@ -282,6 +282,7 @@ def main():
         logging.info(model_args_str)
         logging.info(train_args_str)
         logging.info(args_str)
+        logging.info('gradient_accumulation_steps:%d', gradient_accumulation_steps)
 
     vocabs = get_corpus_vocabs(args.corpus_dir_path)
 
