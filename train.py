@@ -395,9 +395,9 @@ def main():
         optimizer,
         lr_lambda=lambda step: lr_warmup_and_linear_decay(
             step,
-            args.train_args.lr_warmup_steps,
+            args.train_args.lr_warmup_steps // gradient_accumulation_steps,
             args.train_args.lr_decay_end_ratio,
-            args.train_args.lr_decay_end_steps
+            args.train_args.lr_decay_end_steps // gradient_accumulation_steps
         )
     )
 

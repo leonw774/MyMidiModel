@@ -690,7 +690,8 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
             for info, onset_list in info_onsets_dict.items():
                 pitch, velocity, track_number = info
                 for onset in onset_list:
-                    n = Note(velocity=velocity, pitch=pitch, start=onset, end=pending_time)
+                    if 0 <= pitch < 128:
+                        n = Note(velocity=velocity, pitch=pitch, start=onset, end=pending_time)
                     midi.instruments[track_number].notes.append(n)
     return midi
 
