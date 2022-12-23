@@ -748,6 +748,8 @@ def get_first_k_nths(text_list: str, nth, k):
 
         if cur_time > k:
             end_index = i
+            break
+
     if end_index == 0:
         raise ValueError(f'Music in text_list is shorter than k={k} nth unit.')
     return text_list[:end_index]
