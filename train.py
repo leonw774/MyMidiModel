@@ -155,6 +155,12 @@ def parse_args():
         action='store_true'
     )
     global_parser.add_argument(
+        '--max-piece-fits-gpu',
+        type=int,
+        default=256,
+        help='Set this to reasonable value to prevent OOM.'
+    )
+    global_parser.add_argument(
         '--log',
         dest='log_file_path',
         type=str,
@@ -237,6 +243,11 @@ def main():
     accelerator = accelerate.Accelerator() if args.use_parallel else None
     is_main_process = accelerator.is_main_process if args.use_parallel else True
     parallel_devices_count = len(os.getenv('CUDA_VISIBLE_DEVICES').split(',')) if args.use_parallel else 1
+    gradient_accumulation_steps = round(args.batch_size / (args.max_piece_per_gpu * parallel_devices_count))
+    if gradient_accumulation_steps <= 1:
+        gradient_accumulation_steps = 1
+    else:
+        args.batch_size = args.max_piece_fits_gpu * parallel_devices_count
 
     # root logger
     if args.log_file_path != '':
@@ -414,7 +425,7 @@ def main():
         train_loss_list: List[List[float]]
         # forward_time = 0
         # backward_time = 0
-        for _ in tqdm(range(args.train_args.validation_interval), disable=not is_main_process):
+        for n in tqdm(range(args.train_args.validation_interval), disable=not is_main_process):
             try:
                 batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
             except StopIteration:
@@ -443,11 +454,14 @@ def main():
             # assert all(not torch.isnan(hl).any() for hl in head_losses), [torch.isnan(head).nonzero() for hl in head_losses]
             loss = torch.mean(torch.stack(head_losses))
             # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
-            # dot.render(filename='lossbackward_mps', format='png')s
-            if args.use_parallel:
-                accelerator.backward(loss)
-            else:
-                loss.backward()
+            # dot.render(filename='lossbackward_mps', format='png')
+            if gradient_accumulation_steps > 1:
+                loss = loss / gradient_accumulation_steps
+            if (n+1) % gradient_accumulation_steps == 0:
+                if args.use_parallel:
+                    accelerator.backward(loss)
+                else:
+                    loss.backward()
             # print(torch.cuda.memory_allocated()/1e6, 'MB')
             if args.train_args.grad_norm_clip > 0:
                 if args.use_parallel:
