@@ -233,8 +233,8 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
                 logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
 
         # this part prohibits the position tokens that is "behind" the current position
-        k = -1
-        while context_text_list[k][0] not in (tokens.POSITION_EVENTS_CHAR, tokens.MEASURE_EVENTS_CHAR):
+        k = len(context_text_list) - 1
+        while context_text_list[k][0] not in (tokens.POSITION_EVENTS_CHAR, tokens.MEASURE_EVENTS_CHAR) and k > 0:
             k -= 1
         if context_text_list[k][0] == tokens.POSITION_EVENTS_CHAR:
             cur_position = b36str2int(context_text_list[k][1:])
@@ -244,8 +244,8 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
                         logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
 
         # this part prohibit the tempo tokens if there is already a tempo token in the current position
-        k = -1
-        while context_text_list[k][0] not in (tokens.POSITION_EVENTS_CHAR, tokens.TEMPO_EVENTS_CHAR):
+        k = len(context_text_list) - 1
+        while context_text_list[k][0] not in (tokens.POSITION_EVENTS_CHAR, tokens.TEMPO_EVENTS_CHAR) and k > 0:
             k -= 1
         if context_text_list[k][0] == tokens.TEMPO_EVENTS_CHAR:
             for i in tempo_indices:
