@@ -141,6 +141,7 @@ class MidiDataset(Dataset):
                 is_multinote_token = (self.pieces[filename][:, TOKEN_ATTR_INDEX['pit']]) != 0
                 # the pitch attribute of drums / percussion instrument does not means actual note pitch
                 # but different percussion sound
+                # assume instrument vocabulary is 0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
                 not_percussion_notes = (self.pieces[filename][:, TOKEN_ATTR_INDEX['ins']]) != 129
                 self._augmentable_pitches[filenum] = np.logical_and(is_multinote_token, not_percussion_notes)
 
@@ -156,7 +157,8 @@ class MidiDataset(Dataset):
             for attr_name in dir(self)
             if not attr_name.startswith('__')
         )
-        print('Dataset object size:', self_size, 'bytes')
+        if verbose:
+            print('Dataset object size:', self_size, 'bytes')
 
     def __getitem__(self, index):
         # while True:
@@ -175,8 +177,7 @@ class MidiDataset(Dataset):
         sliced_array = sliced_array.astype(np.int32) # was int16 to save space but torch ask for int
 
         # pitch augmentation
-        # assume pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
-        # assume instrument vocabulary is 0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
+        # pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
         if pitch_augment != 0:
             sliced_augmentable_pitches = self._augmentable_pitches[filenum][:end_index]
             # sometimes the sliced array does not contain any pitch-augmentable token
@@ -184,11 +185,11 @@ class MidiDataset(Dataset):
                 if pitch_augment > 0:
                     max_pitch = np.max( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
                     if max_pitch > 128:
-                        pitch_augment = 128 - max_pitch
+                        pitch_augment -= max_pitch - 128
                 else: # pitch_augment < 0
                     min_pitch = np.min( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
                     if min_pitch < 1:
-                        pitch_augment = 1 - min_pitch
+                        pitch_augment += 1 - min_pitch
                 (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] += pitch_augment
 
         if self.permute_track_number:
