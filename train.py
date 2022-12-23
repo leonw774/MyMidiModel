@@ -458,11 +458,10 @@ def main():
             # dot.render(filename='lossbackward_mps', format='png')
             if gradient_accumulation_steps > 1:
                 loss = loss / gradient_accumulation_steps
-            if (n+1) % gradient_accumulation_steps == 0:
-                if args.use_parallel:
-                    accelerator.backward(loss)
-                else:
-                    loss.backward()
+            if args.use_parallel:
+                accelerator.backward(loss)
+            else:
+                loss.backward()
             # print(torch.cuda.memory_allocated()/1e6, 'MB')
             if args.train_args.grad_norm_clip > 0:
                 if args.use_parallel:
@@ -473,9 +472,10 @@ def main():
             if is_main_process:
                 train_loss_list.append([hl.item() for hl in head_losses])
                 # print(train_loss_list[-1])
-            optimizer.step()
-            scheduler.step()
-            optimizer.zero_grad()
+            if (n+1) % gradient_accumulation_steps == 0:
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
             # print('loss + back propagate use time:', time() - start_backward_time)
             # torch.cuda.empty_cache() # use only when oom did happen
             # backward_time += time() - start_backward_time
