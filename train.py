@@ -247,7 +247,7 @@ def main():
     if gradient_accumulation_steps <= 1:
         gradient_accumulation_steps = 1
     else:
-        args.train_args.batch_size = args.max_piece_fits_gpu * parallel_devices_count
+        args.train_args.batch_size = args.max_pieces_per_gpu * parallel_devices_count
 
     # root logger
     if args.log_file_path != '':
