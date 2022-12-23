@@ -155,7 +155,7 @@ def parse_args():
         action='store_true'
     )
     global_parser.add_argument(
-        '--max-piece-fits-gpu',
+        '--max-piece-per-gpu',
         type=int,
         default=256,
         help='Set this to reasonable value to prevent OOM.'
