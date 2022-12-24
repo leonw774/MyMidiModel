@@ -75,7 +75,7 @@ def main():
                 if rand_index not in sampled_rand_index:
                     break
             random_piece = corpus_reader[rand_index]
-            random_piece_total_token_length += len(random_piece.count(' ') + 1)
+            random_piece_total_token_length += random_piece.count(' ') + 1
 
             try:
                 eval_sample_features_per_piece.append(
