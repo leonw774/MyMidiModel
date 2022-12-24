@@ -96,7 +96,7 @@ def parse_args():
         default=8
     )
     train_parser.add_argument(
-        '--steps',
+        '--max-steps',
         type=int
     )
     train_parser.add_argument(
@@ -395,9 +395,9 @@ def main():
         optimizer,
         lr_lambda=lambda step: lr_warmup_and_linear_decay(
             step,
-            args.train_args.lr_warmup_steps // gradient_accumulation_steps,
+            args.train_args.lr_warmup_steps,
             args.train_args.lr_decay_end_ratio,
-            args.train_args.lr_decay_end_steps // gradient_accumulation_steps
+            args.train_args.lr_decay_end_steps
         )
     )
 
@@ -418,67 +418,71 @@ def main():
     early_stop_counter = 0
 
     start_time = time()
-    for start_step in range(0, args.train_args.steps, args.train_args.validation_interval):
+    for start_step in range(0, args.train_args.max_steps, args.train_args.validation_interval):
         if is_main_process:
-            logging.info('Training: %d/%d', start_step, args.train_args.steps)
+            logging.info('Training: %d/%d', start_step, args.train_args.max_steps)
         model.train()
         train_loss_list = []
         train_loss_list: List[List[float]]
         # forward_time = 0
         # backward_time = 0
-        for n in tqdm(range(args.train_args.validation_interval), disable=not is_main_process):
-            try:
-                batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
-            except StopIteration:
-                train_dataloader_iter = iter(train_dataloader)
-                batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
+        for _ in tqdm(range(args.train_args.validation_interval), disable=not is_main_process):
+            for _ in range(gradient_accumulation_steps):
+                try:
+                    batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
+                except StopIteration:
+                    train_dataloader_iter = iter(train_dataloader)
+                    batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
 
-            # batch_seqs has shape: (batch_size, seq_size, complete_attr_num)
-            batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
-            batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
-            if not args.use_parallel:
-                batch_input_seqs = batch_input_seqs.to(args.use_device)
-                batch_target_seqs = batch_target_seqs.to(args.use_device)
-            # start_forward_time = time()
-            prediction = model(batch_input_seqs)
-            # assert all(not torch.isnan(h).any() for h in prediction), [torch.isnan(h).nonzero() for h in prediction]
-            # forward_time += time() - start_forward_time
-            # start_backward_time = time()
-        # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
-            if args.data_args.use_permutable_subseq_loss:
-                head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
-                # print('\ncalc_permutable_subseq_losses use time:', time() - start_backward_time)
-            else:
-                head_losses = calc_losses(prediction, batch_target_seqs)
-                    # print('\ncalc_losses use time:', time() - start_backward_time)
-        # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=32))
-            # assert all(not torch.isnan(hl).any() for hl in head_losses), [torch.isnan(head).nonzero() for hl in head_losses]
-            loss = torch.mean(torch.stack(head_losses))
-            # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
-            # dot.render(filename='lossbackward_mps', format='png')
-            if gradient_accumulation_steps > 1:
-                loss = loss / gradient_accumulation_steps
-            if args.use_parallel:
-                accelerator.backward(loss)
-            else:
-                loss.backward()
-            # print(torch.cuda.memory_allocated()/1e6, 'MB')
-            if args.train_args.grad_norm_clip > 0:
-                if args.use_parallel:
-                    if accelerator.sync_gradients:
-                        accelerator.clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
+                # batch_seqs has shape: (batch_size, seq_size, complete_attr_num)
+                batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
+                batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
+                if not args.use_parallel:
+                    batch_input_seqs = batch_input_seqs.to(args.use_device)
+                    batch_target_seqs = batch_target_seqs.to(args.use_device)
+                # start_forward_time = time()
+                prediction = model(batch_input_seqs)
+                # assert all(not torch.isnan(h).any() for h in prediction), [torch.isnan(h).nonzero() for h in prediction]
+                # forward_time += time() - start_forward_time
+
+                # start_backward_time = time()
+            # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
+                if args.data_args.use_permutable_subseq_loss:
+                    head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
+                    # print('\ncalc_permutable_subseq_losses use time:', time() - start_backward_time)
                 else:
-                    clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
-            if is_main_process:
-                train_loss_list.append([hl.item() for hl in head_losses])
-                # print(train_loss_list[-1])
-            if (n+1) % gradient_accumulation_steps == 0:
-                optimizer.step()
-                scheduler.step()
-                optimizer.zero_grad()
-            # print('loss + back propagate use time:', time() - start_backward_time)
-            # torch.cuda.empty_cache() # use only when oom did happen
-            # backward_time += time() - start_backward_time
+                    head_losses = calc_losses(prediction, batch_target_seqs)
+                        # print('\ncalc_losses use time:', time() - start_backward_time)
+            # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=32))
+                # assert all(not torch.isnan(hl).any() for hl in head_losses)
+                loss = torch.mean(torch.stack(head_losses))
+                # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
+                # dot.render(filename='lossbackward_mps', format='png')
+
+                if is_main_process:
+                    train_loss_list.append([hl.item() for hl in head_losses])
+                    # print(train_loss_list[-1])
+
+                loss = loss / gradient_accumulation_steps
+
+                if args.train_args.grad_norm_clip > 0:
+                    if args.use_parallel:
+                        if accelerator.sync_gradients:
+                            accelerator.clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
+                    else:
+                        clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
+
+                if args.use_parallel:
+                    accelerator.backward(loss)
+                else:
+                    loss.backward()
+                # print('loss + back propagate use time:', time() - start_backward_time)
+                # backward_time += time() - start_backward_time
+            # end for range(gradient_accumulation_steps)
+
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad()
         # print('Forward time', forward_time, 'Backward time', backward_time)
 
         if is_main_process:

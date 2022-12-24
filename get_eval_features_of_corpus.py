@@ -28,9 +28,8 @@ def parse_args():
         default=64
     )
     parser.add_argument(
-        '--corpus-dir-path',
-        type=str,
-        required=True
+        'corpus_dir_path',
+        type=str
     )
     return parser.parse_args()
 
