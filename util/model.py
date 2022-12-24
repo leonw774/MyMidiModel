@@ -5,6 +5,7 @@ import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 # from torch.profiler import record_function
+from tqdm import tqdm
 
 try:
     from fast_transformers.builders import TransformerEncoderBuilder
@@ -209,6 +210,9 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
     sep_inex = vocabs.events.text2id[tokens.SEP_TOKEN_STR]
     # BOS token is redundent, will not be used in generation
     logits[TOKEN_ATTR_INDEX['evt']][bos_index] = large_neg_value
+    # predict PAD is not allowed in generation time
+    for attr_logits in logits:
+        attr_logits[0] = large_neg_value
 
     is_head = context_text_list[-1] == tokens.BEGIN_TOKEN_STR or context_text_list[-1][0] == tokens.TRACK_EVENTS_CHAR
     is_sep = context_text_list[-1] == tokens.SEP_TOKEN_STR
@@ -275,6 +279,7 @@ def generate_sample(
         temperature: float = 1.0,
         try_count_limit: int = 1000,
         print_exception: bool = False,
+        show_tqdm: bool = False,
         ignore_pending_note_error: bool = True
         ) -> list:
     """
@@ -300,12 +305,13 @@ def generate_sample(
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
 
     input_seq = start_seq
+    primer_length = input_seq.shape[0]
     output_seq = model.to_output_attrs(start_seq)
     end_with_end_token = False
     # print(seq.shape)
     # for _ in tqdm(range(steps)):
     with torch.no_grad():
-        while input_seq.shape[0] < steps:
+        for _ in tqdm(range(steps - primer_length), disable=not show_tqdm):
             logits = model(input_seq.to(model_device))
             last_logits = [
                 l[0, -1, :].to('cpu') # back to cpu, if was cuda (likely)

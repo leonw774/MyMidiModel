@@ -102,7 +102,8 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
         start_seq=primer_seq,
         try_count_limit=args.try_count_limit,
         temperature=args.temperature,
-        print_exception=args.print_exception
+        print_exception=args.print_exception,
+        show_tqdm=True
     )
     if gen_text_list == BEGIN_TOKEN_STR + " " + END_TOKEN_STR:
         print(f'{output_file_path}: generated empty piece. will not output file.')
