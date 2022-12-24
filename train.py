@@ -116,8 +116,8 @@ def parse_args():
             Default is %(desult)s.'
     )
     train_parser.add_argument(
-        '--learning-rate', '--lr',
-        dest='learning_rate',
+        '--lr-peak',
+        dest='lr_peak',
         type=float
     )
     train_parser.add_argument(
@@ -389,7 +389,7 @@ def main():
         logging.info(summary_str)
 
     # make optimizer
-    optimizer = AdamW(model.parameters(), args.train_args.learning_rate, betas=(0.9, 0.98), eps=1e-8)
+    optimizer = AdamW(model.parameters(), args.train_args.lr_peak, betas=(0.9, 0.98), eps=1e-8)
     scheduler = lr_scheduler.LambdaLR(
         optimizer,
         lr_lambda=lambda step: lr_warmup_and_linear_decay(
