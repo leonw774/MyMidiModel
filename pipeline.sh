@@ -133,7 +133,7 @@ python3 text_to_array.py --debug --bpe $BPE_ITER --mp-worker-number $PROCESS_WOR
 test $? -ne 0 && { echo "text_to_array.py failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
 # this will not use existed
-python3 generate_eval_features_of_corpus.py --log $LOG_PATH $CORPUS_DIR_PATH
+python3 get_eval_features_of_corpus.py --log $LOG_PATH $CORPUS_DIR_PATH
 
 # test if NO_TRAIN is a set variables
 if [ -n "${NO_TRAIN+x}" ]; then
@@ -173,7 +173,7 @@ else
 fi
 $LAUNCH_COMMAND train.py --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation $PITCH_AUGMENTATION $TRAIN_OTHER_ARGUMENTS \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
-    --batch-size $BATCH_SIZE --max-steps $NAX_STEPS --grad-norm-clip $GRAD_NORM_CLIP \
+    --batch-size $BATCH_SIZE --max-steps $MAX_STEPS --grad-norm-clip $GRAD_NORM_CLIP \
     --split-ratio $SPLIT_RATIO --validation-interval $VALIDATION_INTERVAL --validation-steps $VALIDATION_STEPS --early-stop $EARLY_STOP \
     --lr $LEARNING_RATE --lr-warmup-steps $LEARNING_RATE_WARMUP_STEPS --lr-decay-end-steps $LEARNING_RATE_DECAY_END_STEPS --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
     --use-device $USE_DEVICE --max-pieces-per-gpu $MAX_PIECE_PER_GPU --log $LOG_PATH --model-dir-path $MODEL_DIR_PATH $CORPUS_DIR_PATH
