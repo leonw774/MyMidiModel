@@ -37,21 +37,21 @@ def parse_args():
 def main():
     args = parse_args()
     # root logger
-    # if args.log_file_path != '':
-    #     logging.basicConfig(
-    #         filename=args.log_file_path,
-    #         filemode='a',
-    #         level=logging.INFO,
-    #         format='%(message)s',
-    #     )
-    #     console = logging.StreamHandler()
-    #     console.setLevel(logging.INFO)
-    #     logging.getLogger().addHandler(console)
-    # else:
-    #     logging.basicConfig(
-    #         level=logging.INFO,
-    #         format='%(message)s'
-    #     )
+    if args.log_file_path != '':
+        logging.basicConfig(
+            filename=args.log_file_path,
+            filemode='a',
+            level=logging.INFO,
+            format='%(message)s',
+        )
+        console = logging.StreamHandler()
+        console.setLevel(logging.INFO)
+        logging.getLogger().addHandler(console)
+    else:
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(message)s'
+        )
 
     logging.info(strftime('=== get_eval_features_of_dataset.py start at %Y%m%d-%H%M%S ==='))
 
