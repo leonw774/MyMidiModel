@@ -305,7 +305,7 @@ def generate_sample(
     # print(seq.shape)
     # for _ in tqdm(range(steps)):
     with torch.no_grad():
-        for _ in range(steps):
+        while input_seq.shape[0] < steps:
             logits = model(input_seq.to(model_device))
             last_logits = [
                 l[0, -1, :].to('cpu') # back to cpu, if was cuda (likely)

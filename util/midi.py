@@ -521,10 +521,6 @@ def handle_note_continuation(
         # print(cur_time, 'onset', onset, 'append', pending_cont_notes)
     else:
         # assert 0 <= pitch < 128
-        if not 0 <= pitch < 128:
-            # when using BPE, sometimes model will generated the combination that
-            # the relative_pitch + base_pitch exceeds limit
-            return None
         return Note(
             start=onset,
             end=cur_time+duration,
@@ -633,6 +629,10 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
                 cur_time = position[0] + cur_measure_onset
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
                 note_attrs = (base_pitch + rel_pitch, rel_dur * time_unit, velocity, track_number)
+                # when using BPE, sometimes model will generated the combination that
+                # the relative_pitch + base_pitch exceeds limit
+                if not 0 <= note_attrs[0] < 128:
+                    continue
                 onset_time = cur_time + rel_onset * time_unit
                 n = handle_note_continuation(is_cont, note_attrs, onset_time, pending_cont_notes)
                 if n is not None:
@@ -690,8 +690,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
             for info, onset_list in info_onsets_dict.items():
                 pitch, velocity, track_number = info
                 for onset in onset_list:
-                    if 0 <= pitch < 128:
-                        n = Note(velocity=velocity, pitch=pitch, start=onset, end=pending_time)
+                    n = Note(velocity=velocity, pitch=pitch, start=onset, end=pending_time)
                     midi.instruments[track_number].notes.append(n)
     return midi
 
