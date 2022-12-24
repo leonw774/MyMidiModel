@@ -181,7 +181,7 @@ def parse_args():
         type=str
     )
     global_parser.add_argument(
-        'model_dir+path',
+        'model_dir_path',
         type=str
     )
     # make them as dicts first
