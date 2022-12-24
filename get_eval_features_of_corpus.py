@@ -68,7 +68,7 @@ def main():
         random_piece_total_token_length = 0
         logging.info('Generating unconditional generation sample for evaluation')
         sampled_rand_index = set()
-        for i in tqdm(range(args.eval_sample_number)):
+        for i in tqdm(range(args.sample_number)):
             # get random piece
             while True:
                 rand_index = random.randint(corpus_len)

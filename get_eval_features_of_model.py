@@ -24,14 +24,13 @@ def parse_args():
         default='',
     )
     parser.add_argument(
-        '--eval-sample-number',
+        '--sample-number',
         type=int,
         default=64
     )
     parser.add_argument(
-        '--model-dir-path',
-        type=str,
-        required=True
+        'model_dir_path',
+        type=str
     )
     return parser.parse_args()
 
@@ -70,7 +69,7 @@ def main():
     uncond_gen_start_time = time()
     uncond_gen_total_token_length = 0
     logging.info('Generating unconditional generation sample for evaluation')
-    for i in tqdm(range(args.eval_sample_number)):
+    for i in tqdm(range(args.sample_number)):
         # generate
         uncond_gen_text_list = generate_sample(best_model, best_model.max_seq_length)
         uncond_gen_total_token_length += len(uncond_gen_text_list)
@@ -91,11 +90,11 @@ def main():
 
     logging.info(
         'Done. Generating %d pieces with max_length %d takes %.3f seconds',
-        args.eval_sample_number,
+        args.sample_number,
         best_model.max_seq_length,
         time() - uncond_gen_start_time
     )
-    logging.info('Avg. tokens# in the samples are %.3f', uncond_gen_total_token_length / args.eval_sample_number)
+    logging.info('Avg. tokens# in the samples are %.3f', uncond_gen_total_token_length / args.sample_number)
 
     eval_sample_features = {
         fname: [

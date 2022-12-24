@@ -177,12 +177,11 @@ def parse_args():
         default=4
     )
     global_parser.add_argument(
-        '--model-dir-path',
-        type=str,
-        required=True
+        'corpus_dir_path',
+        type=str
     )
     global_parser.add_argument(
-        'corpus_dir_path',
+        'model_dir+path',
         type=str
     )
     # make them as dicts first
