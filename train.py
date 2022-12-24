@@ -527,7 +527,8 @@ def main():
             print('Generating conditional and unconditional sample for checkpoint')
             uncond_gen_text_list = generate_sample(
                 unwrapped_model if args.use_parallel else model,
-                steps=args.data_args.max_seq_length
+                steps=args.data_args.max_seq_length,
+                temperature=0.8
             )
             uncond_gen_piece = ' '.join(uncond_gen_text_list)
             with open(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
@@ -541,7 +542,8 @@ def main():
             cond_gen_text_list = generate_sample(
                 unwrapped_model if args.use_parallel else model,
                 steps=args.data_args.max_seq_length,
-                start_seq=cond_primer_array
+                start_seq=cond_primer_array,
+                temperature=0.8
             )
             cond_gen_piece = ' '.join(cond_gen_text_list)
             with open(os.path.join(ckpt_dir_path, f'{cur_step}_cond.txt'), 'w+', encoding='utf8') as cond_file:
