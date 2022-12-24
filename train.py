@@ -464,13 +464,6 @@ def main():
 
                 loss = loss / gradient_accumulation_steps
 
-                if args.train_args.grad_norm_clip > 0:
-                    if args.use_parallel:
-                        if accelerator.sync_gradients:
-                            accelerator.clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
-                    else:
-                        clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
-
                 if args.use_parallel:
                     accelerator.backward(loss)
                 else:
@@ -478,6 +471,13 @@ def main():
                 # print('loss + back propagate use time:', time() - start_backward_time)
                 # backward_time += time() - start_backward_time
             # end for range(gradient_accumulation_steps)
+
+            if args.train_args.grad_norm_clip > 0:
+                if args.use_parallel:
+                    if accelerator.sync_gradients:
+                        accelerator.clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
+                else:
+                    clip_grad_norm_(model.parameters(), args.train_args.grad_norm_clip)
 
             optimizer.step()
             scheduler.step()
