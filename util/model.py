@@ -306,7 +306,7 @@ def generate_sample(
 
     input_seq = start_seq
     primer_length = input_seq.shape[1]
-    max_gen_step = min(model.max_seq_length, steps+primer_length)
+    max_gen_step = min(model.max_seq_length, steps+primer_length) - primer_length
     output_seq = model.to_output_attrs(start_seq)
     end_with_end_token = False
     # print(seq.shape)
