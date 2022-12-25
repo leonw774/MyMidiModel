@@ -477,8 +477,8 @@ def midi_to_text_list(
             consecutive_measure_token_count += 1
         elif t[0] == 'N':
             consecutive_measure_token_count = 0
-        # if consecutive_measure_token_count >= 64:
-        #     raise AssertionError('Very long silence detected, likely corrupted')
+        if consecutive_measure_token_count >= 64:
+            raise AssertionError('Very long silence detected, likely corrupted')
 
     return text_list
 
