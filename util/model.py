@@ -306,12 +306,13 @@ def generate_sample(
 
     input_seq = start_seq
     primer_length = input_seq.shape[1]
+    max_gen_step = min(model.max_seq_length, steps+primer_length)
     output_seq = model.to_output_attrs(start_seq)
     end_with_end_token = False
     # print(seq.shape)
     # for _ in tqdm(range(steps)):
     with torch.no_grad():
-        for _ in tqdm(range(steps - primer_length), disable=not show_tqdm):
+        for _ in tqdm(range(max_gen_step), disable=not show_tqdm):
             logits = model(input_seq.to(model_device))
             last_logits = [
                 l[0, -1, :].to('cpu') # back to cpu, if was cuda (likely)
