@@ -396,7 +396,7 @@ def calc_losses(pred_logit: List[Tensor], target_logit: Tensor) -> List[Tensor]:
         # F.nll_loss(
             input=pred_attr_logit.transpose(1, 2), # (batch_size, attr_vocab_size, seq_size)
             target=target_logit[..., k], # (batch_size, seq_size)
-            ignore_index=0 # assume padding is index 0
+            ignore_index=0, # assume padding is index 0
         )
         for k, pred_attr_logit in enumerate(pred_logit)
     ]
