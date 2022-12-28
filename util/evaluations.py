@@ -98,7 +98,9 @@ def midi_to_features(midi: MidiFile, max_pairs_number: int) -> Dict[str, float]:
         max_duration=nth,
         velocity_step=1,
         use_cont_note=True,
-        position_method='event'
+        tempo_quantization=(4,4,516),
+        position_method='event',
+        use_merge_drums=False
     )
     return piece_to_features(temp_piece, nth, max_pairs_number)
 
