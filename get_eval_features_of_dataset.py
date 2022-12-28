@@ -69,20 +69,28 @@ def main():
     eval_sample_features_per_piece = []
     eval_sample_features_per_piece: List[ Dict[str, float] ]
     start_time = time()
-    sampled_rand_index = random.sample(range(dataset_size), args.sample_number)
-    for rand_index in tqdm(sampled_rand_index):
-        random_midi_file_path = file_path_list[rand_index]
-        try:
-            eval_sample_features_per_piece.append(
-                midi_to_features(MidiFile(random_midi_file_path),  max_pairs_number=int(10e6))
-            )
-        except (AssertionError, ValueError):
-            print(f'Error when getting feature from piece witat index #{rand_index} MidiFile object')
-            print(format_exc())
+    sampled_rand_index = set()
+    feature_sample_count = 0
+    with tqdm(total=args.sample_number) as pbar:
+        while feature_sample_count < args.sample_number:
+            rand_index = random.randint(0, dataset_size-1)
+            if rand_index in sampled_rand_index:
+                continue
+            random_midi_file_path = file_path_list[rand_index]
+            try:
+                eval_sample_features_per_piece.append(
+                    midi_to_features(MidiFile(random_midi_file_path),  max_pairs_number=int(10e6))
+                )
+                feature_sample_count += 1
+                pbar.update(1)
+                sampled_rand_index.add(rand_index)
+            except (AssertionError, ValueError):
+                print(f'Error when getting feature from piece witat index #{rand_index} MidiFile object')
+                print(format_exc())
 
     logging.info(
         'Done. Sampling %d midi files from %s takes %.3f seconds',
-        args.eval_sample_number,
+        args.sample_number,
         args.dataset_dir_path,
         time() - start_time
     )
@@ -106,6 +114,7 @@ def main():
         json.dump(eval_sample_features_stats, eval_stat_file)
 
     logging.info(strftime('=== get_eval_features_of_dataset.py exit ==='))
+    return 0
 
 
 if __name__ == '__main__':
