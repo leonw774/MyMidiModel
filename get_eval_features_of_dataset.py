@@ -8,6 +8,7 @@ from traceback import format_exc
 from typing import List, Dict
 import random
 
+from miditoolkit import MidiFile
 import numpy as np
 from pandas import Series
 from tqdm import tqdm
@@ -70,10 +71,10 @@ def main():
     start_time = time()
     sampled_rand_index = random.sample(range(dataset_size), args.sample_number)
     for rand_index in tqdm(sampled_rand_index):
-        random_midi = file_path_list[rand_index]
+        random_midi_file_path = file_path_list[rand_index]
         try:
             eval_sample_features_per_piece.append(
-                midi_to_features(random_midi,  max_pairs_number=int(10e6))
+                midi_to_features(MidiFile(random_midi_file_path),  max_pairs_number=int(10e6))
             )
         except (AssertionError, ValueError):
             print(f'Error when getting feature from piece witat index #{rand_index} MidiFile object')
