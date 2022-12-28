@@ -91,7 +91,7 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
 
 def midi_to_features(midi: MidiFile, max_pairs_number: int) -> Dict[str, float]:
     nth = midi.ticks_per_beat * 4
-    temp_piece = midi_to_text_list(
+    temp_piece = ' '.join(midi_to_text_list(
         midi,
         nth=nth,
         max_track_number=len(midi.instruments),
@@ -101,7 +101,7 @@ def midi_to_features(midi: MidiFile, max_pairs_number: int) -> Dict[str, float]:
         tempo_quantization=(1,1,65536),
         position_method='event',
         use_merge_drums=False
-    )
+    ))
     return piece_to_features(temp_piece, nth, max_pairs_number)
 
 
