@@ -5,9 +5,10 @@ import random
 from typing import Dict
 
 import numpy as np
+from miditoolkit import MidiFile
 
 from .tokens import get_largest_possible_position, b36str2int, MEASURE_EVENTS_CHAR
-from .midi import piece_to_midi
+from .midi import piece_to_midi, midi_to_text_list
 
 
 def _entropy(x: list) -> float:
@@ -86,6 +87,20 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
 
     head = text_list[:measure_indices[0]]
     return head + sampled_body
+
+
+def midi_to_features(midi: MidiFile, max_pairs_number: int) -> Dict[str, float]:
+    nth = midi.ticks_per_beat * 4
+    temp_piece = midi_to_text_list(
+        midi,
+        nth=nth,
+        max_track_number=len(midi.instruments),
+        max_duration=nth,
+        velocity_step=1,
+        use_cont_note=True,
+        position_method='event'
+    )
+    return piece_to_features(temp_piece, nth, max_pairs_number)
 
 
 def piece_to_features(piece: str, nth: int, max_pairs_number: int) -> Dict[str, float]:

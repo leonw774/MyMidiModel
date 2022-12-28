@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+import glob
 import json
 import logging
 import os
@@ -12,7 +13,7 @@ from pandas import Series
 from tqdm import tqdm
 
 from util.corpus import get_corpus_vocabs, CorpusReader
-from util.evaluations import EVAL_FEATURE_NAMES, piece_to_features
+from util.evaluations import EVAL_FEATURE_NAMES, midi_to_features
 
 def parse_args():
     parser = ArgumentParser()
@@ -28,7 +29,7 @@ def parse_args():
         default=64
     )
     parser.add_argument(
-        'corpus_dir_path',
+        'dataset_dir_path',
         type=str
     )
     return parser.parse_args()
@@ -55,40 +56,34 @@ def main():
 
     logging.info(strftime('=== get_eval_features_of_dataset.py start at %Y%m%d-%H%M%S ==='))
 
-    if not os.path.isdir(args.corpus_dir_path):
-        logging.info('Invalid dataset dir path: %s', args.corpus_dir_path)
+    if not os.path.isdir(args.dataset_dir_path):
+        logging.info('Invalid dataset dir path: %s', args.dataset_dir_path)
         return 1
 
-    vocabs = get_corpus_vocabs(args.corpus_dir_path)
-    with CorpusReader(args.corpus_dir_path) as corpus_reader:
-        corpus_len = len(corpus_reader)
-        eval_sample_features_per_piece = []
-        eval_sample_features_per_piece: List[ Dict[str, float] ]
-        start_time = time()
-        random_piece_total_token_length = 0
-        logging.info('Generating unconditional generation sample for evaluation')
-        sampled_rand_index = set()
-        for _ in tqdm(range(args.sample_number)):
-            # get random piece
-            while True:
-                rand_index = random.randint(0, corpus_len-1)
-                if rand_index not in sampled_rand_index:
-                    break
-            random_piece = corpus_reader[rand_index]
-            random_piece_total_token_length += random_piece.count(' ') + 1
+    file_path_list = glob.glob(args.dataset_dir_path+'/**/*.mid', recursive=True)
+    file_path_list += glob.glob(args.dataset_dir_path+'/**/*.midi', recursive=True)
+    file_path_list += glob.glob(args.dataset_dir_path+'/**/*.MID', recursive=True)
 
-            try:
-                eval_sample_features_per_piece.append(
-                    piece_to_features(random_piece, nth=vocabs.paras['nth'], max_pairs_number=int(10e6))
-                )
-            except (AssertionError, ValueError):
-                print(f'Error when getting feature from piece witat index #{rand_index} MidiFile object')
-                print(format_exc())
+
+    dataset_size = len(file_path_list)
+    eval_sample_features_per_piece = []
+    eval_sample_features_per_piece: List[ Dict[str, float] ]
+    start_time = time()
+    sampled_rand_index = random.sample(range(dataset_size), args.sample_number)
+    for rand_index in tqdm(sampled_rand_index):
+        random_midi = file_path_list[rand_index]
+        try:
+            eval_sample_features_per_piece.append(
+                midi_to_features(random_midi,  max_pairs_number=int(10e6))
+            )
+        except (AssertionError, ValueError):
+            print(f'Error when getting feature from piece witat index #{rand_index} MidiFile object')
+            print(format_exc())
 
     logging.info(
-        'Done. Sampling %d pieces from %s takes %.3f seconds',
+        'Done. Sampling %d midi files from %s takes %.3f seconds',
         args.eval_sample_number,
-        args.corpus_dir_path,
+        args.dataset_dir_path,
         time() - start_time
     )
     logging.info('Avg. tokens# in the samples are %.3f', random_piece_total_token_length / args.eval_sample_number)
@@ -108,7 +103,7 @@ def main():
         eval_sample_features_stats[fname] = {
             k : float(v) for k, v in fname_description.items()
         }
-    with open(os.path.join(args.corpus_dir_path, 'eval_sample_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
+    with open(os.path.join(args.dataset_dir_path, 'eval_sample_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
         json.dump(eval_sample_features_stats, eval_stat_file)
 
     logging.info(strftime('=== get_eval_features_of_dataset.py exit ==='))

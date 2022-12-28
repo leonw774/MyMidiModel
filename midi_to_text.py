@@ -11,6 +11,7 @@ from time import time, strftime
 from traceback import format_exc
 import zlib
 
+from miditoolkit import MidiFile
 from psutil import cpu_count
 from tqdm import tqdm
 
@@ -135,6 +136,12 @@ def parse_args():
 
 def handler(args_dict: dict):
     n = args_dict.pop('n', 0)
+    midi_file_path  = args_dict.pop('midi_file_path', '')
+    try:
+        args_dict['midi'] = MidiFile(midi_file_path)
+    except:
+        return 'RuntimeError(\'miditoolkit failed to parse the file\')'
+
     try:
         text_list = midi_to_text_list(**args_dict)
         piece_bytes = ' '.join(text_list).encode()
@@ -143,7 +150,7 @@ def handler(args_dict: dict):
     except KeyboardInterrupt as e:
         raise e
     except Exception as e:
-        logging.debug('%d pid: %d file path: %s', n, os.getpid(), args_dict['midi_file_path'])
+        logging.debug('%d pid: %d file path: %s', n, os.getpid(), midi_file_path)
         logging.debug(format_exc())
         # if not (repr(e).startswith('Assert') or repr(e).startswith('Runtime')):
         #     print(f'{n} pid: {os.getpid()} file path: {args_dict["midi_file_path"]}')

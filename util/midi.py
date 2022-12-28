@@ -421,7 +421,7 @@ def midi_to_token_list(
     return full_token_list
 
 def midi_to_text_list(
-        midi_file_path: str,
+        midi: MidiFile,
         nth: int,
         max_track_number: int,
         max_duration: int,
@@ -452,10 +452,6 @@ def midi_to_text_list(
     assert tempo_quantization[0] <= tempo_quantization[1] and tempo_quantization[2] > 0, 'Bad tempo_quantization'
 
     # start_time = time()
-    try:
-        midi = MidiFile(midi_file_path)
-    except Exception as e:
-        raise RuntimeError('miditoolkit failed to parse the file') from e
     assert len(midi.instruments) > 0, 'No tracks in MidiFile'
     for inst in midi.instruments:
         inst.remove_invalid_notes(verbose=False)
