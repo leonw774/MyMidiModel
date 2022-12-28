@@ -121,7 +121,7 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int) -> Dict[str, 
     for track in midi.instruments:
         for note in track.notes:
             pitch_histogram[note.pitch] += 1
-            durations.append(note.end - note.start)
+            durations.append((note.end - note.start) / nth / 4) # use quarter note as unit
             velocities.append(note.velocity)
 
     try:

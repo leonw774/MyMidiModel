@@ -26,7 +26,7 @@ def parse_args():
     parser.add_argument(
         '--sample-number',
         type=int,
-        default=64
+        default=100
     )
     parser.add_argument(
         'model_dir_path',
