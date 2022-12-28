@@ -12,7 +12,6 @@ import numpy as np
 from pandas import Series
 from tqdm import tqdm
 
-from util.corpus import get_corpus_vocabs, CorpusReader
 from util.evaluations import EVAL_FEATURE_NAMES, midi_to_features
 
 def parse_args():
@@ -86,7 +85,6 @@ def main():
         args.dataset_dir_path,
         time() - start_time
     )
-    logging.info('Avg. tokens# in the samples are %.3f', random_piece_total_token_length / args.eval_sample_number)
 
     eval_sample_features = {
         fname: [
