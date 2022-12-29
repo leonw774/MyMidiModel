@@ -121,6 +121,9 @@ def main():
     assert isinstance(model, MyMidiTransformer)
     nth = model.vocabs.paras['nth']
 
+    if args.output_file_path.endswith('.mid'):
+        args.output_file_path = args.output_file_path[:-4]
+
     # device
     if not args.use_device.startswith('cuda') and args.use_device != 'cpu':
         raise ValueError(f'Bad device name {args.use_device}')
