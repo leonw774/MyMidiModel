@@ -109,7 +109,7 @@ def token_to_str(token: namedtuple) -> str:
 
     if type_priority == TYPE_PRIORITY['NoteToken']:
         # event:pitch:duration:velocity:track:instrument(:position)
-        # negative duration means is_cont==True
+        # negative token.duration means is_cont==True
         text = NOTE_EVENTS_CHAR if token.duration > 0 else NOTE_EVENTS_CHAR + '~'
         text += ( f':{int2b36str(token.pitch)}'
                 + f':{int2b36str(abs(token.duration))}'
@@ -131,8 +131,8 @@ def token_to_str(token: namedtuple) -> str:
         return f'{TEMPO_EVENTS_CHAR}{int2b36str(token.bpm)}:{int2b36str(token.position)}'
 
     elif type_priority == TYPE_PRIORITY['TrackToken']:
-        # type-track:instrument
-        return f'{TRACK_EVENTS_CHAR}{int2b36str(token.track_number)}:{int2b36str(token.instrument)}'
+        # event:track:instrument
+        return f'{TRACK_EVENTS_CHAR}:{int2b36str(token.track_number)}:{int2b36str(token.instrument)}'
 
     elif type_priority == TYPE_PRIORITY['BeginOfScoreToken']:
         return BEGIN_TOKEN_STR

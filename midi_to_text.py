@@ -220,7 +220,7 @@ def mp_func(
 
 def main():
     args = parse_args()
-    corpus_paras_dict = vars(args.handler_args)
+    corpus_paras_dict = dict(vars(args.handler_args)) # a dict() for copy
 
     # when not verbose, only info level or higher will be printed to stdout or stderr and logged into file
     loglevel = logging.DEBUG if args.verbose else logging.INFO
@@ -329,6 +329,7 @@ def main():
         good_path_list_file.close()
 
     logging.info('==== midi_to_text.py exited ====')
+    return 0
 
 
 if __name__ == '__main__':

@@ -158,8 +158,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
 
         elif typename == tokens.TRACK_EVENTS_CHAR:
-            event_text, instrument = text.split(':')
-            track_number = event_text[1:]
+            event_text, track_number, instrument = text.split(':')
             tracks_count += 1
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][TOKEN_ATTR_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
@@ -247,7 +246,11 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
 
         elif typename == tokens.TRACK_EVENTS_CHAR:
             # track token has instrument attribute
-            token_text = event_text + ':' + vocabs.instruments.id2text[array[i][TOKEN_ATTR_INDEX['ins']]]
+            token_text = (
+                event_text + ':'
+                + vocabs.track_numbers.id2text[array[i][TOKEN_ATTR_INDEX['trn']]] + ':'
+                + vocabs.instruments.id2text[array[i][TOKEN_ATTR_INDEX['ins']]]
+            )
             text_list.append(token_text)
 
         elif typename == tokens.MEASURE_EVENTS_CHAR:

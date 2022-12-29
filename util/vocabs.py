@@ -102,10 +102,7 @@ def build_vocabs(
         [tokens.NOTE_EVENTS_CHAR, tokens.NOTE_EVENTS_CHAR+'~']
         + [tokens.MULTI_NOTE_EVENTS_CHAR+shape for shape in bpe_shapes_list]
     )
-
-    event_track_instrument_tokens = [
-        tokens.TRACK_EVENTS_CHAR+int2b36str(i) for i in range(paras['max_track_number'])
-    ]
+    event_track_instrument_tokens = [tokens.TRACK_EVENTS_CHAR]
     event_position_tokens = (
         [tokens.POSITION_EVENTS_CHAR+int2b36str(i) for i in range(get_largest_possible_position(paras['nth']))]
         if paras['position_method'] == 'event' else
