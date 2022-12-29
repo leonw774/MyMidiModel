@@ -2,6 +2,7 @@ from argparse import ArgumentParser, Namespace
 
 import numpy as np
 import torch
+from miditoolkit import MidiFile
 
 from util.tokens import BEGIN_TOKEN_STR, END_TOKEN_STR
 from util.midi import midi_to_text_list, piece_to_midi, get_first_k_measures, get_first_k_nths
@@ -137,7 +138,7 @@ def main():
     if args.primer is not None:
         primer_text_list = []
         if args.primer.endswith('.mid') or args.primer.endswith('.midi'):
-            primer_text_list = midi_to_text_list(args.primer, **model.vocabs.paras)
+            primer_text_list = midi_to_text_list(MidiFile(args.primer), **model.vocabs.paras)
         else:
             try:
                 with CorpusReader(args.primer) as corpus_reader:
