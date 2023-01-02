@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Tuple, Union
 # from time import time
 
 import torch
@@ -177,8 +177,13 @@ class MyMidiTransformer(nn.Module):
         # assert all(not torch.isnan(lg).any() for lg in logits), [torch.isnan(lg).nonzero(as_tuple=True) for lg in logits]
         return logits
 
+LARGE_NEG_VALUE = -1e8
 
-def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str], vocabs: Vocabs):
+def adjust_logits_with_context(
+        logits: List[Tensor],
+        context_text_list: List[str],
+        vocabs: Vocabs,
+        event_family_indices: Tuple[set]):
     """
         Set to large negative numeric value the logits of the attribute values that would definitily raise exception
         if the next token in context_text_list has them
@@ -187,54 +192,46 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
     assert len(context_text_list) > 0, 'Empty context_text_list'
     assert len(logits) == len(OUTPUT_ATTR_NAME) or len(logits) == len(OUTPUT_ATTR_NAME) - 1, 'Bad logits'
     position_method_is_event = len(logits) == len(OUTPUT_ATTR_NAME) - 1
-    large_neg_value = -1e8
+
+    bos_index = vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
+    sep_index = vocabs.events.text2id[tokens.SEP_TOKEN_STR]
+    (
+        multinote_indices,
+        position_indices,
+        measure_indices,
+        track_instrument_indices,
+        tempo_indices
+    ) = event_family_indices
 
     # adjust event attribute logit
-    multinote_indices = set()
-    position_indices = set()
-    measure_indices = set()
-    track_instrument_indices = set()
-    tempo_indices = set()
-    for t, i in vocabs.events.text2id.items():
-        if t[0] == tokens.NOTE_EVENTS_CHAR or t[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
-            multinote_indices.add(i)
-        elif t[0] == tokens.POSITION_EVENTS_CHAR:
-            position_indices.add(i)
-        elif t[0] == tokens.MEASURE_EVENTS_CHAR:
-            measure_indices.add(i)
-        elif t[0] == tokens.TEMPO_EVENTS_CHAR:
-            tempo_indices.add(i)
-        elif t[0] == tokens.TRACK_EVENTS_CHAR:
-            track_instrument_indices.add(i)
-    bos_index = vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
-    sep_inex = vocabs.events.text2id[tokens.SEP_TOKEN_STR]
+
     # BOS token is redundent, will not be used in generation
-    logits[TOKEN_ATTR_INDEX['evt']][bos_index] = large_neg_value
+    logits[TOKEN_ATTR_INDEX['evt']][bos_index] = LARGE_NEG_VALUE
     # predict PAD is not allowed in generation time
     for attr_logits in logits:
-        attr_logits[0] = large_neg_value
+        attr_logits[0] = LARGE_NEG_VALUE
 
     is_head = context_text_list[-1] == tokens.BEGIN_TOKEN_STR or context_text_list[-1][0] == tokens.TRACK_EVENTS_CHAR
     is_sep = context_text_list[-1] == tokens.SEP_TOKEN_STR
     if is_head:
         # if the section is head, then only track-instrument and separater allowed
         for i in range(vocabs.events.size):
-            if i not in track_instrument_indices and i != sep_inex:
-                logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+            if i not in track_instrument_indices and i != sep_index:
+                logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
     elif is_sep:
         # if is separater, then only measure tokens are allowed
         for i in range(vocabs.events.size):
             if i not in measure_indices:
-                logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
-    else:
-        # if the section is body, then the next token's event at least can not be track-instrument
+                logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
+    else: # if the section is body
+        #the next token's event can not be track-instrument
         for i in track_instrument_indices:
-            logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+            logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
         if context_text_list[-1][0] == tokens.MEASURE_EVENTS_CHAR and position_method_is_event:
             # if the last token in context_text_list token is measure and position method is event
             # then the next token's event can not be multi-note or tempo
             for i in multinote_indices.union(tempo_indices):
-                logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+                logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
 
         # this part prohibits the position tokens that is "behind" the current position
         k = len(context_text_list) - 1
@@ -242,10 +239,9 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
             k -= 1
         if context_text_list[k][0] == tokens.POSITION_EVENTS_CHAR:
             cur_position = b36str2int(context_text_list[k][1:])
-            for i in range(vocabs.events.size):
-                if i in position_indices:
-                    if b36str2int(vocabs.events.id2text[i][1:]) <= cur_position:
-                        logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+            for i in position_indices:
+                if b36str2int(vocabs.events.id2text[i][1:]) <= cur_position:
+                    logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
 
         # this part prohibit the tempo tokens if there is already a tempo token in the current position
         k = len(context_text_list) - 1
@@ -253,7 +249,7 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
             k -= 1
         if context_text_list[k][0] == tokens.TEMPO_EVENTS_CHAR:
             for i in tempo_indices:
-                logits[TOKEN_ATTR_INDEX['evt']][i] = large_neg_value
+                logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
 
     # adjust track attribute logit
     if not is_head:
@@ -267,7 +263,7 @@ def adjust_logits_with_context(logits: List[Tensor], context_text_list: List[str
         # first +1 is because index 0 is padding
         # second +1 is because we reset any index > max_track_number+1
         for i in range(max_track_number+1+1, vocabs.track_numbers.size):
-            logits[TOKEN_ATTR_INDEX['trn']][i] = large_neg_value
+            logits[TOKEN_ATTR_INDEX['trn']][i] = LARGE_NEG_VALUE
 
     return logits
 
@@ -302,6 +298,31 @@ def generate_sample(
     training_state = model.training
     model.eval()
 
+    # prepare vocab for logit adjustment
+    multinote_indices = set()
+    position_indices = set()
+    measure_indices = set()
+    track_instrument_indices = set()
+    tempo_indices = set()
+    for t, i in model.vocabs.events.text2id.items():
+        if t[0] == tokens.NOTE_EVENTS_CHAR or t[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
+            multinote_indices.add(i)
+        elif t[0] == tokens.POSITION_EVENTS_CHAR:
+            position_indices.add(i)
+        elif t[0] == tokens.MEASURE_EVENTS_CHAR:
+            measure_indices.add(i)
+        elif t[0] == tokens.TEMPO_EVENTS_CHAR:
+            tempo_indices.add(i)
+        elif t[0] == tokens.TRACK_EVENTS_CHAR:
+            track_instrument_indices.add(i)
+    event_family_indices = (
+        multinote_indices,
+        position_indices,
+        measure_indices,
+        track_instrument_indices,
+        tempo_indices
+    )
+
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
 
     input_seq = start_seq
@@ -320,7 +341,7 @@ def generate_sample(
                 for l in logits
             ]
 
-            last_logits = adjust_logits_with_context(last_logits, text_list, model.vocabs)
+            last_logits = adjust_logits_with_context(last_logits, text_list, model.vocabs, event_family_indices)
 
             # print('\n'.join([repr(logit) for logit in last_logits]))
             try_count = 0
