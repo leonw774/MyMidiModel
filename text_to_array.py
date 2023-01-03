@@ -6,6 +6,7 @@ from multiprocessing import Pool
 import os
 import shutil
 from time import strftime, time
+from traceback import format_exc
 from typing import Dict, List
 
 from matplotlib import pyplot as plt
@@ -35,6 +36,7 @@ def mp_handler(args_dict):
         return a
     except:
         print(f'Error at piece #{i}')
+        print(format_exc())
         return np.empty(shape=(0,))
 
 
