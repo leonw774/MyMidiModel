@@ -544,7 +544,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
         typename = text[0]
         if typename == tokens.TRACK_EVENTS_CHAR:
             assert is_head, 'Track token at body'
-            track_number, instrument = (b36str2int(x) for x in text[1:].split(':'))
+            track_number, instrument = (b36str2int(x) for x in text[2:].split(':'))
             assert track_number not in track_program_mapping, 'Repeated track number'
             # shoud we use more strict track list?: not allow permutation, just 1, ..., n
             assert track_number == len(track_program_mapping), 'Track number not increasing by one'
