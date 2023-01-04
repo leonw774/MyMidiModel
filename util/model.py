@@ -252,11 +252,12 @@ def adjust_logits_with_context(
                 logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
 
     # adjust track attribute logit
-    if not is_head:
+    if not is_head and not is_sep:
         # if the section is body, then only allow the defined track
+        sep_index_in_text_list = context_text_list.index(tokens.SEP_TOKEN_STR)
         max_track_number = max([
-            b36str2int(t[1:t.index(':')])
-            for t in context_text_list
+            b36str2int(t[2:t.index(':')])
+            for t in context_text_list[1:sep_index_in_text_list]
             if t[0] == tokens.TRACK_EVENTS_CHAR
         ])
         # start from max_track_number+1+1
