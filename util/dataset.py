@@ -79,6 +79,7 @@ class MidiDataset(Dataset):
         # _mps_seperators is empty when `use_permutable_subseq_loss` is not True
         self._mps_seperators = list()
         self._bos_id = self.vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
+        self._trn_id = self.vocabs.events.text2id[tokens.TRACK_EVENTS_CHAR]
         self._sep_id = self.vocabs.events.text2id[tokens.SEP_TOKEN_STR]
         self._eos_id = self.vocabs.events.text2id[tokens.END_TOKEN_STR]
         # the pad id should be the same across all vocabs (aka zero)
@@ -103,7 +104,7 @@ class MidiDataset(Dataset):
             self._mps_seperators = set([
                 self._pad_id,
                 self._bos_id,
-                self.vocabs.events.text2id[tokens.TRACK_EVENTS_CHAR+'0'],
+                self._trn_id,
                 self._sep_id,
                 self._eos_id,
             ])
