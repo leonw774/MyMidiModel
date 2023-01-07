@@ -32,8 +32,8 @@ def to_vocabs_file_path(corpus_dir_path: str) -> str:
 def to_arrays_file_path(corpus_dir_path: str) -> str:
     return os.path.join(corpus_dir_path, 'arrays.npz')
 
-def dump_corpus_paras(aras_dict: dict) -> str:
-    return yaml.dump(aras_dict)
+def dump_corpus_paras(paras_dict: dict) -> str:
+    return yaml.dump(paras_dict)
 
 def get_corpus_paras(corpus_dir_path: str) -> dict:
     with open(to_paras_file_path(corpus_dir_path), 'r', encoding='utf8') as paras_file:

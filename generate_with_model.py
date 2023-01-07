@@ -1,4 +1,7 @@
 from argparse import ArgumentParser, Namespace
+import os
+import subprocess
+import tempfile
 
 import numpy as np
 import torch
@@ -6,7 +9,7 @@ from miditoolkit import MidiFile
 
 from util.tokens import BEGIN_TOKEN_STR, END_TOKEN_STR
 from util.midi import midi_to_text_list, piece_to_midi, get_first_k_measures, get_first_k_nths
-from util.corpus import CorpusReader, text_list_to_array
+from util.corpus import CorpusReader, text_list_to_array, to_corpus_file_path, to_paras_file_path, dump_corpus_paras
 from util.model import MyMidiTransformer, generate_sample
 
 def read_args():
@@ -138,8 +141,37 @@ def main():
     if args.primer is not None:
         primer_text_list = []
         if args.primer.endswith('.mid') or args.primer.endswith('.midi'):
-            primer_text_list = midi_to_text_list(MidiFile(args.primer), **model.vocabs.paras)
+            if len(model.vocabs.bpe_shapes_list) == 0: # model not use BPE
+                primer_text_list = midi_to_text_list(MidiFile(args.primer), **model.vocabs.paras)
+
+            else: # model use BPE, then apply it
+                with tempfile.TemporaryDirectory() as tmp_corpus_dir_path:
+                    with open(to_corpus_file_path(tmp_corpus_dir_path), 'w+', encoding='utf8') as tmp_corpus_file:
+                        tmp_corpus_file.write(' '.join(primer_text_list))
+                    with open(to_paras_file_path(tmp_corpus_dir_path), 'w+', encoding='utf8') as tmp_paras_file:
+                        tmp_paras_file.write(dump_corpus_paras(model.vocabs.paras))
+
+                    # make sure the current working directory is currect
+                    assert os.path.abspath(os.getcwd()) == os.path.dirname(os.path.abspath(__file__))
+
+                    # make sure the program is there and new
+                    subprocess.run('make -C ./bpe', check=True)
+
+                    with tempfile.NamedTemporaryFile() as out_corpus_file:
+                        with tempfile.NamedTemporaryFile() as shape_vocab_file:
+                            shape_vocab_file.write('\n'.join(model.vocabs.bpe_shapes_list))
+
+                            # ./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath
+                            apply_args = ['./bpe/apply_vocab', tmp_corpus_dir_path, out_corpus_file.name, shape_vocab_file.name]
+                            subprocess.run(apply_args, check=True)
+
+                            # get content from output
+                            with CorpusReader(out_corpus_file.name) as corpus_reader:
+                                piece = next(iter(corpus_reader)) # get first piece
+                            primer_text_list = piece.split()
+
         else:
+            # we expect the corpus file has same midi parameters as the model
             try:
                 with CorpusReader(args.primer) as corpus_reader:
                     piece = next(iter(corpus_reader)) # get first piece
@@ -159,6 +191,8 @@ def main():
                 raise ValueError(f'primer_text_list has less than primer_length={args.primer_length} tokens.')
             primer_text_list = primer_text_list[:args.primer_length]
 
+
+        # turn primer text list into array
         primer_seq = text_list_to_array(primer_text_list, vocabs=model.vocabs)
         primer_seq = np.expand_dims(primer_seq, axis=0).astype(np.int32)
         primer_seq = torch.from_numpy(primer_seq)
