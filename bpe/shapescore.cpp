@@ -1,6 +1,7 @@
 #include "corpus.hpp"
 #include "shapescore.hpp"
 #include <random>
+
 #include <cmath>
 #include <limits>
 #include "omp.h"
@@ -62,15 +63,13 @@ int mergeCounters(std::map<T, S> counterArray[], size_t arraySize) {
 }
 
 
-size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit, bool excludeDrum) {
+size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit) {
     size_t totalNeighborNumber = 0;
     // for each piece
     #pragma omp parallel for reduction(+: totalNeighborNumber)
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-            // ignore drum?
-            if (corpus.piecesTP[i][j] == 128 && excludeDrum) continue;
             // for each multinote
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // printTrack(corpus.piecesMN[i][j], shapeDict, k, 1);
@@ -162,7 +161,7 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
 }
 
 
-double calculateAvgMulpiSize(const Corpus& corpus, bool excludeDrum, bool ignoreSingleton) {
+double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton) {
     unsigned int max_thread_num = omp_get_max_threads();
     std::vector<uint8_t> multipiSizes[max_thread_num];
     #pragma omp parallel for
@@ -170,9 +169,6 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool excludeDrum, bool ignore
         int thread_num = omp_get_thread_num();
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-            // ignore drum?
-            if (corpus.piecesTP[i][j] == 128 && excludeDrum) continue;
-
             // key: 64 bits: upper 17 unused, 7 for velocity, 8 for duration (time_unit), 32 for onset
             // value: occurence count
             std::map< uint64_t, uint8_t > thisTrackMulpiSizes;
@@ -213,7 +209,7 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool excludeDrum, bool ignore
 }
 
 
-std::vector<size_t> getShapeCounts(const Corpus& corpus, bool excludeDrum = false) {
+std::vector<size_t> getShapeCounts(const Corpus& corpus) {
     unsigned int max_thread_num = omp_get_max_threads();
     std::vector<size_t> shapeCountsParallel[max_thread_num];
     for (int i = 0; i < max_thread_num; ++i) {
@@ -223,8 +219,6 @@ std::vector<size_t> getShapeCounts(const Corpus& corpus, bool excludeDrum = fals
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         int thread_num = omp_get_thread_num();
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-            // ignore drum?
-            if (corpus.piecesTP[i][j] == 128 && excludeDrum) continue;
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 shapeCountsParallel[thread_num][corpus.piecesMN[i][j][k].shapeIndex] += 1;
             }
@@ -253,8 +247,8 @@ std::vector<size_t> getShapeCounts(const Corpus& corpus, bool excludeDrum = fals
 }
 
 
-double calculateShapeEntropy(const Corpus& corpus, bool excludeDrum) {
-    std::vector<size_t> shapeCounts = getShapeCounts(corpus, excludeDrum);
+double calculateShapeEntropy(const Corpus& corpus) {
+    std::vector<size_t> shapeCounts = getShapeCounts(corpus);
     size_t totalCount = 0;
     for (int i = 0; i < shapeCounts.size(); ++i) {
         totalCount += shapeCounts[i];
@@ -271,7 +265,7 @@ double calculateShapeEntropy(const Corpus& corpus, bool excludeDrum) {
 }
 
 
-double calculateAllAttributeEntropy(const Corpus& corpus, bool excludeDrum) {
+double calculateAllAttributeEntropy(const Corpus& corpus) {
     unsigned int max_thread_num = omp_get_max_threads();
     std::map<uint64_t, unsigned int> allAttrCountParallel[max_thread_num];
     // key is made of shape index, pitch, unit and velocity
@@ -280,8 +274,6 @@ double calculateAllAttributeEntropy(const Corpus& corpus, bool excludeDrum) {
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         int thread_num = omp_get_thread_num();
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-            // ignore drum?
-            if (corpus.piecesTP[i][j] == 128 && excludeDrum) continue;
             totalCount += corpus.piecesMN[i][j].size();
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 uint64_t key = corpus.piecesMN[i][j][k].shapeIndex;
@@ -309,8 +301,7 @@ std::vector<std::pair<Shape, T>> shapeScoring(
     const std::vector<Shape>& shapeDict,
     const std::string& scoreFunc,
     const std::string& mergeCoundition,
-    double samplingRate,
-    bool excludeDrum
+    double samplingRate
 ) {
     if (samplingRate <= 0 || 1 < samplingRate) {
         throw std::runtime_error("samplingRate in shapeScoring not in range (0, 1]");
@@ -327,7 +318,7 @@ std::vector<std::pair<Shape, T>> shapeScoring(
     std::vector<double> shapeFreq(shapeDict.size(), 0);
     size_t totalMultiNoteCount = 0;
     if (!isFreqScore) {
-        std::vector<size_t> shapeCounts = getShapeCounts(corpus, excludeDrum);
+        std::vector<size_t> shapeCounts = getShapeCounts(corpus);
         if (shapeCounts.size() < shapeDict.size()) {
             shapeCounts.resize(shapeDict.size(), 0);
         }
@@ -357,8 +348,6 @@ std::vector<std::pair<Shape, T>> shapeScoring(
         std::map<Shape, T> tempScoreDiff;
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-            // ignore drum?
-            if (corpus.piecesTP[i][j] == 128 && excludeDrum) continue;
             // for each multinote
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // for each neighbor
@@ -428,8 +417,7 @@ std::vector<std::pair<Shape, unsigned int>> shapeScoring<unsigned int>(
     const std::vector<Shape>& shapeDict,
     const std::string& scoreFunc,
     const std::string& mergeCoundition,
-    double samplingRate,
-    bool excludeDrum
+    double samplingRate
 );
 
 template
@@ -438,8 +426,7 @@ std::vector<std::pair<Shape, double>> shapeScoring<double>(
     const std::vector<Shape>& shapeDict,
     const std::string& scoreFunc,
     const std::string& mergeCoundition,
-    double samplingRate,
-    bool excludeDrum
+    double samplingRate
 );
 
 template

@@ -8,10 +8,9 @@ int main(int argc, char *argv[]) {
     // read and validate args
     int cmd_opt = 0;
     bool clearLine = false;
-    bool excludeDrum = false;
     bool doLog = false;
     int nonOptStartIndex = 1;
-    while ((cmd_opt = getopt(argc, argv, "l:c:x:")) != -1) {
+    while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
         switch (cmd_opt) {
             case 'l':
@@ -20,17 +19,14 @@ int main(int argc, char *argv[]) {
             case 'c':
                 clearLine = optarg;
                 break;
-            case 'x':
-                excludeDrum = optarg;
-                break;
             case '?':
                 if (isprint(optopt)) {
                     std::cout << "Bad argument: " << argv[optopt] << "\n";
                 }
-                std::cout << "./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit" << std::endl;
+                std::cout << "./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit" << std::endl;
                 return 1;
             default:
-                std::cout << "./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit" << std::endl;
+                std::cout << "./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit" << std::endl;
                 exit(1);
         }
     }
@@ -39,7 +35,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < argc; ++i) {
             std::cout << argv[i] << " ";
         }
-        std::cout << "\n./learn_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit" << std::endl;
+        std::cout << "\n./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit" << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[nonOptStartIndex]);
@@ -68,8 +64,7 @@ int main(int argc, char *argv[]) {
         << "scoreFunc: " << scoreFunc << '\n'
         << "mergeCondition: " << mergeCondition << '\n'
         << "samplingRate: " << samplingRate << '\n'
-        << "minScoreLimit: " << minScoreLimit << '\n'
-        << "excludeDrum: " << (excludeDrum ? "true" : "false") << std::endl;
+        << "minScoreLimit: " << minScoreLimit << std::endl;
 
     // open files
     std::string inCorpusFilePath = inCorpusDirPath + "/corpus";
@@ -122,22 +117,20 @@ int main(int argc, char *argv[]) {
     // sort and count notes
     corpus.sortAllTracks();
 
-    size_t startMultinoteCount, multinoteCount, drumMultinoteCount;
+    size_t startMultinoteCount, multinoteCount;
     startMultinoteCount = multinoteCount = corpus.getMultiNoteCount();
-    drumMultinoteCount = corpus.getMultiNoteCount(true);
-    double startAvgMulpi = calculateAvgMulpiSize(corpus, excludeDrum, false);
-    double startShapeEntropy = calculateShapeEntropy(corpus, excludeDrum);
-    double startAllEntropy = calculateAllAttributeEntropy(corpus, excludeDrum);
+    double startAvgMulpi = calculateAvgMulpiSize(corpus, false);
+    double startShapeEntropy = calculateShapeEntropy(corpus);
+    double startAllEntropy = calculateAllAttributeEntropy(corpus);
     double avgMulpi = startAvgMulpi;
 
     std::cout << "Start Multinote count: " << multinoteCount
-        << ", Drum's multinote count: " << drumMultinoteCount
         << ", Start average mulpi: " << avgMulpi
         << ", Start shape entropy: " << startShapeEntropy
         << ", Start all attribute entropy: " << startAllEntropy
         << ", Reading used time: " << (std::chrono::system_clock::now() - ioStartTimePoint) / oneSencondDur << std::endl;
 
-    if (multinoteCount == 0 || (multinoteCount == drumMultinoteCount && excludeDrum)) {
+    if (multinoteCount == 0) {
         std::cout << "No notes to merge. Exited." << std::endl;
         return 1;
     }
@@ -161,13 +154,13 @@ int main(int argc, char *argv[]) {
             }
             std::cout << iterCount;
         }
-        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth, excludeDrum); 
+        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth); 
 
         // clac shape scores
         Shape maxScoreShape;
         partStartTimePoint = std::chrono::system_clock::now();
         if (scoreFunc == "freq") {
-            shapeScoreFreq = shapeScoring<unsigned int>(corpus, shapeDict, scoreFunc, mergeCondition, samplingRate, excludeDrum);
+            shapeScoreFreq = shapeScoring<unsigned int>(corpus, shapeDict, scoreFunc, mergeCondition, samplingRate);
             std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScoreFreq);
             if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
@@ -182,7 +175,7 @@ int main(int argc, char *argv[]) {
             }
         }
         else {
-            shapeScoreWPlike = shapeScoring<double>(corpus, shapeDict, scoreFunc, mergeCondition, samplingRate, excludeDrum);
+            shapeScoreWPlike = shapeScoring<double>(corpus, shapeDict, scoreFunc, mergeCondition, samplingRate);
             std::pair<Shape, double> maxValPair = findMaxValPair(shapeScoreWPlike);
             if (maxValPair.second < minScoreLimit) {
                 std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
@@ -216,8 +209,6 @@ int main(int argc, char *argv[]) {
             // for each track
             #pragma omp parallel for
             for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-                // ignore drum?
-                if (corpus.piecesTP[i][j] == 128 && excludeDrum) continue;
                 // for each multinote
                 for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                     // for each neighbor
@@ -271,8 +262,8 @@ int main(int argc, char *argv[]) {
         iterTime = (std::chrono::system_clock::now() - iterStartTimePoint) / oneSencondDur;
         if (doLog) {
             partStartTimePoint = std::chrono::system_clock::now();
-            shapeEntropy = calculateShapeEntropy(corpus, excludeDrum);
-            allEntropy = calculateAllAttributeEntropy(corpus, excludeDrum);
+            shapeEntropy = calculateShapeEntropy(corpus);
+            allEntropy = calculateAllAttributeEntropy(corpus);
             multinoteCount = corpus.getMultiNoteCount();
             // To exclude the time used on calculating metrics
             metricsTime += (std::chrono::system_clock::now() - partStartTimePoint) / oneSencondDur;
@@ -288,7 +279,7 @@ int main(int argc, char *argv[]) {
         if (clearLine) {
             std::cout << '\n';
         }
-        avgMulpi = calculateAvgMulpiSize(corpus, excludeDrum);
+        avgMulpi = calculateAvgMulpiSize(corpus);
         std::cout << "End multinote count: " << multinoteCount
             << ", End average mulpi: " << avgMulpi
             << ", End shape entropy: " << shapeEntropy

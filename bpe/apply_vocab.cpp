@@ -8,10 +8,9 @@ int main(int argc, char *argv[]) {
     // read and validate args
     int cmd_opt = 0;
     bool clearLine = false;
-    bool excludeDrum = false;
     bool doLog = true;
     int nonOptStartIndex = 1;
-    while ((cmd_opt = getopt(argc, argv, "l:c:x:")) != -1) {
+    while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
         switch (cmd_opt) {
             case 'l':
@@ -20,23 +19,20 @@ int main(int argc, char *argv[]) {
             case 'c':
                 clearLine = optarg;
                 break;
-            case 'x':
-                excludeDrum = optarg;
-                break;
             case '?':
                 if (isprint(optopt)) {
                     std::cout << "Bad argument: " << argv[optopt] << "\n";
                 }
-                std::cout << "./apply_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
+                std::cout << "./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
                 return 1;
             default:
-                std::cout << "./apply_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
+                std::cout << "./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
                 exit(1);
         }
     }
     if (argc - nonOptStartIndex != 3) {
         std::cout << "Bad number of non-optional arguments: " << argc - nonOptStartIndex << " != 3\n";
-        std::cout << "./apply_vocab [-log] [-clearLine] [-xcludeDrum] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
+        std::cout << "./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[nonOptStartIndex]);
@@ -149,7 +145,7 @@ int main(int argc, char *argv[]) {
     size_t startMultinoteCount, multinoteCount, drumMultinoteCount;
     startMultinoteCount = multinoteCount = corpus.getMultiNoteCount();
     drumMultinoteCount = corpus.getMultiNoteCount(true);
-    double startAvgMulpi = calculateAvgMulpiSize(corpus, excludeDrum, false);
+    double startAvgMulpi = calculateAvgMulpiSize(corpus, false);
     double avgMulpi = startAvgMulpi;
 
     std::cout << "Start multinote count: " << multinoteCount
@@ -182,7 +178,7 @@ int main(int argc, char *argv[]) {
             }
             std::cout << shapeIndex;
         }
-        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth, excludeDrum);
+        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth);
 
         Shape mergingShape = shapeDict[shapeIndex];
         if (doLog){
@@ -199,8 +195,6 @@ int main(int argc, char *argv[]) {
             // for each track
             #pragma omp parallel for
             for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-                // ignore drum
-                if (corpus.piecesTP[i][j] == 128 && excludeDrum) continue;
                 // for each multinote
                 for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                     // for each neighbor
@@ -254,8 +248,8 @@ int main(int argc, char *argv[]) {
         iterTime = (std::chrono::system_clock::now() - iterStartTimePoint) / oneSencondDur;
         if (doLog) {
             partStartTimePoint = std::chrono::system_clock::now();
-            shapeEntropy = calculateShapeEntropy(corpus, excludeDrum);
-            allEntropy = calculateAllAttributeEntropy(corpus, excludeDrum);
+            shapeEntropy = calculateShapeEntropy(corpus);
+            allEntropy = calculateAllAttributeEntropy(corpus);
             multinoteCount = corpus.getMultiNoteCount();
             // To exclude the time used on calculating metrics
             metricsTime += (std::chrono::system_clock::now() - partStartTimePoint) / oneSencondDur;
@@ -269,7 +263,7 @@ int main(int argc, char *argv[]) {
         if (clearLine) {
             std::cout << '\n';
         }
-        avgMulpi = calculateAvgMulpiSize(corpus, excludeDrum);
+        avgMulpi = calculateAvgMulpiSize(corpus);
         std::cout << "Ending multinote count: " << multinoteCount
             << ", Ending average mulpi: " << avgMulpi
             << ", End shape entropy: " << shapeEntropy

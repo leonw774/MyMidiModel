@@ -4,7 +4,7 @@
 #define COUNTING_THREAD_NUM 8
 
 // return sum of all note's neighbor number
-size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit, bool excludeDrum);
+size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit);
 
 Shape getShapeOfMultiNotePair(
     const MultiNote& lmn,
@@ -12,11 +12,11 @@ Shape getShapeOfMultiNotePair(
     const std::vector<Shape>& shapeDict
 );
 
-double calculateAvgMulpiSize(const Corpus& corpus, bool excludeDrum, bool ignoreSingleton=false);
+double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton=false);
 
-double calculateShapeEntropy(const Corpus& corpus, bool excludeDrum);
+double calculateShapeEntropy(const Corpus& corpus);
 
-double calculateAllAttributeEntropy(const Corpus& corpus, bool excludeDrum);
+double calculateAllAttributeEntropy(const Corpus& corpus);
 
 template<typename T>
 std::vector<std::pair<Shape, T>> shapeScoring(
@@ -24,8 +24,7 @@ std::vector<std::pair<Shape, T>> shapeScoring(
     const std::vector<Shape>& shapeDict,
     const std::string& scoreFunc,
     const std::string& mergeCoundition,
-    double samplingRate,
-    bool excludeDrum
+    double samplingRate
 );
 
 template<typename T>

@@ -279,7 +279,8 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth, std::string position
 
             case TRACK_EVENTS_CHAR:
                 corpus.piecesMN.back().push_back(Track());
-                while (inCorpusFile.get() != ':');
+                inCorpusFile.get(); // eat the ':' after TRACK_EVENTS_CHAR
+                while (inCorpusFile.get() != ':'); // eat the track number 
                 for (i = 0; (a[i] = inCorpusFile.get()) != ' '; ++i); a[i] = '\0';
                 corpus.piecesTP.back().push_back((uint8_t) b36strtoi(a));
                 break;
@@ -385,7 +386,8 @@ void writeOutputCorpusFile(
         outCorpusFile << BEGIN_TOKEN_STR << " ";
 
         for (int j = 0; j < corpus.piecesTP[i].size(); ++j) {
-            outCorpusFile << TRACK_EVENTS_CHAR << itob36str(j)
+            outCorpusFile << TRACK_EVENTS_CHAR
+                << ":" << itob36str(j)
                 << ":" << itob36str(corpus.piecesTP[i][j]) << " ";
         }
 
