@@ -158,7 +158,7 @@ def main():
                     subprocess.run(['make', '-C', './bpe'], check=True)
 
                     with tempfile.NamedTemporaryFile() as out_corpus_file:
-                        with tempfile.NamedTemporaryFile() as shape_vocab_file:
+                        with tempfile.NamedTemporaryFile(mode='w+') as shape_vocab_file:
                             shape_vocab_file.write('\n'.join(model.vocabs.bpe_shapes_list))
 
                             # ./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath
