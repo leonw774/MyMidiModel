@@ -99,15 +99,6 @@ int main(int argc, char *argv[]) {
     std::string line;
     while (vocabFile.good()) {
         std::getline(vocabFile, line, '\n');
-        if (line[0] != 'S') {
-            if (line.size() > 1) {
-                std::cout << "shape vocab format error" << std::endl;
-                return 1;
-            }
-            else {
-                continue; // is just newline
-            }
-        }
         line.pop_back(); // because last character must be ';'
         for (int i = 0; i < line.size(); ++i) {
             if (line[i] == ',' || line[i] == ';') {
