@@ -55,8 +55,8 @@ def read_args():
     parser.add_argument(
         '--max-generation-step', '--step',
         type=int,
-        default=1024,
-        help='The maximum TOKENS in each sample would be generated. Default is %(default)s.'
+        default=-1,
+        help='The maximum TOKENS in each sample would be generated. Default is models max sequence length.'
     )
     parser.add_argument(
         '--temperature', '-t',
@@ -124,6 +124,8 @@ def main():
     model = torch.load(args.model_file_path)
     assert isinstance(model, MyMidiTransformer)
     nth = model.vocabs.paras['nth']
+    if args.max_generation_step == -1:
+        args.max_generation_step = model.max_seq_length
 
     if args.output_file_path.endswith('.mid'):
         args.output_file_path = args.output_file_path[:-4]
