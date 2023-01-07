@@ -155,7 +155,7 @@ def main():
                     assert os.path.abspath(os.getcwd()) == os.path.dirname(os.path.abspath(__file__))
 
                     # make sure the program is there and new
-                    subprocess.run('make -C ./bpe', check=True)
+                    subprocess.run(['make', '-C', './bpe'], check=True)
 
                     with tempfile.NamedTemporaryFile() as out_corpus_file:
                         with tempfile.NamedTemporaryFile() as shape_vocab_file:
