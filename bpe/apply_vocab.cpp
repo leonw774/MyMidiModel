@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
             }
         }
         Shape shape;
-        std::stringstream lineSS(line.substr(1));
+        std::stringstream lineSS(line);
         while(lineSS.good()) {
             int isCont = 0, relOnset, relPitch, relDur;
             std::string relOnsetStr, relPitchStr, relDurStr;
@@ -134,18 +134,16 @@ int main(int argc, char *argv[]) {
 
     // sort and count notes
     corpus.sortAllTracks();
-    size_t startMultinoteCount, multinoteCount, drumMultinoteCount;
+    size_t startMultinoteCount, multinoteCount;
     startMultinoteCount = multinoteCount = corpus.getMultiNoteCount();
-    drumMultinoteCount = corpus.getMultiNoteCount(true);
     double startAvgMulpi = calculateAvgMulpiSize(corpus, false);
     double avgMulpi = startAvgMulpi;
 
     std::cout << "Start multinote count: " << multinoteCount
-        << ", Drum's multinote count: " << drumMultinoteCount
         << ", Start average mulpi: " << avgMulpi
         << ", Reading used time: " <<  (std::chrono::system_clock::now() - ioStartTimePoint) / oneSencondDur << std::endl;
 
-    if (multinoteCount == 0 || multinoteCount == drumMultinoteCount) {
+    if (multinoteCount == 0) {
         std::cout << "No notes to merge. Exited." << std::endl;
         return 1;
     }

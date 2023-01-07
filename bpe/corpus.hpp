@@ -146,7 +146,7 @@ struct Corpus {
 
     void pushNewPiece();
     void shrink();
-    size_t getMultiNoteCount(bool onlyDrums=false);
+    size_t getMultiNoteCount();
     void sortAllTracks();
 };
 
