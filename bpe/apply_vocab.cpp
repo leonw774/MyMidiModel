@@ -99,6 +99,7 @@ int main(int argc, char *argv[]) {
     std::string line;
     while (vocabFile.good()) {
         std::getline(vocabFile, line, '\n');
+        if (line.size() == 0) continue;
         line.pop_back(); // because last character must be ';'
         for (int i = 0; i < line.size(); ++i) {
             if (line[i] == ',' || line[i] == ';') {
