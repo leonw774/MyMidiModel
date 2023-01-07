@@ -8,7 +8,7 @@ int main(int argc, char *argv[]) {
     // read and validate args
     int cmd_opt = 0;
     bool clearLine = false;
-    bool doLog = true;
+    bool doLog = false;
     int nonOptStartIndex = 1;
     while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
         std::cout << "Empty shape vocab file\n";
         return 0;
     }
-    std::cout << "Shape vocab size: " << shapeDict.size() << std::endl;
+    std::cout << "Shape vocab size: " << shapeDict.size() - 2 << "(+2)" << std::endl;
 
     // sort and count notes
     corpus.sortAllTracks();
