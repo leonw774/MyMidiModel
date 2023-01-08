@@ -218,7 +218,7 @@ def main():
             tracks_text = piece[4:head_end]
             track_tokens = tracks_text.split()
             for track_token in track_tokens:
-                instrument_id = b36str2int(track_token.split(':')[1])
+                instrument_id = b36str2int(track_token.split(':')[2])
                 distributions['instrument'][instrument_id] += 1
 
             multinote_number = piece.count(' '+tokens.NOTE_EVENTS_CHAR) + piece.count(' '+tokens.MULTI_NOTE_EVENTS_CHAR)
@@ -267,6 +267,8 @@ def main():
     )
     plt.subplots_adjust(left=0.125)
     plt.hist(distributions['tokens_number']['track'], bins=max(distributions['tokens_number']['track']))
+    plt.xlabel('number of tracks')
+    plt.ylabel('number of pieces')
     plt.savefig(os.path.join(stats_dir_path, 'number_of_track_distribution.png'))
     plt.clf()
 
@@ -282,6 +284,8 @@ def main():
     multinote_numbers_per_piece = distributions['tokens_number']['multinote']
     plt.hist(multinote_numbers_per_piece, bins=min(100, len(multinote_numbers_per_piece)))
     plt.yscale('log')
+    plt.xlabel('number of note/multinote tokens')
+    plt.ylabel('number of pieces')
     plt.savefig(os.path.join(stats_dir_path, 'number_of_note_multinote_tokens_distribution.png'))
     plt.clf()
 
