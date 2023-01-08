@@ -1,9 +1,0 @@
-#!/bin/bash
-# bpe parameters
-BPE_ITER=1000
-SCORE_FUNC="freq"
-MERGE_CONDITION="ours"
-MIN_SCORE_LIMIT=0
-SAMPLE_RATE=0.02
-BPE_CLEARLINE="-clearLine"
-BPE_DOLOG="-log"
