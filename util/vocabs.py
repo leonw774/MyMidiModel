@@ -150,7 +150,7 @@ def build_vocabs(
         f'- Tempo: {len(event_tempo)} ({event_tempo})\n'\
         f'- Shape: {len(event_multi_note_shapes)}\n'\
         f'Duration vocab size: {len(duration_vocab)}\n'\
-        f'Velocity vocab size: {len(velocity_vocab)} ({velocity_vocab})\n'\
+        f'Velocity vocab size: {len(velocity_vocab)} ({velocity_vocab})'\
     )
     # print(f'Vocabulary build time: {time()-start_time}')
 
