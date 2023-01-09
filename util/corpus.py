@@ -146,7 +146,6 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
     cur_measure_number = 0 # measure_number starts at 1, 0 is padding
     cur_tempo_id = padding
     cur_time_sig_id = padding
-    cur_measure_cursor = 0
     cur_position_cursor = 0
     for i, text in enumerate(text_list):
         if len(text) > 0:
@@ -168,7 +167,6 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
             cur_position_id = vocabs.positions.text2id['0']
             cur_time_sig_id = vocabs.time_signatures.text2id[text]
             cur_measure_number += 1
-            cur_measure_cursor = i
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
             x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
             x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
@@ -181,9 +179,8 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
             if position_method == 'attribute':
                 cur_position_id = b36str2int(attr[0])
             else:
+                # because tempo come after position and the position token was assigned to previous tempo's id
                 x[cur_position_cursor][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
-            # because tempo come after position and/or measure token, which are assigned to previous tempo's id
-            x[cur_measure_cursor][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
             x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id

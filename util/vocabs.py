@@ -90,46 +90,51 @@ def build_vocabs(
     """
     # start_time = time()
 
-    # Event tokens include:
+    # Events include:
     # - begin-of-score, end-of-score and seperator
-    # - note and multi-note
+    # - shape of multi-note/note
     # - track and instrument
     # - position
     # - measure and time_signature
     # - tempo change
 
-    event_note_multi_note_tokens = (
+    event_multi_note_shapes = (
         [tokens.NOTE_EVENTS_CHAR, tokens.NOTE_EVENTS_CHAR+'~']
         + [tokens.MULTI_NOTE_EVENTS_CHAR+shape for shape in bpe_shapes_list]
     )
-    event_track_instrument_tokens = [tokens.TRACK_EVENTS_CHAR]
-    event_position_tokens = (
+    event_track_instrument = [tokens.TRACK_EVENTS_CHAR]
+    event_position = (
         [tokens.POSITION_EVENTS_CHAR+int2b36str(i) for i in range(get_largest_possible_position(paras['nth']))]
         if paras['position_method'] == 'event' else
         []
     )
-    event_measure_time_sig_tokens = [
+    event_measure_time_sig = [
         f'{tokens.MEASURE_EVENTS_CHAR}{int2b36str(n)}/{int2b36str(d)}' for n, d in SUPPORTED_TIME_SIGNATURES
     ]
     tempo_min, tempo_max, tempo_step = paras['tempo_quantization']
-    event_tempo_tokens = [
+    event_tempo = [
         tokens.TEMPO_EVENTS_CHAR+int2b36str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
     ]
 
     # padding token HAVE TO be at first
-    event_tokens = (
-        tokens.SPECIAL_TOKENS_STR + event_note_multi_note_tokens + event_track_instrument_tokens + event_position_tokens
-        + event_measure_time_sig_tokens + event_tempo_tokens
+    event_vocab = (
+        tokens.SPECIAL_TOKENS_STR + event_multi_note_shapes + event_track_instrument + event_position
+        + event_measure_time_sig + event_tempo
     )
 
-    max_duration = paras['max_duration']
     pad_token = [tokens.PADDING_TOKEN_STR]
-    pitch_tokens = pad_token + list(map(int2b36str, range(128)))
-    duration_tokens = pad_token + list(map(int2b36str, range(1, max_duration+1)))
-    velocity_tokens = pad_token + list(map(int2b36str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
-    track_number_tokens = pad_token + list(map(int2b36str, range(paras['max_track_number'])))
-    instrument_tokens = pad_token + list(map(int2b36str, range(129)))
-    position_tokens = pad_token + list(map(int2b36str, range(get_largest_possible_position(paras['nth']))))
+    pitch_vocab = pad_token + list(map(int2b36str, range(128)))
+    duration_vocab = pad_token + list(map(int2b36str, range(1, paras['max_duration']+1))) # add 1 because range end is exclusive
+    velocity_vocab = pad_token + list(map(int2b36str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
+    track_number_vocab = pad_token + list(map(int2b36str, range(paras['max_track_number'])))
+    instrument_vocab = pad_token + list(map(int2b36str, range(129)))
+
+    # measure number are just increasing integer that generated dynamically in corpus.text_to_array, no vocab needed
+    # position vocab need to use pure b36 int string because we have posattr setting
+    position_vocab = pad_token + list(map(int2b36str, range(get_largest_possible_position(paras['nth']))))
+    # these two vocabs are just same as their event counterparts just with PAD
+    tempo_vocab = pad_token + event_tempo
+    time_sig_vocab = pad_token + event_measure_time_sig
 
     token_count_per_piece = []
     for piece in corpus_reader:
@@ -138,15 +143,14 @@ def build_vocabs(
 
     summary_string = (
         f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
-        f'Event vocab size: {len(event_tokens)}\n'\
-        f'- Shapes: {len(bpe_shapes_list)+2}\n'\
-        f'- Tracks: {paras["max_track_number"]}\n'\
-        f'- Measure/TimeSig event: {len(event_measure_time_sig_tokens)}\n'\
-        f'- Position event: {len(position_tokens)}\n'\
-        f'- Tempo event: {len(event_tempo_tokens)}\n'\
-        f'Largest possible duration: {paras["max_duration"] * paras["nth"] // 4}\n'\
-        f'Velocity vocab: {velocity_tokens}\n'\
-        f'Tempo vocab: {len(event_tempo_tokens)} ({event_tempo_tokens})'\
+        f'Event vocab size: {len(event_vocab)}\n'\
+        f'- Track number: {paras["max_track_number"]}\n'\
+        f'- Measure-time signature: {len(event_measure_time_sig)}\n'\
+        f'- Position: {len(position_vocab)}\n'\
+        f'- Tempo: {len(event_tempo)} ({event_tempo})\n'\
+        f'- Shape: {len(event_multi_note_shapes)}\n'\
+        f'Duration vocab size: {len(duration_vocab)}\n'\
+        f'Velocity vocab size: {len(velocity_vocab)} ({velocity_vocab})\n'\
     )
     # print(f'Vocabulary build time: {time()-start_time}')
 
@@ -155,15 +159,15 @@ def build_vocabs(
         paras=paras,
         bpe_shapes_list=bpe_shapes_list,
         padding_token=tokens.PADDING_TOKEN_STR,
-        events=event_tokens,
-        pitchs=pitch_tokens,
-        durations=duration_tokens,
-        velocities=velocity_tokens,
-        track_numbers=track_number_tokens,
-        instruments=instrument_tokens,
-        positions=position_tokens,
-        tempos=event_tempo_tokens,
-        time_signatures=event_measure_time_sig_tokens
+        events=event_vocab,
+        pitchs=pitch_vocab,
+        durations=duration_vocab,
+        velocities=velocity_vocab,
+        track_numbers=track_number_vocab,
+        instruments=instrument_vocab,
+        positions=position_vocab,
+        tempos=tempo_vocab,
+        time_signatures=time_sig_vocab
     )
 
     return vocabs, summary_string
