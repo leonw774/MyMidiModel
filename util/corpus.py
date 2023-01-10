@@ -168,9 +168,9 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
             cur_time_sig_id = vocabs.time_signatures.text2id[text]
             cur_measure_number += 1
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
-            x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
             x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
             x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
+            # x[i][TOKEN_ATTR_INDEX['tmp']] = padding
             x[i][TOKEN_ATTR_INDEX['tis']] = cur_time_sig_id
 
         elif typename == tokens.TEMPO_EVENTS_CHAR:
@@ -182,9 +182,9 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
                 # because tempo come after position and the position token was assigned to previous tempo's id
                 x[cur_position_cursor][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
-            x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
             x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
             x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
+            x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
             x[i][TOKEN_ATTR_INDEX['tis']] = cur_time_sig_id
 
         elif typename == tokens.POSITION_EVENTS_CHAR:
