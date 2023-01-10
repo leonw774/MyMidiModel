@@ -144,13 +144,13 @@ def build_vocabs(
     summary_string = (
         f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
         f'Event vocab size: {len(event_vocab)}\n'\
-        f'- Track number: {paras["max_track_number"]}\n'\
         f'- Measure-time signature: {len(event_measure_time_sig)}\n'\
         f'- Position: {len(position_vocab)}\n'\
         f'- Tempo: {len(event_tempo)} ({event_tempo})\n'\
         f'- Shape: {len(event_multi_note_shapes)}\n'\
         f'Duration vocab size: {len(duration_vocab)}\n'\
-        f'Velocity vocab size: {len(velocity_vocab)} ({velocity_vocab})'\
+        f'Velocity vocab size: {len(velocity_vocab)} ({velocity_vocab})\n'\
+        f'Track number vocab size: {paras["max_track_number"]}'\
     )
     # print(f'Vocabulary build time: {time()-start_time}')
 
