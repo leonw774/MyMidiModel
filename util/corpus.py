@@ -185,6 +185,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
             x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
             x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
             x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
+            x[i][TOKEN_ATTR_INDEX['tis']] = cur_time_sig_id
 
         elif typename == tokens.POSITION_EVENTS_CHAR:
             cur_position_id = vocabs.positions.text2id[text[1:]]
