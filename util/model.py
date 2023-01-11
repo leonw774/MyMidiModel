@@ -71,7 +71,7 @@ class MyMidiTransformer(nn.Module):
                 num_embeddings=vsize,
                 embedding_dim=embedding_dim,
                 padding_idx=vocabs.events.text2id[tokens.PADDING_TOKEN_STR]
-                # [...] the embedding vector at padding_idx will default to all zeros [...]
+                # [...] the embedding vector of padding_idx will default to all zeros [...]
             )
             for vsize in self.embedding_vocabs_size
         ])

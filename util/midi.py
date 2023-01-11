@@ -619,17 +619,17 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
                 else:
                     relnote = [False] + [b36str2int(a) for a in s.split(',')]
                 relnote_list.append(relnote)
-            base_pitch, time_unit, velocity, track_number, *position = (b36str2int(x) for x in other_attr)
+            base_pitch, stretch_factor, velocity, track_number, *position = (b36str2int(x) for x in other_attr)
             assert track_number in track_program_mapping, 'Multi-Note not in used track'
             if len(position) == 1:
                 cur_time = position[0] + cur_measure_onset
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
-                note_attrs = (base_pitch + rel_pitch, rel_dur * time_unit, velocity, track_number)
+                note_attrs = (base_pitch + rel_pitch, rel_dur * stretch_factor, velocity, track_number)
                 # when using BPE, sometimes model will generated the combination that
                 # the relative_pitch + base_pitch exceeds limit
                 if not 0 <= note_attrs[0] < 128:
                     continue
-                onset_time = cur_time + rel_onset * time_unit
+                onset_time = cur_time + rel_onset * stretch_factor
                 n = handle_note_continuation(is_cont, note_attrs, onset_time, pending_cont_notes)
                 if n is not None:
                     midi.instruments[track_number].notes.append(n)
@@ -724,23 +724,20 @@ def get_first_k_nths(text_list: str, nth, k):
 
         elif typename == tokens.TEMPO_EVENTS_CHAR:
             if ':' in text[1:]:
-                _tempo, position = (b36str2int(x) for x in text[1:].split(':'))
+                position = text[1:].split(':')[1]
                 cur_time = position + cur_measure_onset
 
         elif typename == tokens.NOTE_EVENTS_CHAR:
-            is_cont = (text[1] == '~')
-            if is_cont:
-                note_attr = tuple(b36str2int(x) for x in text[3:].split(':'))
-            else:
-                note_attr = tuple(b36str2int(x) for x in text[2:].split(':'))
-            if len(note_attr) == 5:
-                cur_time = note_attr[4] + cur_measure_onset
+            attrs = text.split(':')
+            if len(attrs) == 6:
+                position = b36str2int(attrs[5])
+                cur_time = position + cur_measure_onset
 
         elif typename == tokens.MULTI_NOTE_EVENTS_CHAR:
-            _shape_string, *other_attr = text[1:].split(':')
-            note_attr = tuple(b36str2int(x) for x in other_attr)
-            if len(note_attr) == 5:
-                cur_time = note_attr[4] + cur_measure_onset
+            attrs = text[1:].split(':')
+            if len(attrs) == 6:
+                position = b36str2int(attrs[5])
+                cur_time = position + cur_measure_onset
 
         if cur_time > k:
             end_index = i

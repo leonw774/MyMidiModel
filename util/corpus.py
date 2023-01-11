@@ -385,15 +385,15 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
                     relnote = [b36str2int(a) for a in s.split(',')]
                 relnote = [is_cont] + relnote
                 relnote_list.append(relnote)
-            base_pitch, time_unit, _velocity, track_number, *position = (b36str2int(x) for x in other_attr)
+            base_pitch, stretch_factor, _velocity, track_number, *position = (b36str2int(x) for x in other_attr)
             if len(position) == 1:
                 cur_time = position[0] + cur_measure_onset
             prev_pitch = -1
             prev_onset_time = -1
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
                 pitch = base_pitch + rel_pitch
-                duration = rel_dur * time_unit
-                onset_time = cur_time + rel_onset * time_unit
+                duration = rel_dur * stretch_factor
+                onset_time = cur_time + rel_onset * stretch_factor
                 if track_number in drum_tracks:
                     current_axis.add_patch(
                         Ellipse(
