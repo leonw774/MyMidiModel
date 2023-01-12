@@ -249,18 +249,18 @@ int main(int argc, char *argv[]) {
             else            std::cout << std::endl;
         }
     }
-    if (doLog) {
-        if (clearLine) {
-            std::cout << '\n';
-        }
-        avgMulpi = calculateAvgMulpiSize(corpus);
-        std::cout << "Ending multinote count: " << multinoteCount
-            << ", Ending average mulpi: " << avgMulpi
-            << ", End shape entropy: " << shapeEntropy
-            << ", End all attribute entropy: " << allEntropy
-            << ", Multinote reduce rate: " << 1 - (double) multinoteCount / startMultinoteCount
-            << ", Average mulpi reduce rate: " << 1 - avgMulpi / startAvgMulpi << std::endl;
+
+    if (clearLine) {
+        std::cout << '\n';
     }
+    avgMulpi = calculateAvgMulpiSize(corpus);
+    std::cout << "Ending multinote count: " << multinoteCount
+        << ", Ending average mulpi: " << avgMulpi
+        << ", End shape entropy: " << shapeEntropy
+        << ", End all attribute entropy: " << allEntropy
+        << ", Multinote reduce rate: " << 1 - (double) multinoteCount / startMultinoteCount
+        << ", Average mulpi reduce rate: " << 1 - avgMulpi / startAvgMulpi << std::endl;
+
     // Write files
     std::ofstream outCorpusFile(outCorpusFilePath, std::ios::out | std::ios::trunc);
     if (!outCorpusFile.is_open()) {
