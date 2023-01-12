@@ -506,10 +506,7 @@ def main():
                     batch_target_seqs = batch_target_seqs.to(args.use_device)
                 prediction = model(batch_input_seqs)
 
-                if args.data_args.use_permutable_subseq_loss:
-                    head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
-                else:
-                    head_losses = calc_losses(prediction, batch_target_seqs)
+                head_losses = calc_losses(prediction, batch_target_seqs)
                 if is_main_process:
                     valid_loss_list.append([hl.item() for hl in head_losses])
 

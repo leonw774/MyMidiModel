@@ -437,6 +437,7 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_logit: Tensor
         return a list of losses of each head
     """
     use_device = target_logit.device
+    # detech the logits because we don't need their gradients when finding best permutation
     cpu_pred_logit = [
         pred_attr_logit.detach().cpu()
         for pred_attr_logit in pred_logit
