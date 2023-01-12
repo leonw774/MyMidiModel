@@ -448,13 +448,16 @@ def main():
             # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
                 if args.data_args.use_permutable_subseq_loss:
                     head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
+                    loss = torch.mean(torch.stack(head_losses))
+                    # use mps loss for grad descent but record regular loss as metric
+                    head_losses = calc_losses(prediction, batch_target_seqs)
                     # print('\ncalc_permutable_subseq_losses use time:', time() - start_backward_time)
+                    # assert all(not torch.isnan(hl).any() for hl in head_losses)
                 else:
                     head_losses = calc_losses(prediction, batch_target_seqs)
+                    loss = torch.mean(torch.stack(head_losses))
                         # print('\ncalc_losses use time:', time() - start_backward_time)
             # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=32))
-                # assert all(not torch.isnan(hl).any() for hl in head_losses)
-                loss = torch.mean(torch.stack(head_losses))
                 # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
                 # dot.render(filename='lossbackward_mps', format='png')
 
