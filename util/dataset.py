@@ -73,9 +73,9 @@ class MidiDataset(Dataset):
 
         if verbose:
             print('Processing')
-        # Seperators are:
-        # BOS, EOS, SEP, PADDING, first track-instrument token, measure tokens, position tokens and tempo tokens
-        # stores their index in event vocab
+        # The seperators of maximal permutable subsequence are:
+        # BOS, EOS, SEP, PADDING, track-instrument token, measure tokens, position tokens
+        # we stores their index number in _mps_seperators
         # _mps_seperators is empty when `use_permutable_subseq_loss` is not True
         self._mps_seperators = list()
         self._bos_id = self.vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
@@ -84,7 +84,6 @@ class MidiDataset(Dataset):
         self._eos_id = self.vocabs.events.text2id[tokens.END_TOKEN_STR]
         # the pad id should be the same across all vocabs (aka zero)
         self._pad_id = self.vocabs.events.text2id[self.vocabs.padding_token]
-        self._track_ids = set()
         self._measure_ids = set()
         self._tempo_ids = set()
         self._position_ids = list()
@@ -96,8 +95,6 @@ class MidiDataset(Dataset):
                 self._position_ids.append(index)
             elif text[0] == tokens.MEASURE_EVENTS_CHAR:
                 self._measure_ids.add(index)
-            elif text[0] == tokens.TRACK_EVENTS_CHAR:
-                self._track_ids.add(index)
             elif text[0] == tokens.TEMPO_EVENTS_CHAR:
                 self._tempo_ids.add(index)
         if use_permutable_subseq_loss or permute_mps:
@@ -108,7 +105,6 @@ class MidiDataset(Dataset):
                 self._sep_id,
                 self._eos_id,
             ])
-            self._mps_seperators.update(self._track_ids)
             self._mps_seperators.update(self._measure_ids)
             self._mps_seperators.update(self._position_ids)
             # self._mps_seperators.update(self._tempo_ids)
@@ -135,6 +131,16 @@ class MidiDataset(Dataset):
                 )
                 for i in range(mps_sep_indices.shape[0] - 1):
                     self._file_mps_sep_indices[filenum].append(mps_sep_indices[i])
+                    # M = Measure, P = Position, N = Multi-note
+                    # consider this sequence: M  P  N  N  N  P  N  N  P  N  M  P  N  N
+                    #                  index: 0  1  2  3  4  5  6  7  8  9  10 11 12 13
+                    # the mps are like this:  X  X  1  1  1  X  2  2  X  3  X  X  4  4
+                    # indices of separator:  [0, 1,          5,       8,    10,11]
+                    # X means it is separator, number represents different mps
+                    # if see separator as mps of length 1, we get mps like this:
+                    #                         1  2  3  3  3  4  5  5  6  7  8  9  10 10
+                    # then seperator the mps by the begining index of them:
+                    #                        [0, 1, 2,       5, 6,    8, 9, 10,11,12]
                     if mps_sep_indices[i+1] != mps_sep_indices[i] + 1:
                         self._file_mps_sep_indices[filenum].append(mps_sep_indices[i] + 1)
 
