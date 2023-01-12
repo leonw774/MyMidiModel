@@ -203,7 +203,7 @@ class MidiDataset(Dataset):
             # amortize the calculation
             if self._piece_body_start_index[filenum] == 0:
                 j = 2 # because first token is BOS and second must be track as we excluded all empty midis
-                while self.pieces[str(filenum)][j][0] in self._track_ids:
+                while self.pieces[str(filenum)][j][0] == self._trn_id:
                     j += 1
                 self._piece_body_start_index[filenum] = j
 
