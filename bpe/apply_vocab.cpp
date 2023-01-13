@@ -253,6 +253,11 @@ int main(int argc, char *argv[]) {
     if (clearLine) {
         std::cout << '\n';
     }
+    if (!doLog) {
+        shapeEntropy = calculateShapeEntropy(corpus);
+        allEntropy = calculateAllAttributeEntropy(corpus);
+        multinoteCount = corpus.getMultiNoteCount();
+    }
     avgMulpi = calculateAvgMulpiSize(corpus);
     std::cout << "Ending multinote count: " << multinoteCount
         << ", Ending average mulpi: " << avgMulpi
