@@ -238,6 +238,9 @@ class MidiDataset(Dataset):
                 for i in self._file_mps_sep_indices[filenum]
                 if i < end_index
             ]
+            # technically, the BOS is the mps separator
+            # so the first number in mps_sep_indices_list already is 0
+            # but we just add them to be safe
             mps_sep_indices_and_two_ends = [0] + mps_sep_indices_list + [sliced_array.shape[0]]
             for i in range(len(mps_sep_indices_and_two_ends)-1):
                 start = mps_sep_indices_and_two_ends[i]
