@@ -32,7 +32,6 @@ at::Tensor findMinPermuLossTarget(
     at::Tensor batchedTarget,
     std::vector<std::vector<int32_t>> batchedMPSIndices
 ) {
-    torch::TensorOptions deviceOpt = torch::TensorOptions().device(batchedTarget.device());
     int outAttrNum = batchedPredLogitsList.size();
     for (int batchNum = 0; batchNum < batchedMPSIndices.size(); batchNum++) {
         // std::cout << "batchNum " << batchNum << std::endl;
@@ -166,8 +165,8 @@ at::Tensor findMinPermuLossTarget(
                 });
                 at::Tensor curMPSStackedLoss = at::full(
                     {mpsSize-1, mpsSize},
-                    std::numeric_limits<float>::max(),
-                    deviceOpt
+                    std::numeric_limits<float>::max() //,
+                    // torch::TensorOptions().device(catFlattenMPSLossMean.device())
                 );
                 // make the flattened become stacked
                 curMPSStackedLoss.index_put_(
