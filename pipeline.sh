@@ -150,14 +150,28 @@ if [ -d $MODEL_DIR_PATH ]; then
 echo "Model dir: $MODEL_DIR_PATH"
 
 TRAIN_OTHER_ARGUMENTS=""
-test "$USE_PERMUTABLE_SUBSEQ_LOSS" == true && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-permutable-subseq-loss"
+if [ "$USE_PERMUTABLE_SUBSEQ_LOSS" == true ]; then
+    python3 -c "import torch;import mps_loss" 2>&1 | grep ModuleNotFoundError
+    # if module not exist
+    if [ $? -eq 0 ]; then
+        cd util/pytorch/mps_loss
+        python3 setup.py install
+        cd ../../..
+    fi
+    # check if success
+    python3 -c "import torch;import mps_loss" 2>&1 | grep ModuleNotFoundError
+    test $? -eq 0 && { echo "mps_loss extension setup failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+    TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-permutable-subseq-loss"
+fi
 test "$PERMUTE_MPS" == true                && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-mps"
 test "$PERMUTE_TRACK_NUMBER" == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-track-number"
 test "$USE_LINEAR_ATTENTION" == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-linear-attn"
 test "$INPUT_NO_TEMPO" == true             && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-tempo"
 test "$INPUT_NO_TIME_SIGNATURE" == true    && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-time-signatrue"
 test "$USE_PARALLEL" == true               && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-parallel"
+test -n "$MAX_PIECE_PER_GPU"               && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --max-pieces-per-gpu ${MAX_PIECE_PER_GPU}"
 test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended${TRAIN_OTHER_ARGUMENTS} to train.py's argument" | tee -a $LOG_PATH ; }
+
 
 # change CUDA_VISIABLE_DEVICES according to the machine it runs on
 if [ "$USE_PARALLEL" == true ]; then
@@ -173,7 +187,7 @@ $LAUNCH_COMMAND train.py --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation $
     --batch-size $BATCH_SIZE --max-steps $MAX_STEPS --grad-norm-clip $GRAD_NORM_CLIP \
     --split-ratio $SPLIT_RATIO --validation-interval $VALIDATION_INTERVAL --validation-steps $VALIDATION_STEPS --early-stop $EARLY_STOP \
     --lr-peak $LEARNING_RATE_PEAK --lr-warmup-steps $LEARNING_RATE_WARMUP_STEPS --lr-decay-end-steps $LEARNING_RATE_DECAY_END_STEPS --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
-    --use-device $USE_DEVICE --max-pieces-per-gpu $MAX_PIECE_PER_GPU --log $LOG_PATH $CORPUS_DIR_PATH $MODEL_DIR_PATH
+    --use-device $USE_DEVICE  $MAX_PIECE_PER_GPU --log $LOG_PATH $CORPUS_DIR_PATH $MODEL_DIR_PATH
 
 test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
@@ -182,6 +196,6 @@ python3 get_eval_features_of_model.py --log $LOG_PATH $MODEL_DIR_PATH
 test $? -ne 0 && { echo "evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
 # this will not use existed
-python3 get_eval_features_of_corpus.py --log $LOG_PATH $CORPUS_DIR_PATH
+python3 get_eval_features_of_dataset.py --log $LOG_PATH $CORPUS_DIR_PATH
 
 echo "pipeline.sh done."

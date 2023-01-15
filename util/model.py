@@ -1,11 +1,13 @@
 from typing import List, Tuple, Union
-# from time import time
+from time import time
 
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 # from torch.profiler import record_function
 from tqdm import tqdm
+
+import mps_loss
 
 try:
     from fast_transformers.builders import TransformerEncoderBuilder
@@ -436,35 +438,78 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_label: Tensor
         mps_indices is a numpy object array of numpy int16 arrays in varying lengths
         return a list of losses of each head
     """
+
+    # because the target is prediction shifted right by 1 index
+    # the first (0th) prediction in a mps can have (mps_size-1) possible labels
+    # the last (mps_size-th) prediction can have (next_mps_size) possible labels
+    # when we we are finding permutation of target, all index need to be subtracted by 1
+    # so that their corrresponding target is the beginning of mps
+    batched_mps_indices_as_list = [
+        [m-1 for m in mps_indices] + [target_label.shape[1]-1]
+        for mps_indices in batched_mps_indices
+    ]
+
+    # start_time = time()
+    # modified_target_label = find_min_loss_target(pred_logit, target_label, batched_mps_indices_as_list)
+    # print('Python function used time:', time()-start_time)
+    # print('--------')
+
+    start_time = time()
+    cpu_pred_logit = [
+        pred_attr_logit.clone().detach().cpu()
+        for pred_attr_logit in pred_logit
+    ]
+    cpu_target_label = target_label.clone().detach().cpu().long()
+    cpp_modified_target_label: Tensor = mps_loss.find_min_loss_target(
+        cpu_pred_logit,
+        cpu_target_label,
+        batched_mps_indices_as_list
+    )
+
+    # print('C++ extension function used time:', time()-start_time)
+    # print('========')
+    # assert (modified_target_label == cpp_modified_target_label).all().item()
+
+    head_losses = calc_losses(pred_logit, cpp_modified_target_label.to(target_label.device))
+    return head_losses
+
+
+def find_min_loss_target(
+        pred_logit: List[Tensor],
+        target_label: Tensor,
+        batched_mps_indices_as_list: List[List[int]]) -> Tensor:
     use_device = target_label.device
     # detech the tensors because we don't need their gradients when finding best permutation
     cpu_pred_logit = [
-        pred_attr_logit.detach().cpu()
+        pred_attr_logit.clone().detach().cpu()
         for pred_attr_logit in pred_logit
     ]
-    cpu_target_label = target_label.detach().cpu()
+    cpu_target_label = target_label.clone().detach().cpu()
     out_attr_number = len(pred_logit)
-    for batch_number, mps_indices in enumerate(batched_mps_indices):
-        mps_indices_with_begin_and_end = [0] + [m for m in mps_indices] + [cpu_target_label.shape[1]]
+    for batch_number, mps_indices in enumerate(batched_mps_indices_as_list):
+        # print('batch_number', batch_number)
+        # print('mps_indices len', len(mps_indices))
         indices_replacments = []
-        seq_flatten_target_label_list = []
+        flatten_mps_target_list = []
         # will become a tensor of shape (seq_mps_flatten_size, out_attr_number)
-        seq_flatten_pred_logit_list = [[] for _ in range(out_attr_number)]
+        flatten_mps_pred_logit_list = [[] for _ in range(out_attr_number)]
         # will have out_attr_number tensors, each has shape (seq_mps_flatten_size, attr_vocabs_size)
         triu_indices_of_mps = dict()
     # with record_function('flatten_mps'):
-        for i in range(len(mps_indices_with_begin_and_end) - 1):
-            begin_index = mps_indices_with_begin_and_end[i]
-            end_index = mps_indices_with_begin_and_end[i+1]
+        for i in range(len(mps_indices) - 1):
+            begin_index = mps_indices[i]
+            if begin_index < 0:
+                continue
+            end_index = mps_indices[i+1]
             mps_size = end_index - begin_index
-            # assert mps_size >= 0, f'{begin_index}~{end_index}\n{mps_indices_with_begin_and_end}'
+            # assert mps_size >= 0, f'{begin_index}~{end_index}\n{mps_indices}'
             if mps_size == 2:
-                seq_flatten_target_label_list.append(
+                flatten_mps_target_list.append(
                     cpu_target_label[batch_number, begin_index:end_index]
                 )
                 # view (mps_size, out_attr_number)
                 for k, pred_attr_logit in enumerate(cpu_pred_logit):
-                    seq_flatten_pred_logit_list[k].append(
+                    flatten_mps_pred_logit_list[k].append(
                         pred_attr_logit[batch_number, begin_index].expand((2, -1))
                     )
                     # view (attr_vocabs_size, ) and then expand into (mps_size, attr_vocabs_size)
@@ -483,7 +528,7 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_label: Tensor
                 flatten_full_mps_target = full_mps_target[triu_indices[0], triu_indices[1]].flatten(end_dim=-2)
                 # print(flatten_full_mps_target.shape)
                 # t1, t2, t3 ... tn, t2, t3, t4 ... tn, ... , tn-1, tn
-                seq_flatten_target_label_list.append(flatten_full_mps_target)
+                flatten_mps_target_list.append(flatten_full_mps_target)
 
                 for k, pred_attr_logit in enumerate(cpu_pred_logit):
                     full_mps_attr_logit = pred_attr_logit[batch_number, begin_index:end_index]
@@ -496,69 +541,71 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_label: Tensor
                     # :         :
                     flatten_full_mps_attr_logit = full_mps_attr_logit[triu_indices[0], triu_indices[1]].flatten(end_dim=-2)
                     # l1, l1, l1, ... , l1 (n times), l2, l2, l2, ... , l2 (n-1 times), ... , ln-1, ln-1 (2 times)
-                    seq_flatten_pred_logit_list[k].append(flatten_full_mps_attr_logit)
+                    flatten_mps_pred_logit_list[k].append(flatten_full_mps_attr_logit)
     # with record_function('cat_and_cross'):
-        if len(seq_flatten_target_label_list) == 0:
+        # print('flatten list len:', len(flatten_mps_target_list))
+        # print([t.shape[0] for t in flatten_mps_target_list])
+        if len(flatten_mps_target_list) == 0:
             continue
         # F.cross_entropy only accept long
-        seq_flatten_target_labels = torch.cat(seq_flatten_target_label_list, dim=0).long().to(use_device)
+        flatten_mps_targets = torch.cat(flatten_mps_target_list, dim=0).long().to(use_device)
         # cat into (seq_mps_flatten_size, out_attr_number)
-        seq_flatten_pred_logits = [
-            torch.cat(seq_flatten_pred_logit_list[k], dim=0).to(use_device)
+        # print('concated flatten mps target len:', flatten_mps_targets.shape[0])
+        # print('concated flatten mps target:\n', flatten_mps_targets)
+        flatten_mps_pred_logits = [
+            torch.cat(flatten_mps_pred_logit_list[k], dim=0).to(use_device)
             # cat into (seq_mps_flatten_size, attr_vocabs_size)
             for k in range(out_attr_number)
         ]
-        seq_flatten_head_losses = [
+        flatten_mps_head_losses = [
             F.cross_entropy(
-                input=seq_flatten_pred_logits[k], # shape = (seq_mps_flatten_size, attr_vocabs_size)
-                target=seq_flatten_target_labels[:, k], # shape = (seq_mps_flatten_size, )
+                input=flatten_mps_pred_logits[k], # shape = (seq_mps_flatten_size, attr_vocabs_size)
+                target=flatten_mps_targets[:, k], # shape = (seq_mps_flatten_size, )
                 ignore_index=0, # padding is index 0
                 reduction='none' # return shape (seq_mps_flatten_size, )
             )
             for k in range(out_attr_number)
         ]
-        seq_flatten_head_losses = torch.stack(seq_flatten_head_losses) # (out_attr_number, seq_mps_flatten_size)
+        flatten_mps_head_losses = torch.stack(flatten_mps_head_losses) # (out_attr_number, seq_mps_flatten_size)
+        # print(flatten_mps_head_losses)
         # because when an attribute is labeled as padding, its loss would be zero
         # we want to ignore the zero values
-        seq_flatten_loss_sum = torch.sum(seq_flatten_head_losses, dim=0) # (seq_mps_flatten_size, )
-        nonzero_elem_count = torch.sum((seq_flatten_head_losses != 0), dim=0) # (seq_mps_flatten_size, )
+        flatten_mps_loss_sum = torch.sum(flatten_mps_head_losses, dim=0) # (seq_mps_flatten_size, )
+        nonzero_elem_count = torch.sum((flatten_mps_head_losses != 0), dim=0) # (seq_mps_flatten_size, )
         # if divided by zero error happen at this point, the dataset must have problem
-        seq_flatten_loss_mean = seq_flatten_loss_sum / nonzero_elem_count
-        # print(
-        #     'mps_indices len:', len(mps_indices),
-        #     'flatten len:', seq_flatten_loss_mean.shape[0]
-        # )
+        flatten_mps_loss_mean = flatten_mps_loss_sum / nonzero_elem_count
     # with record_function('find_argmins'):
-        prev_seq_flatten_index = 0
-        for i in range(len(mps_indices_with_begin_and_end) - 1):
-            begin_index = mps_indices_with_begin_and_end[i]
-            end_index = mps_indices_with_begin_and_end[i+1]
+        cur_flatten_mps_index = 0
+        for i in range(len(mps_indices) - 1):
+            begin_index = mps_indices[i]
+            if begin_index < 0:
+                continue
+            end_index = mps_indices[i+1]
             mps_size = end_index - begin_index
             if mps_size == 2:
-                if seq_flatten_loss_mean[prev_seq_flatten_index] < seq_flatten_loss_mean[prev_seq_flatten_index+1]:
-                    argmin_loss_sum = 0
-                else:
-                    argmin_loss_sum = 1
-                prev_seq_flatten_index += 2
-                indices_replacments.append((begin_index, begin_index + argmin_loss_sum))
+                if flatten_mps_loss_mean[cur_flatten_mps_index] > flatten_mps_loss_mean[cur_flatten_mps_index+1]:
+                    indices_replacments.append((begin_index, begin_index + 1))
+                cur_flatten_mps_index += 2
             elif mps_size > 2:
                 flatten_length = mps_size * (mps_size + 1) // 2 - 1
-                cur_mps_flatten_loss_mean = seq_flatten_loss_mean[prev_seq_flatten_index:prev_seq_flatten_index+flatten_length]
-                prev_seq_flatten_index += flatten_length
+                cur_mps_flatten_loss_mean = flatten_mps_loss_mean[cur_flatten_mps_index:cur_flatten_mps_index+flatten_length]
+                # print(cur_mps_flatten_loss_mean)
+                cur_flatten_mps_index += flatten_length
                 triu_indices = triu_indices_of_mps[i]
                 loss_stacked = torch.full((mps_size-1, mps_size), float('inf'), device=use_device)
                 loss_stacked[triu_indices[0], triu_indices[1]] = cur_mps_flatten_loss_mean
+                # print(loss_stacked)
                 argmin_loss_stacked = torch.argmin(loss_stacked, dim=1)
-                for i, m in enumerate(argmin_loss_stacked):
-                    if i < m:
-                        indices_replacments.append((begin_index + i, begin_index + m))
+                for i, min_loss in enumerate(argmin_loss_stacked):
+                    min_loss_int = min_loss.item()
+                    if i != min_loss_int:
+                        indices_replacments.append((begin_index + i, begin_index + min_loss_int))
 
+        # print('indices_replacments len:', len(indices_replacments))
+        # print(indices_replacments)
     # with record_function('mod_target'):
-        # modify target logit such that the target at cur_index is now the target at min_loss_sum_index
-        for cur_index, min_loss_sum_index in indices_replacments:
-            cpu_target_label[batch_number, cur_index] = cpu_target_label[batch_number, min_loss_sum_index]
+        # modify target such that the target at cur_index is now the target at min_loss_sum_index
+        for cur_index, min_loss_index in indices_replacments:
+            cpu_target_label[batch_number, cur_index] = cpu_target_label[batch_number, min_loss_index]
 
-    head_losses = calc_losses(pred_logit, cpu_target_label.to(target_label.device))
-    return head_losses
-
-# MidiTransformerDecoder = MyMidiTransformer # old name
+    return cpu_target_label
