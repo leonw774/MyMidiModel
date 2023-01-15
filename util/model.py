@@ -456,11 +456,10 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_label: Tensor
 
     # start_time = time()
     deteched_pred_logit = [
-        pred_attr_logit.clone().detach().cpu()
-        # move to cpu because, turns out, there would be more moving if they are on gpu
+        pred_attr_logit.clone().detach()
         for pred_attr_logit in pred_logit
     ]
-    deteched_target_label = target_label.clone().detach().cpu().long()
+    deteched_target_label = target_label.clone().detach().long()
     cpp_modified_target_label: Tensor = mps_loss.find_min_loss_target(
         deteched_pred_logit,
         deteched_target_label,
@@ -480,7 +479,6 @@ def find_min_loss_target(
         target_label: Tensor,
         batched_mps_indices_as_list: List[List[int]]) -> Tensor:
     use_device = target_label.device
-    # detech the tensors because we don't need their gradients when finding best permutation
     deteched_pred_logit = [
         pred_attr_logit.clone().detach().cpu()
         for pred_attr_logit in pred_logit
