@@ -3,7 +3,7 @@
 #include <vector>
 #include <utility>
 #include <limits>
-// #include <iostream>
+#include <iostream>
 
 using namespace torch::indexing;
 
@@ -165,7 +165,8 @@ at::Tensor findMinPermuLossTarget(
                 });
                 at::Tensor curMPSStackedLoss = at::full(
                     {mpsSize-1, mpsSize},
-                    std::numeric_limits<float>::max()
+                    std::numeric_limits<float>::max() //,
+                    // torch::TensorOptions().device(catFlattenMPSLossMean.device())
                 );
                 // make the flattened become stacked
                 curMPSStackedLoss.index_put_(
