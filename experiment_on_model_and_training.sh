@@ -1,21 +1,31 @@
 #!/bin/bash
 
-# basic config
-./pipeline.sh lmd_full no_bpe linear_small_permute_data --use-existed
-./pipeline.sh snd      no_bpe linear_small_permute_data --use-existed
+# full component
+./pipeline.sh lmd_full ours_sample1.0 linear_large_permute_data+mps_loss --use-existed
+./pipeline.sh snd      ours_sample1.0 linear_large_permute_data+mps_loss --use-existed
 
-# experiments on BPE usage
-./pipeline.sh lmd_full ours_sample1.0 linear_small_permute_data --use-existed
-./pipeline.sh snd      ours_sample1.0 linear_small_permute_data --use-existed
+# ABLATIONS
+if [ $# -ne 1 ] ; then
+    exit 0
+else
+    if [ $1 -ne 'ablation' ] then
+        exit 0
+    fi
+fi
 
-# experiments on set loss
-./pipeline.sh lmd_full ours_sample1.0 linear_small_permute_data+loss --use-existed
-./pipeline.sh snd      ours_sample1.0 linear_small_permute_data+loss --use-existed
+# no BPE
+./pipeline.sh lmd_full no_bpe linear_large_permute_data+mps_loss --use-existed
+./pipeline.sh snd      no_bpe linear_large_permute_data+mps_loss --use-existed
 
-# experiment on input data design (??)
-# - posevent v.s. posattr
-# - no_time_signature & no_tempo in input array
+# no MPS loss
+./pipeline.sh lmd_full ours_sample1.0 linear_large_permute_data --use-existed
+./pipeline.sh snd      ours_sample1.0 linear_large_permute_data --use-existed
 
-# experiment on data augmentation (permutation & pitch-shift) (??)
-#
+# no BPE & no MPS loss
+./pipeline.sh lmd_full no_bpe linear_large_permute_data --use-existed
+./pipeline.sh snd      no_bpe linear_large_permute_data --use-existed
+
+# no data augmentation (permutation & pitch-shift) & no MPS loss
+# ./pipeline.sh lmd_full ours_sample1.0 linear_large --use-existed
+# ./pipeline.sh snd      ours_sample1.0 linear_large --use-existed
 

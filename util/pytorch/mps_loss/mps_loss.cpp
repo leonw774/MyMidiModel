@@ -8,6 +8,8 @@
 using namespace torch::indexing;
 
 /*
+For each position of predicted label, find the target label that minimizes the cross entropy loss in its MPS
+
 Input:
 
     batchedPredLogitsList is a list of Float64 tensors
@@ -24,7 +26,7 @@ Input:
 
 Output:
 
-    The modified target labels that minimizes the loss in contetxt of MPS
+    The modified target labels that minimizes the loss in each position's MPS
 */
 
 at::Tensor findMinPermuLossTarget(
@@ -163,19 +165,19 @@ at::Tensor findMinPermuLossTarget(
                 at::Tensor curMPSTriu = at::triu_indices(mpsSize, mpsSize, 0).index({
                     Ellipsis, Slice(None, curFlattenMPSLength)
                 });
-                at::Tensor curMPSStackedLoss = at::full(
+                at::Tensor curStackedMPSLoss = at::full(
                     {mpsSize-1, mpsSize},
                     std::numeric_limits<float>::max() //,
                     // torch::TensorOptions().device(catFlattenMPSLossMean.device())
                 );
                 // make the flattened become stacked
-                curMPSStackedLoss.index_put_(
+                curStackedMPSLoss.index_put_(
                     {curMPSTriu.index({0}), curMPSTriu.index({1})},
                     catFlattenMPSLossMean.index({Slice(curFlattenMPSIndex, curFlattenMPSIndex+curFlattenMPSLength)})
                 );
                 curFlattenMPSIndex += curFlattenMPSLength;
-                // std::cout << curMPSStackedLoss << std::endl;
-                at::Tensor curMPSLossArgmin = curMPSStackedLoss.argmin(1);
+                // std::cout << curStackedMPSLoss << std::endl;
+                at::Tensor curMPSLossArgmin = curStackedMPSLoss.argmin(1);
                 for (int i = 0; i < curMPSLossArgmin.size(0); i++) {
                     int minLossIndex = curMPSLossArgmin[i].item<int>();
                     if (minLossIndex != i) {
@@ -200,37 +202,12 @@ at::Tensor findMinPermuLossTarget(
     return batchedTarget;
 }
 
-// torch::Tensor findMinPermuLossTarget(
-//     std::vector<torch::Tensor> batchedPredLogitsList,
-//     torch::Tensor batchedTarget,
-//     std::vector<std::vector<int32_t>> batchedMPSIndices
-// ) {
-//     std::cout << "Number of batch: " << batchedMPSIndices.size();
-//     std::cout << "\nbatchedMPSIndices: ";
-//     for (size_t batchNum = 0; batchNum < batchedMPSIndices.size(); batchNum++) {
-//         std::cout << batchedMPSIndices[batchNum].size() << ",";
-//     }
-//     std::cout << "\nbatchedPredLogitsList: ";
-//     std::cout << "length:" << batchedPredLogitsList.size() << "\n";
-//     for (size_t batchNum = 0; batchNum < batchedMPSIndices.size(); batchNum++) {
-//         for (int i = 0; i < 3; i++) {
-//             std::cout << batchedPredLogitsList[batchNum].size(i) << ",";
-//         }
-//         std::cout << "\n";
-//     }
-//     std::cout << "\nbatchedTarget: ";
-//     for (int i = 0; i < 3; i++) {
-//         std::cout << batchedTarget.size(i) << ",";
-//     }
-//     std::cout << std::endl;
-//     return batchedTarget;
-// }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.doc() = "C++ extension to make finding the modified target labels that minmize the the loss faster";
     m.def(
         "find_min_loss_target",
         &findMinPermuLossTarget,
-        "Find the target tensor that minimizes the loss in contetxt of MPS"
+        "For each position of predicted label, find the target label that minimizes the cross entropy loss in its MPS"
     );
 }

@@ -439,9 +439,9 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_label: Tensor
         return a list of losses of each head
     """
 
-    # because the target is prediction shifted right by 1 index
+    # because the target is prediction shifted left by 1 index
     # the first (0th) prediction in a mps can have (mps_size-1) possible labels
-    # the last (mps_size-th) prediction can have (next_mps_size) possible labels
+    # the last (mps_size-th) prediction in a mps can have (next_mps_size) possible labels
     # when we we are finding permutation of target, all index need to be subtracted by 1
     # so that their corrresponding target is the beginning of mps
     batched_mps_indices_as_list = [
