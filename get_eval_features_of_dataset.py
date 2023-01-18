@@ -95,10 +95,10 @@ def main():
             for rand_index in random_indices
         ]
         with Pool(args.workers) as p:
-            eval_sample_features = tqdm(
+            eval_sample_features = list(tqdm(
                 p.imap(midi_to_features_wrapper, eval_args_dict_list),
                 total=args.sample_number
-            )
+            ))
             eval_sample_features_per_piece += [f for f in eval_sample_features if f is not None]
 
     logging.info(
