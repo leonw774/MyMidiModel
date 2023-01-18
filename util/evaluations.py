@@ -89,22 +89,6 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
     return head + sampled_body
 
 
-def midi_to_features(midi: MidiFile, max_pairs_number: int) -> Dict[str, float]:
-    nth = midi.ticks_per_beat * 4
-    temp_piece = ' '.join(midi_to_text_list(
-        midi,
-        nth=nth,
-        max_track_number=len(midi.instruments),
-        max_duration=nth,
-        velocity_step=1,
-        use_cont_note=True,
-        tempo_quantization=(1,1,65536),
-        position_method='event',
-        use_merge_drums=False
-    ))
-    return piece_to_features(temp_piece, nth, max_pairs_number)
-
-
 def piece_to_features(piece: str, nth: int, max_pairs_number: int) -> Dict[str, float]:
     '''
         Return:
@@ -115,6 +99,11 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int) -> Dict[str, 
         - grooving self-similarity
     '''
     midi = piece_to_midi(piece, nth, ignore_pending_note_error=True)
+    return midi_to_features(midi, max_pairs_number)
+
+
+def midi_to_features(midi: MidiFile, max_pairs_number: int) -> Dict[str, float]:
+    nth = midi.ticks_per_beat * 4
     pitch_histogram = [0] * 128
     durations = []
     velocities = []

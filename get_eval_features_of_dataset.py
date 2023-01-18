@@ -85,7 +85,7 @@ def main():
                 pbar.update(1)
                 sampled_rand_index.add(rand_index)
             except (AssertionError, ValueError):
-                print(f'Error when getting feature from piece witat index #{rand_index} MidiFile object')
+                print(f'Error when getting feature from piece at index #{rand_index} MidiFile object')
                 print(format_exc())
 
     logging.info(
