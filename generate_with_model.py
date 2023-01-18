@@ -73,6 +73,10 @@ def read_args():
             Default is %(default)s.'
     )
     parser.add_argument(
+        '--use-logit-adjustment',
+        action='store_true'
+    )
+    parser.add_argument(
         '--use-device',
         type=str,
         choices=['cpu', 'cuda'],
@@ -104,8 +108,9 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
         model,
         steps=args.max_generation_step,
         start_seq=primer_seq,
-        try_count_limit=args.try_count_limit,
         temperature=args.temperature,
+        try_count_limit=args.try_count_limit,
+        use_logit_adjustment=args.use_logit_adjustment,
         print_exception=args.print_exception,
         show_tqdm=True
     )

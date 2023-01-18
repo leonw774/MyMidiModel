@@ -277,6 +277,7 @@ def generate_sample(
         start_seq: Union[Tensor, None] = None,
         temperature: float = 1.0,
         try_count_limit: int = 1000,
+        use_logit_adjustment: bool = True,
         print_exception: bool = False,
         show_tqdm: bool = False,
         ignore_pending_note_error: bool = True
@@ -302,29 +303,30 @@ def generate_sample(
     model.eval()
 
     # prepare vocab for logit adjustment
-    multinote_indices = set()
-    position_indices = set()
-    measure_indices = set()
-    track_instrument_indices = set()
-    tempo_indices = set()
-    for t, i in model.vocabs.events.text2id.items():
-        if t[0] == tokens.NOTE_EVENTS_CHAR or t[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
-            multinote_indices.add(i)
-        elif t[0] == tokens.POSITION_EVENTS_CHAR:
-            position_indices.add(i)
-        elif t[0] == tokens.MEASURE_EVENTS_CHAR:
-            measure_indices.add(i)
-        elif t[0] == tokens.TEMPO_EVENTS_CHAR:
-            tempo_indices.add(i)
-        elif t[0] == tokens.TRACK_EVENTS_CHAR:
-            track_instrument_indices.add(i)
-    event_family_indices = (
-        multinote_indices,
-        position_indices,
-        measure_indices,
-        track_instrument_indices,
-        tempo_indices
-    )
+    if use_logit_adjustment:
+        multinote_indices = set()
+        position_indices = set()
+        measure_indices = set()
+        track_instrument_indices = set()
+        tempo_indices = set()
+        for t, i in model.vocabs.events.text2id.items():
+            if t[0] == tokens.NOTE_EVENTS_CHAR or t[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
+                multinote_indices.add(i)
+            elif t[0] == tokens.POSITION_EVENTS_CHAR:
+                position_indices.add(i)
+            elif t[0] == tokens.MEASURE_EVENTS_CHAR:
+                measure_indices.add(i)
+            elif t[0] == tokens.TEMPO_EVENTS_CHAR:
+                tempo_indices.add(i)
+            elif t[0] == tokens.TRACK_EVENTS_CHAR:
+                track_instrument_indices.add(i)
+        event_family_indices = (
+            multinote_indices,
+            position_indices,
+            measure_indices,
+            track_instrument_indices,
+            tempo_indices
+        )
 
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
 
@@ -344,7 +346,8 @@ def generate_sample(
                 for l in logits
             ]
 
-            last_logits = adjust_logits_with_context(last_logits, text_list, model.vocabs, event_family_indices)
+            if use_logit_adjustment:
+                last_logits = adjust_logits_with_context(last_logits, text_list, model.vocabs, event_family_indices)
 
             # print('\n'.join([repr(logit) for logit in last_logits]))
             try_count = 0
