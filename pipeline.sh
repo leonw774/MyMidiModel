@@ -195,7 +195,10 @@ python3 get_eval_features_of_model.py --log $LOG_PATH $MODEL_DIR_PATH
 
 test $? -ne 0 && { echo "evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
-# this will not use existed
-python3 get_eval_features_of_dataset.py --log $LOG_PATH $CORPUS_DIR_PATH
+if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_sample_feature_stats.json" ] ; then
+    echo "Midi dataset ${MIDI_DIR_PATH} already has feature stats file. get_eval_features_of_dataset.py is skipped."
+else
+    python3 get_eval_features_of_dataset.py --log $LOG_PATH $MIDI_DIR_PATH
+fi
 
 echo "pipeline.sh done."
