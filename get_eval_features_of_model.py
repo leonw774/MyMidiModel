@@ -29,6 +29,11 @@ def parse_args():
         default=100
     )
     parser.add_argument(
+        '--max-pairs-number',
+        type=int,
+        default=int(1e6)
+    )
+    parser.add_argument(
         'model_dir_path',
         type=str
     )
@@ -78,11 +83,11 @@ def main():
         # save to disk
         open(os.path.join(eval_dir_path, f'{i}.txt'), 'w+', encoding='utf8').write(uncond_gen_piece)
         try:
-            piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True).dump(
+            piece_to_midi(uncond_gen_piece, vocabs.paras['nth']).dump(
                 os.path.join(eval_dir_path, f'{i}.mid')
             )
             eval_sample_features_per_piece.append(
-                piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=int(10e6))
+                piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=args.max_pairs_number)
             )
         except (AssertionError, ValueError):
             print(f'Error when dumping eval uncond gen #{i} MidiFile object')

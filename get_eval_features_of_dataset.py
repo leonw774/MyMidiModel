@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 import glob
 import json
 import logging
+from multiprocessing import Pool
 import os
 from time import strftime, time
 from traceback import format_exc
@@ -27,6 +28,16 @@ def parse_args():
         '--sample-number',
         type=int,
         default=100
+    )
+    parser.add_argument(
+        '--workers',
+        type=int,
+        default=20
+    )
+    parser.add_argument(
+        '--max-pairs-number',
+        type=int,
+        default=int(1e6)
     )
     parser.add_argument(
         'dataset_dir_path',
@@ -66,27 +77,26 @@ def main():
 
 
     dataset_size = len(file_path_list)
-    eval_sample_features_per_piece = []
-    eval_sample_features_per_piece: List[ Dict[str, float] ]
+    eval_sample_features_per_piece: List[ Dict[str, float] ] = []
     start_time = time()
     sampled_rand_index = set()
-    feature_sample_count = 0
-    with tqdm(total=args.sample_number) as pbar:
-        while feature_sample_count < args.sample_number:
-            rand_index = random.randint(0, dataset_size-1)
-            if rand_index in sampled_rand_index:
-                continue
-            random_midi_file_path = file_path_list[rand_index]
+
+    while len(eval_sample_features_per_piece) < args.sample_number:
+        random_indices = random.sample(list(range(dataset_size)), args.sample_number - len(eval_sample_features_per_piece))
+        eval_arg_dict_list = []
+        for rand_index in random_indices:
             try:
-                eval_sample_features_per_piece.append(
-                    midi_to_features(MidiFile(random_midi_file_path),  max_pairs_number=int(10e6))
+                # because some file cannot be read by MidiFile
+                eval_arg_dict_list.append(
+                    {'midi': MidiFile(file_path_list[rand_index]), 'max_pairs_number': args.max_pairs_number}
                 )
-                feature_sample_count += 1
-                pbar.update(1)
-                sampled_rand_index.add(rand_index)
-            except (AssertionError, ValueError):
-                print(f'Error when getting feature from piece at index #{rand_index} MidiFile object')
-                print(format_exc())
+            except:
+                pass
+        with Pool(args.workers) as p:
+            eval_sample_features_per_piece += tqdm(
+                p.imap(midi_to_features, eval_arg_dict_list),
+                total=args.sample_number
+            )
 
     logging.info(
         'Done. Sampling %d midi files from %s takes %.3f seconds',
