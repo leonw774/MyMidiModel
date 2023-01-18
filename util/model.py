@@ -114,16 +114,15 @@ class MyMidiTransformer(nn.Module):
         if use_linear_attn:
             # https://linear-transformers.com/
             enc_builder = RecurrentEncoderBuilder.from_kwargs(
-                activation='relu',
+                activation='gelu', # same as SymphonyNet
                 n_layers=layers_number,
                 n_heads=attn_heads_number,
-                feed_forward_dimensions=2048,   # same as torch's default
+                feed_forward_dimensions=4 * embedding_dim, # same as SymphonyNet
                 query_dimensions=embedding_dim // attn_heads_number,
                 value_dimensions=embedding_dim // attn_heads_number,
-                dropout=0.1,                    # same as torch's default
-                attention_dropout=0.1,          # same as torch's default
+                dropout=0.1, # same as SymphonyNet
                 attention_type="causal-linear",
-                # final_normalization=True,       # same as torch's default
+                # final_normalization=True,
                 # feature_map=MY_ELU_FEATURE_MAP  # make the model pickle-able
             )
             self.transformer_encoder = enc_builder.get()

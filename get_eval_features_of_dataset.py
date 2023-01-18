@@ -51,6 +51,7 @@ def midi_to_features_wrapper(args_dict: dict):
         midifile_obj = MidiFile(args_dict['midi_path'])
         features = midi_to_features(midi=midifile_obj, max_pairs_number=args_dict['max_pairs_number'])
     except Exception as e:
+        # print(format_exc)
         return None
     return features
 
@@ -96,10 +97,12 @@ def main():
         ]
         with Pool(args.workers) as p:
             eval_sample_features = list(tqdm(
-                p.imap(midi_to_features_wrapper, eval_args_dict_list),
-                total=args.sample_number
+                p.imap_unordered(midi_to_features_wrapper, eval_args_dict_list),
+                total=len(random_indices)
             ))
-            eval_sample_features_per_piece += [f for f in eval_sample_features if f is not None]
+            eval_sample_features = [f for f in eval_sample_features if f is not None]
+            print(f'Processed {len(eval_sample_features)} uncorrupted files out of {len(random_indices)} random indices')
+            eval_sample_features_per_piece += eval_sample_features
 
     logging.info(
         'Done. Sampling %d midi files from %s takes %.3f seconds',
