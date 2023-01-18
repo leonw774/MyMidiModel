@@ -46,6 +46,14 @@ def parse_args():
     return parser.parse_args()
 
 
+def midi_to_features_wrapper(args_dict: dict):
+    try:
+        midifile_obj = MidiFile(args_dict['midi_path'])
+    except Exception as e:
+        return None
+        midifile_obj = MidiFile(args_dict['midi_path'])
+    return midi_to_features(midi=midifile_obj, max_pairs_number=args_dict['max_pairs_number'])
+
 def main():
     args = parse_args()
     # root logger
@@ -79,24 +87,19 @@ def main():
     dataset_size = len(file_path_list)
     eval_sample_features_per_piece: List[ Dict[str, float] ] = []
     start_time = time()
-    sampled_rand_index = set()
 
     while len(eval_sample_features_per_piece) < args.sample_number:
         random_indices = random.sample(list(range(dataset_size)), args.sample_number - len(eval_sample_features_per_piece))
-        eval_arg_dict_list = []
-        for rand_index in random_indices:
-            try:
-                # because some file cannot be read by MidiFile
-                eval_arg_dict_list.append(
-                    {'midi': MidiFile(file_path_list[rand_index]), 'max_pairs_number': args.max_pairs_number}
-                )
-            except:
-                pass
+        eval_args_dict_list = [
+            {'midi_path': file_path_list[rand_index], 'max_pairs_number': args.max_pairs_number}
+            for rand_index in random_indices
+        ]
         with Pool(args.workers) as p:
-            eval_sample_features_per_piece += tqdm(
-                p.imap(midi_to_features, eval_arg_dict_list),
+            eval_sample_features += tqdm(
+                p.imap(midi_to_features_wrapper, eval_args_dict_list),
                 total=args.sample_number
             )
+        eval_sample_features_per_piece += [f for f in eval_sample_features if f is not None]
 
     logging.info(
         'Done. Sampling %d midi files from %s takes %.3f seconds',
