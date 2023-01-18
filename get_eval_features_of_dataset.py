@@ -49,10 +49,10 @@ def parse_args():
 def midi_to_features_wrapper(args_dict: dict):
     try:
         midifile_obj = MidiFile(args_dict['midi_path'])
+        features = midi_to_features(midi=midifile_obj, max_pairs_number=args_dict['max_pairs_number'])
     except Exception as e:
         return None
-        midifile_obj = MidiFile(args_dict['midi_path'])
-    return midi_to_features(midi=midifile_obj, max_pairs_number=args_dict['max_pairs_number'])
+    return features
 
 def main():
     args = parse_args()
