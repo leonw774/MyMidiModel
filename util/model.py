@@ -13,6 +13,7 @@ try:
     from fast_transformers.builders import TransformerEncoderBuilder, RecurrentEncoderBuilder
     from fast_transformers.masking import FullMask
     from fast_transformers.feature_maps import ActivationFunctionFeatureMap
+    from fast_transformers.utils import make_mirror
 
     def my_elu_function(x):
         return F.elu(x) + 1
@@ -41,7 +42,8 @@ class MyMidiTransformer(nn.Module):
             embedding_dim: int,
             input_no_tempo: bool,
             input_no_time_signature: bool,
-            embedding_dropout_rate=0.1
+            embedding_dropout_rate=0.1,
+            is_inference: bool = False
             ) -> None:
         super().__init__()
 
@@ -54,6 +56,9 @@ class MyMidiTransformer(nn.Module):
         self.embedding_dim = embedding_dim
         self.input_no_tempo = input_no_tempo
         self.input_no_time_signature = input_no_time_signature
+
+        # set the to True ONLY when inferencing
+        self.is_inference = is_inference
 
         # Input attributess
 
@@ -113,19 +118,21 @@ class MyMidiTransformer(nn.Module):
         # name's encoder, used as decoder
         if use_linear_attn:
             # https://linear-transformers.com/
-            enc_builder = RecurrentEncoderBuilder.from_kwargs(
-                activation='gelu', # same as SymphonyNet
-                n_layers=layers_number,
-                n_heads=attn_heads_number,
-                feed_forward_dimensions=4 * embedding_dim, # same as SymphonyNet
-                query_dimensions=embedding_dim // attn_heads_number,
-                value_dimensions=embedding_dim // attn_heads_number,
-                dropout=0.1, # same as SymphonyNet
-                attention_type="causal-linear",
-                # final_normalization=True,
-                # feature_map=MY_ELU_FEATURE_MAP  # make the model pickle-able
-            )
-            self.transformer_encoder = enc_builder.get()
+            params = {
+                'activation': 'gelu', # same as SymphonyNet
+                'n_layers': layers_number,
+                'n_heads': attn_heads_number,
+                'query_dimensions': embedding_dim // attn_heads_number,
+                'value_dimensions': embedding_dim // attn_heads_number,
+                'feed_forward_dimensions': 4 * embedding_dim, # same as SymphonyNet
+                'attention_type': 'causal-linear',
+                'dropout': 0.1, # same as SymphonyNet
+                # 'final_normalization'=True,
+                'feature_map': MY_ELU_FEATURE_MAP  # make the model pickle-able
+            }
+            self.transformer_encoder = TransformerEncoderBuilder.from_dictionary(params).get()
+            self.transformer_encoder_inference = RecurrentEncoderBuilder.from_dictionary(params).get()
+            make_mirror(self.transformer_encoder, self.transformer_encoder_inference)
         else:
             layer = nn.TransformerEncoderLayer(
                 d_model=embedding_dim,
@@ -161,19 +168,32 @@ class MyMidiTransformer(nn.Module):
         #         emb_sum = emb_mask * emb_i
         emb_sum_dropout = self.embedding_dropout(emb_sum)
         if self.use_linear_attn:
-            # in fast_transformer's FullMask class, 0 is masked, 1 is keep
-            causal_mask = self.causal_mask
-            length_mask = FullMask(mask=x[..., 0].ne(0).bool().to(x.device))
+            if self.is_inference:
+                # no mask is needed when using recurrent for inference
+                # also have to squeeze(0), dunno why
+                # the batch size should be one
+                assert emb_sum_dropout.shape[0] == 1, 'The batch size of the input should be 1 if is_inference is True'
+                transformer_output, memory = self.transformer_encoder_inference(emb_sum_dropout.squeeze(0))
+                transformer_output = transformer_output.unsqueeze(0)
+            else:
+                # in fast_transformer's FullMask class, 0 is masked, 1 is keep
+                causal_mask = self.causal_mask
+                length_mask = FullMask(mask=x[..., 0].ne(0).bool().to(x.device))
+                transformer_output = self.transformer_encoder(
+                    emb_sum_dropout,
+                    causal_mask,
+                    length_mask
+                )
         else:
             # in pytorch's official implementation, True is masked, False is keep
             causal_mask = self.causal_mask[:x.shape[1], :x.shape[1]].to(x.device)
             length_mask = x[..., 0].eq(0).to(x.device)
+            transformer_output = self.transformer_encoder(
+                emb_sum_dropout,
+                causal_mask,
+                length_mask
+            )
 
-        transformer_output = self.transformer_encoder(
-            emb_sum_dropout,
-            causal_mask,
-            length_mask
-        )
         logits = tuple(
             logit(transformer_output) for logit in self.logits
         )
@@ -218,8 +238,9 @@ def adjust_logits_with_context(
     is_sep = context_text_list[-1] == tokens.SEP_TOKEN_STR
     if is_head:
         # if the section is head, then only track-instrument and separater allowed
+        # but if it is only BOS, then only track-instrument allowed
         for i in range(vocabs.events.size):
-            if i not in track_instrument_indices and i != sep_index:
+            if i not in track_instrument_indices and (i != sep_index or len(context_text_list) == 0):
                 logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
     elif is_sep:
         # if is separater, then only measure tokens are allowed
@@ -258,14 +279,18 @@ def adjust_logits_with_context(
     if not is_head and not is_sep:
         # if the section is body, then only allow the defined track
         sep_index_in_text_list = context_text_list.index(tokens.SEP_TOKEN_STR)
-        max_track_number = max([
-            b36str2int(t.split(':')[1])
-            for t in context_text_list[1:sep_index_in_text_list]
-            if t[0] == tokens.TRACK_EVENTS_CHAR
-        ])
+        try:
+            max_track_number = max([
+                b36str2int(t.split(':')[1])
+                for t in context_text_list[1:sep_index_in_text_list]
+                if t[0] == tokens.TRACK_EVENTS_CHAR
+            ])
+        except Exception as e:
+            print(context_text_list[1:sep_index_in_text_list])
+            raise e
         # start from max_track_number+1+1
         # first +1 is because index 0 is padding
-        # second +1 is because we reset any index > max_track_number+1
+        # second +1 is because we reset any index that greater than max_track_number+1
         for i in range(max_track_number+1+1, vocabs.track_numbers.size):
             logits[TOKEN_ATTR_INDEX['trn']][i] = LARGE_NEG_VALUE
 
@@ -301,6 +326,7 @@ def generate_sample(
     # get model device
     model_device = next(model.parameters()).device
     training_state = model.training
+    model.is_inference = True
     model.eval()
 
     # prepare vocab for logit adjustment
@@ -348,7 +374,7 @@ def generate_sample(
             ]
 
             if use_logit_adjustment:
-                # prevent many bad format in advance, but not restricting the order of track number in head section 
+                # prevent many bad format in advance, but not restricting the order of track number in head section
                 last_logits = adjust_logits_with_context(last_logits, text_list, model.vocabs, event_family_indices)
 
             # print('\n'.join([repr(logit) for logit in last_logits]))
@@ -379,19 +405,19 @@ def generate_sample(
                             nth=model.vocabs.paras['nth'],
                             ignore_pending_note_error=ignore_pending_note_error
                         )
-                    # compute extended attributes
-                    extended_try_token_array = torch.from_numpy(
-                        text_list_to_array(try_text_list, vocabs=model.vocabs, output_range=(len(try_text_list)-1, None))
+                    # compute complete attribute array and second format checking 
+                    try_text_list_array = torch.from_numpy(
+                        text_list_to_array(try_text_list, vocabs=model.vocabs)
                     ).unsqueeze(0).int() # shape = (1, 1, complete_attr_num)
-                    input_seq = torch.cat([input_seq, extended_try_token_array], dim=1)
-                    text_list = try_text_list
-                    break
                 except (AssertionError, ValueError) as e:
                     if print_exception:
                         print(repr(e))
                     try_count += 1
                     continue # keep sampling until no error
-
+                # no error
+                input_seq = try_text_list_array
+                text_list = try_text_list
+                break
             # end while try
             # print(text_list)
             if try_count == try_count_limit:
@@ -406,6 +432,7 @@ def generate_sample(
     if not end_with_end_token:
         text_list.append(tokens.END_TOKEN_STR)
 
+    model.is_inference = False
     model.train(training_state)
     return text_list
 
