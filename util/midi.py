@@ -525,7 +525,7 @@ def handle_note_continuation(
     return None
 
 
-def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False) -> MidiFile:
+def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) -> MidiFile:
     # tick time == nth time
     midi = MidiFile(ticks_per_beat=nth//4)
 
@@ -546,7 +546,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
             assert is_head, 'Track token at body'
             track_number, instrument = (b36str2int(x) for x in text[2:].split(':'))
             assert track_number not in track_program_mapping, 'Repeated track number'
-            # shoud we use more strict track list?: not allow permutation, just 1, ..., n
+            # assertion below restrict track list to just: 1, ..., n
             assert track_number == len(track_program_mapping), 'Track number not increasing by one'
             track_program_mapping[track_number] = instrument
 
@@ -558,7 +558,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = False)
             track_numbers_list.sort()
             # track number must at least be a permutation of 1, ..., n
             assert track_numbers_list == list(range(len(track_numbers_list))),\
-                'Track numbers are not consecutive integers starting from 1'
+                'Track numbers are not permutation of consecutive integers starting from 1'
             for track_number in track_numbers_list:
                 program = track_program_mapping[track_number]
                 midi.instruments.append(

@@ -10,7 +10,7 @@ from tqdm import tqdm
 import mps_loss
 
 try:
-    from fast_transformers.builders import TransformerEncoderBuilder
+    from fast_transformers.builders import TransformerEncoderBuilder, RecurrentEncoderBuilder
     from fast_transformers.masking import FullMask
     from fast_transformers.feature_maps import ActivationFunctionFeatureMap
 
@@ -110,8 +110,10 @@ class MyMidiTransformer(nn.Module):
             # in pytorch's official implementation, True is masked, False is keep
             self.causal_mask = torch.triu(torch.ones(max_seq_length, max_seq_length), diagonal=1).bool()
 
+        # name's encoder, used as decoder
         if use_linear_attn:
-            enc_builder = TransformerEncoderBuilder.from_kwargs(
+            # https://linear-transformers.com/
+            enc_builder = RecurrentEncoderBuilder.from_kwargs(
                 activation='relu',
                 n_layers=layers_number,
                 n_heads=attn_heads_number,
@@ -121,12 +123,12 @@ class MyMidiTransformer(nn.Module):
                 dropout=0.1,                    # same as torch's default
                 attention_dropout=0.1,          # same as torch's default
                 attention_type="causal-linear",
-                final_normalization=True,       # same as torch's default
-                feature_map=MY_ELU_FEATURE_MAP  # make the model pickle-able
+                # final_normalization=True,       # same as torch's default
+                # feature_map=MY_ELU_FEATURE_MAP  # make the model pickle-able
             )
             self.transformer_encoder = enc_builder.get()
         else:
-            layer = nn.TransformerEncoderLayer( # name's encoder, used as decoder.
+            layer = nn.TransformerEncoderLayer(
                 d_model=embedding_dim,
                 nhead=attn_heads_number,
                 batch_first=True
@@ -329,17 +331,17 @@ def generate_sample(
         )
 
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
+    is_head = tokens.SEP_TOKEN_STR not in text_list
 
     input_seq = start_seq
     primer_length = input_seq.shape[1]
     max_gen_step = min(model.max_seq_length, steps+primer_length) - primer_length
-    output_seq = model.to_output_attrs(start_seq)
     end_with_end_token = False
     # print(seq.shape)
     # for _ in tqdm(range(steps)):
     with torch.no_grad():
         for _ in tqdm(range(max_gen_step), disable=not show_tqdm):
-            logits = model(input_seq.to(model_device))
+            logits = model(model.to_input_attrs(input_seq).to(model_device))
             last_logits = [
                 l[0, -1, :].to('cpu') # back to cpu, if was cuda (likely)
                 # l has shape (1, sequence_length, attr_vocab_size)
@@ -347,6 +349,7 @@ def generate_sample(
             ]
 
             if use_logit_adjustment:
+                # prevent many bad format in advance, but not restricting the order of track number in head section 
                 last_logits = adjust_logits_with_context(last_logits, text_list, model.vocabs, event_family_indices)
 
             # print('\n'.join([repr(logit) for logit in last_logits]))
@@ -357,30 +360,31 @@ def generate_sample(
                     for l in last_logits # l has shape (1, attr_vocab_size)
                 ]
                 # print(sampled_attrs)
-                try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, attr_num)
+                try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, out_attr_num)
                 # print([ model.vocabs.to_dict()[OUTPUT_ATTR_NAME[i]]['id2text'][int(f)] for i, f in enumerate(try_token[0]) ])
-                try_token = torch.unsqueeze(try_token, dim=0) # shape = (1, 1, attr_num)
-                try_seq = torch.cat((output_seq, try_token), dim=1)
-                try_text_list = array_to_text_list(try_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=True)
+                try_token_text = array_to_text_list(try_token.cpu().numpy(), vocabs=model.vocabs, is_output=True)[0]
                 # print(try_text_list)
-                if try_text_list[-1] == tokens.END_TOKEN_STR:
-                    text_list = try_text_list
+                if try_token_text == tokens.END_TOKEN_STR:
+                    text_list = text_list + [try_token_text]
                     # if sampled EOS, then dont check. just end
                     break
 
                 try:
+                    is_head = is_head and (try_token_text == tokens.SEP_TOKEN_STR)
+                    try_text_list = text_list + [try_token_text]
                     # format checking
-                    # have to append EOS at the end to not raise error
-                    piece_to_midi(
-                        piece=' '.join(try_text_list + [tokens.END_TOKEN_STR]),
-                        nth=model.vocabs.paras['nth'],
-                        ignore_pending_note_error=ignore_pending_note_error
-                    )
-                    # format checking and position, tempo, measure_number calculation
-                    input_seq = torch.from_numpy(
-                        text_list_to_array(try_text_list, vocabs=model.vocabs)
-                    ).unsqueeze(0).int()
-                    output_seq = model.to_output_attrs(input_seq)
+                    if not use_logit_adjustment and is_head:
+                        # have to append EOS at the end to not raise error
+                        piece_to_midi(
+                            piece=' '.join(try_text_list + [tokens.END_TOKEN_STR]),
+                            nth=model.vocabs.paras['nth'],
+                            ignore_pending_note_error=ignore_pending_note_error
+                        )
+                    # compute extended attributes
+                    extended_try_token_array = torch.from_numpy(
+                        text_list_to_array(try_text_list, vocabs=model.vocabs, output_range=(len(try_text_list)-1, None))
+                    ).unsqueeze(0).int() # shape = (1, 1, complete_attr_num)
+                    input_seq = torch.cat([input_seq, extended_try_token_array], dim=1)
                     text_list = try_text_list
                     break
                 except (AssertionError, ValueError) as e:
