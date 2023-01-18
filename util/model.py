@@ -395,7 +395,6 @@ def generate_sample(
                     break
 
                 try:
-                    is_head = is_head and (try_token_text == tokens.SEP_TOKEN_STR)
                     try_text_list = text_list + [try_token_text]
                     # format checking
                     if not use_logit_adjustment and is_head:
@@ -415,6 +414,8 @@ def generate_sample(
                     try_count += 1
                     continue # keep sampling until no error
                 # no error
+                if try_token_text == tokens.SEP_TOKEN_STR:
+                    is_head = False
                 input_seq = try_text_list_array
                 text_list = try_text_list
                 break
