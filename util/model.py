@@ -397,7 +397,7 @@ def generate_sample(
                 try:
                     try_text_list = text_list + [try_token_text]
                     # format checking
-                    if not use_logit_adjustment and is_head:
+                    if not use_logit_adjustment or is_head:
                         # have to append EOS at the end to not raise error
                         piece_to_midi(
                             piece=' '.join(try_text_list + [tokens.END_TOKEN_STR]),

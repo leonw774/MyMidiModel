@@ -120,7 +120,7 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
         if args.output_txt:
             with open(f'{output_file_path}.txt', 'w+', encoding='utf8') as f:
                 f.write(' '.join(gen_text_list))
-        midi = piece_to_midi(' '.join(gen_text_list), model.vocabs.paras['nth'], ignore_pending_note_error=True)
+        midi = piece_to_midi(' '.join(gen_text_list), model.vocabs.paras['nth'])
         midi.dump(f'{output_file_path}.mid')
 
 def main():
@@ -140,8 +140,7 @@ def main():
         raise ValueError(f'Bad device name {args.use_device}')
     if not torch.cuda.is_available():
         args.use_device = 'cpu'
-    if args.use_device.startswith('cuda'):
-        model = model.to(args.use_device)
+    model = model.to(args.use_device)
 
     # primer
     primer_seq = None
