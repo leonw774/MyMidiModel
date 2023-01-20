@@ -29,13 +29,13 @@ Output:
     The modified target labels that minimizes the loss in each position's MPS
 */
 
-at::Tensor findMinPermuLossTarget(
+at::Tensor findMinPermuLossTarget_TriU(
     std::vector<at::Tensor> batchedPredLogitsList,
     at::Tensor batchedTarget,
     std::vector<std::vector<int32_t>> batchedMPSIndices
 ) {
-    int outAttrNum = batchedPredLogitsList.size();
-    for (int batchNum = 0; batchNum < batchedMPSIndices.size(); batchNum++) {
+    int64_t outAttrNum = batchedTarget.size(2);
+    for (int64_t batchNum = 0; batchNum < batchedTarget.size(0); batchNum++) {
         // std::cout << "batchNum " << batchNum << std::endl;
         std::vector<int32_t> curMPSIndices= batchedMPSIndices[batchNum]; // copy the vector
 
@@ -167,8 +167,8 @@ at::Tensor findMinPermuLossTarget(
                 });
                 at::Tensor curStackedMPSLoss = at::full(
                     {mpsSize-1, mpsSize},
-                    std::numeric_limits<float>::max() //,
-                    // torch::TensorOptions().device(catFlattenMPSLossMean.device())
+                    std::numeric_limits<float>::max(),
+                    torch::TensorOptions().device(catFlattenMPSLossMean.device())
                 );
                 // make the flattened become stacked
                 curStackedMPSLoss.index_put_(
@@ -203,11 +203,183 @@ at::Tensor findMinPermuLossTarget(
 }
 
 
+
+at::Tensor findMinPermuLossTarget_Loop(
+    std::vector<at::Tensor> batchedPredLogitsList,
+    at::Tensor batchedTarget,
+    std::vector<std::vector<int32_t>> batchedMPSIndices
+) {
+    torch::TensorOptions thisDevice =  torch::TensorOptions().device(batchedTarget.device());
+    int64_t outAttrNum = batchedTarget.size(2);
+    for (int64_t batchNum = 0; batchNum < batchedTarget.size(0); batchNum++) {
+        // std::cout << "batchNum " << batchNum << std::endl;
+        std::vector<int32_t> curMPSIndices = batchedMPSIndices[batchNum]; // copy
+        
+        std::vector<size_t> mpsNums;
+        std::vector<int32_t> mpsSizes; 
+        std::vector<int32_t> flattenMPSBeginIndices; 
+
+        // Flatten MPSs
+        // Calcucate the size of the flatten mps
+        int32_t flattenMPSSize = 0;
+        for (size_t mpsNum = 0; mpsNum < curMPSIndices.size() - 1; mpsNum++) {
+            int32_t beginIndex = curMPSIndices[mpsNum];
+            if (beginIndex < 0) {
+                continue;
+            }
+            int32_t endIndex = curMPSIndices[mpsNum+1];
+            int32_t mpsSize = endIndex - beginIndex;
+            if (mpsSize < 0) {
+                throw std::range_error("Negtive mpsSize");
+            }
+            else if (mpsSize == 2) {
+                mpsNums.push_back(mpsNum);
+                flattenMPSBeginIndices.push_back(flattenMPSSize);
+                mpsSizes.push_back(mpsSize);
+                flattenMPSSize += 2;
+            }
+            else if (mpsSize > 2) {
+                mpsNums.push_back(mpsNum);
+                flattenMPSBeginIndices.push_back(flattenMPSSize);
+                mpsSizes.push_back(mpsSize);
+                flattenMPSSize += mpsSize * (mpsSize + 1) / 2 - 1;
+            }
+        }
+        // std::cout << "flattenMPSSize " << flattenMPSSize << std::endl;
+        // for (auto mpsSize: mpsSizes) {
+        //     std::cout << " " << mpsSize;
+        // }
+        // std::cout << std::endl;
+        if (flattenMPSSize == 0) {
+            continue;
+        }
+
+        // init flatten target and logits
+        at::Tensor flattenMPSTarget = at::empty({flattenMPSSize, outAttrNum}, thisDevice.dtype(c10::ScalarType::Long));
+        std::vector<at::Tensor> flattenMPSPredLogitList;
+        for (int k = 0; k < outAttrNum; k++) {
+            flattenMPSPredLogitList.push_back(at::empty({flattenMPSSize, batchedPredLogitsList[k].size(2)}, thisDevice));
+        }
+        for (size_t i = 0; i < mpsNums.size(); i++) {
+            size_t mpsNum = mpsNums[i];
+            int32_t beginIndex = curMPSIndices[mpsNum], endIndex = curMPSIndices[mpsNum+1];
+            int32_t mpsSize = mpsSizes[i];
+            int32_t curFlattenMPSBeginIndex = flattenMPSBeginIndices[i];
+            if (mpsSize == 2) {
+                int32_t curFlattenMPSEndIndex = curFlattenMPSBeginIndex + 2;
+                flattenMPSTarget.index_put_(
+                    {Slice(curFlattenMPSBeginIndex, curFlattenMPSEndIndex)},
+                    batchedTarget.index({batchNum, Slice(beginIndex, endIndex)})
+                );
+                for (int k = 0; k < outAttrNum; k++) {
+                    flattenMPSPredLogitList[k].index_put_(
+                        {Slice(curFlattenMPSBeginIndex, curFlattenMPSEndIndex)},
+                        batchedPredLogitsList[k].index({batchNum, beginIndex})
+                    );
+                }
+            }
+            else if (mpsSize > 2) {
+                // curMPSTarget = batchedTarget[batch_number, begin_index:end_index]
+                at::Tensor curMPSTarget = batchedTarget.index({batchNum, Slice(beginIndex, endIndex)});
+                // we want:
+                // t1, t2, t3 ... tn
+                // -->
+                // t1, t2, t3 ... tn, t2, t3, t4 ... tn, ... , tn-1, tn
+                int32_t b = curFlattenMPSBeginIndex;
+                for (int32_t j = 0; j < mpsSize - 1; j++) {
+                    flattenMPSTarget.index_put_(
+                        {Slice(b, b + mpsSize - j)},
+                        curMPSTarget.index({Slice(j, mpsSize)})
+                    );
+                    b += mpsSize - j;
+                }
+
+                for (int k = 0; k < outAttrNum; k++) {
+                    at::Tensor curMPSLogitK = batchedPredLogitsList[k].index({batchNum, Slice(beginIndex, endIndex)});
+                    // we want:
+                    // l1, l2, l3 ... ln
+                    // -->
+                    // l1, l1, l1, ... , l1 (n times), l2, l2, l2, ... , l2 (n-1 times), ... , ln-1, ln-1 (2 times)
+                    int32_t b = curFlattenMPSBeginIndex;
+                    for (int32_t j = 0; j < mpsSize - 1; j++) {
+                        flattenMPSPredLogitList[k].index_put_(
+                            {Slice(b, b + mpsSize - j)},
+                            curMPSLogitK.index({j})
+                        );
+                        b += mpsSize - j;
+                    }
+                }
+            }
+        }
+
+        std::vector<at::Tensor> flattenMPSLossesList;
+        for (int k = 0; k < outAttrNum; k++) {
+            flattenMPSLossesList.push_back(
+                at::cross_entropy_loss(
+                    at::concat(flattenMPSPredLogitList[k], 0), // input
+                    flattenMPSTarget.index({Ellipsis, k}), // target
+                    {}, // weight
+                    at::Reduction::None, // reduction
+                    0LL // ignore_index
+                )
+            );
+        }
+        // calculate the mean of k attr losses
+        at::Tensor flattenMPSLossesStack = at::stack(flattenMPSLossesList); // (outAttrNum, flattenMPSLength)
+        // std::cout << flattenMPSLossesStack << std::endl;
+        // because when an attribute is labeled as padding, its loss would be zero
+        // we want to ignore the zero values
+        at::Tensor flattenMPSLossMean =
+            flattenMPSLossesStack.sum(0) / flattenMPSLossesStack.count_nonzero(c10::optional<int64_t>(0));
+
+        // Find argmins and indices to replace
+        std::vector<std::pair<int, int>> replaceIndices;
+        for (size_t i = 0; i < mpsNums.size(); i++) {
+            size_t mpsNum = mpsNums[i];
+            int32_t beginIndex = curMPSIndices[mpsNum];
+            int32_t mpsSize = mpsSizes[i];
+            int32_t curFlattenMPSBeginIndex = flattenMPSBeginIndices[i];
+            if (mpsSize == 2) {
+                if (flattenMPSLossMean[curFlattenMPSBeginIndex].item<float>()
+                    > flattenMPSLossMean[curFlattenMPSBeginIndex+1].item<float>()) {
+                    replaceIndices.push_back(std::make_pair(beginIndex, beginIndex+1));
+                    // std::cout << "(" << beginIndex << ", " << beginIndex+1 << "), ";
+                }
+            }
+            else if (mpsSize > 2) {
+                int32_t b = curFlattenMPSBeginIndex;
+                for (int32_t j = 0; j < mpsSize - 1; j++) {
+                    int32_t m = flattenMPSLossMean.index({Slice(b, b + mpsSize - j)}).argmin().item<int32_t>();
+                    if (m != j) {
+                        replaceIndices.push_back(std::make_pair(beginIndex+j, beginIndex+m));
+                        // std::cout << "(" << beginIndex+j << ", " << beginIndex+m << "), ";
+                    }
+                    b += mpsSize - j;
+                }
+            }
+        }
+        // std::cout << std::endl;
+        
+        // std::cout << "replaceIndices.size() " << replaceIndices.size() << std::endl;
+        // modify the target such that the label at cur_index is replaced with the label at minLossIndex
+        for (auto replacePair: replaceIndices) {
+            // batchedTarget[batchNum, replacePair[0]] = batchedTarget[batchNum, replacePair[1]]
+            batchedTarget.index_put_(
+                {batchNum, replacePair.first},
+                batchedTarget.index({batchNum, replacePair.second})
+            );
+        }
+    }
+    return batchedTarget;
+}
+
+
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.doc() = "C++ extension to make finding the modified target labels that minmize the the loss faster";
     m.def(
         "find_min_loss_target",
-        &findMinPermuLossTarget,
+        &findMinPermuLossTarget_Loop,
         "For each position of predicted label, find the target label that minimizes the cross entropy loss in its MPS"
     );
 }
