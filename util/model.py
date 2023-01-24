@@ -461,8 +461,6 @@ def calc_losses(pred_logit: List[Tensor], target_label: Tensor) -> List[Tensor]:
     return head_losses
 
 
-# NOTE: this function is VERY SLOW since it has three level of for-loops and does cross_entropy with O(N^2) data worst case
-# How can I make it faster?
 def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_label: Tensor, batched_mps_indices: List):
     """
         pred_logit is a list
@@ -483,44 +481,47 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_label: Tensor
         for mps_indices in batched_mps_indices
     ]
 
-    # start_time = time()
-    # modified_target_label = find_min_loss_target(pred_logit, target_label, batched_mps_indices_as_list)
-    # print('Python function used time:', time()-start_time)
-    # print('--------')
+    with torch.no_grad():
+        # start_time = time()
+        # modified_target_label = find_min_loss_target(pred_logit, target_label, batched_mps_indices_as_list)
+        # print('Python function used time:', time()-start_time)
+        # print('--------')
 
-    # start_time = time()
-    deteched_pred_logit = [
-        pred_attr_logit.clone().detach()
-        # pred_attr_logit.clone().detach().cpu()
-        for pred_attr_logit in pred_logit
-    ]
-    deteched_target_label = target_label.clone().detach().long()
-    # deteched_target_label = target_label.clone().detach().cpu().long()
-    cpp_modified_target_label: Tensor = mps_loss.find_min_loss_target(
-        deteched_pred_logit,
-        deteched_target_label,
-        batched_mps_indices_as_list
-    )
+        # start_time = time()
+        detached_pred_logit = [
+            pred_attr_logit.clone().detach()
+            # pred_attr_logit.clone().detach().cpu()
+            for pred_attr_logit in pred_logit
+        ]
+        detached_target_label = target_label.clone().detach().long()
+        # detached_target_label = target_label.clone().detach().cpu().long()
+        cpp_modified_target_label: Tensor = mps_loss.find_min_loss_target(
+            detached_pred_logit,
+            detached_target_label,
+            batched_mps_indices_as_list
+        )
 
-    # print('C++ extension function used time:', time()-start_time)
-    # print('========')
-    # assert (modified_target_label == cpp_modified_target_label).all().item()
+        # print('C++ extension function used time:', time()-start_time)
+        # print('========')
+        # assert (modified_target_label == cpp_modified_target_label).all().item()
 
     head_losses = calc_losses(pred_logit, cpp_modified_target_label.to(target_label.device))
     return head_losses
 
 
+# NOTE: this function is VERY SLOW since it has three level of for-loops and does cross_entropy with O(N^2) data worst case
+# How can I make it faster?
 def find_min_loss_target(
         pred_logit: List[Tensor],
         target_label: Tensor,
         batched_mps_indices_as_list: List[List[int]]) -> Tensor:
     use_device = target_label.device
-    # detech the tensors because we don't need their gradients when finding best permutation
-    deteched_pred_logit = [
+    # detach the tensors because we don't need their gradients when finding best permutation
+    detached_pred_logit = [
         pred_attr_logit.clone().detach().cpu()
         for pred_attr_logit in pred_logit
     ]
-    deteched_target_label = target_label.clone().detach().cpu()
+    detached_target_label = target_label.clone().detach().cpu()
     out_attr_number = len(pred_logit)
     for batch_number, mps_indices in enumerate(batched_mps_indices_as_list):
         # print('batch_number', batch_number)
@@ -541,10 +542,10 @@ def find_min_loss_target(
             # assert mps_size >= 0, f'{begin_index}~{end_index}\n{mps_indices}'
             if mps_size == 2:
                 flatten_mps_target_list.append(
-                    deteched_target_label[batch_number, begin_index:end_index]
+                    detached_target_label[batch_number, begin_index:end_index]
                 )
                 # view (mps_size, out_attr_number)
-                for k, pred_attr_logit in enumerate(deteched_pred_logit):
+                for k, pred_attr_logit in enumerate(detached_pred_logit):
                     flatten_mps_pred_logit_list[k].append(
                         pred_attr_logit[batch_number, begin_index].expand((2, -1))
                     )
@@ -553,7 +554,7 @@ def find_min_loss_target(
                 triu_indices = torch.triu_indices(mps_size, mps_size)
                 triu_indices = triu_indices[:, :-1] # drop last
                 triu_indices_of_mps[i] = triu_indices
-                full_mps_target = deteched_target_label[batch_number, begin_index:end_index]
+                full_mps_target = detached_target_label[batch_number, begin_index:end_index]
                 # view (mps_size, out_attr_number)
                 full_mps_target = full_mps_target.unsqueeze(0).expand((mps_size, -1, -1))
                 # exapnd dim to (1, mps_size, out_attr_number) then repeat to (mps_size, mps_size, out_attr_number)
@@ -566,7 +567,7 @@ def find_min_loss_target(
                 # t1, t2, t3 ... tn, t2, t3, t4 ... tn, ... , tn-1, tn
                 flatten_mps_target_list.append(flatten_full_mps_target)
 
-                for k, pred_attr_logit in enumerate(deteched_pred_logit):
+                for k, pred_attr_logit in enumerate(detached_pred_logit):
                     full_mps_attr_logit = pred_attr_logit[batch_number, begin_index:end_index]
                     # view (mps_size, attr_vocabs_size)
                     full_mps_attr_logit = full_mps_attr_logit.unsqueeze(1).expand((-1, mps_size, -1))
@@ -642,6 +643,6 @@ def find_min_loss_target(
     # with record_function('mod_target'):
         # modify target such that the target at cur_index is now the target at min_loss_sum_index
         for cur_index, min_loss_index in indices_replacments:
-            deteched_target_label[batch_number, cur_index] = deteched_target_label[batch_number, min_loss_index]
+            detached_target_label[batch_number, cur_index] = detached_target_label[batch_number, min_loss_index]
 
-    return deteched_target_label
+    return detached_target_label
