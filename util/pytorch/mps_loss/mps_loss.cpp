@@ -29,6 +29,9 @@ Output:
     The modified target labels that minimizes the loss in each position's MPS
 */
 
+// Using triu_indices to process data "in parallel"
+// Comparing to the loop version of the function, this method have 4% increase in performance
+// Tested on two RTX3090 with huggingface/accelerate default configuration
 at::Tensor findMinPermuLossTarget_TriU(
     std::vector<at::Tensor> batchedPredLogitsList,
     at::Tensor batchedTarget,
@@ -379,7 +382,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.doc() = "C++ extension to make finding the modified target labels that minmize the the loss faster";
     m.def(
         "find_min_loss_target",
-        &findMinPermuLossTarget_Loop,
+        &findMinPermuLossTarget_TriU,
         "For each position of predicted label, find the target label that minimizes the cross entropy loss in its MPS"
     );
 }
