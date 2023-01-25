@@ -42,8 +42,7 @@ class MyMidiTransformer(nn.Module):
             embedding_dim: int,
             input_no_tempo: bool,
             input_no_time_signature: bool,
-            embedding_dropout_rate=0.1,
-            is_inference: bool = False
+            embedding_dropout_rate=0.1
             ) -> None:
         super().__init__()
 
@@ -57,8 +56,8 @@ class MyMidiTransformer(nn.Module):
         self.input_no_tempo = input_no_tempo
         self.input_no_time_signature = input_no_time_signature
 
-        # set the to True ONLY when inferencing
-        self.is_inference = is_inference
+        # set the to True ONLY when generating sample
+        self.inferencing = False
 
         # Input attributess
 
@@ -168,11 +167,11 @@ class MyMidiTransformer(nn.Module):
         #         emb_sum = emb_mask * emb_i
         emb_sum_dropout = self.embedding_dropout(emb_sum)
         if self.use_linear_attn:
-            if self.is_inference:
+            if self.inferencing:
                 # no mask is needed when using recurrent for inference
-                # also have to squeeze(0), dunno why
-                # the batch size should be one
-                assert emb_sum_dropout.shape[0] == 1, 'The batch size of the input should be 1 if is_inference is True'
+                # also it only accept size of (seq_length, embed_size) so have to squeeze(0)
+                # and the batch size have to be one
+                assert emb_sum_dropout.shape[0] == 1, 'The batch size of the input have to be 1 if inferencing is True'
                 transformer_output, memory = self.transformer_encoder_inference(emb_sum_dropout.squeeze(0))
                 transformer_output = transformer_output.unsqueeze(0)
             else:
@@ -200,7 +199,33 @@ class MyMidiTransformer(nn.Module):
         # assert all(not torch.isnan(lg).any() for lg in logits), [torch.isnan(lg).nonzero(as_tuple=True) for lg in logits]
         return logits
 
+    # Override the eval() and train() method to integrate the self.inferencing flag
+    # Also added self.inference()
+
+    def eval(self) -> None:
+        self.inferencing = False
+        super().eval()
+
+    def train(self, mode: bool = True) -> None:
+        self.inferencing = False
+        super().train(mode)
+
+    def inference(self) -> None:
+        '''
+            Equivalent to
+            ```
+            self.inferencing = True
+            self.eval()
+            ```
+        '''
+        self.inferencing = True
+        super().eval()
+
+# end class MyMidiTransformer
+
+
 LARGE_NEG_VALUE = -1e8
+
 
 def adjust_logits_with_context(
         logits: List[Tensor],
@@ -325,9 +350,8 @@ def generate_sample(
 
     # get model device
     model_device = next(model.parameters()).device
-    training_state = model.training
-    model.is_inference = True
-    model.eval()
+    prev_training_state = model.training
+    model.inference()
 
     # prepare vocab for logit adjustment
     if use_logit_adjustment:
@@ -433,8 +457,7 @@ def generate_sample(
     if not end_with_end_token:
         text_list.append(tokens.END_TOKEN_STR)
 
-    model.is_inference = False
-    model.train(training_state)
+    model.train(prev_training_state)
     return text_list
 
 
