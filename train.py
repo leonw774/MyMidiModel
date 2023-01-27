@@ -239,9 +239,11 @@ def main():
         args.use_parallel = False
     args.use_device = torch.device(args.use_device)
 
+    parallel_devices_count = len(os.getenv('CUDA_VISIBLE_DEVICES').split(',')) if args.use_parallel else 1
+    if args.use_parallel and parallel_devices_count == 1:
+        args.use_parallel = False
     accelerator = accelerate.Accelerator() if args.use_parallel else None
     is_main_process = accelerator.is_main_process if args.use_parallel else True
-    parallel_devices_count = len(os.getenv('CUDA_VISIBLE_DEVICES').split(',')) if args.use_parallel else 1
     gradient_accumulation_steps = int(args.train_args.batch_size / (args.max_pieces_per_gpu * parallel_devices_count))
     if gradient_accumulation_steps > 1:
         args.train_args.batch_size = args.max_pieces_per_gpu * parallel_devices_count
