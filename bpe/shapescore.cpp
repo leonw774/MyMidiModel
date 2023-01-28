@@ -76,7 +76,7 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
                 unsigned int onsetTime = corpus.piecesMN[i][j][k].onset;
                 unsigned int maxRelOffset = findMaxRelOffset(shapeDict[corpus.piecesMN[i][j][k].shapeIndex]);
                 unsigned int offsetTime = corpus.piecesMN[i][j][k].onset + maxRelOffset * corpus.piecesMN[i][j][k].unit;
-                unsigned int immdAfterOnset = -1;
+                unsigned int immdFollowOnset = -1;
                 int n = 1;
                 while (k+n < corpus.piecesMN[i][j].size() && n < MultiNote::neighborLimit) {
                     // overlapping
@@ -84,14 +84,14 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
                     if (nOnsetTime < offsetTime) { 
                         n++;
                     }
-                    // immediately after
-                    else if (immdAfterOnset == -1 || nOnsetTime == immdAfterOnset) {
+                    // immediately following
+                    else if (immdFollowOnset == -1 || nOnsetTime == immdFollowOnset) {
                         n++;
-                        // gap limit of immedAfter
+                        // we want offsetTime <= nOnsetTime <= offsetTime + gap limit
                         if (nOnsetTime - offsetTime > gapLimit) {
                             break;
                         }
-                        immdAfterOnset = nOnsetTime;
+                        immdFollowOnset = nOnsetTime;
                     }
                     else {
                         break;
