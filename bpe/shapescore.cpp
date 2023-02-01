@@ -118,13 +118,14 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
     Shape pairShape;
     bool badShape = false;
 
-    unsigned int unitAndOnsets[rightSize+2];
+    unsigned int unitAndOnsets[rightSize*2+1];
     for (int i = 0; i < rightSize; ++i) {
-        unitAndOnsets[i] = rShape[i].getRelOnset() * rightUnit + rmn.onset - lmn.onset;
+        unitAndOnsets[i]           = rShape[i].getRelOnset() * rightUnit + rmn.onset - lmn.onset;
+        unitAndOnsets[i+rightSize] = rShape[i].relDur * rightUnit;
     }
-    unitAndOnsets[rightSize] = lmn.unit;
-    unitAndOnsets[rightSize+1] = rmn.unit;
-    unsigned int newUnit = gcd(unitAndOnsets, rightSize+2);
+    unitAndOnsets[rightSize*2] = lmn.unit;
+    unsigned int newUnit = gcd(unitAndOnsets, rightSize*2+1);
+
     // check to prevent overflow, because RelNote's onset is stored in uint8
     // if overflowed, return empty shape
     for (int i = 0; i < rightSize; ++i) {
