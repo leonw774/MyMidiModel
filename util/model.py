@@ -151,7 +151,7 @@ class MyMidiTransformer(nn.Module):
         # expect batch_input_seqs has shape: (batch_size, seq_size, complete_attr_num)
         return batch_input_seqs[..., self.output_attrs_indices]
 
-    def forward(self, x):
+    def forward(self, x, memory=None):
         # x has shape: (batch_size, seq_size, in_attr_number)
         emb_sum = sum(
             emb(x[..., i]) for i, emb in enumerate(self.embeddings)
@@ -169,11 +169,9 @@ class MyMidiTransformer(nn.Module):
         if self.use_linear_attn:
             if self.inferencing:
                 # no mask is needed when using recurrent for inference
-                # also it only accept size of (seq_length, embed_size) so have to squeeze(0)
-                # and the batch size have to be one
-                assert emb_sum_dropout.shape[0] == 1, 'The batch size of the input have to be 1 if inferencing is True'
-                transformer_output, memory = self.transformer_encoder_inference(emb_sum_dropout.squeeze(0))
-                transformer_output = transformer_output.unsqueeze(0)
+                # The recurrent model receive the last element with size of (batch_size, embed_size)
+                emb_sum_dropout = emb_sum_dropout[:, -1]
+                transformer_output, memory = self.transformer_encoder_inference(emb_sum_dropout, memory)
             else:
                 # in fast_transformer's FullMask class, 0 is masked, 1 is keep
                 causal_mask = self.causal_mask
@@ -197,29 +195,33 @@ class MyMidiTransformer(nn.Module):
             logit(transformer_output) for logit in self.logits
         )
         # assert all(not torch.isnan(lg).any() for lg in logits), [torch.isnan(lg).nonzero(as_tuple=True) for lg in logits]
-        return logits
+        if self.inferencing:
+            return logits, memory
+        else:
+            return logits
 
     # Override the eval() and train() method to integrate the self.inferencing flag
     # Also added self.inference()
 
     def eval(self) -> None:
-        self.inferencing = False
         super().eval()
+        self.inferencing = False
 
     def train(self, mode: bool = True) -> None:
-        self.inferencing = False
         super().train(mode)
+        self.inferencing = False
 
     def inference(self) -> None:
         '''
             Equivalent to
             ```
-            self.inferencing = True
-            self.eval()
+            model.eval()
+            model.inferencing = True
             ```
         '''
-        self.inferencing = True
+        # changing the order of these two expression will cause self.inferencing = False, weird
         super().eval()
+        self.inferencing = True
 
 # end class MyMidiTransformer
 
@@ -386,15 +388,17 @@ def generate_sample(
     primer_length = input_seq.shape[1]
     max_gen_step = min(model.max_seq_length, steps+primer_length) - primer_length
     end_with_end_token = False
+    recurrent_memory = None
     # print(seq.shape)
     # for _ in tqdm(range(steps)):
     with torch.no_grad():
         for _ in tqdm(range(max_gen_step), disable=not show_tqdm):
-            logits = model(model.to_input_attrs(input_seq).to(model_device))
+            # return batched_last_logits because inferencing is True
+            batched_last_logits, recurrent_memory = model(model.to_input_attrs(input_seq).to(model_device), recurrent_memory)
             last_logits = [
-                l[0, -1, :].to('cpu') # back to cpu, if was cuda (likely)
-                # l has shape (1, sequence_length, attr_vocab_size)
-                for l in logits
+                l[0].to('cpu') # to cpu, if was cuda (likely)
+                # l has shape (1, attr_vocab_size)
+                for l in batched_last_logits
             ]
 
             if use_logit_adjustment:
@@ -406,7 +410,7 @@ def generate_sample(
             while try_count < try_count_limit:
                 sampled_attrs = [
                     torch.multinomial(F.softmax(l / temperature, dim=0), 1)
-                    for l in last_logits # l has shape (1, attr_vocab_size)
+                    for l in last_logits # l has shape (attr_vocab_size,)
                 ]
                 # print(sampled_attrs)
                 try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, out_attr_num)
