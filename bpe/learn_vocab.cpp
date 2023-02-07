@@ -3,6 +3,7 @@
 #include <string>
 #include <algorithm>
 #include <unistd.h>
+#include "omp.h"
 
 int main(int argc, char *argv[]) {
     // read and validate args
@@ -10,6 +11,7 @@ int main(int argc, char *argv[]) {
     bool clearLine = false;
     bool doLog = false;
     int nonOptStartIndex = 1;
+    std::string cmdLineUsage = "./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit [workersNum]";
     while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
         switch (cmd_opt) {
@@ -23,19 +25,19 @@ int main(int argc, char *argv[]) {
                 if (isprint(optopt)) {
                     std::cout << "Bad argument: " << argv[optopt] << "\n";
                 }
-                std::cout << "./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit" << std::endl;
+                std::cout << cmdLineUsage << std::endl;
                 return 1;
             default:
-                std::cout << "./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit" << std::endl;
+                std::cout << cmdLineUsage << std::endl;
                 exit(1);
         }
     }
-    if (argc - nonOptStartIndex != 7) {
-        std::cout << "Bad number of non-optional arguments: " << argc - nonOptStartIndex << " != 7\n";
+    if (argc - nonOptStartIndex != 7 or argc - nonOptStartIndex != 8) {
+        std::cout << "Bad number of non-optional arguments: " << argc - nonOptStartIndex << " != 7 or 8\n";
         for (int i = 0; i < argc; ++i) {
             std::cout << argv[i] << " ";
         }
-        std::cout << "\n./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit" << std::endl;
+        std::cout << "\n" << cmdLineUsage << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[nonOptStartIndex]);
@@ -45,6 +47,11 @@ int main(int argc, char *argv[]) {
     std::string mergeCondition(argv[nonOptStartIndex+4]);
     double samplingRate = atof(argv[nonOptStartIndex+5]);
     double minScoreLimit = atof(argv[nonOptStartIndex+6]);
+    int workersNum = -1; // -1 means use default
+    if (argc - nonOptStartIndex != 8) {
+        workersNum = atoi(argv[nonOptStartIndex+7]);
+        omp_set_num_threads(workersNum);
+    }
     
     if (bpeIter <= 0 || MultiNote::shapeIndexLimit < bpeIter) {
         std::cout << "Error: bpeIter <= 0 or > 2045: " << bpeIter << std::endl;
