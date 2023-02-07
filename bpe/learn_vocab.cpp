@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
                 exit(1);
         }
     }
-    if (argc - nonOptStartIndex != 7 or argc - nonOptStartIndex != 8) {
+    if ((argc - nonOptStartIndex != 7) && (argc - nonOptStartIndex != 8)) {
         std::cout << "Bad number of non-optional arguments: " << argc - nonOptStartIndex << " != 7 or 8\n";
         for (int i = 0; i < argc; ++i) {
             std::cout << argv[i] << " ";
@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     double samplingRate = atof(argv[nonOptStartIndex+5]);
     double minScoreLimit = atof(argv[nonOptStartIndex+6]);
     int workersNum = -1; // -1 means use default
-    if (argc - nonOptStartIndex != 8) {
+    if (argc - nonOptStartIndex == 8) {
         workersNum = atoi(argv[nonOptStartIndex+7]);
         omp_set_num_threads(workersNum);
     }

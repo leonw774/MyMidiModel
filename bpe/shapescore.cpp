@@ -10,13 +10,19 @@ unsigned int gcd(unsigned int a, unsigned int b) {
     if (a == b) return a;
     if (a == 0 || b == 0) return ((a > b) ? a : b);
     if (a == 1 || b == 1) return 1;
-    unsigned tmp;
-    while (b > 0) {
-        tmp = b;
-        b = a % b;
-        a = tmp;
-    }
-    return a;
+    // binary gcd
+    // https://lemire.me/blog/2013/12/26/fastest-way-to-compute-the-greatest-common-divisor/
+    // https://hbfs.wordpress.com/2013/12/10/the-speed-of-gcd/
+    unsigned int shift = __builtin_ctz(a|b);
+    a >>= shift;
+    do {
+        b >>= __builtin_ctz(b);
+        if (a > b) {
+            std::swap(a, b);
+        }
+        b -= a;
+    } while (b);
+    return a << shift;
 }
 
 unsigned int gcd(unsigned int* arr, unsigned int size) {
