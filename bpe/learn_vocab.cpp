@@ -51,11 +51,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     if (scoreFunc != "freq" && scoreFunc != "wplike") {
-        std::cout << "Error: scoreFunc is not ( default | wplike ): " << scoreFunc << std::endl;
+        std::cout << "Error: scoreFunc is not \"freq\" or \"wplike\": " << scoreFunc << std::endl;
         return 1;
     }
     if (mergeCondition != "ours" && mergeCondition != "mulpi") {
-        std::cout << "Error: mergeCondition is not ( ours | mulpi ): " << mergeCondition << std::endl;
+        std::cout << "Error: mergeCondition is not \"ours\" or \"mulpi\": " << mergeCondition << std::endl;
         return 1;
     }
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
