@@ -9,7 +9,10 @@ from tqdm import tqdm
 
 try:
     import mps_loss
+except ImportError:
+    pass
 
+try:
     from fast_transformers.builders import TransformerEncoderBuilder, RecurrentEncoderBuilder
     from fast_transformers.masking import FullMask
     from fast_transformers.feature_maps import ActivationFunctionFeatureMap
