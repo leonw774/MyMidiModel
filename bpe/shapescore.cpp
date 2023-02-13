@@ -13,6 +13,7 @@ unsigned int gcd(unsigned int a, unsigned int b) {
     // binary gcd
     // https://lemire.me/blog/2013/12/26/fastest-way-to-compute-the-greatest-common-divisor/
     // https://hbfs.wordpress.com/2013/12/10/the-speed-of-gcd/
+    // use gcc build-in function __builtin_ctz
     unsigned int shift = __builtin_ctz(a|b);
     a >>= shift;
     do {
@@ -36,7 +37,7 @@ unsigned int gcd(unsigned int* arr, unsigned int size) {
 }
 
 /*  
-    Do merging O(logt) in time, t is arraySize
+    Do merging in O(logt) time, t is arraySize
     A merge between two counter with size of A and B takes $\sum_{i=A}^{A+B} \log{i}$ time
     Since $\int_A^{A+B} \log{x} dx = (A+B)\log{A+B} - A\log{A} - B$
     We could say a merge is O(n logn), where n is number of elements to count

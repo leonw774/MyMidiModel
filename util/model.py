@@ -7,9 +7,9 @@ import torch.nn.functional as F
 # from torch.profiler import record_function
 from tqdm import tqdm
 
-import mps_loss
-
 try:
+    import mps_loss
+
     from fast_transformers.builders import TransformerEncoderBuilder, RecurrentEncoderBuilder
     from fast_transformers.masking import FullMask
     from fast_transformers.feature_maps import ActivationFunctionFeatureMap
