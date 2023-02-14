@@ -1,4 +1,4 @@
-#include "corpus.hpp"
+#include "classes.hpp"
 
 /********
   RelNote

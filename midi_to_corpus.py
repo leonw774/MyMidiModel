@@ -239,7 +239,7 @@ def main():
             level=loglevel,
             format='%(message)s'
         )
-    logging.info(strftime('==== midi_to_text.py start at %Y%m%d-%H%M%SS ===='))
+    logging.info(strftime('==== midi_to_corpus.py start at %Y%m%d-%H%M%SS ===='))
 
     corpus_paras_str = '\n'.join([
         str(k)+':'+str(v) for k, v in corpus_paras_dict.items()
@@ -328,7 +328,7 @@ def main():
         good_path_list_file.write('\n'.join(good_path_list))
         good_path_list_file.close()
 
-    logging.info('==== midi_to_text.py exited ====')
+    logging.info('==== midi_to_corpus.py exited ====')
     return 0
 
 

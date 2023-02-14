@@ -93,7 +93,7 @@ def main():
             level=loglevel,
             format='%(message)s'
         )
-    logging.info(strftime('==== text_to_array.py start at %Y%m%d-%H%M%S ===='))
+    logging.info(strftime('==== make_arrays.py start at %Y%m%d-%H%M%S ===='))
 
     if not os.path.isdir(args.corpus_dir_path):
         logging.info('%s does not exist', args.corpus_dir_path)
@@ -111,7 +111,7 @@ def main():
         if args.use_existed:
             logging.info('Corpus directory: %s already has vocabs file and arrays file.', args.corpus_dir_path)
             logging.info('Flag --use-existed is set')
-            logging.info('==== text_to_array.py exited ====')
+            logging.info('==== make_arrays.py exited ====')
             return 0
         else:
             logging.info('Corpus directory: %s already has vocabs file and arrays file. Remove? (y=remove/n=exit)', args.corpus_dir_path)
@@ -123,7 +123,7 @@ def main():
                     logging.info('Removed %s and %s', npz_path, vocab_path)
                     break
                 if i == 'n':
-                    logging.info('==== text_to_array.py exited ====')
+                    logging.info('==== make_arrays.py exited ====')
                     return 0
                 print('(y/n):')
 
@@ -185,7 +185,7 @@ def main():
             original_text_list = p0.split()
             array_data = text_list_to_array(p0.split(), vocabs)
 
-            debug_txt_path = os.path.join(args.corpus_dir_path, 'text_to_array_debug.txt')
+            debug_txt_path = os.path.join(args.corpus_dir_path, 'make_array_debug.txt')
             print(f'Write debug file: {debug_txt_path}')
 
             debug_str = get_input_array_format_string(array_data, None, vocabs)
@@ -308,7 +308,7 @@ def main():
     logging.info('Dumped stats.json at %s', os.path.join(stats_dir_path, 'stats.json'))
     logging.info('Make statistics time: %.3f', time()-start_time)
 
-    logging.info('==== text_to_array.py exited ====')
+    logging.info('==== make_arrays.py exited ====')
     return 0
 
 if __name__ == '__main__':

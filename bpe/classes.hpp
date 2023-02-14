@@ -1,5 +1,5 @@
-#ifndef CORPUS_H
-#define CORPUS_H
+#ifndef CLASSES_H
+#define CLASSES_H
 
 #include <iostream>
 #include <fstream>

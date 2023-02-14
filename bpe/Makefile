@@ -1,16 +1,16 @@
 all: apply_vocab learn_vocab ;
 
-apply_vocab: apply_vocab.cpp corpus.o shapescore.o ;
-	g++ -g -fopenmp corpus.o shapescore.o apply_vocab.cpp -o apply_vocab
+apply_vocab: apply_vocab.cpp classes.o functions.o ;
+	g++ -g -fopenmp classes.o functions.o apply_vocab.cpp -o apply_vocab
 
-learn_vocab: learn_vocab.cpp corpus.o shapescore.o ;
-	g++ -g -fopenmp corpus.o shapescore.o learn_vocab.cpp -o learn_vocab
+learn_vocab: learn_vocab.cpp classes.o functions.o ;
+	g++ -g -fopenmp classes.o functions.o learn_vocab.cpp -o learn_vocab
 
-shapescore.o: shapescore.cpp shapescore.hpp corpus.hpp ;
-	g++ -g -c -fopenmp shapescore.cpp -o shapescore.o
+functions.o: functions.cpp functions.hpp classes.hpp ;
+	g++ -g -c -fopenmp functions.cpp -o functions.o
 
-corpus.o: corpus.cpp corpus.hpp ;
-	g++ -g -c corpus.cpp -o corpus.o
+classes.o: classes.cpp classes.hpp ;
+	g++ -g -c classes.cpp -o classes.o
 
 clean: 
 	rm *.o learn_vocab apply_vocab

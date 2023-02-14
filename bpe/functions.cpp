@@ -1,5 +1,5 @@
-#include "corpus.hpp"
-#include "shapescore.hpp"
+#include "classes.hpp"
+#include "functions.hpp"
 #include <random>
 
 #include <cmath>

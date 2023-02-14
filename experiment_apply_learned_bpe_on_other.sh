@@ -18,7 +18,10 @@ mkdir "${BASE_PATH}/corpus/lmd--snd_freq_ours_1.0"
     "${BASE_PATH}/corpus/lmd--snd_freq_ours_1.0/corpus" \
     "${LMD_BPE_PATH}/shape_vocab" | tee "${BASE_PATH}/logs/lmd--snd_freq_ours_1.0.log" -a
 
-python3 text_to_array.py --bpe 128 --log "${BASE_PATH}/logs/lmd--snd_freq_ours_1.0.log" --debug "${BASE_PATH}/corpus/lmd--snd_freq_ours_1.0"
+sed -i 's/\r/\n/g ; s/\x1B\[2K//g' ${BASE_PATH}/logs/lmd--snd_freq_ours_1.0.log
+python3 plot_bpe_log.py ${BASE_PATH}/corpus/lmd--snd_freq_ours_1.0 ${BASE_PATH}/logs/lmd--snd_freq_ours_1.0.log
+
+python3 make_array.py --bpe 128 --log "${BASE_PATH}/logs/lmd--snd_freq_ours_1.0.log" --debug "${BASE_PATH}/corpus/lmd--snd_freq_ours_1.0"
 
 
 mkdir "${BASE_PATH}/corpus/snd--lmd_freq_ours_1.0"
@@ -27,5 +30,8 @@ mkdir "${BASE_PATH}/corpus/snd--lmd_freq_ours_1.0"
     "${BASE_PATH}/corpus/snd--lmd_freq_ours_1.0/corpus" \
     "${SND_BPE_PATH}/shape_vocab" | tee "${BASE_PATH}/logs/snd--lmd_freq_ours_1.0.log" -a
 
-python3 text_to_array.py --bpe 128 --log "${BASE_PATH}/logs/snd--lmd_freq_ours_1.0.log" --debug "${BASE_PATH}/corpus/snd--lmd_freq_ours_1.0"
+sed -i 's/\r/\n/g ; s/\x1B\[2K//g' ${BASE_PATH}/logs/snd--lmd_freq_ours_1.0.log
+python3 plot_bpe_log.py ${BASE_PATH}/corpus/snd--lmd_freq_ours_1.0 ${BASE_PATH}/logs/snd--lmd_freq_ours_1.0.log
+
+python3 make_array.py --bpe 128 --log "${BASE_PATH}/logs/snd--lmd_freq_ours_1.0.log" --debug "${BASE_PATH}/corpus/snd--lmd_freq_ours_1.0"
 

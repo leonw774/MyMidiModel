@@ -79,7 +79,7 @@ if [ "$DO_MIDI_TO_TEXT" == true ]; then
 
     echo "Corpus dir: ${CORPUS_DIR_PATH}"
 
-    python3 midi_to_text.py --nth $NTH --max-track-number $MAX_TRACK_NUMBER --max-duration $MAX_DURATION --velocity-step $VELOCITY_STEP \
+    python3 midi_to_corpus.py --nth $NTH --max-track-number $MAX_TRACK_NUMBER --max-duration $MAX_DURATION --velocity-step $VELOCITY_STEP \
         --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --position-method $POSITION_METHOD $MIDI_TO_TEXT_OTHER_ARGUMENTS $USE_EXISTED \
         --log $LOG_PATH -w $PROCESS_WORKERS -r -o $CORPUS_DIR_PATH $MIDI_DIR_PATH
     test $? -ne 0 && { echo "midi_to_text.py failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1

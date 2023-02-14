@@ -1,5 +1,5 @@
-#ifndef SHAPE_SCORING_H
-#define SHAPE_SCORING_H
+#ifndef FUNCS_H
+#define FUNCS_H
 
 #define COUNTING_THREAD_NUM 8
 
