@@ -7,7 +7,7 @@
 3. Run `./pipeline.sh {midi_preprocess_config_filename} {bpe_config_filename} {training_config_filename}` to do everything from pre-processing to model training at once.
    - You need to add `--use-existed` at the end of the command to tell `pipeline.sh` not to overwrite existing data.
    - The config files are placed in `./configs/midi`, `./configs/bpe` and `./configs/train`.
-   - If you want to recreate our experiment, just run: ``
+   - You can recreate our experiment by running `experiment*.sh` files.
 
 ## Configuration Files
 
@@ -15,18 +15,18 @@ Details about configuration setting. TBD.
 
 ## Corpus Structure
 
-Corpi are located at `data/corpus`. A complete "corpus" is directory containing at least 5 files in the following list. The name of the corpus directory is in the format of `{CORPUS_NAME}_nth{NTH}_r{MAX_TRACK_NUMBER}_d{MAX_DURATION}_v{VELOCITY_STEP}_t{TEMPO_MIN}_{TEMPO_MAX}_{TEMPO_STEP}_pos{POSITION_METHOD}(_bpe{BPE_ITER}_{SCORE_FUNC}_{MERGE_CONDITION}_{SAMPLE_RATE})`. It can contain more files/directories which would be described in later section.
+Corpi are located at `data/corpus`. A complete "corpus" is directory containing at least 5 files in the following list. The name of the corpus directory is in the format of `{CORPUS_NAME}_nth{NTH}_r{MAX_TRACK_NUMBER}_d{MAX_DURATION}_v{VELOCITY_STEP}_t{TEMPO_MIN}_{TEMPO_MAX}_{TEMPO_STEP}_pos{POSITION_METHOD}(_bpe{BPE_ITER}_{SCORE_FUNC}_{MERGE_CONDITION}_{SAMPLE_RATE})`.
 
-- `corpus`: A text file. Each `\n`-separated line is a text representation of a midi file.
+- `corpus`: A text file. Each `\n`-separated line is a text representation of a midi file. This is the "main form" of the representation.
 - `paras`: A yaml file that contains parameters of pre-processing used by `midi_to_corpus.py`.
 - `pathlist`: A text file. Each `\n`-separated line is the path of midi file corresponding to text representation in `corpus`.
 - `vocabs.json`: The vocabulary to be used by the model. The format is defined in `util/vocabs.py`.
-- `arrays.npz`: A zip file of numpy array in `.npy` format. Can be accessed by `numpy.load()` and it will return an instance of`NpzFile` class. This is "final form" of the representation that would be used to train model. 
+- `arrays.npz`: A zip file of numpy array in `.npy` format. Can be accessed by `numpy.load()` and it will return an instance of`NpzFile` class. This is the "final form" of the representation that would be used to train model. 
 
 Other possible files and directories:
 
 - `stats`: A directoy that contains statistics about the corpus. The some output of `make_arrays.py` and all the figures by `plot_bpe_log.py` would be end up here.
-- `shape_vocab`: A text file created by `bpe/learn_vocab`. It will be read by `make_array.py` to help create `vocabs.json`.
+- `shape_vocab`: A text file created by `bpe/learn_vocab`. It will be read by `make_arrays.py` to help create `vocabs.json`.
 - `arrays`: A temporary directory for placing the `.npy` files before they are zipped.
 - `make_array_debug.txt`: A text file that shows array content of the first piece in the corpus. Created by `make_arrays.py`.
 
@@ -54,7 +54,7 @@ We train model with a corpus. A completed trained model is stored at `models/{DA
 
 Pythons scripts
 
-- `extract.py`: Extract piece(s) from a corpus into texts, midi file, or piano-roll graph
+- `extract.py`: Extract piece(s) from the given corpus directory into text representation(s), midi file(s), or piano-roll graph(s).
 - `generate_with_models.py`: Use trained model to generate midi files, with or without a primer.
 - `get_eval_features_of_dataset.py`: Do as per its name. It will sample midi file in a midi dataset. Output results as json file.
 - `get_eval_features_of_dataset.py`: Do as per its name. It will use a model to generate midi files at `models/{DATE_AND_FULL_CONFIG_NAME}/eval_samples`. Output results as json file.
@@ -66,6 +66,7 @@ Pythons scripts
 
 Shell scripts
 
+- `experiment_apply_learned_shapes_on_other.sh`
 - `experiment_on_bpe_parameters.sh`
 - `experiment_on_model_and_training.sh`
 - `pipeline.sh`
