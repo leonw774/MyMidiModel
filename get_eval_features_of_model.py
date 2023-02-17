@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from collections import Counter
 import json
 import logging
 import os
@@ -13,7 +14,7 @@ from tqdm import tqdm
 
 from util.midi import piece_to_midi
 from util.model import MyMidiTransformer, generate_sample
-from util.evaluations import EVAL_FEATURE_NAMES, piece_to_features
+from util.evaluations import EVAL_SCALAR_FEATURE_NAMES, EVAL_DISTRIBUTION_FEATURE_NAMES, piece_to_features, _kl_divergence
 
 def parse_args():
     parser = ArgumentParser()
@@ -32,6 +33,16 @@ def parse_args():
         '--max-pairs-number',
         type=int,
         default=int(1e6)
+    )
+    parser.add_argument(
+        '--data-dir-path',
+        type=str,
+        default=''
+    )
+    parser.add_argument(
+        '--use-device',
+        type=str,
+        default='cuda'
     )
     parser.add_argument(
         'model_dir_path',
@@ -67,10 +78,17 @@ def main():
         return 1
 
     logging.info('Loading model at %s', os.path.join(args.model_dir_path, 'best_model.pt'))
-    best_model: MyMidiTransformer = torch.load(os.path.join(args.model_dir_path, 'best_model.pt'))
+
+    if not args.use_device.startswith('cuda') and args.use_device != 'cpu':
+        raise ValueError(f'Bad device name {args.use_device}')
+    if not torch.cuda.is_available():
+        args.use_device = 'cpu'
+
+    best_model: MyMidiTransformer = torch.load(os.path.join(args.model_dir_path, 'best_model.pt'), map_location=torch.device(args.use_device))
+    
     vocabs = best_model.vocabs
-    eval_sample_features_per_piece = []
-    eval_sample_features_per_piece: List[ Dict[str, float] ]
+    eval_features_per_piece = []
+    eval_features_per_piece: List[ Dict[str, float] ]
     uncond_gen_start_time = time()
     uncond_gen_total_token_length = 0
     logging.info('Generating unconditional generation sample for evaluation')
@@ -86,7 +104,7 @@ def main():
             piece_to_midi(uncond_gen_piece, vocabs.paras['nth']).dump(
                 os.path.join(eval_dir_path, f'{i}.mid')
             )
-            eval_sample_features_per_piece.append(
+            eval_features_per_piece.append(
                 piece_to_features(uncond_gen_piece, nth=vocabs.paras['nth'], max_pairs_number=args.max_pairs_number)
             )
         except (AssertionError, ValueError):
@@ -101,24 +119,49 @@ def main():
     )
     logging.info('Avg. tokens# in the samples are %.3f', uncond_gen_total_token_length / args.sample_number)
 
-    eval_sample_features = {
+    aggr_scalar_eval_features = {
         fname: [
-            fs[fname]
-            for fs in eval_sample_features_per_piece
+            features[fname]
+            for features in eval_features_per_piece
         ]
-        for fname in EVAL_FEATURE_NAMES
+        for fname in EVAL_SCALAR_FEATURE_NAMES
     }
 
-    eval_sample_features_stats = dict()
-    for fname in EVAL_FEATURE_NAMES:
-        fname_description = dict(Series(eval_sample_features[fname]).dropna().describe())
+    model_eval_features_stats = dict()
+    for fname in EVAL_SCALAR_FEATURE_NAMES:
+        fname_description = dict(Series(aggr_scalar_eval_features[fname]).dropna().describe())
         fname_description: Dict[str, np.float64]
-        eval_sample_features_stats[fname] = {
+        model_eval_features_stats[fname] = {
             k : float(v) for k, v in fname_description.items()
         }
-    with open(os.path.join(args.model_dir_path, 'eval_sample_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
-        json.dump(eval_sample_features_stats, eval_stat_file)
-    
+
+    for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
+        model_eval_features_stats[fname] = dict(sum(
+            [Counter(features[fname]) for features in eval_features_per_piece],
+            Counter() # starting value of empty counter
+        ))
+
+    if args.dataset_dir_path != '':
+        dataset_eval_stat_file_path = os.path.join(args.dataset_dir_path, 'eval_feature_stats.json')
+        if os.path.isfile(dataset_eval_stat_file_path):
+            with open(dataset_eval_stat_file_path, 'r', encoding='utf8') as dataset_eval_stat_file:
+                dataset_eval_features_stats = json.load(dataset_eval_stat_file)
+            logging.info(
+                'Computing KL-divergance of pitch, duration, and velocity between %s and %s',
+                args.dataset_dir_path,
+                args.model_dir_path
+            )
+            for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
+                model_eval_features_stats[fname+'_KLD'] = _kl_divergence(
+                    dataset_eval_features_stats[fname],
+                    model_eval_features_stats[fname]
+                )
+        else:
+            logging.info('Path: %s does not have "eval_feature_stats.json"', args.dataset_dir_path)
+
+    with open(os.path.join(args.model_dir_path, 'eval_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
+        json.dump(model_eval_features_stats, eval_stat_file)
+
     logging.info(strftime('=== get_eval_features_of_model.py exit ==='))
 
 

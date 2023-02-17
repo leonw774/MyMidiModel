@@ -1,9 +1,11 @@
 from argparse import ArgumentParser
+from collections import Counter
 import glob
 import json
 import logging
 from multiprocessing import Pool
 import os
+from psutil import cpu_count
 from time import strftime, time
 from traceback import format_exc
 from typing import List, Dict
@@ -14,7 +16,7 @@ import numpy as np
 from pandas import Series
 from tqdm import tqdm
 
-from util.evaluations import EVAL_FEATURE_NAMES, midi_to_features
+from util.evaluations import EVAL_SCALAR_FEATURE_NAMES, EVAL_DISTRIBUTION_FEATURE_NAMES, midi_to_features
 
 def parse_args():
     parser = ArgumentParser()
@@ -32,7 +34,7 @@ def parse_args():
     parser.add_argument(
         '--workers',
         type=int,
-        default=20
+        default=min(cpu_count(), 4)
     )
     parser.add_argument(
         '--max-pairs-number',
@@ -50,8 +52,8 @@ def midi_to_features_wrapper(args_dict: dict):
     try:
         midifile_obj = MidiFile(args_dict['midi_path'])
         features = midi_to_features(midi=midifile_obj, max_pairs_number=args_dict['max_pairs_number'])
-    except Exception as e:
-        # print(format_exc)
+    except Exception:
+        logging.debug(format_exc())
         return None
     return features
 
@@ -86,23 +88,23 @@ def main():
 
 
     dataset_size = len(file_path_list)
-    eval_sample_features_per_piece: List[ Dict[str, float] ] = []
+    eval_features_per_piece: List[ Dict[str, float] ] = []
     start_time = time()
 
-    while len(eval_sample_features_per_piece) < args.sample_number:
-        random_indices = random.sample(list(range(dataset_size)), args.sample_number - len(eval_sample_features_per_piece))
+    while len(eval_features_per_piece) < args.sample_number:
+        random_indices = random.sample(list(range(dataset_size)), args.sample_number - len(eval_features_per_piece))
         eval_args_dict_list = [
             {'midi_path': file_path_list[rand_index], 'max_pairs_number': args.max_pairs_number}
             for rand_index in random_indices
         ]
         with Pool(args.workers) as p:
-            eval_sample_features = list(tqdm(
+            eval_features = list(tqdm(
                 p.imap_unordered(midi_to_features_wrapper, eval_args_dict_list),
                 total=len(random_indices)
             ))
-            eval_sample_features = [f for f in eval_sample_features if f is not None]
-            print(f'Processed {len(eval_sample_features)} uncorrupted files out of {len(random_indices)} random indices')
-            eval_sample_features_per_piece += eval_sample_features
+            eval_features = [f for f in eval_features if f is not None]
+            print(f'Processed {len(eval_features)} uncorrupted files out of {len(random_indices)} random indices')
+            eval_features_per_piece += eval_features
 
     logging.info(
         'Done. Sampling %d midi files from %s takes %.3f seconds',
@@ -111,23 +113,30 @@ def main():
         time() - start_time
     )
 
-    eval_sample_features = {
+    aggr_scalar_eval_features = {
         fname: [
             fs[fname]
-            for fs in eval_sample_features_per_piece
+            for fs in eval_features_per_piece
         ]
-        for fname in EVAL_FEATURE_NAMES
+        for fname in EVAL_SCALAR_FEATURE_NAMES
     }
 
-    eval_sample_features_stats = dict()
-    for fname in EVAL_FEATURE_NAMES:
-        fname_description = dict(Series(eval_sample_features[fname]).dropna().describe())
+    dataset_eval_features_stats = dict()
+    for fname in EVAL_SCALAR_FEATURE_NAMES:
+        fname_description = dict(Series(aggr_scalar_eval_features[fname]).dropna().describe())
         fname_description: Dict[str, np.float64]
-        eval_sample_features_stats[fname] = {
+        dataset_eval_features_stats[fname] = {
             k : float(v) for k, v in fname_description.items()
         }
-    with open(os.path.join(args.dataset_dir_path, 'eval_sample_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
-        json.dump(eval_sample_features_stats, eval_stat_file)
+
+    for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
+        dataset_eval_features_stats[fname] = dict(sum(
+            [Counter(features[fname]) for features in eval_features_per_piece],
+            Counter() # starting value of empty counter
+        ))
+
+    with open(os.path.join(args.dataset_dir_path, 'eval_feature_stats.json'), 'w+', encoding='utf8') as eval_stat_file:
+        json.dump(dataset_eval_features_stats, eval_stat_file)
 
     logging.info(strftime('=== get_eval_features_of_dataset.py exit ==='))
     return 0

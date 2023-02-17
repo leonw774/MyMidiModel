@@ -348,7 +348,7 @@ def generate_sample(
         exception_msg = f'start_seq\'s shape have to be (1, seq_length, complete_attr_number), get {start_seq.shape}'
         if len(start_seq.shape) != 3:
             raise AssertionError(exception_msg)
-        elif start_seq.shape[0] != 1 or start_seq.shape[2] != len(COMPLETE_ATTR_NAME):
+        elif start_seq.shape[0] != 1 or start_seq.shape[1] < 1 or start_seq.shape[2] != len(COMPLETE_ATTR_NAME):
             raise AssertionError(exception_msg)
     else:
         start_seq = torch.from_numpy(text_list_to_array([tokens.BEGIN_TOKEN_STR], model.vocabs)).unsqueeze(0).int()
@@ -392,17 +392,32 @@ def generate_sample(
     max_gen_step = min(model.max_seq_length, steps+primer_length) - primer_length
     end_with_end_token = False
     recurrent_memory = None
+
+    # build memory for primer first if use linear transformer
+    if model.use_linear_attn:
+        for i in range(1, primer_length):
+            _, recurrent_memory = model(model.to_input_attrs(input_seq[:, :i]).to(model_device), recurrent_memory)
+
     # print(seq.shape)
     # for _ in tqdm(range(steps)):
     with torch.no_grad():
         for _ in tqdm(range(max_gen_step), disable=not show_tqdm):
             # return batched_last_logits because inferencing is True
-            batched_last_logits, recurrent_memory = model(model.to_input_attrs(input_seq).to(model_device), recurrent_memory)
-            last_logits = [
-                l[0].to('cpu') # to cpu, if was cuda (likely)
-                # l has shape (1, attr_vocab_size)
-                for l in batched_last_logits
-            ]
+            input_seq_in_attr_device = model.to_input_attrs(input_seq).to(model_device)
+            if model.use_linear_attn:
+                batched_last_logits, recurrent_memory = model(input_seq_in_attr_device, recurrent_memory)
+                last_logits = [
+                    l[0].to('cpu') # to cpu, if was cuda (likely)
+                    # l has shape (1, attr_vocab_size)
+                    for l in batched_last_logits
+                ]
+            else:
+                batched_logits = model(input_seq_in_attr_device)
+                last_logits = [
+                    l[0, -1].to('cpu')
+                    # l has shape (1, seq_length, attr_vocab_size)
+                    for l in batched_logits
+                ]
 
             if use_logit_adjustment:
                 # prevent many bad format in advance, but not restricting the order of track number in head section
@@ -435,7 +450,7 @@ def generate_sample(
                             nth=model.vocabs.paras['nth'],
                             ignore_pending_note_error=ignore_pending_note_error
                         )
-                    # compute complete attribute array and second format checking 
+                    # compute complete attribute array and second format checking
                     try_text_list_array = torch.from_numpy(
                         text_list_to_array(try_text_list, vocabs=model.vocabs)
                     ).unsqueeze(0).int() # shape = (1, 1, complete_attr_num)
@@ -453,6 +468,8 @@ def generate_sample(
             # end while try
             # print(text_list)
             if try_count == try_count_limit:
+                if print_exception:
+                    print('Exceeded try count limit:', try_count_limit)
                 break
 
             if text_list[-1] == tokens.END_TOKEN_STR:

@@ -119,7 +119,7 @@ if [ "$DO_BPE" == true ]; then
     python3 plot_bpe_log.py $CORPUS_DIR_PATH_WITH_BPE $LOG_PATH
 
     # check if tokenized corpus is equal to original corpus
-    python3 verify_corpus_equality.py $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE | tee -a $LOG_PATH
+    python3 verify_corpus_equality.py $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $PROCESS_WORKERS | tee -a $LOG_PATH
     VERIFY_EXIT_CODE=${PIPESTATUS[0]}
     test $VERIFY_EXIT_CODE -ne 0 && { echo "Corpus equality verification failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 fi
@@ -191,14 +191,14 @@ $LAUNCH_COMMAND train.py --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation $
 
 test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
-python3 get_eval_features_of_model.py --log $LOG_PATH $MODEL_DIR_PATH
-
-test $? -ne 0 && { echo "evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
-
 if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_sample_feature_stats.json" ] ; then
     echo "Midi dataset ${MIDI_DIR_PATH} already has feature stats file. get_eval_features_of_dataset.py is skipped."
 else
-    python3 get_eval_features_of_dataset.py --log $LOG_PATH $MIDI_DIR_PATH
+    python3 get_eval_features_of_dataset.py --log $LOG_PATH --workers $PROCESS_WORKERS $MIDI_DIR_PATH
 fi
+
+python3 get_eval_features_of_model.py --log $LOG_PATH --data-dir-path $MIDI_DIR_PATH $MODEL_DIR_PATH 
+
+test $? -ne 0 && { echo "evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
 echo "pipeline.sh done."

@@ -55,10 +55,10 @@ dependencies:
   - numpy-base=1.23.5=py38h31eccc5_0
   - openssl=1.1.1t=h7f8727e_0
   - pip=22.3.1=py38h06a4308_0
-  - pybind11=2.10.1=py38hdb19cb5_0
-  - pybind11-global=2.10.1=py38hdb19cb5_0
+  - conda-forge::pybind11=2.6.1=py38h82cb98a_0
   - pycparser=2.21=pyhd3eb1b0_0
   - python=3.8.16=h7a1cb2a_2
+  - python_abi=3.8=2_cp38
   - pytorch=1.12.1=gpu_cuda113py38h19ae3d8_1
   - pyyaml=6.0=py38h5eee18b_1
   - readline=8.2=h5eee18b_0

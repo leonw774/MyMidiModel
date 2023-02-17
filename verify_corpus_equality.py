@@ -2,6 +2,7 @@ from collections import Counter
 import io
 from itertools import repeat
 from multiprocessing import Pool
+from psutil import cpu_count
 import sys
 from traceback import format_exc
 
@@ -9,8 +10,6 @@ from tqdm import tqdm
 
 from util.midi import piece_to_midi
 from util.corpus import CorpusReader, get_corpus_paras
-
-MP_WORKER_NUMBER = 24
 
 def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -> bool:
     try:
@@ -99,7 +98,7 @@ def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -
 def compare_wrapper(args_dict) -> bool:
     return compare_two_pieces(**args_dict)
 
-def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str) -> bool:
+def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, mp_worker_number: int) -> bool:
     """
         Takes two corpus and check if they are "equal", that is,
         all the pieces at the same index are representing the same midi information,
@@ -131,7 +130,7 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str) -> bool:
             for i, a, b, nth in args_zip
         ]
 
-        with Pool(MP_WORKER_NUMBER) as p:
+        with Pool(mp_worker_number) as p:
             for result in tqdm(p.imap_unordered(compare_wrapper, args_dict_list), total=corpus_length):
                 if not result:
                     p.terminate()
@@ -144,11 +143,16 @@ if __name__ == '__main__':
     if len(sys.argv) == 3:
         a_corpus_dir = sys.argv[1]
         b_corpus_dir = sys.argv[2]
+        mp_worker_number = min(cpu_count(), 4)
+    elif len(sys.argv) == 4:
+        a_corpus_dir = sys.argv[1]
+        b_corpus_dir = sys.argv[2]
+        mp_worker_number = int(sys.argv[3])
     else:
         print('Bad arguments')
         exit(1)
     print("Begin equality verification")
-    if verify_corpus_equality(a_corpus_dir, b_corpus_dir):
+    if verify_corpus_equality(a_corpus_dir, b_corpus_dir, mp_worker_number):
         print("Equality verification success")
         exit(0)
     else:

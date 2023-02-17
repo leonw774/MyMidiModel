@@ -115,29 +115,43 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) ->
         - grooving self-similarity
     '''
     midi = piece_to_midi(piece, nth, ignore_pending_note_error=True)
-    pitch_histogram = [0] * 128
+    pitch_histogram = {p:0 for p in range(128)}
     durations = []
     velocities = []
     for track in midi.instruments:
         for note in track.notes:
             pitch_histogram[note.pitch] += 1
-            durations.append((note.end - note.start) / nth / 4) # use quarter note as unit
+            durations.append((note.end - note.start) / nth * 4) # use quarter note as unit
             velocities.append(note.velocity)
 
     try:
         pitch_histogram_entropy = _entropy(pitch_histogram)
     except ValueError:
         pitch_histogram_entropy = float('nan')
+
+    duration_distribution = dict()
+    for d in durations:
+        if d in duration_distribution:
+            duration_distribution[d] += 1
+        else:
+            duration_distribution[d] = 1
     durations_mean = np.mean(durations) if len(durations) > 0 else float('nan')
     durations_var = np.var(durations) if len(durations) > 0 else float('nan')
+
+    velocity_histogram = {v:0 for v in range(128)}
+    for v in velocities:
+        velocity_histogram[v] += 1
     velocities_mean = np.mean(velocities) if len(velocities) > 0 else float('nan')
     velocities_var = np.var(velocities) if len(velocities) > 0 else float('nan')
 
     if isnan(pitch_histogram_entropy):
         return {
+            'pitch_histogram': pitch_histogram,
             'pitch_histogram_entropy': pitch_histogram_entropy,
+            'duration_distribution': duration_distribution,
             'durations_mean': durations_mean,
             'durations_var': durations_var,
+            'velocity_histogram': velocity_histogram,
             'velocities_mean': velocities_mean,
             'velocities_var': velocities_var,
             'instrumentation_self_similarity': float('nan'),
@@ -195,9 +209,12 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) ->
     grooving_self_similarity = np.mean(cross_grooving_similarities)
 
     features = {
+        'pitch_histogram': pitch_histogram,
         'pitch_histogram_entropy': pitch_histogram_entropy,
+        'duration_distribution': duration_distribution,
         'durations_mean': durations_mean,
         'durations_var': durations_var,
+        'velocity_histogram': duration_distribution,
         'velocities_mean': velocities_mean,
         'velocities_var': velocities_var,
         'instrumentation_self_similarity': instrumentation_self_similarity,
@@ -205,7 +222,7 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) ->
     }
     return features
 
-EVAL_FEATURE_NAMES = {
+EVAL_SCALAR_FEATURE_NAMES = {
     'pitch_histogram_entropy',
     'durations_mean',
     'durations_var',
@@ -213,4 +230,10 @@ EVAL_FEATURE_NAMES = {
     'velocities_var',
     'instrumentation_self_similarity',
     'grooving_self_similarity'
+}
+
+EVAL_DISTRIBUTION_FEATURE_NAMES = {
+    'pitch_histogram',
+    'duration_distribution',
+    'velocity_histogram'
 }
