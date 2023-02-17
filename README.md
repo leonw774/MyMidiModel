@@ -2,7 +2,7 @@
 
 ## Overall
 
-1. Build environment: `conda env create -f environment.yml -n {ENV_NAME}`. You may need to clear cache first by `pip cache purge` and `conda clean --all`.
+1. Create environment with conda: `conda env create --name {ENV_NAME} --file environment.yml`. You may need to clear cache first by `pip cache purge` and `conda clean --all`.
 2. Make you own copy of config files (e.g.: `./config/midi/my_setting.sh`) if you want to make some changes to the settings.
 3. Run `./pipeline.sh {midi_preprocess_config_filename} {bpe_config_filename} {training_config_filename}` to do everything from pre-processing to model training at once.
    - You need to add `--use-existed` at the end of the command to tell `pipeline.sh` not to overwrite existing data.
