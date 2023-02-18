@@ -182,8 +182,8 @@ def main():
                         subprocess.run(apply_args, check=True)
 
                         # get content from output
-                        with CorpusReader(tmp_out_corpus_dir_path) as corpus_reader:
-                            piece = next(iter(corpus_reader)) # get first piece
+                        with open(to_corpus_file_path(tmp_out_corpus_dir_path), 'r', encoding='utf8') as tmp_out_corpus:
+                            piece = tmp_out_corpus.readline() # get first piece
                         primer_text_list = piece.split()
 
         else:
