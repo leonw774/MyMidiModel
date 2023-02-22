@@ -65,16 +65,22 @@ def read_args():
         help='Control the temperature of softmax before multinomial sampling. Default is %(default)s.'
     )
     parser.add_argument(
+        '--no-logit-adjustment',
+        action='store_true'
+    )
+    parser.add_argument(
+        '--nucleus-sampling-threshold', '--nu',
+        type=float,
+        default=1.0,
+        help='The probability threshold nuclues sampling. Default is %(default)s.'
+    )
+    parser.add_argument(
         '--try-count-limit',
         type=int,
         default=1000,
         help='The model may fail to generate next token that satisfy the rule.\
             The generation ends when its trying times pass this limit.\
             Default is %(default)s.'
-    )
-    parser.add_argument(
-        '--no-logit-adjustment',
-        action='store_true'
     )
     parser.add_argument(
         '--use-device',
@@ -111,6 +117,7 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
         temperature=args.temperature,
         try_count_limit=args.try_count_limit,
         use_logit_adjustment=(not args.no_logit_adjustment),
+        nucleus_sampling_threshold=args.nucleus_sampling_threshold,
         print_exception=args.print_exception,
         show_tqdm=True
     )

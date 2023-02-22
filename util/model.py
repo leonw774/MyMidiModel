@@ -278,12 +278,13 @@ def adjust_logits_with_context(
             if i not in measure_indices:
                 logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
     else: # if the section is body
-        #the next token's event can not be track-instrument
+        # the next token's event can not be track-instrument
         for i in track_instrument_indices:
             logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
+
+        # if the last token in context_text_list token is measure and position method is event
+        # then the next token's event can not be multi-note or tempo
         if context_text_list[-1][0] == tokens.MEASURE_EVENTS_CHAR and position_method_is_event:
-            # if the last token in context_text_list token is measure and position method is event
-            # then the next token's event can not be multi-note or tempo
             for i in multinote_indices.union(tempo_indices):
                 logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
 
@@ -327,6 +328,19 @@ def adjust_logits_with_context(
     return logits
 
 
+def nucleus_sample(probs, threshold):
+    sorted_probs, sorted_indices = torch.sort(probs, dim=-1, descending=True)
+    cumsum_probs = torch.cumsum(sorted_probs, dim=-1)
+    nucleus_number = sum(cumsum_probs < threshold) + 1
+    if nucleus_number == 1:
+        return torch.unsqueeze(sorted_indices[0], dim=0) # returned dimension have to be 1
+    else:
+        nucleus_probs = sorted_probs[:nucleus_number]
+    sampled_nuclei = torch.multinomial(nucleus_probs, 1)
+    sampled_index = sorted_indices[sampled_nuclei]
+    return sampled_index
+
+
 def generate_sample(
         model: MyMidiTransformer,
         steps: int,
@@ -334,6 +348,7 @@ def generate_sample(
         temperature: float = 1.0,
         try_count_limit: int = 1000,
         use_logit_adjustment: bool = True,
+        nucleus_sampling_threshold: float = 1.0,
         print_exception: bool = False,
         show_tqdm: bool = False,
         ignore_pending_note_error: bool = True
@@ -426,10 +441,20 @@ def generate_sample(
             # print('\n'.join([repr(logit) for logit in last_logits]))
             try_count = 0
             while try_count < try_count_limit:
-                sampled_attrs = [
-                    torch.multinomial(F.softmax(l / temperature, dim=0), 1)
+                softmaxed_logits = [
+                    F.softmax(l / temperature, dim=0)
                     for l in last_logits # l has shape (attr_vocab_size,)
                 ]
+                if nucleus_sampling_threshold != 1.0:
+                    sampled_attrs = [
+                        nucleus_sample(p, nucleus_sampling_threshold)
+                        for p in softmaxed_logits
+                    ]
+                else:
+                    sampled_attrs = [
+                        torch.multinomial(p, 1)
+                        for p in softmaxed_logits # l has shape (attr_vocab_size,)
+                    ]
                 # print(sampled_attrs)
                 try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, out_attr_num)
                 # print([ model.vocabs.to_dict()[OUTPUT_ATTR_NAME[i]]['id2text'][int(f)] for i, f in enumerate(try_token[0]) ])

@@ -620,7 +620,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
                     relnote = [False] + [b36str2int(a) for a in s.split(',')]
                 relnote_list.append(relnote)
             base_pitch, stretch_factor, velocity, track_number, *position = (b36str2int(x) for x in other_attr)
-            assert track_number in track_program_mapping, 'Multi-Note not in used track'
+            assert track_number in track_program_mapping, 'Multi-note not in used track'
             if len(position) == 1:
                 cur_time = position[0] + cur_measure_onset
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
