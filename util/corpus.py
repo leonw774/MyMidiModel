@@ -1,6 +1,7 @@
 import io
 import json
 import os
+from typing import Union
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -124,7 +125,7 @@ OUTPUT_ATTR_NAME = [
 ]
 
 
-def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
+def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict, None] = None, output_memory: bool = False) -> np.ndarray:
     """
         Serialize pieces into numpy array for the model input.
 
@@ -138,20 +139,34 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
     vocabs.events.text2id = vocabs.events.text2id
     # in build_vocabs, padding token is made to be the 0th element
     padding = 0
-    x = np.full((len(text_list), len(COMPLETE_ATTR_NAME)), fill_value=padding, dtype=np.int16)
 
-    tracks_count = 0
-
-    cur_position_id = 0
-    cur_measure_number = 0 # measure_number starts at 1, 0 is padding
-    cur_tempo_id = padding
-    cur_time_sig_id = padding
-    cur_position_cursor = 0
-    for i, text in enumerate(text_list):
+    if input_memory is None:
+        last_array_len = 0
+        x = np.full((len(text_list), len(COMPLETE_ATTR_NAME)), fill_value=padding, dtype=np.int16)
+        tracks_count = 0
+        cur_position_id = 0
+        cur_measure_number = 0 # measure_number starts at 1, 0 is padding
+        cur_tempo_id = padding
+        cur_time_sig_id = padding
+        cur_position_cursor = 0
+    elif isinstance(input_memory, dict):
+        last_array_len = input_memory['last_array'].shape[0]
+        x = np.full((last_array_len+len(text_list), len(COMPLETE_ATTR_NAME)), fill_value=padding, dtype=np.int16)
+        x[:last_array_len] = input_memory['last_array']
+        tracks_count = input_memory['tracks_count']
+        cur_position_id = input_memory['cur_position_id']
+        cur_measure_number = input_memory['cur_measure_number']
+        cur_tempo_id = input_memory['cur_tempo_id']
+        cur_time_sig_id = input_memory['cur_time_sig_id']
+        cur_position_cursor = input_memory['cur_position_cursor']
+    else:
+        raise ValueError('input_memory is not None nor a dictionary')
+    for h, text in enumerate(text_list):
         if len(text) > 0:
             typename = text[0]
         else:
             continue
+        i = h + last_array_len
 
         if text in tokens.SPECIAL_TOKENS_STR:
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
@@ -214,7 +229,18 @@ def text_list_to_array(text_list: list, vocabs: Vocabs) -> np.ndarray:
 
         else:
             raise ValueError('unknown typename')
-    return x
+    if output_memory:
+        return x, {
+                'last_array': x,
+                'tracks_count': tracks_count,
+                'cur_position_id': cur_position_id,
+                'cur_measure_number': cur_measure_number,
+                'cur_tempo_id': cur_tempo_id,
+                'cur_time_sig_id': cur_time_sig_id,
+                'cur_position_cursor': cur_position_cursor,
+            }
+    else:
+        return x
 
 
 def array_to_text_list(array, vocabs: Vocabs, is_output=False):

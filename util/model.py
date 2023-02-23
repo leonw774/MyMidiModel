@@ -407,17 +407,26 @@ def generate_sample(
     max_gen_step = min(model.max_seq_length, steps+primer_length) - primer_length
     end_with_end_token = False
     recurrent_memory = None
+    _, array_to_text_list_memory = text_list_to_array(
+        text_list,
+        model.vocabs,
+        input_memory=None,
+        output_memory=True
+    )
 
     # build memory for primer first if use linear transformer
     if model.use_linear_attn:
         for i in range(1, primer_length):
             _, recurrent_memory = model(model.to_input_attrs(input_seq[:, :i]).to(model_device), recurrent_memory)
 
+    # get_logit_time = 0
+    # get_sample_time = 0
+    # check_format_time = 0
     # print(seq.shape)
-    # for _ in tqdm(range(steps)):
     with torch.no_grad():
         for _ in tqdm(range(max_gen_step), disable=not show_tqdm):
             # return batched_last_logits because inferencing is True
+            # bt = time()
             input_seq_in_attr_device = model.to_input_attrs(input_seq).to(model_device)
             if model.use_linear_attn:
                 batched_last_logits, recurrent_memory = model(input_seq_in_attr_device, recurrent_memory)
@@ -437,10 +446,11 @@ def generate_sample(
             if use_logit_adjustment:
                 # prevent many bad format in advance, but not restricting the order of track number in head section
                 last_logits = adjust_logits_with_context(last_logits, text_list, model.vocabs, event_family_indices)
-
+            # get_logit_time += time() - bt
             # print('\n'.join([repr(logit) for logit in last_logits]))
             try_count = 0
             while try_count < try_count_limit:
+                # bt = time()
                 softmaxed_logits = [
                     F.softmax(l / temperature, dim=0)
                     for l in last_logits # l has shape (attr_vocab_size,)
@@ -464,7 +474,8 @@ def generate_sample(
                     text_list = text_list + [try_token_text]
                     # if sampled EOS, then dont check. just end
                     break
-
+                # get_sample_time = time() - bt
+                # bt = time()
                 try:
                     try_text_list = text_list + [try_token_text]
                     # format checking
@@ -476,18 +487,26 @@ def generate_sample(
                             ignore_pending_note_error=ignore_pending_note_error
                         )
                     # compute complete attribute array and second format checking
-                    try_text_list_array = torch.from_numpy(
-                        text_list_to_array(try_text_list, vocabs=model.vocabs)
+                    try_text_list_array, array_to_text_list_memory = text_list_to_array(
+                        [try_token_text],
+                        vocabs=model.vocabs,
+                        input_memory=array_to_text_list_memory,
+                        output_memory=True
+                    )
+                    try_text_list_tensor = torch.from_numpy(
+                        try_text_list_array
                     ).unsqueeze(0).int() # shape = (1, 1, complete_attr_num)
+                    # check_format_time += time() - bt
                 except (AssertionError, ValueError) as e:
                     if print_exception:
                         print(repr(e))
                     try_count += 1
+                    # check_format_time += time() - bt
                     continue # keep sampling until no error
                 # no error
                 if try_token_text == tokens.SEP_TOKEN_STR:
                     is_head = False
-                input_seq = try_text_list_array
+                input_seq = try_text_list_tensor
                 text_list = try_text_list
                 break
             # end while try
@@ -502,6 +521,9 @@ def generate_sample(
                 break
         # end for each step
     # end with torch.no_grad
+    # print('get_logit_time', get_logit_time)
+    # print('get_sample_time', get_sample_time)
+    # print('check_format_time', check_format_time)
 
     if not end_with_end_token:
         text_list.append(tokens.END_TOKEN_STR)
