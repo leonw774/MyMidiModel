@@ -156,24 +156,18 @@ class MyMidiTransformer(nn.Module):
 
     def forward(self, x, memory=None):
         # x has shape: (batch_size, seq_size, in_attr_number)
+        if self.use_linear_attn:
+            if self.inferencing:
+                # The recurrent model only need to receive the last element with size of (batch_size, embed_size)
+                x = x[:, -1:] # become (batch_size, 1, embed_size)
         emb_sum = sum(
             emb(x[..., i]) for i, emb in enumerate(self.embeddings)
         )
-        # emb_sum = None
-        # for i, emb in enumerate(self.embeddings):
-        #     emb_i = emb(x[..., i])
-        #     # to deal with sparisity of non-padding tokens in some attribute
-        #     emb_mask = emb_i.ne(0).float().unsqueeze(dim=-1).to(x.device)
-        #     if emb_sum is not None:
-        #         emb_sum += emb_mask * emb_i
-        #     else:
-        #         emb_sum = emb_mask * emb_i
         emb_sum_dropout = self.embedding_dropout(emb_sum)
         if self.use_linear_attn:
             if self.inferencing:
                 # no mask is needed when using recurrent for inference
-                # The recurrent model receive the last element with size of (batch_size, embed_size)
-                emb_sum_dropout = emb_sum_dropout[:, -1]
+                emb_sum_dropout = emb_sum_dropout[:, 0] # become (batch_size, embed_size)
                 transformer_output, memory = self.transformer_encoder_inference(emb_sum_dropout, memory)
             else:
                 # in fast_transformer's FullMask class, 0 is masked, 1 is keep

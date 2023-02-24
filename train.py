@@ -41,6 +41,11 @@ def parse_args():
         action='store_true'
     )
     data_parser.add_argument(
+        '--measure-sample-step-ratio',
+        type=float,
+        default=0.25
+    )
+    data_parser.add_argument(
         '--permute-mps',
         action='store_true'
     )
@@ -49,7 +54,7 @@ def parse_args():
         action='store_true'
     )
     data_parser.add_argument(
-        '--pitch-augmentation',
+        '--pitch-augmentation-range',
         type=int,
         default=0
     )
@@ -391,7 +396,7 @@ def main():
         logging.info(summary_str)
 
     # make optimizer
-    optimizer = AdamW(model.parameters(), args.train_args.lr_peak, betas=(0.9, 0.98), eps=1e-8)
+    optimizer = AdamW(model.parameters(), args.train_args.lr_peak, betas=(0.9, 0.98), eps=1e-6)
     scheduler = lr_scheduler.LambdaLR(
         optimizer,
         lr_lambda=lambda step: lr_warmup_and_linear_decay(
