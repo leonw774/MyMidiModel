@@ -155,16 +155,10 @@ class MyMidiTransformer(nn.Module):
         return batch_input_seqs[..., self.output_attrs_indices]
 
     def forward(self, x, memory=None):
-        print(x.shape)
         # x has shape: (batch_size, seq_size, in_attr_number)
         if self.use_linear_attn and self.inferencing:
             # The recurrent model only need to receive the last element with size of (batch_size, embed_size)
             x = x[:, -1:] # become (batch_size, 1, embed_size)
-        # check all class numbers are in embedding size
-        for i, vsize in enumerate(self.embedding_vocabs_size):
-            assert torch.all(x[..., i] < vsize).bool(), f'Embedding #{i}, vsize={vsize}\n{x[..., i]}'
-            assert torch.all(0 <= x[..., i]).bool(), f'Embedding #{i}, vsize={vsize}\n{x[..., i]}'
-
         emb_sum = sum(
             emb(x[..., i]) for i, emb in enumerate(self.embeddings)
         )
