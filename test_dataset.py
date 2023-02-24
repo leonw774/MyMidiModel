@@ -13,7 +13,7 @@ dataset = MidiDataset(
     measure_sample_step_ratio=0.25,
     permute_mps=True,
     permute_track_number=True,
-    pitch_augmentation=2
+    pitch_augmentation_range=2
 )
 vocabs_dict = dataset.vocabs
 print('max_seq_length', dataset.max_seq_length)
