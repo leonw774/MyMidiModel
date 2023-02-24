@@ -139,7 +139,8 @@ def handler(args_dict: dict):
     midi_file_path  = args_dict.pop('midi_file_path', '')
     try:
         args_dict['midi'] = MidiFile(midi_file_path)
-    except:
+    except Exception as e:
+        logging.debug('%d pid: %d file path: %s\n', n, os.getpid(), midi_file_path, format_exc())
         return 'RuntimeError(\'miditoolkit failed to parse the file\')'
 
     try:
@@ -150,8 +151,7 @@ def handler(args_dict: dict):
     except KeyboardInterrupt as e:
         raise e
     except Exception as e:
-        logging.debug('%d pid: %d file path: %s', n, os.getpid(), midi_file_path)
-        logging.debug(format_exc())
+        logging.debug('%d pid: %d file path: %s\n%s', n, os.getpid(), midi_file_path, format_exc())
         # if not (repr(e).startswith('Assert') or repr(e).startswith('Runtime')):
         #     print(f'{n} pid: {os.getpid()} file path: {args_dict["midi_file_path"]}')
         #     print(format_exc())

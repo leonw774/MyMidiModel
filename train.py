@@ -396,7 +396,7 @@ def main():
         logging.info(summary_str)
 
     # make optimizer
-    optimizer = AdamW(model.parameters(), args.train_args.lr_peak, betas=(0.9, 0.98), eps=1e-6)
+    optimizer = AdamW(model.parameters(), args.train_args.lr_peak, betas=(0.9, 0.98), eps=1e-6, weight_decay=1e-2)
     scheduler = lr_scheduler.LambdaLR(
         optimizer,
         lr_lambda=lambda step: lr_warmup_and_linear_decay(
