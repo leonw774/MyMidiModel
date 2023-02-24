@@ -20,11 +20,11 @@ class MidiDataset(Dataset):
             self,
             data_dir_path: str,
             max_seq_length: int,
-            use_permutable_subseq_loss: bool,
             measure_sample_step_ratio: float = 0.25,
             permute_mps: bool = False,
             permute_track_number: bool = False,
             pitch_augmentation_range: int = 0,
+            use_permutable_subseq_loss: bool = False,
             verbose: bool = False
         ) -> None:
         """
@@ -43,16 +43,17 @@ class MidiDataset(Dataset):
         self.vocabs = get_corpus_vocabs(data_dir_path)
         assert max_seq_length >= 0
         self.max_seq_length = max_seq_length
-        assert isinstance(use_permutable_subseq_loss, bool)
-        self.use_permutable_subseq_loss = use_permutable_subseq_loss
+        assert 0 <= measure_sample_step_ratio <= 1
+        self.measure_sample_step_ratio = measure_sample_step_ratio
         assert isinstance(permute_mps, bool)
         self.permute_mps = permute_mps
         assert isinstance(permute_track_number, bool)
         self.permute_track_number = permute_track_number
         assert pitch_augmentation_range >= 0
         self.pitch_augmentation_range = pitch_augmentation_range
-        assert 0 <= measure_sample_step_ratio <= 1
-        self.measure_sample_step_ratio = measure_sample_step_ratio
+        assert isinstance(use_permutable_subseq_loss, bool)
+        assert not (use_permutable_subseq_loss and not permute_mps)
+        self.use_permutable_subseq_loss = use_permutable_subseq_loss
 
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
         if verbose:
@@ -123,7 +124,8 @@ class MidiDataset(Dataset):
         # create virtual pieces from overlength pieces
         if measure_sample_step_ratio > 0:
             virtual_piece_step = max_seq_length * measure_sample_step_ratio
-            self._virtual_piece_start_index = [[0] for _ in range(self.number_of_pieces)]
+            # the default zeros will be replaced by body start index
+            self._virtual_piece_start_index = [[0] for _ in range(self.number_of_pieces)] 
             for filenum in range(self.number_of_pieces):
                 filename = str(filenum)
                 if self.pieces[filename].shape[0] > max_seq_length:
@@ -148,10 +150,16 @@ class MidiDataset(Dataset):
         for filenum in tqdm(range(self.number_of_pieces), disable=not verbose):
             filename = str(filenum)
 
+            j = 2 # because first token is BOS and second must be track as we excluded all empty midis
+            while self.pieces[str(filenum)][j][TOKEN_ATTR_INDEX['evt']] == self._trn_id:
+                j += 1
+            self._piece_body_start_index[filenum] = j
+            self._virtual_piece_start_index[filenum][0] = j
+
             if use_permutable_subseq_loss or permute_mps:
-                # find all seperater's index
+                # find all seperater's index in body
                 mps_sep_indices = np.flatnonzero(
-                    np.isin(self.pieces[filename][:, TOKEN_ATTR_INDEX['evt']], self._mps_seperators)
+                    np.isin(self.pieces[filename][j:, TOKEN_ATTR_INDEX['evt']], self._mps_seperators)
                 )
                 for i in range(mps_sep_indices.shape[0] - 1):
                     self._file_mps_sep_indices[filenum].append(mps_sep_indices[i])
@@ -163,7 +171,7 @@ class MidiDataset(Dataset):
                     # X means it is separator, number represents different mps
                     # if see separator as mps of length 1, we get mps like this:
                     #                         1  2  3  3  3  4  5  5  6  7  8  9  10 10
-                    # then seperator the mps by the begining index of them:
+                    # then seperate the mps by the begining index of them:
                     #                        [0, 1, 2,       5, 6,    8, 9, 10,11,12]
                     if mps_sep_indices[i+1] != mps_sep_indices[i] + 1:
                         self._file_mps_sep_indices[filenum].append(mps_sep_indices[i] + 1)
@@ -191,58 +199,44 @@ class MidiDataset(Dataset):
             print('Dataset object size:', self_size, 'bytes')
 
     def __getitem__(self, index):
+
         filenum = bisect.bisect_left(self._filenum_indices, index)
+        body_start_index = self._piece_body_start_index[filenum]
+
         index_offset = index if filenum == 0 else index - self._filenum_indices[filenum-1] - 1
         virtual_piece_number = index_offset // self._pitch_augmentation_factor
         pitch_augment = index_offset - virtual_piece_number * self._pitch_augmentation_factor - self.pitch_augmentation_range
-        start_index = self._virtual_piece_start_index[filenum][virtual_piece_number]
 
-        if virtual_piece_number == 0:
-            end_index = min(self.max_seq_length, self._piece_lengths[filenum])
-            sliced_array = np.array(self.pieces[str(filenum)][start_index:end_index]) # copy
-        else:
-            end_index = start_index + self.max_seq_length - self._piece_body_start_index[filenum] # preserve space for head
-            body_array = np.array(self.pieces[str(filenum)][start_index:end_index]) # copy
-            head_array = np.array(self.pieces[str(filenum)][:self._piece_body_start_index[filenum]])
-            sliced_array = np.concatenate([head_array, body_array], axis=0)
-        sliced_array = sliced_array.astype(np.int32) # was int16 to save space but torch ask for int
+        start_index = self._virtual_piece_start_index[filenum][virtual_piece_number]
+        end_index = start_index + self.max_seq_length - body_start_index # preserve space for head
+        head_array = np.array(self.pieces[str(filenum)][:body_start_index])
+        body_array = np.array(self.pieces[str(filenum)][start_index:end_index]) # copy
+        sampled_array = np.concatenate([head_array, body_array], axis=0)
+        sampled_array = sampled_array.astype(np.int32) # was int16 to save space but torch ask for int
 
         # pitch augmentation
         # pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
         if pitch_augment != 0:
-            sliced_augmentable_pitches = self._augmentable_pitches[filenum][start_index:end_index]
-            if virtual_piece_number != 0:
-                sliced_augmentable_pitches = np.concatenate(
-                    [self._augmentable_pitches[filenum][:self._piece_body_start_index[filenum]], sliced_augmentable_pitches],
-                    axis=0
-                )
-            # sometimes the sliced array does not contain any pitch-augmentable token
-            if np.any(sliced_augmentable_pitches):
+            sampled_augmentable_pitches = self._augmentable_pitches[filenum][start_index:end_index]
+            # sometimes the sampled array does not contain any pitch-augmentable token
+            if np.any(sampled_augmentable_pitches):
                 if pitch_augment > 0:
-                    max_pitch = np.max( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
-                    if max_pitch > 128:
+                    max_pitch = np.max((sampled_array[body_start_index:, TOKEN_ATTR_INDEX['pit']])[sampled_augmentable_pitches])
+                    if max_pitch + pitch_augment > 128:
                         pitch_augment -= max_pitch - 128
                 else: # pitch_augment < 0
-                    min_pitch = np.min( (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] ) + pitch_augment
-                    if min_pitch < 1:
+                    min_pitch = np.min((sampled_array[body_start_index:, TOKEN_ATTR_INDEX['pit']])[sampled_augmentable_pitches])
+                    if min_pitch + pitch_augment < 1:
                         pitch_augment += 1 - min_pitch
-                (sliced_array[:, TOKEN_ATTR_INDEX['pit']])[sliced_augmentable_pitches] += pitch_augment
+                (sampled_array[body_start_index:, TOKEN_ATTR_INDEX['pit']])[sampled_augmentable_pitches] += pitch_augment
 
         if self.permute_track_number:
-            # amortize the calculation
-            if self._piece_body_start_index[filenum] == 0:
-                j = 2 # because first token is BOS and second must be track as we excluded all empty midis
-                while self.pieces[str(filenum)][j][0] == self._trn_id:
-                    j += 1
-                self._piece_body_start_index[filenum] = j
-
             # use self._piece_body_start_index to know how many tracks there are in this piece
-            track_count = self._piece_body_start_index[filenum] - 1
-            body_start_index = self._piece_body_start_index[filenum]
+            track_count = body_start_index - 1
             # add one because there is a padding token at the beginning of the vocab
             perm_array = np.random.permutation(track_count) + 1
             # view body's track number col
-            body_trn_column = sliced_array[body_start_index:, TOKEN_ATTR_INDEX['trn']]
+            body_trn_column = sampled_array[body_start_index:, TOKEN_ATTR_INDEX['trn']]
             body_trn_column_expand = np.asarray([
                 (body_trn_column == i + 1) for i in range(track_count)
             ])
@@ -257,20 +251,24 @@ class MidiDataset(Dataset):
                 inv_perm_array[perm_array-1] = (np.arange(track_count) + 1)
                 track_permuted_ins = np.empty(track_count, dtype=np.int16)
                 track_permuted_ins = self.pieces[str(filenum)][inv_perm_array, ins_col_index]
-                sliced_array[1:body_start_index, ins_col_index] = track_permuted_ins
+                sampled_array[1:body_start_index, ins_col_index] = track_permuted_ins
 
         mps_sep_indices_list = []
         if self.permute_mps:
             mps_tokens_ranges = []
-            mps_sep_indices_list = [
-                i
+            mps_sep_indices_list_head = [
+                i for i in range(body_start_index) # because all tokens in head should not be permutable
+            ]
+            mps_sep_indices_list_body = [
+                i - start_index + body_start_index
                 for i in self._file_mps_sep_indices[filenum]
                 if start_index <= i < end_index
             ]
+            mps_sep_indices_list = mps_sep_indices_list_head + mps_sep_indices_list_body
             # technically, the BOS is the mps separator
             # so the first number in mps_sep_indices_list already is 0
             # but we just add them to be safe
-            mps_sep_indices_and_two_ends = [0] + mps_sep_indices_list + [sliced_array.shape[0]]
+            mps_sep_indices_and_two_ends = [0] + mps_sep_indices_list + [sampled_array.shape[0]]
             for i in range(len(mps_sep_indices_and_two_ends)-1):
                 start = mps_sep_indices_and_two_ends[i]
                 end = mps_sep_indices_and_two_ends[i+1]
@@ -280,23 +278,17 @@ class MidiDataset(Dataset):
             # print(mps_tokens_ranges)
             for start, end in mps_tokens_ranges:
                 p = np.random.permutation(end-start) + start
-                sliced_array[start:end] = sliced_array[p]
+                sampled_array[start:end] = sampled_array[p]
 
-        # a numpy array of sequences sep indices would also be returned if self.use_permutable_subseq_loss
-        if self.use_permutable_subseq_loss:
-            if len(mps_sep_indices_list) == 0:
-                mps_sep_indices_list = [
-                    i
-                    for i in self._file_mps_sep_indices[filenum]
-                    if start_index <= i < end_index
-                ]
-            mps_sep_indices = np.array(
-                mps_sep_indices_list,
-                dtype=np.int16
-            )
-            return from_numpy(sliced_array), mps_sep_indices
+            # a numpy array of sequences sep indices would also be returned if self.use_permutable_subseq_loss
+            if self.use_permutable_subseq_loss:
+                mps_sep_indices = np.array(
+                    mps_sep_indices_list,
+                    dtype=np.int16
+                )
+                return from_numpy(sampled_array), mps_sep_indices
 
-        return from_numpy(sliced_array), None
+        return from_numpy(sampled_array), None
 
 
     def __len__(self):
