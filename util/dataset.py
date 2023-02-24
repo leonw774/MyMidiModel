@@ -121,13 +121,31 @@ class MidiDataset(Dataset):
         self._position_ids = np.sort(np.array(self._position_ids))
         self._measure_ids = np.sort(np.array(self._measure_ids))
 
-        # create virtual pieces from overlength pieces
-        if measure_sample_step_ratio > 0:
-            virtual_piece_step = max_seq_length * measure_sample_step_ratio
-            # the default zeros will be replaced by body start index
-            self._virtual_piece_start_index = [[0] for _ in range(self.number_of_pieces)] 
-            for filenum in range(self.number_of_pieces):
-                filename = str(filenum)
+        # preprocessing
+        self._filenum_indices = [0] * self.number_of_pieces
+        self._piece_lengths = [0] * self.number_of_pieces
+
+        # the default zeros will be replaced by body start index
+        self._piece_body_start_index = [0] * self.number_of_pieces
+        virtual_piece_step = max_seq_length * measure_sample_step_ratio
+        self._virtual_piece_start_index = [[0] for _ in range(self.number_of_pieces)]
+
+        self._file_mps_sep_indices = [[] for _ in range(self.number_of_pieces)]
+        self._augmentable_pitches = [np.empty((0,), dtype=np.bool8) for _ in range(self.number_of_pieces)]
+        self._pitch_augmentation_factor = self.pitch_augmentation_range * 2 + 1 # length of (-pa, ..., -1, 0, 1, ..., pa)
+
+        cur_index = -1 # <-- !!! because the first element we add should become index 0
+        for filenum in tqdm(range(self.number_of_pieces), disable=not verbose):
+            filename = str(filenum)
+
+            j = 2 # because first token is BOS and second must be track as we excluded all empty midis
+            while self.pieces[str(filenum)][j][TOKEN_ATTR_INDEX['evt']] == self._trn_id:
+                j += 1
+            self._piece_body_start_index[filenum] = j
+            self._virtual_piece_start_index[filenum][0] = j
+
+            # create virtual pieces from overlength pieces
+            if measure_sample_step_ratio > 0:
                 if self.pieces[filename].shape[0] > max_seq_length:
                     measure_indices = list(
                         np.flatnonzero(np.isin(self.pieces[filename][:, TOKEN_ATTR_INDEX['evt']], self._measure_ids))
@@ -137,24 +155,6 @@ class MidiDataset(Dataset):
                         if measure_index > virtual_piece_step * start_index_num:
                             self._virtual_piece_start_index[filenum].append(measure_index)
                             start_index_num += 1
-
-        # preprocessing
-        self._filenum_indices = [0] * self.number_of_pieces
-        self._piece_lengths = [0] * self.number_of_pieces
-        self._piece_body_start_index = [0] * self.number_of_pieces
-        self._file_mps_sep_indices = [[] for _ in range(self.number_of_pieces)]
-        self._augmentable_pitches = [np.empty((0,), dtype=np.bool8) for _ in range(self.number_of_pieces)]
-        self._pitch_augmentation_factor = self.pitch_augmentation_range * 2 + 1 # length of (-pa, ..., -1, 0, 1, ..., pa)
-        cur_index = -1 # <-- !!! because the first element we add should become index 0
-
-        for filenum in tqdm(range(self.number_of_pieces), disable=not verbose):
-            filename = str(filenum)
-
-            j = 2 # because first token is BOS and second must be track as we excluded all empty midis
-            while self.pieces[str(filenum)][j][TOKEN_ATTR_INDEX['evt']] == self._trn_id:
-                j += 1
-            self._piece_body_start_index[filenum] = j
-            self._virtual_piece_start_index[filenum][0] = j
 
             if use_permutable_subseq_loss or permute_mps:
                 # find all seperater's index in body
@@ -209,26 +209,37 @@ class MidiDataset(Dataset):
 
         start_index = self._virtual_piece_start_index[filenum][virtual_piece_number]
         end_index = start_index + self.max_seq_length - body_start_index # preserve space for head
-        head_array = np.array(self.pieces[str(filenum)][:body_start_index])
+        head_array = np.array(self.pieces[str(filenum)][:body_start_index]) # copy
         body_array = np.array(self.pieces[str(filenum)][start_index:end_index]) # copy
         sampled_array = np.concatenate([head_array, body_array], axis=0)
         sampled_array = sampled_array.astype(np.int32) # was int16 to save space but torch ask for int
+
+        # to make sure measure number is smaller than max_seq_length
+        # if last token is EOS, body_end_index is length of sample array - 1
+        body_end_index = -1 if sampled_array[-1, TOKEN_ATTR_INDEX['mea']] == 0 else sampled_array.shape[0]
+        min_measure_number = np.min(sampled_array[body_start_index:body_end_index, TOKEN_ATTR_INDEX['mea']])
+        if min_measure_number > 1:
+            sampled_array[body_start_index:body_end_index, TOKEN_ATTR_INDEX['mea']] -= (min_measure_number - 1)
+        # if there are still measure numbers that bigger than max_seq_length, panic
+        # max_measure_number = np.max(sampled_array[body_start_index:body_end_index, TOKEN_ATTR_INDEX['mea']])
+        # assert max_measure_number < self.max_seq_length
 
         # pitch augmentation
         # pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
         if pitch_augment != 0:
             sampled_augmentable_pitches = self._augmentable_pitches[filenum][start_index:end_index]
             # sometimes the sampled array does not contain any pitch-augmentable token
+            sampled_body_pitch_col = sampled_array[body_start_index:, TOKEN_ATTR_INDEX['pit']]
             if np.any(sampled_augmentable_pitches):
                 if pitch_augment > 0:
-                    max_pitch = np.max((sampled_array[body_start_index:, TOKEN_ATTR_INDEX['pit']])[sampled_augmentable_pitches])
+                    max_pitch = np.max((sampled_body_pitch_col)[sampled_augmentable_pitches])
                     if max_pitch + pitch_augment > 128:
                         pitch_augment -= max_pitch - 128
                 else: # pitch_augment < 0
-                    min_pitch = np.min((sampled_array[body_start_index:, TOKEN_ATTR_INDEX['pit']])[sampled_augmentable_pitches])
+                    min_pitch = np.min((sampled_body_pitch_col)[sampled_augmentable_pitches])
                     if min_pitch + pitch_augment < 1:
                         pitch_augment += 1 - min_pitch
-                (sampled_array[body_start_index:, TOKEN_ATTR_INDEX['pit']])[sampled_augmentable_pitches] += pitch_augment
+                sampled_body_pitch_col[sampled_augmentable_pitches] += pitch_augment
 
         if self.permute_track_number:
             # use self._piece_body_start_index to know how many tracks there are in this piece
