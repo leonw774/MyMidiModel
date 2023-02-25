@@ -31,9 +31,9 @@ class MidiDataset(Dataset):
             Parameters:
             - data_dir_path: Expected to have 'data.npz' and 'vocabs.json'
             - use_permutable_subseq_loss: Whether or not we provide a mps_seperator_indices information at __getitem__
-            - measure_sample_step_ratio: Will divide overlength pieces by measures into multiple virtual pieces.
-              The division point will be at the first measure that has index >= max_seq_length * measure_sample_step_ratio * N
-              , where N is positive integer
+            - measure_sample_step_ratio: Will create multiple virtual pieces by sampling overlength pieces.
+              The start point of samples will be at the first measure token that has index not smaller than
+              max_seq_length * measure_sample_step_ratio * N, where N is positive integer
             - permute_mps: Whether or not the dataset should permute all the *maximal permutable subsequences*
               in the sequence before returning in `__getitem__`
             - permute_track_number: Permute all the track numbers, as data augmentation

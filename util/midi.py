@@ -435,7 +435,7 @@ def midi_to_text_list(
         - midi_file_path: midi file path
         - nth: to quantize notes to nth (96, 64 or 32)
         - max_track_number: the maximum tracks nubmer to keep in text, if the input midi has more
-        'instruments' than this value, some tracks would be merged or discard
+          'instruments' than this value, some tracks would be merged or discard
         - max_duration: max length of duration in unit of nth note
         - velocity_step: velocity to be quantize as (velocity_step//2, 3*velocity_step//2, 5*velocity_step//2, ...)
         - use_cont_note: have contiuing notes or not
