@@ -26,41 +26,40 @@ def _entropy(x: list) -> float:
     return entropy
 
 
-def _kl_divergence(true, pred):
-    if isinstance(true, list) and isinstance(pred, list):
-        assert len(true) == len(pred) and len(true) > 0
-        sum_true = sum(true)
+def kl_divergence(pred, true):
+    if isinstance(pred, list) and isinstance(true, list):
+        assert len(pred) == len(true) and len(true) > 0
         sum_pred = sum(pred)
-        if sum_true == 0 or sum_pred == 0:
+        sum_true = sum(true)
+        if sum_pred == 0 or sum_true == 0:
             raise ValueError()
-        norm_true = [x / sum_true for x in true]
         norm_pred = [x / sum_pred for x in pred]
-        entropy = -sum([
-            p * log(q/p)
-            for p, q in zip(norm_true, norm_pred)
+        norm_true = [x / sum_true for x in true]
+        kld = sum([
+            p * log(p/q)
+            for p, q in zip(norm_pred, norm_true)
             if p != 0 and q != 0
         ])
-        return entropy
-    elif isinstance(true, dict) and isinstance(pred, dict):
+        return kld
+    elif isinstance(pred, dict) and isinstance(true, dict):
         assert len(true) > 0
-        assert all((x in true) for x in pred), 'true(x) = 0 does not imply pred(x) = 0'
-        sum_true = sum(true.values())
         sum_pred = sum(pred.values())
-        if sum_true == 0 or sum_pred == 0:
+        sum_true = sum(true.values())
+        if sum_pred == 0 or sum_true == 0:
             raise ValueError()
-        norm_true = {k: true[k]/sum_true for k in true}
         norm_pred = {k: pred[k]/sum_pred for k in pred}
-        entropy = -sum([
-            norm_true[x] * log(norm_pred[x]/norm_true[x])
-            for x in norm_true
-            if norm_true[x] != 0 and x in norm_pred
+        norm_true = {k: true[k]/sum_true for k in true}
+        valid_keys = {x for x in norm_pred if x != 0}.intersection({x for x in norm_true if x != 0})
+        kld = sum([
+            norm_true[x] * log(norm_true[x]/norm_pred[x])
+            for x in valid_keys
         ])
-        return entropy
+        return kld
     else:
         raise TypeError('pred and true should be both list or dict')
 
 
-def _overlapping_area(true, pred):
+def overlapping_area(pred, true):
     raise NotImplementedError()
 
 

@@ -172,9 +172,10 @@ def parse_args():
         default='',
     )
     global_parser.add_argument(
-        '--eval-sample-number',
-        type=int,
-        default=64
+        '--nucleus-sampling-threshold', '--nu',
+        type=float,
+        default=1.0,
+        help='The probability threshold nuclues sampling. Default is %(default)s.'
     )
     global_parser.add_argument(
         '--ckpt-cond-primer-measures',
@@ -334,15 +335,20 @@ def main():
     valid_len = len(complete_dataset) - train_len
     train_dataset, valid_dataset = random_split(complete_dataset, (train_len, valid_len))
     if is_main_process:
-        logging.info('Legnth of training set: %d', len(train_dataset))
-        logging.info('Legnth of validation set: %d', len(valid_dataset))
+        logging.info('Size of training set: %d', len(train_dataset))
+        logging.info('Size of validation set: %d', len(valid_dataset))
 
     # get random conditional primer from complete_dataset
-    cond_primer_index = np.random.randint(len(complete_dataset.pieces))
-    cond_primer_array = complete_dataset.pieces[str(cond_primer_index)]
-    cond_primer_text_list = array_to_text_list(cond_primer_array, vocabs)
-    cond_primer_text_list = get_first_k_measures(cond_primer_text_list, args.ckpt_cond_primer_measures)
-    cond_primer_array = text_list_to_array(cond_primer_text_list, vocabs).astype(np.int32)
+    while True:
+        try:
+            cond_primer_index = np.random.randint(len(complete_dataset.pieces))
+            cond_primer_array = complete_dataset.pieces[str(cond_primer_index)]
+            cond_primer_text_list = array_to_text_list(cond_primer_array, vocabs)
+            cond_primer_text_list = get_first_k_measures(cond_primer_text_list, args.ckpt_cond_primer_measures)
+            cond_primer_array = text_list_to_array(cond_primer_text_list, vocabs).astype(np.int32)
+            break
+        except Exception:
+            continue
     cond_primer_array = torch.from_numpy(np.expand_dims(cond_primer_array, axis=0))
     if is_main_process:
         logging.info('Conditional generation primer is #%d', cond_primer_index)
@@ -535,7 +541,7 @@ def main():
             uncond_gen_text_list = generate_sample(
                 unwrapped_model if args.use_parallel else model,
                 steps=args.data_args.max_seq_length,
-                temperature=1.0
+                nucleus_sampling_threshold=args.nucleus_sampling_threshold
             )
             uncond_gen_piece = ' '.join(uncond_gen_text_list)
             with open(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
@@ -550,7 +556,7 @@ def main():
                 unwrapped_model if args.use_parallel else model,
                 steps=args.data_args.max_seq_length,
                 start_seq=cond_primer_array,
-                temperature=1.0
+                nucleus_sampling_threshold=args.nucleus_sampling_threshold
             )
             cond_gen_piece = ' '.join(cond_gen_text_list)
             with open(os.path.join(ckpt_dir_path, f'{cur_step}_cond.txt'), 'w+', encoding='utf8') as cond_file:

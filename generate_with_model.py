@@ -2,6 +2,7 @@ from argparse import ArgumentParser, Namespace
 import os
 import subprocess
 import tempfile
+from traceback import format_exc
 
 import numpy as np
 import torch
@@ -95,6 +96,11 @@ def read_args():
         help='When model fail to generate next toke that satisfy the rule. Print out the exception message.'
     )
     parser.add_argument(
+        '--no-tqdm',
+        action='store_true',
+        help='No tqdm progress bar when generating samples.'
+    )
+    parser.add_argument(
         'model_file_path',
         type=str
     )
@@ -110,25 +116,30 @@ def read_args():
 
 
 def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_file_path: str):
-    gen_text_list = generate_sample(
-        model,
-        steps=args.max_generation_step,
-        start_seq=primer_seq,
-        temperature=args.temperature,
-        try_count_limit=args.try_count_limit,
-        use_logit_adjustment=(not args.no_logit_adjustment),
-        nucleus_sampling_threshold=args.nucleus_sampling_threshold,
-        print_exception=args.print_exception,
-        show_tqdm=True
-    )
-    if gen_text_list == BEGIN_TOKEN_STR + " " + END_TOKEN_STR:
-        print(f'{output_file_path}: generated empty piece. will not output file.')
-    else:
-        if args.output_txt:
-            with open(f'{output_file_path}.txt', 'w+', encoding='utf8') as f:
-                f.write(' '.join(gen_text_list))
-        midi = piece_to_midi(' '.join(gen_text_list), model.vocabs.paras['nth'])
-        midi.dump(f'{output_file_path}.mid')
+    try:
+        gen_text_list = generate_sample(
+            model,
+            steps=args.max_generation_step,
+            start_seq=primer_seq,
+            temperature=args.temperature,
+            try_count_limit=args.try_count_limit,
+            use_logit_adjustment=(not args.no_logit_adjustment),
+            nucleus_sampling_threshold=args.nucleus_sampling_threshold,
+            print_exception=args.print_exception,
+            show_tqdm=(not args.no_tqdm)
+        )
+        if gen_text_list == BEGIN_TOKEN_STR + " " + END_TOKEN_STR:
+            print(f'{output_file_path}: generated empty piece. will not output file.')
+        else:
+            if args.output_txt:
+                with open(f'{output_file_path}.txt', 'w+', encoding='utf8') as f:
+                    f.write(' '.join(gen_text_list))
+            midi = piece_to_midi(' '.join(gen_text_list), model.vocabs.paras['nth'])
+            midi.dump(f'{output_file_path}.mid')
+    except Exception:
+        print('Generation failed becuase the following exception:')
+        print(format_exc())
+
 
 def main():
     args = read_args()

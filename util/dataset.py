@@ -148,7 +148,9 @@ class MidiDataset(Dataset):
             if measure_sample_step_ratio > 0:
                 if self.pieces[filename].shape[0] > max_seq_length:
                     measure_indices = list(
-                        np.flatnonzero(np.isin(self.pieces[filename][:, TOKEN_ATTR_INDEX['evt']], self._measure_ids))
+                        np.flatnonzero(
+                            np.isin(self.pieces[filename][:, TOKEN_ATTR_INDEX['evt']], self._measure_ids)
+                        )
                     )
                     start_index_num = 1
                     for measure_index in measure_indices:

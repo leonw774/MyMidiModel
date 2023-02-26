@@ -191,7 +191,7 @@ class MyMidiTransformer(nn.Module):
             logit(transformer_output) for logit in self.logits
         )
         # assert all(not torch.isnan(lg).any() for lg in logits), [torch.isnan(lg).nonzero(as_tuple=True) for lg in logits]
-        if self.inferencing:
+        if self.use_linear_attn and self.inferencing:
             return logits, memory
         else:
             return logits
