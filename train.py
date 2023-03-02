@@ -468,11 +468,17 @@ def main():
                         prediction,
                         batch_target_seqs,
                         batch_mps_sep_indices,
+                        'nll',
                         args.train_args.loss_weighted_by_nonpadding_number
                     )
                     # print('\ncalc_permutable_subseq_losses use time:', time() - start_backward_time)
                 else:
-                    head_losses = calc_losses(prediction, batch_target_seqs, args.train_args.loss_weighted_by_nonpadding_number)
+                    head_losses = calc_losses(
+                        prediction,
+                        batch_target_seqs,
+                        'nll',
+                        args.train_args.loss_weighted_by_nonpadding_number
+                    )
                         # print('\ncalc_losses use time:', time() - start_backward_time)
             # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=32))
                 # assert all(not torch.isnan(hl).any() for hl in head_losses)
@@ -481,7 +487,11 @@ def main():
                 # dot.render(filename='lossbackward_mps', format='png')
 
                 if is_main_process:
-                    train_loss_list.append([hl.item() for hl in head_losses])
+                    if args.train_args.loss_weighted_by_nonpadding_number:
+                        nonpadding_numbers = (batch_target_seqs != 0).sum(dim=0).sum(dim=0) # nonpadding numbers per attributes
+                        train_loss_list.append([(hl / npn).item() for hl, npn in zip(head_losses, nonpadding_numbers)])
+                    else:
+                        train_loss_list.append([hl.item() for hl in head_losses])
                     # print(train_loss_list[-1])
 
                 loss = loss / gradient_accumulation_steps
@@ -529,13 +539,23 @@ def main():
                     head_losses = calc_permutable_subseq_losses(
                         prediction,
                         batch_target_seqs,
+                        'nll',
                         batch_mps_sep_indices,
-                        args.train_args.loss_weighted_by_nonpadding_number
+                        False
                     )
                 else:
-                    head_losses = calc_losses(prediction, batch_target_seqs, args.train_args.loss_weighted_by_nonpadding_number)
+                    head_losses = calc_losses(
+                        prediction,
+                        batch_target_seqs,
+                        'nll',
+                        False
+                    )
                 if is_main_process:
-                    valid_loss_list.append([hl.item() for hl in head_losses])
+                    if args.train_args.loss_weighted_by_nonpadding_number:
+                        nonpadding_numbers = (batch_target_seqs != 0).sum(dim=0).sum(dim=0) # nonpadding numbers per attributes
+                        valid_loss_list.append([(hl / npn).item() for hl, npn in zip(head_losses, nonpadding_numbers)])
+                    else:
+                        valid_loss_list.append([hl.item() for hl in head_losses])
 
         cur_step = start_step + args.train_args.validation_interval
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
