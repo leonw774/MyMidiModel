@@ -169,6 +169,7 @@ test "$USE_LINEAR_ATTENTION" == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTH
 test "$INPUT_NO_TEMPO" == true             && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-tempo"
 test "$INPUT_NO_TIME_SIGNATURE" == true    && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-time-signatrue"
 test "$USE_PARALLEL" == true               && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-parallel"
+test "$WEIGHT_LOSS_BY_NONPAD_NUM" == true  && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --loss-weighted-by-nonpadding-number"
 test -n "$MAX_PIECE_PER_GPU"               && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --max-pieces-per-gpu ${MAX_PIECE_PER_GPU}"
 test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended${TRAIN_OTHER_ARGUMENTS} to train.py's argument" | tee -a $LOG_PATH ; }
 
@@ -184,21 +185,30 @@ else
 fi
 $LAUNCH_COMMAND train.py --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation-range $PITCH_AUGMENTATION_RANGE --measure-sample-step-ratio $MEASURE_SAMPLE_STEP_RATIO \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
-    --batch-size $BATCH_SIZE --max-steps $MAX_STEPS --grad-norm-clip $GRAD_NORM_CLIP \
-    --split-ratio $SPLIT_RATIO --validation-interval $VALIDATION_INTERVAL --validation-steps $VALIDATION_STEPS --early-stop $EARLY_STOP \
-    --lr-peak $LEARNING_RATE_PEAK --lr-warmup-steps $LEARNING_RATE_WARMUP_STEPS --lr-decay-end-steps $LEARNING_RATE_DECAY_END_STEPS --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
+    --batch-size $BATCH_SIZE --max-steps $MAX_STEPS --grad-norm-clip $GRAD_NORM_CLIP --split-ratio $SPLIT_RATIO \
+    --validation-interval $VALIDATION_INTERVAL --validation-steps $VALIDATION_STEPS --early-stop $EARLY_STOP --nucleus-sampling-threshold $NUCLEUS_THRESHOLD \
+    --lr-peak $LEARNING_RATE_PEAK --lr-warmup-steps $LEARNING_RATE_WARMUP_STEPS \
+    --lr-decay-end-steps $LEARNING_RATE_DECAY_END_STEPS --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
     --use-device $USE_DEVICE --log $LOG_PATH $TRAIN_OTHER_ARGUMENTS $CORPUS_DIR_PATH $MODEL_DIR_PATH
 
 test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
-if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_sample_feature_stats.json" ] ; then
+if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_feature_stats.json" ] ; then
     echo "Midi dataset ${MIDI_DIR_PATH} already has feature stats file. get_eval_features_of_dataset.py is skipped."
 else
-    python3 get_eval_features_of_dataset.py --log $LOG_PATH --workers $PROCESS_WORKERS $MIDI_DIR_PATH
+    echo "Get evaluation features of ${MIDI_DIR_PATH}"
+    python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS $MIDI_DIR_PATH
+    test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 fi
 
-python3 get_eval_features_of_model.py --log $LOG_PATH --data-dir-path $MIDI_DIR_PATH $MODEL_DIR_PATH 
+echo "Generating $EVAL_SAMPLE_NUMBER unconditional samples for evaluating model performance"
+python3 generate_with_model.py --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --sample-number $EVAL_SAMPLE_NUMBER --no-tqdm --output-txt \
+    $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/uncond
 
-test $? -ne 0 && { echo "evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples"
+python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
+    --reference-file-path $MIDI_DIR_PATH/eval_feature_stats.json $MODEL_DIR_PATH/eval_samples
+
+test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
 echo "pipeline.sh done."

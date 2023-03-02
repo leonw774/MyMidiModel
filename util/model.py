@@ -98,13 +98,14 @@ class MyMidiTransformer(nn.Module):
             getattr(vocabs, OUTPUT_ATTR_NAME[i]).size
             for i in self.output_attrs_indices
         ]
-        self.logits = nn.ModuleList([
+        self.project_linear = nn.ModuleList([
             nn.Linear(
                 in_features=embedding_dim,
                 out_features=vsize
             )
             for vsize in self.logit_vocabs_size
         ])
+        self.layer_norm = nn.LayerNorm()
 
         self.use_linear_attn = use_linear_attn
 
@@ -186,9 +187,9 @@ class MyMidiTransformer(nn.Module):
                 causal_mask,
                 length_mask
             )
-
+        transformer_output = self.layer_norm(transformer_output)
         logits = tuple(
-            logit(transformer_output) for logit in self.logits
+            proj(transformer_output) for proj in self.project_linear
         )
         # assert all(not torch.isnan(lg).any() for lg in logits), [torch.isnan(lg).nonzero(as_tuple=True) for lg in logits]
         if self.use_linear_attn and self.inferencing:
@@ -525,7 +526,7 @@ def generate_sample(
     return text_list
 
 
-def calc_losses(pred_logit: List[Tensor], target_label: Tensor) -> List[Tensor]:
+def calc_losses(pred_logit: List[Tensor], target_label: Tensor, weighted_by_nonpadding_number=False) -> List[Tensor]:
     """
         pred_logit is a list
         - length: out_attr_number
@@ -542,13 +543,22 @@ def calc_losses(pred_logit: List[Tensor], target_label: Tensor) -> List[Tensor]:
             input=pred_attr_logit.transpose(1, 2), # (batch_size, attr_vocab_size, seq_size)
             target=target_label[..., k], # (batch_size, seq_size)
             ignore_index=0, # assume padding is index 0
+            reduction=('sum' if weighted_by_nonpadding_number else 'mean')
+            # because some attributes have more non-padding occurence than others
+            # and we can reflect this by them having different "weight" of loss by using "sum"
         )
         for k, pred_attr_logit in enumerate(pred_logit)
     ]
+    if weighted_by_nonpadding_number:
+        head_losses = [l / target_label.shape[0] for l in head_losses]
     return head_losses
 
 
-def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_label: Tensor, batched_mps_indices: List):
+def calc_permutable_subseq_losses(
+        pred_logit: List[Tensor],
+        target_label: Tensor,
+        batched_mps_indices: List,
+        weighted_by_nonpadding_number=False):
     """
         pred_logit is a list
         - length: out_attr_num
@@ -592,7 +602,7 @@ def calc_permutable_subseq_losses(pred_logit: List[Tensor], target_label: Tensor
         # print('========')
         # assert (modified_target_label == cpp_modified_target_label).all().item()
 
-    head_losses = calc_losses(pred_logit, cpp_modified_target_label.to(target_label.device))
+    head_losses = calc_losses(pred_logit, cpp_modified_target_label.to(target_label.device), weighted_by_nonpadding_number)
     return head_losses
 
 

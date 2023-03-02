@@ -121,6 +121,10 @@ def parse_args():
             Default is %(desult)s.'
     )
     train_parser.add_argument(
+        '--loss-weighted-by-nonpadding-number',
+        action='store_true'
+    )
+    train_parser.add_argument(
         '--lr-peak',
         dest='lr_peak',
         type=float
@@ -460,10 +464,15 @@ def main():
                 # start_backward_time = time()
             # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
                 if args.data_args.use_permutable_subseq_loss:
-                    head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
+                    head_losses = calc_permutable_subseq_losses(
+                        prediction,
+                        batch_target_seqs,
+                        batch_mps_sep_indices,
+                        args.train_args.loss_weighted_by_nonpadding_number
+                    )
                     # print('\ncalc_permutable_subseq_losses use time:', time() - start_backward_time)
                 else:
-                    head_losses = calc_losses(prediction, batch_target_seqs)
+                    head_losses = calc_losses(prediction, batch_target_seqs, args.train_args.loss_weighted_by_nonpadding_number)
                         # print('\ncalc_losses use time:', time() - start_backward_time)
             # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=32))
                 # assert all(not torch.isnan(hl).any() for hl in head_losses)
@@ -517,9 +526,14 @@ def main():
                 prediction = model(batch_input_seqs)
 
                 if args.data_args.use_permutable_subseq_loss:
-                    head_losses = calc_permutable_subseq_losses(prediction, batch_target_seqs, batch_mps_sep_indices)
+                    head_losses = calc_permutable_subseq_losses(
+                        prediction,
+                        batch_target_seqs,
+                        batch_mps_sep_indices,
+                        args.train_args.loss_weighted_by_nonpadding_number
+                    )
                 else:
-                    head_losses = calc_losses(prediction, batch_target_seqs)
+                    head_losses = calc_losses(prediction, batch_target_seqs, args.train_args.loss_weighted_by_nonpadding_number)
                 if is_main_process:
                     valid_loss_list.append([hl.item() for hl in head_losses])
 
