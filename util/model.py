@@ -105,7 +105,7 @@ class MyMidiTransformer(nn.Module):
             )
             for vsize in self.logit_vocabs_size
         ])
-        self.layer_norm = nn.LayerNorm()
+        self.layer_norm = nn.LayerNorm(normalized_shape=embedding_dim, eps=1e-6)
 
         self.use_linear_attn = use_linear_attn
 
