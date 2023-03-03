@@ -115,7 +115,7 @@ def parse_args():
     train_parser.add_argument(
         "--grad-clip-norm",
         type=float,
-        default=1.0,
+        default=0.0,
         help='Set the max_norm of nn.util.clip_grad_norm_(). \
             If this value is zero, gradient clipping will not be used. \
             Default is %(desult)s.'
