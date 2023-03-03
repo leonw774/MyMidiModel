@@ -487,11 +487,7 @@ def main():
                 # dot.render(filename='lossbackward_mps', format='png')
 
                 if is_main_process:
-                    if args.train_args.loss_weighted_by_nonpadding_number:
-                        nonpadding_numbers = (batch_target_seqs != 0).sum(dim=0).sum(dim=0) # nonpadding numbers per attributes
-                        train_loss_list.append([(hl / npn).item() for hl, npn in zip(head_losses, nonpadding_numbers)])
-                    else:
-                        train_loss_list.append([hl.item() for hl in head_losses])
+                    train_loss_list.append([hl.item() for hl in head_losses])
                     # print(train_loss_list[-1])
 
                 loss = loss / gradient_accumulation_steps
@@ -551,11 +547,7 @@ def main():
                         False
                     )
                 if is_main_process:
-                    if args.train_args.loss_weighted_by_nonpadding_number:
-                        nonpadding_numbers = (batch_target_seqs != 0).sum(dim=0).sum(dim=0) # nonpadding numbers per attributes
-                        valid_loss_list.append([(hl / npn).item() for hl, npn in zip(head_losses, nonpadding_numbers)])
-                    else:
-                        valid_loss_list.append([hl.item() for hl in head_losses])
+                    valid_loss_list.append([hl.item() for hl in head_losses])
 
         cur_step = start_step + args.train_args.validation_interval
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')

@@ -559,6 +559,8 @@ def calc_losses(
         )
         for k, logits in enumerate(pred_logits)
     ]
+    if weighted_by_nonpadding_number:
+        head_losses = [hl / target_labels.shape[0] / target_labels.shape[1] for hl in head_losses]
     return head_losses
 
 
