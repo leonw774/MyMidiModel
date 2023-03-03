@@ -168,7 +168,6 @@ test "$PERMUTE_TRACK_NUMBER" == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTH
 test "$USE_LINEAR_ATTENTION" == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-linear-attn"
 test "$INPUT_NO_TEMPO" == true             && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-tempo"
 test "$INPUT_NO_TIME_SIGNATURE" == true    && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-time-signatrue"
-test "$USE_PARALLEL" == true               && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-parallel"
 test "$WEIGHT_LOSS_BY_NONPAD_NUM" == true  && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --loss-weighted-by-nonpadding-number"
 test -n "$MAX_PIECE_PER_GPU"               && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --max-pieces-per-gpu ${MAX_PIECE_PER_GPU}"
 test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended${TRAIN_OTHER_ARGUMENTS} to train.py's argument" | tee -a $LOG_PATH ; }
@@ -178,7 +177,17 @@ test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended${TRAIN_OTHER_ARGUMENTS} to 
 if [ "$USE_PARALLEL" == true ]; then
     NUM_OF_CUDA_VISIBLE_DEVICE=$(echo $CUDA_VISIBLE_DEVICES | tr -cd , | wc -c ;)
     NUM_OF_CUDA_VISIBLE_DEVICE=$(($NUM_OF_CUDA_VISIBLE_DEVICE+1)) # perform arithmetic expression with $((...))
-    LAUNCH_COMMAND="accelerate launch --multi_gpu --num_processes $NUM_OF_CUDA_VISIBLE_DEVICE --num_machine 1"
+    NUM_OF_ACTUAL_CUDA_DEVICE=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)
+    if [ $NUM_OF_ACTUAL_CUDA_DEVICE -lt $NUM_OF_CUDA_VISIBLE_DEVICE ]; then
+        NUM_OF_CUDA_VISIBLE_DEVICE=$NUM_OF_ACTUAL_CUDA_DEVICE
+    fi
+    if [ "$NUM_OF_CUDA_VISIBLE_DEVICE" == "1" ]; then
+        LAUNCH_COMMAND="python3"
+        "$USE_PARALLEL" == false
+    else
+        LAUNCH_COMMAND="accelerate launch --multi_gpu --num_processes $NUM_OF_CUDA_VISIBLE_DEVICE --num_machine 1"
+        TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-parallel"
+    fi
     accelerate config default
 else
     LAUNCH_COMMAND="python3"
