@@ -91,17 +91,18 @@ class MyMidiTransformer(nn.Module):
             TOKEN_ATTR_INDEX[fname]
             for fname in OUTPUT_ATTR_NAME
         ]
-        # because position is the last attribute in OUTPUT_ATTR_NAME
         if vocabs.paras['position_method'] == 'event':
+            # remove position, the last attribute in OUTPUT_ATTR_NAME
             self.output_attrs_indices.pop()
         self.logit_vocabs_size = [
             getattr(vocabs, OUTPUT_ATTR_NAME[i]).size
             for i in self.output_attrs_indices
         ]
-        self.project_linear = nn.ModuleList([
+        self.project_linears = nn.ModuleList([
             nn.Linear(
                 in_features=embedding_dim,
-                out_features=vsize
+                out_features=vsize,
+                bias=False # no bias need because they are after a layer normalization
             )
             for vsize in self.logit_vocabs_size
         ])
@@ -130,7 +131,6 @@ class MyMidiTransformer(nn.Module):
                 'feed_forward_dimensions': 4 * embedding_dim, # same as SymphonyNet
                 'attention_type': 'causal-linear',
                 'dropout': 0.1, # same as SymphonyNet
-                # 'final_normalization'=True,
                 'feature_map': MY_ELU_FEATURE_MAP  # make the model pickle-able
             }
             self.transformer_encoder = TransformerEncoderBuilder.from_dictionary(params).get()
@@ -146,6 +146,17 @@ class MyMidiTransformer(nn.Module):
                 encoder_layer=layer,
                 num_layers=layers_number
             )
+        self.apply(self._init_weights)
+
+    # copied from SymphonyNet
+    def _init_weights(self, module):
+        if isinstance(module, (nn.Linear, nn.Embedding)):
+            module.weight.data.normal_(mean=0.0, std=self.embed_dim ** -0.5)
+            if isinstance(module, nn.Linear) and module.bias is not None:
+                module.bias.data.zero_()
+        elif isinstance(module, nn.LayerNorm):
+            module.bias.data.zero_()
+            module.weight.data.fill_(1.0)
 
     def to_input_attrs(self, batch_input_seqs: Tensor) -> Tensor:
         # expect batch_input_seqs has shape: (batch_size, seq_size, complete_attr_num)
@@ -189,7 +200,7 @@ class MyMidiTransformer(nn.Module):
             )
         transformer_output = self.layer_norm(transformer_output)
         logits = tuple(
-            proj(transformer_output) for proj in self.project_linear
+            proj(transformer_output) for proj in self.project_linears
         )
         # assert all(not torch.isnan(lg).any() for lg in logits), [torch.isnan(lg).nonzero(as_tuple=True) for lg in logits]
         if self.use_linear_attn and self.inferencing:
@@ -323,6 +334,8 @@ def adjust_logits_with_context(
 
 
 def nucleus_sample(probs, threshold):
+    if threshold == 1.0:
+        return torch.multinomial(probs, 1)
     sorted_probs, sorted_indices = torch.sort(probs, dim=-1, descending=True)
     cumsum_probs = torch.cumsum(sorted_probs, dim=-1)
     nucleus_number = sum(cumsum_probs < threshold) + 1
@@ -445,20 +458,11 @@ def generate_sample(
             try_count = 0
             while try_count < try_count_limit:
                 # bt = time()
-                softmaxed_logits = [
-                    F.softmax(l / temperature, dim=0)
+                sampled_attrs = [
+                    nucleus_sample(F.softmax(l / temperature, dim=0), nucleus_sampling_threshold)
                     for l in last_logits # l has shape (attr_vocab_size,)
                 ]
-                if nucleus_sampling_threshold != 1.0:
-                    sampled_attrs = [
-                        nucleus_sample(p, nucleus_sampling_threshold)
-                        for p in softmaxed_logits
-                    ]
-                else:
-                    sampled_attrs = [
-                        torch.multinomial(p, 1)
-                        for p in softmaxed_logits # l has shape (attr_vocab_size,)
-                    ]
+
                 # print(sampled_attrs)
                 try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, out_attr_num)
                 # print([ model.vocabs.to_dict()[OUTPUT_ATTR_NAME[i]]['id2text'][int(f)] for i, f in enumerate(try_token[0]) ])
