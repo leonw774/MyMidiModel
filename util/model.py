@@ -133,16 +133,16 @@ class MyMidiTransformer(nn.Module):
                 'dropout': 0.1, # same as SymphonyNet
                 'feature_map': MY_ELU_FEATURE_MAP  # make the model pickle-able
             }
-            self.transformer_encoder = TransformerEncoderBuilder.from_dictionary(params).get()
-            self.transformer_encoder_inference = RecurrentEncoderBuilder.from_dictionary(params).get()
-            make_mirror(self.transformer_encoder, self.transformer_encoder_inference)
+            self.transformer_decoder = TransformerEncoderBuilder.from_dictionary(params).get()
+            self.transformer_decoder_inference = RecurrentEncoderBuilder.from_dictionary(params).get()
+            make_mirror(self.transformer_decoder, self.transformer_decoder_inference)
         else:
             layer = nn.TransformerEncoderLayer(
                 d_model=embedding_dim,
                 nhead=attn_heads_number,
                 batch_first=True
             )
-            self.transformer_encoder = nn.TransformerEncoder(
+            self.transformer_decoder = nn.TransformerEncoder(
                 encoder_layer=layer,
                 num_layers=layers_number
             )
@@ -179,12 +179,12 @@ class MyMidiTransformer(nn.Module):
             if self.inferencing:
                 # no mask is needed when using recurrent for inference
                 emb_sum_dropout = emb_sum_dropout[:, 0] # become (batch_size, embed_size)
-                transformer_output, memory = self.transformer_encoder_inference(emb_sum_dropout, memory)
+                transformer_output, memory = self.transformer_decoder_inference(emb_sum_dropout, memory)
             else:
                 # in fast_transformer's FullMask class, 0 is masked, 1 is keep
                 causal_mask = self.causal_mask
                 length_mask = FullMask(mask=x[..., 0].ne(0).bool().to(x.device))
-                transformer_output = self.transformer_encoder(
+                transformer_output = self.transformer_decoder(
                     emb_sum_dropout,
                     causal_mask,
                     length_mask
@@ -193,7 +193,7 @@ class MyMidiTransformer(nn.Module):
             # in pytorch's official implementation, True is masked, False is keep
             causal_mask = self.causal_mask[:x.shape[1], :x.shape[1]].to(x.device)
             length_mask = x[..., 0].eq(0).to(x.device)
-            transformer_output = self.transformer_encoder(
+            transformer_output = self.transformer_decoder(
                 emb_sum_dropout,
                 causal_mask,
                 length_mask
@@ -234,22 +234,20 @@ class MyMidiTransformer(nn.Module):
 # end class MyMidiTransformer
 
 
-LARGE_NEG_VALUE = -1e8
 
-
-def adjust_logits_with_context(
-        logits: List[Tensor],
+def adjust_probs_with_context(
+        probs: List[Tensor],
         context_text_list: List[str],
         vocabs: Vocabs,
         event_family_indices: Tuple[set]):
     """
-        Set to large negative numeric value the logits of the attribute values that would definitily raise exception
+        Set to large negative numeric value the probs of the attribute values that would definitily raise exception
         if the next token in context_text_list has them
         and force the position tokens to be ordered increasingly in time
     """
     assert len(context_text_list) > 0, 'Empty context_text_list'
-    assert len(logits) == len(OUTPUT_ATTR_NAME) or len(logits) == len(OUTPUT_ATTR_NAME) - 1, 'Bad logits'
-    position_method_is_event = len(logits) == len(OUTPUT_ATTR_NAME) - 1
+    assert len(probs) == len(OUTPUT_ATTR_NAME) or len(probs) == len(OUTPUT_ATTR_NAME) - 1, 'Bad probs'
+    position_method_is_event = len(probs) == len(OUTPUT_ATTR_NAME) - 1
 
     bos_index = vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
     sep_index = vocabs.events.text2id[tokens.SEP_TOKEN_STR]
@@ -264,10 +262,10 @@ def adjust_logits_with_context(
     # adjust event attribute logit
 
     # BOS token is redundent, will not be used in generation
-    logits[TOKEN_ATTR_INDEX['evt']][bos_index] = LARGE_NEG_VALUE
+    probs[TOKEN_ATTR_INDEX['evt']][bos_index] = 0
     # predict PAD is not allowed in generation time
-    for attr_logits in logits:
-        attr_logits[0] = LARGE_NEG_VALUE
+    for attr_probs in probs:
+        attr_probs[0] = 0
 
     is_head = context_text_list[-1] == tokens.BEGIN_TOKEN_STR or context_text_list[-1][0] == tokens.TRACK_EVENTS_CHAR
     is_sep = context_text_list[-1] == tokens.SEP_TOKEN_STR
@@ -276,22 +274,22 @@ def adjust_logits_with_context(
         # but if it is only BOS, then only track-instrument allowed
         for i in range(vocabs.events.size):
             if i not in track_instrument_indices and (i != sep_index or len(context_text_list) == 0):
-                logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
+                probs[TOKEN_ATTR_INDEX['evt']][i] = 0
     elif is_sep:
         # if is separater, then only measure tokens are allowed
         for i in range(vocabs.events.size):
             if i not in measure_indices:
-                logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
+                probs[TOKEN_ATTR_INDEX['evt']][i] = 0
     else: # if the section is body
         # the next token's event can not be track-instrument
         for i in track_instrument_indices:
-            logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
+            probs[TOKEN_ATTR_INDEX['evt']][i] = 0
 
         # if the last token in context_text_list token is measure and position method is event
         # then the next token's event can not be multi-note or tempo
         if context_text_list[-1][0] == tokens.MEASURE_EVENTS_CHAR and position_method_is_event:
             for i in multinote_indices.union(tempo_indices):
-                logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
+                probs[TOKEN_ATTR_INDEX['evt']][i] = 0
 
         # this part prohibits the position tokens that is "behind" the current position
         k = len(context_text_list) - 1
@@ -301,7 +299,7 @@ def adjust_logits_with_context(
             cur_position = b36str2int(context_text_list[k][1:])
             for i in position_indices:
                 if b36str2int(vocabs.events.id2text[i][1:]) <= cur_position:
-                    logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
+                    probs[TOKEN_ATTR_INDEX['evt']][i] = 0
 
         # this part prohibit the tempo tokens if there is already a tempo token in the current position
         k = len(context_text_list) - 1
@@ -309,7 +307,7 @@ def adjust_logits_with_context(
             k -= 1
         if context_text_list[k][0] == tokens.TEMPO_EVENTS_CHAR:
             for i in tempo_indices:
-                logits[TOKEN_ATTR_INDEX['evt']][i] = LARGE_NEG_VALUE
+                probs[TOKEN_ATTR_INDEX['evt']][i] = 0
 
     # adjust track attribute logit
     if not is_head and not is_sep:
@@ -328,9 +326,11 @@ def adjust_logits_with_context(
         # first +1 is because index 0 is padding
         # second +1 is because we reset any index that greater than max_track_number+1
         for i in range(max_track_number+1+1, vocabs.track_numbers.size):
-            logits[TOKEN_ATTR_INDEX['trn']][i] = LARGE_NEG_VALUE
+            probs[TOKEN_ATTR_INDEX['trn']][i] = 0
 
-    return logits
+    # re-normalized it
+    probs = [p / p.sum() for p in probs]
+    return probs
 
 
 def nucleus_sample(probs, threshold):
@@ -354,7 +354,7 @@ def generate_sample(
         start_seq: Union[Tensor, None] = None,
         temperature: float = 1.0,
         try_count_limit: int = 1000,
-        use_logit_adjustment: bool = True,
+        use_prob_adjustment: bool = True,
         nucleus_sampling_threshold: float = 1.0,
         print_exception: bool = False,
         show_tqdm: bool = False,
@@ -381,7 +381,7 @@ def generate_sample(
     model.inference()
 
     # prepare vocab for logit adjustment
-    if use_logit_adjustment:
+    if use_prob_adjustment:
         multinote_indices = set()
         position_indices = set()
         measure_indices = set()
@@ -450,16 +450,20 @@ def generate_sample(
                     for l in batched_logits
                 ]
 
-            if use_logit_adjustment:
+            last_probs = [
+                F.softmax(l / temperature, dim=0)
+                for l in last_logits
+            ]
+            if use_prob_adjustment:
                 # prevent many bad format in advance, but not restricting the order of track number in head section
-                last_logits = adjust_logits_with_context(last_logits, text_list, model.vocabs, event_family_indices)
+                last_probs = adjust_probs_with_context(last_probs, text_list, model.vocabs, event_family_indices)
             # get_logit_time += time() - bt
-            # print('\n'.join([repr(logit) for logit in last_logits]))
+            # print('\n'.join([repr(p) for p in last_probs]))
             try_count = 0
             while try_count < try_count_limit:
                 # bt = time()
                 sampled_attrs = [
-                    nucleus_sample(F.softmax(l / temperature, dim=0), nucleus_sampling_threshold)
+                    nucleus_sample(last_probs, nucleus_sampling_threshold)
                     for l in last_logits # l has shape (attr_vocab_size,)
                 ]
 
@@ -477,7 +481,7 @@ def generate_sample(
                 try:
                     try_text_list = text_list + [try_token_text]
                     # format checking
-                    if not use_logit_adjustment or is_head:
+                    if not use_prob_adjustment or is_head:
                         # have to append EOS at the end to not raise error
                         piece_to_midi(
                             piece=' '.join(try_text_list + [tokens.END_TOKEN_STR]),

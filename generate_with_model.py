@@ -66,7 +66,7 @@ def read_args():
         help='Control the temperature of softmax before multinomial sampling. Default is %(default)s.'
     )
     parser.add_argument(
-        '--no-logit-adjustment',
+        '--no-prob-adjustment',
         action='store_true'
     )
     parser.add_argument(
@@ -123,7 +123,7 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
             start_seq=primer_seq,
             temperature=args.temperature,
             try_count_limit=args.try_count_limit,
-            use_logit_adjustment=(not args.no_logit_adjustment),
+            use_prob_adjustment=(not args.no_prob_adjustment),
             nucleus_sampling_threshold=args.nucleus_sampling_threshold,
             print_exception=args.print_exception,
             show_tqdm=(not args.no_tqdm)
