@@ -114,19 +114,26 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) ->
         - grooving self-similarity
     '''
     midi = piece_to_midi(piece, nth, ignore_pending_note_error=True)
-    pitch_histogram = {p:0 for p in range(128)}
+    pitchs = []
     durations = []
     velocities = []
     for track in midi.instruments:
         for note in track.notes:
-            pitch_histogram[note.pitch] += 1
+            pitchs.append(note.pitch)
             durations.append((note.end - note.start) / nth * 4) # use quarter note as unit
             velocities.append(note.velocity)
 
+    pitch_histogram = {p:0 for p in range(128)}
+    pitch_class_histogram = {pc:0 for pc in range(12)}
+    for p in pitchs:
+        pitch_histogram[p] += 1
+        pitch_class_histogram[p%12] += 1
     try:
-        pitch_histogram_entropy = _entropy(pitch_histogram)
+        pitch_class_entropy = _entropy(pitch_class_histogram)
     except ValueError:
-        pitch_histogram_entropy = float('nan')
+        pitch_class_entropy = float('nan')
+    pitchs_mean = np.mean(pitchs) if len(pitchs) > 0 else float('nan')
+    pitchs_var = np.var(pitchs) if len(pitchs) > 0 else float('nan')
 
     duration_distribution = dict()
     for d in durations:
@@ -143,10 +150,12 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) ->
     velocities_mean = np.mean(velocities) if len(velocities) > 0 else float('nan')
     velocities_var = np.var(velocities) if len(velocities) > 0 else float('nan')
 
-    if isnan(pitch_histogram_entropy):
+    if isnan(pitch_class_entropy):
         return {
             'pitch_histogram': pitch_histogram,
-            'pitch_histogram_entropy': pitch_histogram_entropy,
+            'pitch_class_entropy': pitch_class_entropy,
+            'pitchs_mean': pitchs_mean,
+            'pitchs_var': pitchs_var,
             'duration_distribution': duration_distribution,
             'durations_mean': durations_mean,
             'durations_var': durations_var,
@@ -209,7 +218,9 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) ->
 
     features = {
         'pitch_histogram': pitch_histogram,
-        'pitch_histogram_entropy': pitch_histogram_entropy,
+        'pitch_class_entropy': pitch_class_entropy,
+        'pitchs_mean': pitchs_mean,
+        'pitchs_var': pitchs_var,
         'duration_distribution': duration_distribution,
         'durations_mean': durations_mean,
         'durations_var': durations_var,
@@ -222,7 +233,9 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) ->
     return features
 
 EVAL_SCALAR_FEATURE_NAMES = {
-    'pitch_histogram_entropy',
+    'pitch_class_entropy',
+    'pitchs_mean',
+    'pitchs_var',
     'durations_mean',
     'durations_var',
     'velocities_mean',

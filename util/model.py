@@ -543,24 +543,28 @@ def calc_losses(
     target_labels = target_labels.long()
     if loss_function == 'cross_entropy':
         func = F.cross_entropy
+        input_tensors = [logits.transpose(1, 2) for logits in pred_logits]
     elif loss_function == 'nll':
         func = F.nll_loss
+        input_tensors = [F.softmax(logits, dim=2).transpose(1, 2) for logits in pred_logits]
     else:
         raise ValueError('argument loss_function should either "cross_entropy" or "nll"')
+
     head_losses = [
         func(
-            input=F.softmax(logits, dim=2).transpose(1, 2) if loss_function == 'nll' else logits.transpose(1, 2),
+            input=input_tensor,
             # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
             target=target_labels[..., k], # (batch_size, seq_size)
             ignore_index=0, # assume padding is index 0
             reduction=('sum' if weighted_by_nonpadding_number else 'mean')
             # because some attributes have more non-padding occurence than others
-            # and we can reflect this by them having different "weight" of loss by using "sum"
+            # we can reflect this by them having different "weight" of loss using "sum"
         )
-        for k, logits in enumerate(pred_logits)
+        for k, input_tensor in enumerate(input_tensors)
     ]
     if weighted_by_nonpadding_number:
-        head_losses = [hl / target_labels.shape[0] / target_labels.shape[1] for hl in head_losses]
+        token_number = target_labels.shape[0] * target_labels.shape[1]
+        head_losses = [hl / token_number for hl in head_losses]
     return head_losses
 
 
