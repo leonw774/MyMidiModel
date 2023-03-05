@@ -447,12 +447,12 @@ def generate_sample(
                 last_logits = [
                     l[0, -1].to('cpu')
                     # l has shape (1, seq_length, attr_vocab_size)
-                    for l in batched_logits
+                    for l in batched_logits 
                 ]
 
             last_probs = [
                 F.softmax(l / temperature, dim=0)
-                for l in last_logits
+                for l in last_logits # l has shape (attr_vocab_size,)
             ]
             if use_prob_adjustment:
                 # prevent many bad format in advance, but not restricting the order of track number in head section
@@ -463,8 +463,8 @@ def generate_sample(
             while try_count < try_count_limit:
                 # bt = time()
                 sampled_attrs = [
-                    nucleus_sample(last_probs, nucleus_sampling_threshold)
-                    for l in last_logits # l has shape (attr_vocab_size,)
+                    nucleus_sample(p, nucleus_sampling_threshold)
+                    for p in last_probs
                 ]
 
                 # print(sampled_attrs)
