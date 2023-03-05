@@ -264,11 +264,17 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
 
         elif typename == tokens.TRACK_EVENTS_CHAR:
             # track token has instrument attribute
-            token_text = (
-                event_text + ':'
-                + vocabs.track_numbers.id2text[array[i][TOKEN_ATTR_INDEX['trn']]] + ':'
-                + vocabs.instruments.id2text[array[i][TOKEN_ATTR_INDEX['ins']]]
-            )
+            if vocabs.combine_track_instrument:
+                token_text = (
+                    event_text + ':'
+                    + vocabs.track_numbers.id2text[array[i][TOKEN_ATTR_INDEX['trn']]]
+                )
+            else:
+                token_text = (
+                    event_text
+                    + vocabs.instruments.id2text[array[i][TOKEN_ATTR_INDEX['ins']]] + ':'
+                    + vocabs.track_numbers.id2text[array[i][TOKEN_ATTR_INDEX['trn']]]
+                )
             text_list.append(token_text)
 
         elif typename == tokens.MEASURE_EVENTS_CHAR:

@@ -84,7 +84,7 @@ class MidiDataset(Dataset):
         # The seperators of maximal permutable subsequence are:
         # BOS, EOS, SEP, PADDING, track-instrument token, measure tokens, position tokens
         # we stores their index number in _mps_seperators
-        # _mps_seperators is empty when `use_permutable_subseq_loss` is not True
+        # _mps_seperators is empty when `permute_mps` is False
         self._mps_seperators = list()
         self._bos_id = self.vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
         self._sep_id = self.vocabs.events.text2id[tokens.SEP_TOKEN_STR]
@@ -107,7 +107,7 @@ class MidiDataset(Dataset):
                 self._tempo_ids.add(index)
             elif text[0] == tokens.TRACK_EVENTS_CHAR:
                 self._track_ids.add(index)
-        if use_permutable_subseq_loss or permute_mps:
+        if permute_mps:
             self._mps_seperators = set([
                 self._pad_id,
                 self._bos_id,
@@ -166,10 +166,10 @@ class MidiDataset(Dataset):
                             self._virtual_piece_start_index[filenum].append(m_idx)
                             start_vp_num += 1
 
-            if use_permutable_subseq_loss or permute_mps:
+            if permute_mps:
                 # find all seperater's index in body
                 mps_sep_indices = np.flatnonzero(
-                    np.isin(self.pieces[filename][j:, TOKEN_ATTR_INDEX['evt']], self._mps_seperators)
+                    np.isin(self.pieces[filename][:, TOKEN_ATTR_INDEX['evt']], self._mps_seperators)
                 )
                 for i in range(mps_sep_indices.shape[0] - 1):
                     self._file_mps_sep_indices[filenum].append(mps_sep_indices[i])
