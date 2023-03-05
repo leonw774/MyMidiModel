@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
     bool clearLine = false;
     bool doLog = false;
     int nonOptStartIndex = 1;
-    std::string cmdLineUsage = "./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath bpeIter scoreFunc mergeCondition samplingRate minScoreLimit [workersNum]";
+    std::string cmdLineUsage = "./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath bpeIter mergeCondition samplingRate minScoreLimit [workersNum]";
     while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
         switch (cmd_opt) {
@@ -32,8 +32,8 @@ int main(int argc, char *argv[]) {
                 exit(1);
         }
     }
-    if ((argc - nonOptStartIndex != 7) && (argc - nonOptStartIndex != 8)) {
-        std::cout << "Bad number of non-optional arguments: " << argc - nonOptStartIndex << " != 7 or 8\n";
+    if ((argc - nonOptStartIndex != 6) && (argc - nonOptStartIndex != 7)) {
+        std::cout << "Bad number of non-optional arguments: " << argc - nonOptStartIndex << "not 6 or 7\n";
         for (int i = 0; i < argc; ++i) {
             std::cout << argv[i] << " ";
         }
@@ -43,10 +43,9 @@ int main(int argc, char *argv[]) {
     std::string inCorpusDirPath(argv[nonOptStartIndex]);
     std::string outCorpusDirPath(argv[nonOptStartIndex+1]);
     int bpeIter = atoi(argv[nonOptStartIndex+2]);
-    std::string scoreFunc(argv[nonOptStartIndex+3]);
-    std::string mergeCondition(argv[nonOptStartIndex+4]);
-    double samplingRate = atof(argv[nonOptStartIndex+5]);
-    double minScoreLimit = atof(argv[nonOptStartIndex+6]);
+    std::string mergeCondition(argv[nonOptStartIndex+3]);
+    double samplingRate = atof(argv[nonOptStartIndex+4]);
+    double minScoreLimit = atof(argv[nonOptStartIndex+5]);
     int workersNum = -1; // -1 means use default
     if (argc - nonOptStartIndex == 8) {
         workersNum = atoi(argv[nonOptStartIndex+7]);
@@ -57,10 +56,6 @@ int main(int argc, char *argv[]) {
         std::cout << "Error: bpeIter <= 0 or > 2045: " << bpeIter << std::endl;
         return 1;
     }
-    if (scoreFunc != "freq" && scoreFunc != "wplike") {
-        std::cout << "Error: scoreFunc is not \"freq\" or \"wplike\": " << scoreFunc << std::endl;
-        return 1;
-    }
     if (mergeCondition != "ours" && mergeCondition != "mulpi") {
         std::cout << "Error: mergeCondition is not \"ours\" or \"mulpi\": " << mergeCondition << std::endl;
         return 1;
@@ -68,7 +63,6 @@ int main(int argc, char *argv[]) {
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
         << "outCorpusDirPath: " << outCorpusDirPath << '\n'
         << "bpeIter: " << bpeIter << '\n'
-        << "scoreFunc: " << scoreFunc << '\n'
         << "mergeCondition: " << mergeCondition << '\n'
         << "samplingRate: " << samplingRate << '\n'
         << "minScoreLimit: " << minScoreLimit << std::endl;
@@ -164,35 +158,18 @@ int main(int argc, char *argv[]) {
         // clac shape scores
         Shape maxScoreShape;
         partStartTimePoint = std::chrono::system_clock::now();
-        if (scoreFunc == "freq") {
-            shapeScoreFreq = shapeScoring<unsigned int>(corpus, shapeDict, scoreFunc, mergeCondition, samplingRate);
-            std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScoreFreq);
-            if (maxValPair.second < minScoreLimit) {
-                std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
-                break;
-            }
-            maxScoreShape = maxValPair.first;
-            if (doLog){
-                std::cout << ", " << (double) totalNeighborNumber / multinoteCount << ", "
-                        << shapeScoreFreq.size() << ", "
-                        << "\"" << shape2str(maxScoreShape) << "\", "
-                        << maxValPair.second << ", ";
-            }
+        shapeScoreFreq = shapeScoring(corpus, shapeDict, mergeCondition, samplingRate);
+        std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScoreFreq);
+        if (maxValPair.second < minScoreLimit) {
+            std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
+            break;
         }
-        else {
-            shapeScoreWPlike = shapeScoring<double>(corpus, shapeDict, scoreFunc, mergeCondition, samplingRate);
-            std::pair<Shape, double> maxValPair = findMaxValPair(shapeScoreWPlike);
-            if (maxValPair.second < minScoreLimit) {
-                std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
-                break;
-            }
-            maxScoreShape = maxValPair.first;
-            if (doLog){
-                std::cout << ", " << (double) totalNeighborNumber / multinoteCount << ", "
-                        << shapeScoreWPlike.size() << ", "
-                        << "\"" << shape2str(maxScoreShape) << "\", "
-                        << maxValPair.second << ", ";
-            }
+        maxScoreShape = maxValPair.first;
+        if (doLog){
+            std::cout << ", " << (double) totalNeighborNumber / multinoteCount << ", "
+                    << shapeScoreFreq.size() << ", "
+                    << "\"" << shape2str(maxScoreShape) << "\", "
+                    << maxValPair.second << ", ";
         }
         // check if shape has repeated relnote
         for (int i = 1; i < maxScoreShape.size(); ++i) {

@@ -276,7 +276,7 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth) {
 
             case TRACK_EVENTS_CHAR:
                 corpus.piecesMN.back().push_back(Track());
-                for (i = 0; (a[i] = inCorpusFile.get()) != ' '; ++i); a[i] = '\0';
+                for (i = 0; (a[i] = inCorpusFile.get()) != ':'; ++i); a[i] = '\0';
                 corpus.piecesTP.back().push_back((uint8_t) b36strtoi(a));
                 while (inCorpusFile.get() != ' '); // eat the track number
                 break;

@@ -18,11 +18,9 @@ double calculateShapeEntropy(const Corpus& corpus);
 
 double calculateAllAttributeEntropy(const Corpus& corpus);
 
-template<typename T>
-std::vector<std::pair<Shape, T>> shapeScoring(
+std::vector<std::pair<Shape, unsigned int>> shapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    const std::string& scoreFunc,
     const std::string& mergeCoundition,
     double samplingRate
 );

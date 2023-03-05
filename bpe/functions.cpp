@@ -303,40 +303,22 @@ double calculateAllAttributeEntropy(const Corpus& corpus) {
 }
 
 
-template<typename T>
-std::vector<std::pair<Shape, T>> shapeScoring(
+std::vector<std::pair<Shape, unsigned int>> shapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    const std::string& scoreFunc,
     const std::string& mergeCoundition,
     double samplingRate
 ) {
     if (samplingRate <= 0 || 1 < samplingRate) {
         throw std::runtime_error("samplingRate in shapeScoring not in range (0, 1]");
     }
-    if (scoreFunc != "freq" && scoreFunc != "wplike") {
-        throw std::runtime_error("scoreFunc in shapeScoring not \"freq\" or \"wplike\"");
-    }
-    bool isFreqScore = (scoreFunc == "freq");
     bool isOursMerge = (mergeCoundition == "ours");
 
     // std::chrono::time_point<std::chrono::system_clock> partStartTimePoint = std::chrono::system_clock::now();
-    std::vector<std::pair<Shape, T>> shapeScore;
+    std::vector<std::pair<Shape, unsigned int>> shapeScore;
 
     std::vector<double> shapeFreq(shapeDict.size(), 0);
     size_t totalMultiNoteCount = 0;
-    if (!isFreqScore) {
-        std::vector<size_t> shapeCounts = getShapeCounts(corpus);
-        if (shapeCounts.size() < shapeDict.size()) {
-            shapeCounts.resize(shapeDict.size(), 0);
-        }
-        for (int i = 0; i < shapeCounts.size(); ++i) {
-            totalMultiNoteCount += shapeCounts[i];
-        }
-        for (int i = 0; i < shapeFreq.size(); ++i) {
-            shapeFreq[i] = ((double) shapeCounts[i]) / totalMultiNoteCount;
-        }
-    }
 
     std::vector<unsigned int> samplePieceIndices;
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
@@ -347,13 +329,13 @@ std::vector<std::pair<Shape, T>> shapeScoring(
     }
 
     unsigned int max_thread_num = omp_get_max_threads();
-    std::map<Shape, T> shapeScoreParallel[max_thread_num];
+    std::map<Shape, unsigned int> shapeScoreParallel[max_thread_num];
     #pragma omp parallel for
     for (int h = 0; h < samplePieceIndices.size(); ++h) {
         int i = samplePieceIndices[h];
         int thread_num = omp_get_thread_num();
         // to reduce the times we do "find" operations in big set
-        std::map<Shape, T> tempScoreDiff;
+        std::map<Shape, unsigned int> tempScoreDiff;
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             // for each multinote
@@ -375,16 +357,8 @@ std::vector<std::pair<Shape, T>> shapeScoring(
                     );
                     // empty shape mean overflow happened
                     if (s.size() == 0) continue;
-                    if (isFreqScore) {
-                        // shapeScoreParallel[thread_num][s] += 1;
-                        tempScoreDiff[s] += 1;
-                    }
-                    else {
-                        unsigned int lShapeIndex = corpus.piecesMN[i][j][k].shapeIndex,
-                                     rShapeIndex = corpus.piecesMN[i][j][k+n].shapeIndex;
-                        tempScoreDiff[s] += 1 / (shapeFreq[lShapeIndex] * shapeFreq[rShapeIndex]);
-                        // shapeScoreParallel[thread_num][s] += 1.0 / (shapeFreq[lShapeIndex] + shapeFreq[rShapeIndex]);
-                    }
+                    // shapeScoreParallel[thread_num][s] += 1;
+                    tempScoreDiff[s] += 1;
                 }
             }
         }
@@ -401,10 +375,10 @@ std::vector<std::pair<Shape, T>> shapeScoring(
     return shapeScore;
 }
 
-template<typename T>
-std::pair<Shape, T> findMaxValPair(const std::vector<std::pair<Shape, T>>& shapeScore) {
-    #pragma omp declare reduction(maxsecond: std::pair<Shape, T> : omp_out = omp_in.second > omp_out.second ? omp_in : omp_out)
-    std::pair<Shape, T> maxSecondPair;
+
+std::pair<Shape, unsigned int> findMaxValPair(const std::vector<std::pair<Shape, unsigned int>>& shapeScore) {
+    #pragma omp declare reduction(maxsecond: std::pair<Shape, unsigned int> : omp_out = omp_in.second > omp_out.second ? omp_in : omp_out)
+    std::pair<Shape, unsigned int> maxSecondPair;
     maxSecondPair.second = 0;
     #pragma omp parallel for reduction(maxsecond: maxSecondPair)
     for (int i = 0; i < shapeScore.size(); ++i) {
@@ -415,30 +389,3 @@ std::pair<Shape, T> findMaxValPair(const std::vector<std::pair<Shape, T>>& shape
     return maxSecondPair;
 }
 
-// instantiate function
-// use <unsigned int> when scoreFunc is "freq"
-// use <double> when scoreFunc is "wplike"
-
-template
-std::vector<std::pair<Shape, unsigned int>> shapeScoring<unsigned int>(
-    const Corpus& corpus,
-    const std::vector<Shape>& shapeDict,
-    const std::string& scoreFunc,
-    const std::string& mergeCoundition,
-    double samplingRate
-);
-
-template
-std::vector<std::pair<Shape, double>> shapeScoring<double>(
-    const Corpus& corpus,
-    const std::vector<Shape>& shapeDict,
-    const std::string& scoreFunc,
-    const std::string& mergeCoundition,
-    double samplingRate
-);
-
-template
-std::pair<Shape, unsigned int> findMaxValPair(const std::vector<std::pair<Shape, unsigned int>>& shapeScore);
-
-template
-std::pair<Shape, double> findMaxValPair(const std::vector<std::pair<Shape, double>>& shapeScore);
