@@ -60,7 +60,7 @@ def parse_args():
 
 def midi_to_features_wrapper(args_dict: dict):
     try:
-        midifile_obj = MidiFile(args_dict['midi_path'])
+        midifile_obj = MidiFile(args_dict['midi_file_path'])
         features = midi_to_features(midi=midifile_obj, max_pairs_number=args_dict['max_pairs_number'])
     except Exception:
         logging.debug(format_exc())
@@ -110,7 +110,7 @@ def main():
         else:
             sampled_indices = random.sample(list(range(dataset_size)), args.sample_number - len(eval_features_per_piece))
         eval_args_dict_list = [
-            {'midi_path': file_path_list[idx], 'max_pairs_number': args.max_pairs_number}
+            {'midi_file_path': file_path_list[idx], 'max_pairs_number': args.max_pairs_number}
             for idx in sampled_indices
         ]
         with Pool(args.workers) as p:

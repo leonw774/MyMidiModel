@@ -8,7 +8,7 @@ from typing import Dict
 import numpy as np
 from miditoolkit import MidiFile
 
-from .tokens import get_largest_possible_position, b36str2int, MEASURE_EVENTS_CHAR
+from .tokens import get_largest_possible_position, get_supported_time_signatures, b36str2int, MEASURE_EVENTS_CHAR
 from .midi import piece_to_midi, midi_to_text_list
 
 
@@ -183,7 +183,7 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) ->
     while measure_onsets[-1] < end_note_onset:
         measure_onsets.append(measure_onsets[-1] + cur_measure_length)
 
-    max_position = get_largest_possible_position(nth)
+    max_position = get_largest_possible_position(nth, get_supported_time_signatures())
     instrumentation_per_bar = np.zeros(shape=(len(measure_onsets), 129), dtype=np.bool8)
     grooving_per_bar = np.zeros(shape=(len(measure_onsets), max_position), dtype=np.bool8)
     for track in midi.instruments:

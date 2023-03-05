@@ -54,7 +54,7 @@ EndOfScoreToken = namedtuple(
 )
 
 def get_supported_time_signature(
-        numerator_max: int = 24, # hard-coded, dont alter
+        numerator_max: int = 24, # hard-coded default
         denominator_log2_max: int = 4, # 2, 4, 8, 16
         nd_raio_max: float = 3) -> set:
     return {
@@ -64,7 +64,12 @@ def get_supported_time_signature(
     }
 
 # if use default (hard-coded), should be 96
-def get_largest_possible_position(nth: int, supported_time_signatures: set) -> int:
+def get_largest_possible_position(nth: int, supported_time_signatures: set = None) -> int:
+    if supported_time_signatures is None:
+        return max(
+            s[0] * (nth // s[1])
+            for s in get_supported_time_signature() # use default
+        )
     return max(
         s[0] * (nth // s[1])
         for s in supported_time_signatures
