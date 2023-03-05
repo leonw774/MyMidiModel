@@ -110,7 +110,7 @@ def main():
             sampled_indices = list(sample_able_indices)
         else:
             sampled_indices = random.sample(list(sample_able_indices), args.sample_number - len(eval_features_per_piece))
-            sample_able_indices = sample_able_indices.difference_update(sampled_indices)
+            sample_able_indices.difference_update(sampled_indices)
         eval_args_dict_list = [
             {'midi_file_path': file_path_list[idx], 'max_pairs_number': args.max_pairs_number}
             for idx in sampled_indices
