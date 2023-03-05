@@ -2,7 +2,7 @@ from . import tokens
 from .tokens import (
     int2b36str,
     get_largest_possible_position,
-    get_supported_time_signature
+    get_supported_time_signatures
 )
 
 class Vocabs:
@@ -102,7 +102,7 @@ def build_vocabs(
     # - measure and time_signature
     # - tempo change
 
-    supported_time_signatures = get_supported_time_signature()
+    supported_time_signatures = get_supported_time_signatures()
     largest_possible_position = get_largest_possible_position(paras['nth'], supported_time_signatures)
 
     event_multi_note_shapes = (

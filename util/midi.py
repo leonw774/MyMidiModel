@@ -9,7 +9,7 @@ from .tokens import (
     BeginOfScoreToken, SectionSeperatorToken, EndOfScoreToken,
     NoteToken, TempoToken, PositionToken, MeasureToken, TrackToken,
     TYPE_PRIORITY,
-    get_supported_time_signature,
+    get_supported_time_signatures,
     token_to_str,
     b36str2int,
 )
@@ -439,7 +439,7 @@ def midi_to_text_list(
 
     merge_tracks(midi, max_track_number, use_merge_drums)
 
-    supported_time_signatures = get_supported_time_signature()
+    supported_time_signatures = get_supported_time_signatures()
 
     for i, track in enumerate(midi.instruments):
         if track.is_drum:
