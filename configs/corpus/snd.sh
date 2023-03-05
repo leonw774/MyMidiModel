@@ -14,4 +14,4 @@ MIDI_DIR_PATH="data/midis/SymphonyNet_Dataset"
 DATA_NAME="snd"
 
 # vocab setting
-COMBINE_TRACK_INST=false
+COMBINE_TRACK_INST=true
