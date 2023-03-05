@@ -224,7 +224,7 @@ def main():
             tracks_text = piece[4:head_end]
             track_tokens = tracks_text.split()
             for track_token in track_tokens:
-                instrument_id = b36str2int(track_token.split(':')[2])
+                instrument_id = b36str2int(track_token.split(':')[0][1:])
                 distributions['instrument'][instrument_id] += 1
 
             multinote_number = piece.count(' '+tokens.NOTE_EVENTS_CHAR) + piece.count(' '+tokens.MULTI_NOTE_EVENTS_CHAR)
