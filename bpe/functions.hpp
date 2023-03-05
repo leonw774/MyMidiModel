@@ -25,7 +25,6 @@ std::vector<std::pair<Shape, unsigned int>> shapeScoring(
     double samplingRate
 );
 
-template<typename T>
-std::pair<Shape, T> findMaxValPair(const std::vector<std::pair<Shape, T>>& shapeScore);
+std::pair<Shape, unsigned int> findMaxValPair(const std::vector<std::pair<Shape, unsigned int>>& shapeScore);
 
 #endif
