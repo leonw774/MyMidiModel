@@ -116,12 +116,12 @@ TOKEN_ATTR_INDEX = {
 }
 
 COMPLETE_ATTR_NAME = [
-    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions',
-    'measure_numbers', 'tempos', 'time_signatures'
+    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments',
+    'positions', 'measure_numbers', 'tempos', 'time_signatures'
 ]
 
 OUTPUT_ATTR_NAME = [
-    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions'
+    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments'
 ]
 
 
@@ -135,8 +135,6 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         If a token doesn't have an attribute, fill it with the index of PAD (which should be zero).
         If a token has an attrbute, but it is not in the dictionary, fill the index of UNK.
     """
-    position_method = vocabs.paras['position_method']
-    vocabs.events.text2id = vocabs.events.text2id
     # in build_vocabs, padding token is made to be the 0th element
     padding = 0
 
@@ -172,7 +170,12 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
 
         elif typename == tokens.TRACK_EVENTS_CHAR:
-            event_text, track_number, instrument = text.split(':')
+            if vocabs.combine_track_instrument:
+                event_text, track_number = text.split(':')
+                instrument = event_text[1:]
+            else:
+                event_text, track_number = text.split(':')
+                event_text, instrument = event_text[0], event_text[1:]
             tracks_count += 1
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][TOKEN_ATTR_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
@@ -191,11 +194,8 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         elif typename == tokens.TEMPO_EVENTS_CHAR:
             event_text, *attr = text = text.split(':')
             cur_tempo_id = vocabs.tempos.text2id[event_text]
-            if position_method == 'attribute':
-                cur_position_id = b36str2int(attr[0])
-            else:
-                # because tempo come after position and the position token was assigned to previous tempo's id
-                x[cur_position_cursor][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
+            # because tempo come after position and the position token was assigned to previous tempo's id
+            x[cur_position_cursor][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
             x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
@@ -213,8 +213,6 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
 
         elif typename == tokens.NOTE_EVENTS_CHAR or typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             event_text, *attr = text.split(':')
-            if position_method == 'attribute':
-                cur_position_id = vocabs.positions.text2id[attr[4]]
             x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][TOKEN_ATTR_INDEX['pit']] = vocabs.pitchs.text2id[attr[0]]
             x[i][TOKEN_ATTR_INDEX['dur']] = vocabs.durations.text2id[attr[1]]
@@ -248,13 +246,9 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
         Inverse of text_list_to_array.
         Expect array to be numpy-like array
     """
-    position_method = vocabs.paras['position_method']
     assert len(array.shape) == 2 and array.shape[0] > 0, f'Bad numpy array shape: {array.shape}'
     if is_output:
-        if position_method == 'event':
-            assert array.shape[1] == len(OUTPUT_ATTR_NAME) - 1, f'Bad numpy array shape: {array.shape}'
-        else:
-            assert array.shape[1] == len(OUTPUT_ATTR_NAME), f'Bad numpy array shape: {array.shape}'
+        assert array.shape[1] == len(OUTPUT_ATTR_NAME) - 1, f'Bad numpy array shape: {array.shape}'
     else:
         assert array.shape[1] == len(COMPLETE_ATTR_NAME), f'Bad numpy array shape: {array.shape}'
 
@@ -296,8 +290,6 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
                 + vocabs.velocities.id2text[array[i][TOKEN_ATTR_INDEX['vel']]] + ':'
                 + int2b36str(track_number)
             )
-            if position_method == 'attribute':
-                token_text += ':' + vocabs.positions.id2text[array[i][TOKEN_ATTR_INDEX['pos']]]
             text_list.append(token_text)
         elif event_text == tokens.PADDING_TOKEN_STR:
             pass

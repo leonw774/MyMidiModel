@@ -99,7 +99,6 @@ def midi_to_features(midi: MidiFile, max_pairs_number: int = int(1e6)) -> Dict[s
         velocity_step=1,
         use_cont_note=True,
         tempo_quantization=(1,1,65536),
-        position_method='event',
         use_merge_drums=False
     ))
     return piece_to_features(temp_piece, nth, max_pairs_number)

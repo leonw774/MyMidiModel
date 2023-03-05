@@ -28,6 +28,7 @@ class Vocabs:
     paras: dict
     bpe_shapes_list: list
     padding_token: str
+    combine_track_instrument: bool
     events: AttrVocab
     pitchs: AttrVocab
     durations: AttrVocab
@@ -37,11 +38,12 @@ class Vocabs:
     positions: AttrVocab
     tempos: AttrVocab
 
-    def __init__(self, paras: dict, bpe_shapes_list: list, padding_token: str,
+    def __init__(self, paras: dict, bpe_shapes_list: list, padding_token: str, combine_track_instrument: bool,
             events, pitchs, durations, velocities, track_numbers, instruments, positions, tempos, time_signatures) -> None:
         self.paras = paras
         self.bpe_shapes_list = bpe_shapes_list
         self.padding_token = padding_token
+        self.combine_track_instrument = combine_track_instrument
         self.events = Vocabs.AttrVocab(events)
         self.pitchs = Vocabs.AttrVocab(pitchs)
         self.durations = Vocabs.AttrVocab(durations)
@@ -56,6 +58,7 @@ class Vocabs:
     def from_dict(cls, d):
         return cls(
             d['paras'], d['bpe_shapes_list'], d['padding_token'],
+            d['combine_track_instrument'],
             d['events'], d['pitchs'], d['durations'],
             d['velocities'], d['track_numbers'], d['instruments'],
             d['positions'], d['tempos'], d['time_signatures']
@@ -66,6 +69,7 @@ class Vocabs:
             'paras': self.paras,
             'bpe_shapes_list': self.bpe_shapes_list,
             'padding_token': self.padding_token,
+            'combine_track_instrument': self.combine_track_instrument,
             'events': vars(self.events),
             'pitchs': vars(self.pitchs),
             'durations': vars(self.durations),
@@ -81,7 +85,8 @@ class Vocabs:
 def build_vocabs(
         corpus_reader,
         paras: dict,
-        bpe_shapes_list: list):
+        bpe_shapes_list: list,
+        combine_track_instrument: bool):
     """
         Parameters:
         - bpe_shapes_list: The multinote shape are learned by bpe algorithms.
@@ -92,7 +97,7 @@ def build_vocabs(
     # Events include:
     # - begin-of-score, end-of-score and seperator
     # - shape of multi-note/note
-    # - track and instrument
+    # - track
     # - position
     # - measure and time_signature
     # - tempo change
@@ -104,11 +109,13 @@ def build_vocabs(
         [tokens.NOTE_EVENTS_CHAR, tokens.NOTE_EVENTS_CHAR+'~']
         + [tokens.MULTI_NOTE_EVENTS_CHAR+shape for shape in bpe_shapes_list]
     )
-    event_track_instrument = [tokens.TRACK_EVENTS_CHAR]
+    event_track_instrument = (
+        [tokens.TRACK_EVENTS_CHAR+int2b36str(i) for i in range(129)]
+        if combine_track_instrument else
+        [tokens.TRACK_EVENTS_CHAR]
+    )
     event_position = (
         [tokens.POSITION_EVENTS_CHAR+int2b36str(i) for i in range(largest_possible_position)]
-        if paras['position_method'] == 'event' else
-        []
     )
     event_measure_time_sig = [
         f'{tokens.MEASURE_EVENTS_CHAR}{int2b36str(n)}/{int2b36str(d)}' for n, d in supported_time_signatures
@@ -125,7 +132,7 @@ def build_vocabs(
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
         existed_measure_time_sigs.update({text for text in text_list if text[0] == tokens.MEASURE_EVENTS_CHAR})
-    event_measure_time_sig = [t for t in event_measure_time_sig if t in existed_measure_time_sigs]
+    # event_measure_time_sig = [t for t in event_measure_time_sig if t in existed_measure_time_sigs]
 
     # padding token HAVE TO be at first
     event_vocab = (
@@ -150,7 +157,7 @@ def build_vocabs(
     summary_string = (
         f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
         f'Event vocab size: {len(event_vocab)}\n'\
-        f'- Measure-time signature: {len(event_measure_time_sig)}\n'\
+        f'- Measure-time signature: {len(event_measure_time_sig)} (existed_measure_time_sigs: {len(existed_measure_time_sigs)})\n'\
         f'- Position: {len(position_vocab)}\n'\
         f'- Tempo: {len(event_tempo)} ({event_tempo})\n'\
         f'- Shape: {len(event_multi_note_shapes)}\n'\
@@ -164,6 +171,7 @@ def build_vocabs(
     vocabs = Vocabs(
         paras=paras,
         bpe_shapes_list=bpe_shapes_list,
+        combine_track_instrument=combine_track_instrument,
         padding_token=tokens.PADDING_TOKEN_STR,
         events=event_vocab,
         pitchs=pitch_vocab,

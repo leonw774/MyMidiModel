@@ -50,6 +50,12 @@ def parse_args():
             If the number is integer that greater than 0, it implicated that BPE was performed.'
     )
     parser.add_argument(
+        '--combine-track-instrument',
+        action='store_true',
+        help='If this is set, "instrument" will become a contextual attribute instead of essential one.\
+            The track symbol will expand into 129 track+instrument symbols.'
+    )
+    parser.add_argument(
         '--mp-worker-number',
         type=int,
         default=1
@@ -132,7 +138,7 @@ def main():
     with CorpusReader(args.corpus_dir_path) as corpus_reader:
         assert len(corpus_reader) > 0, f'empty corpus: {args.corpus_dir_path}'
 
-        vocabs, summary_string = build_vocabs(corpus_reader, corpus_paras, bpe_shapes_list)
+        vocabs, summary_string = build_vocabs(corpus_reader, corpus_paras, bpe_shapes_list, args.combine_track_instrument)
         with open(vocab_path, 'w+', encoding='utf8') as vocabs_file:
             json.dump(vocabs.to_dict(), vocabs_file)
         logging.info(summary_string)

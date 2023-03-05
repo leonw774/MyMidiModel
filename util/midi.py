@@ -336,14 +336,11 @@ def get_time_structure_tokens(
     return  measure_token_list, tempo_token_list
 
 
-def get_position_infos(note_token_list: list, measure_token_list: list, tempo_token_list: list, position_method: str):
+def get_position_infos(note_token_list: list, measure_token_list: list, tempo_token_list: list):
     nmt_token_list = measure_token_list + note_token_list + tempo_token_list
     nmt_token_list.sort()
 
     position_token_list = []
-    if position_method == 'attribute':
-        note_token_list.clear()
-        tempo_token_list.clear()
 
     cur_measure_onset = 0
     last_added_position_onset = 0
@@ -354,8 +351,16 @@ def get_position_infos(note_token_list: list, measure_token_list: list, tempo_to
             cur_measure_onset = token.onset
 
         elif token.type_priority == TYPE_PRIORITY['TempoToken']:
-            if position_method == 'event':
-            # if token.onset > last_added_position_onset: # don't need this because tempo must come before notes
+        # if token.onset > last_added_position_onset: # don't need this because tempo must come before notes
+            position_token_list.append(
+                PositionToken(
+                    onset=token.onset,
+                    position=token.onset-cur_measure_onset
+                )
+            )
+            last_added_position_onset = token.onset
+        elif token.type_priority == TYPE_PRIORITY['NoteToken']:
+            if token.onset > last_added_position_onset:
                 position_token_list.append(
                     PositionToken(
                         onset=token.onset,
@@ -363,28 +368,6 @@ def get_position_infos(note_token_list: list, measure_token_list: list, tempo_to
                     )
                 )
                 last_added_position_onset = token.onset
-            else:
-                tempo_token_list.append(
-                    token._replace(
-                        position=token.onset-cur_measure_onset
-                    )
-                )
-        elif token.type_priority == TYPE_PRIORITY['NoteToken']:
-            if position_method == 'event':
-                if token.onset > last_added_position_onset:
-                    position_token_list.append(
-                        PositionToken(
-                            onset=token.onset,
-                            position=token.onset-cur_measure_onset
-                        )
-                    )
-                    last_added_position_onset = token.onset
-            else:
-                note_token_list.append(
-                    token._replace(
-                        position=token.onset-cur_measure_onset
-                    )
-                )
     return position_token_list
 
 
@@ -406,14 +389,13 @@ def midi_to_token_list(
         velocity_step: int,
         use_cont_note: bool,
         tempo_quantization: Tuple[int, int, int],
-        position_method: str,
         supported_time_signatures: set) -> list:
 
     note_token_list = get_note_tokens(midi, max_duration, velocity_step, use_cont_note)
     assert len(note_token_list) > 0, 'No notes in midi'
     measure_token_list, tempo_token_list = get_time_structure_tokens(midi, note_token_list, nth, tempo_quantization, supported_time_signatures)
     assert measure_token_list[0].onset <= note_token_list[0].onset, 'First measure is after first note'
-    pos_token_list = get_position_infos(note_token_list, measure_token_list, tempo_token_list, position_method)
+    pos_token_list = get_position_infos(note_token_list, measure_token_list, tempo_token_list)
     body_token_list = pos_token_list + note_token_list + measure_token_list + tempo_token_list
     body_token_list.sort()
 
@@ -430,7 +412,6 @@ def midi_to_text_list(
         velocity_step: int,
         use_cont_note: bool,
         tempo_quantization: Tuple[int, int, int], # [tempo_min, tempo_max, tempo_step]
-        position_method: str,
         use_merge_drums: bool) -> list:
     """
         Parameters:
@@ -441,10 +422,6 @@ def midi_to_text_list(
         - max_duration: max length of duration in unit of nth note
         - velocity_step: velocity to be quantize as (velocity_step//2, 3*velocity_step//2, 5*velocity_step//2, ...)
         - use_cont_note: have contiuing notes or not
-        - position_method: can be 'attribute' or 'event'
-          - 'attribute' means position info is part of the note token
-          - 'event' means position info will be its own event token.
-            the token will be placed after the position token and before the note tokens in the same position
         - tempo_quantization: (min, max, step), where min and max are INCLUSIVE
         - use_merge_drums: to merge drums tracks or not
     """
@@ -474,7 +451,6 @@ def midi_to_text_list(
         velocity_step,
         use_cont_note,
         tempo_quantization,
-        position_method,
         supported_time_signatures
     )
 
@@ -557,7 +533,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
         typename = text[0]
         if typename == tokens.TRACK_EVENTS_CHAR:
             assert is_head, 'Track token at body'
-            track_number, instrument = (b36str2int(x) for x in text[2:].split(':'))
+            instrument, track_number = (b36str2int(x) for x in text[1:].split(':'))
             assert track_number not in track_program_mapping, 'Repeated track number'
             # assertion below restrict track list to just: 1, ..., n
             assert track_number == len(track_program_mapping), 'Track number not increasing by one'
@@ -598,12 +574,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
 
         elif typename == tokens.TEMPO_EVENTS_CHAR:
             assert not is_head, 'Tempo token at head'
-            if ':' in text[1:]:
-                tempo, position = (b36str2int(x) for x in text[1:].split(':'))
-                cur_time = position + cur_measure_onset
-                midi.tempo_changes.append(TempoChange(tempo=tempo, time=cur_time))
-            else:
-                midi.tempo_changes.append(TempoChange(tempo=b36str2int(text[1:]), time=cur_time))
+            midi.tempo_changes.append(TempoChange(tempo=b36str2int(text[1:]), time=cur_time))
 
         elif typename == tokens.NOTE_EVENTS_CHAR:
             assert not is_head, 'Note token at head'
@@ -612,11 +583,8 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
                 note_attrs = tuple(b36str2int(x) for x in text[3:].split(':'))
             else:
                 note_attrs = tuple(b36str2int(x) for x in text[2:].split(':'))
-            # note_attrs = pitch, duration, velocity, track_number, (position)
+            # note_attrs = pitch, duration, velocity, track_number
             assert note_attrs[3] in track_program_mapping, 'Note not in used track'
-            if len(note_attrs) == 5:
-                cur_time = note_attrs[4] + cur_measure_onset
-                note_attrs = note_attrs[:4]
             n = handle_note_continuation(is_cont, note_attrs, cur_time, pending_cont_notes)
             if n is not None:
                 midi.instruments[note_attrs[3]].notes.append(n)
@@ -632,10 +600,8 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
                 else:
                     relnote = [False] + [b36str2int(a) for a in s.split(',')]
                 relnote_list.append(relnote)
-            base_pitch, stretch_factor, velocity, track_number, *position = (b36str2int(x) for x in other_attr)
+            base_pitch, stretch_factor, velocity, track_number = (b36str2int(x) for x in other_attr)
             assert track_number in track_program_mapping, 'Multi-note not in used track'
-            if len(position) == 1:
-                cur_time = position[0] + cur_measure_onset
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
                 note_attrs = (base_pitch + rel_pitch, rel_dur * stretch_factor, velocity, track_number)
                 # when using BPE, sometimes model will generated the combination that

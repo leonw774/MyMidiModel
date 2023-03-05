@@ -61,17 +61,6 @@ def parse_args():
         help='Three integers: (min, max, step), where min and max are INCLUSIVE. Default is %(default)s.'
     )
     handler_args_parser.add_argument(
-        '--position-method',
-        dest='position_method',
-        type=str,
-        choices=['event', 'attribute'],
-        default='event',
-        help="Could be 'event' or 'attribute'. \
-            'attribute' means position info is part of the note token. \
-            'event' means position info will be its own event token. \
-            Default is %(default)s"
-    )
-    handler_args_parser.add_argument(
         '--use-continuing-note',
         dest='use_cont_note',
         action='store_true'

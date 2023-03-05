@@ -87,11 +87,11 @@ class MidiDataset(Dataset):
         # _mps_seperators is empty when `use_permutable_subseq_loss` is not True
         self._mps_seperators = list()
         self._bos_id = self.vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
-        self._trn_id = self.vocabs.events.text2id[tokens.TRACK_EVENTS_CHAR]
         self._sep_id = self.vocabs.events.text2id[tokens.SEP_TOKEN_STR]
         self._eos_id = self.vocabs.events.text2id[tokens.END_TOKEN_STR]
         # the pad id should be the same across all vocabs (aka zero)
         self._pad_id = self.vocabs.events.text2id[self.vocabs.padding_token]
+        self._track_ids = set()
         self._tempo_ids = set()
         self._measure_ids = list()
         self._position_ids = list()
@@ -105,14 +105,16 @@ class MidiDataset(Dataset):
                 self._measure_ids.append(index)
             elif text[0] == tokens.TEMPO_EVENTS_CHAR:
                 self._tempo_ids.add(index)
+            elif text[0] == tokens.TRACK_EVENTS_CHAR:
+                self._track_ids.add(index)
         if use_permutable_subseq_loss or permute_mps:
             self._mps_seperators = set([
                 self._pad_id,
                 self._bos_id,
-                self._trn_id,
                 self._sep_id,
                 self._eos_id,
             ])
+            self._mps_seperators.update(self._track_ids)
             self._mps_seperators.update(self._measure_ids)
             self._mps_seperators.update(self._position_ids)
             self._mps_seperators = np.sort(np.array(list(self._mps_seperators)))

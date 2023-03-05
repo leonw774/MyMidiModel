@@ -152,7 +152,7 @@ struct Corpus {
 
 std::map<std::string, std::string> readParasFile(std::ifstream& paraFile);
 
-Corpus readCorpusFile(std::ifstream& corpusFile, int nth, std::string positionMethod);
+Corpus readCorpusFile(std::ifstream& corpusFile, int nth);
 
 void writeShapeVocabFile(std::ostream& vocabOutfile, const std::vector<Shape>& shapeDict);
 
@@ -160,8 +160,7 @@ void writeOutputCorpusFile(
     std::ostream& tokenizedCorpusFile,
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    int maxTrackNum,
-    const std::string& positionMethod
+    int maxTrackNum
 );
 
 #endif

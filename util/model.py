@@ -91,9 +91,8 @@ class MyMidiTransformer(nn.Module):
             TOKEN_ATTR_INDEX[fname]
             for fname in OUTPUT_ATTR_NAME
         ]
-        if vocabs.paras['position_method'] == 'event':
-            # remove position, the last attribute in OUTPUT_ATTR_NAME
-            self.output_attrs_indices.pop()
+        if vocabs.combine_track_instrument:
+            self.output_attrs_indices.remove(TOKEN_ATTR_INDEX['instruments'])
         self.logit_vocabs_size = [
             getattr(vocabs, OUTPUT_ATTR_NAME[i]).size
             for i in self.output_attrs_indices
@@ -247,7 +246,6 @@ def adjust_probs_with_context(
     """
     assert len(context_text_list) > 0, 'Empty context_text_list'
     assert len(probs) == len(OUTPUT_ATTR_NAME) or len(probs) == len(OUTPUT_ATTR_NAME) - 1, 'Bad probs'
-    position_method_is_event = len(probs) == len(OUTPUT_ATTR_NAME) - 1
 
     bos_index = vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
     sep_index = vocabs.events.text2id[tokens.SEP_TOKEN_STR]
@@ -285,9 +283,9 @@ def adjust_probs_with_context(
         for i in track_instrument_indices:
             probs[TOKEN_ATTR_INDEX['evt']][i] = 0
 
-        # if the last token in context_text_list token is measure and position method is event
+        # if the last token in context_text_list token is measure
         # then the next token's event can not be multi-note or tempo
-        if context_text_list[-1][0] == tokens.MEASURE_EVENTS_CHAR and position_method_is_event:
+        if context_text_list[-1][0] == tokens.MEASURE_EVENTS_CHAR:
             for i in multinote_indices.union(tempo_indices):
                 probs[TOKEN_ATTR_INDEX['evt']][i] = 0
 
@@ -358,8 +356,7 @@ def generate_sample(
         nucleus_sampling_threshold: float = 1.0,
         print_exception: bool = False,
         show_tqdm: bool = False,
-        ignore_pending_note_error: bool = True
-        ) -> list:
+        ignore_pending_note_error: bool = True) -> list:
     """
         Expect start_seq to be Tensor with shape: (1, seq_size, complete_attr_number) or None
         If start_seq is None, will use `text_list_to_array([BEGIN_TOKEN_STR])` as start_seq

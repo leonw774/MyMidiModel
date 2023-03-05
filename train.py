@@ -305,7 +305,8 @@ def main():
         loss_csv_head = 'step,'
         train_output_attr_name = ['train_' + n for n in OUTPUT_ATTR_NAME]
         valid_output_attr_name = ['valid_' + n for n in OUTPUT_ATTR_NAME]
-        if vocabs.paras['position_method'] == 'event':
+        if vocabs.combine_track_instrument:
+            # remove instrument from output attribute names
             train_output_attr_name = train_output_attr_name[:-1]
             valid_output_attr_name = valid_output_attr_name[:-1]
         loss_csv_head += ','.join(

@@ -104,19 +104,17 @@ int main(int argc, char *argv[]) {
     // read parameters
     std::map<std::string, std::string> paras = readParasFile(parasFile);
     int nth, maxDur, maxTrackNum;
-    std::string positionMethod;
     // stoi: c++11 thing
     nth = stoi(paras[std::string("nth")]);
     maxDur = stoi(paras[std::string("max_duration")]);
     maxTrackNum = stoi(paras[std::string("max_track_number")]);
-    positionMethod = paras[std::string("position_method")];
-    if (nth <= 0 || maxDur <= 0 || maxDur > 255 || maxTrackNum <= 0 || (positionMethod != "event" && positionMethod != "attribute")) {
+    if (nth <= 0 || maxDur <= 0 || maxDur > 255 || maxTrackNum <= 0) {
         std::cout << "Corpus parameter error" << std::endl;
         return 1;
     }
 
     // read notes from corpus
-    Corpus corpus = readCorpusFile(inCorpusFile, nth, positionMethod);
+    Corpus corpus = readCorpusFile(inCorpusFile, nth);
     std::cout << "Reading done. There are " << corpus.piecesTP.size() << " pieces" << std::endl;
 
     std::vector<Shape> shapeDict = getDefaultShapeDict();
@@ -315,7 +313,7 @@ int main(int argc, char *argv[]) {
     ioStartTimePoint = std::chrono::system_clock::now();
     writeShapeVocabFile(vocabFile, shapeDict);
     std::cout << "Writing merged corpus file" << std::endl;
-    writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum, positionMethod);
+    writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum);
     std::cout << "Writing done. Writing used time: " << (std::chrono::system_clock::now() - ioStartTimePoint) / oneSencondDur << '\n'
         << "Total used time: " << (std::chrono::system_clock::now() - programStartTimePoint) / oneSencondDur - metricsTime << std::endl;
     return 0;

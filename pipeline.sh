@@ -129,7 +129,12 @@ if [ $BPE_ITER -ne 0 ]; then
     CORPUS_DIR_PATH=$CORPUS_DIR_PATH_WITH_BPE
 fi
 
-python3 make_arrays.py --debug --bpe $BPE_ITER --mp-worker-number $PROCESS_WORKERS --log $LOG_PATH $CORPUS_DIR_PATH $USE_EXISTED
+if [ "$COMBINE_TRACK_INST" == true ]; then
+    $COMBINE_TRACK_INST="--combine-track-instrument"
+else
+    $COMBINE_TRACK_INST=""
+fi 
+python3 make_arrays.py --debug --bpe $BPE_ITER $COMBINE_TRACK_INST --mp-worker-number $PROCESS_WORKERS --log $LOG_PATH $CORPUS_DIR_PATH $USE_EXISTED
 test $? -ne 0 && { echo "text_to_array.py failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
 # test if NO_TRAIN is a set variables

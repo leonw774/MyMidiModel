@@ -54,16 +54,16 @@ EndOfScoreToken = namedtuple(
 )
 
 def get_supported_time_signature(
-        numerator_max: int = 64, # hard-coded, dont alter
-        denominator_log2_max: int = 4,
+        numerator_max: int = 24, # hard-coded, dont alter
+        denominator_log2_max: int = 4, # 2, 4, 8, 16
         nd_raio_max: float = 3) -> set:
     return {
         (numerator, denominator)
         for denominator in [int(2 ** (log2d+1)) for log2d in range(denominator_log2_max)]
-        for numerator in range(1, min(numerator_max, denominator*nd_raio_max+1))
+        for numerator in range(1, min(numerator_max+1, denominator*nd_raio_max+1))
     }
 
-
+# if use default (hard-coded), should be 96
 def get_largest_possible_position(nth: int, supported_time_signatures: set) -> int:
     return max(
         s[0] * (nth // s[1])
@@ -131,8 +131,7 @@ def token_to_str(token: namedtuple) -> str:
         return f'{TEMPO_EVENTS_CHAR}{int2b36str(token.bpm)}:{int2b36str(token.position)}'
 
     elif type_priority == TYPE_PRIORITY['TrackToken']:
-        # event:track:instrument
-        return f'{TRACK_EVENTS_CHAR}:{int2b36str(token.track_number)}:{int2b36str(token.instrument)}'
+        return f'{TRACK_EVENTS_CHAR}{int2b36str(token.instrument)}:{int2b36str(token.track_number)}'
 
     elif type_priority == TYPE_PRIORITY['BeginOfScoreToken']:
         return BEGIN_TOKEN_STR
