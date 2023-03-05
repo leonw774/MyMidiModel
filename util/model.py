@@ -257,8 +257,6 @@ def adjust_probs_with_context(
         tempo_indices
     ) = event_family_indices
 
-    # adjust event attribute logit
-
     # BOS token is redundent, will not be used in generation
     probs[TOKEN_ATTR_INDEX['evt']][bos_index] = 0
     # predict PAD is not allowed in generation time
@@ -279,9 +277,10 @@ def adjust_probs_with_context(
             if i not in measure_indices:
                 probs[TOKEN_ATTR_INDEX['evt']][i] = 0
     else: # if the section is body
-        # the next token's event can not be track-instrument
+        # the next token's event can not be track-instrument or sep
         for i in track_instrument_indices:
             probs[TOKEN_ATTR_INDEX['evt']][i] = 0
+        probs[TOKEN_ATTR_INDEX['evt']][sep_index] = 0
 
         # if the last token in context_text_list token is measure
         # then the next token's event can not be multi-note or tempo
@@ -322,7 +321,7 @@ def adjust_probs_with_context(
             raise e
         # start from max_track_number+1+1
         # first +1 is because index 0 is padding
-        # second +1 is because we reset any index that greater than max_track_number+1
+        # second +1 is because we want indices that greater than max_track_number+1
         for i in range(max_track_number+1+1, vocabs.track_numbers.size):
             probs[TOKEN_ATTR_INDEX['trn']][i] = 0
 
