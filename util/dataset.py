@@ -144,10 +144,10 @@ class MidiDataset(Dataset):
             self._piece_lengths[filenum] = cur_piece_lengths
 
             j = 2 # because first token is BOS and second must be track as we excluded all empty midis
-            while self.pieces[str(filenum)][j][TOKEN_ATTR_INDEX['evt']] == self._trn_id:
+            while self.pieces[str(filenum)][j][TOKEN_ATTR_INDEX['evt']] != self._sep_id:
                 j += 1
-            self._piece_body_start_index[filenum] = j
-            self._virtual_piece_start_index[filenum][0] = j
+            self._piece_body_start_index[filenum] = j + 1
+            self._virtual_piece_start_index[filenum][0] = j + 1
 
             # create virtual pieces from overlength pieces
             if measure_sample_step_ratio > 0:
