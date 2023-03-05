@@ -431,10 +431,7 @@ def midi_to_text_list(
         use_cont_note: bool,
         tempo_quantization: Tuple[int, int, int], # [tempo_min, tempo_max, tempo_step]
         position_method: str,
-        use_merge_drums: bool,
-        numerator_max: int = 32,
-        denominator_log2_max: int = 4,
-        nd_raio_max: float = 3) -> list:
+        use_merge_drums: bool) -> list:
     """
         Parameters:
         - midi_file_path: midi file path
@@ -450,7 +447,6 @@ def midi_to_text_list(
             the token will be placed after the position token and before the note tokens in the same position
         - tempo_quantization: (min, max, step), where min and max are INCLUSIVE
         - use_merge_drums: to merge drums tracks or not
-        - numerator_max, denominator_log2_max, and nd_raio_max: parameter for supported time signatures. hard-coded, dont alter.
     """
 
     assert nth > 4 and nth % 4 == 0, 'nth is not multiple of 4'
@@ -466,7 +462,7 @@ def midi_to_text_list(
 
     merge_tracks(midi, max_track_number, use_merge_drums)
 
-    supported_time_signatures = get_supported_time_signature(numerator_max, denominator_log2_max, nd_raio_max)
+    supported_time_signatures = get_supported_time_signature()
 
     for i, track in enumerate(midi.instruments):
         if track.is_drum:

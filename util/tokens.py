@@ -54,9 +54,9 @@ EndOfScoreToken = namedtuple(
 )
 
 def get_supported_time_signature(
-        numerator_max: int,
-        denominator_log2_max: int,
-        nd_raio_max: float) -> set:
+        numerator_max: int = 64, # hard-coded, dont alter
+        denominator_log2_max: int = 4,
+        nd_raio_max: float = 3) -> set:
     return {
         (numerator, denominator)
         for denominator in [int(2 ** (log2d+1)) for log2d in range(denominator_log2_max)]

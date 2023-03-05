@@ -1,9 +1,8 @@
-# from util.corpus import CorpusReader # will cause circular import
 from . import tokens
 from .tokens import (
     int2b36str,
     get_largest_possible_position,
-    SUPPORTED_TIME_SIGNATURES
+    get_supported_time_signature
 )
 
 class Vocabs:
@@ -98,23 +97,37 @@ def build_vocabs(
     # - measure and time_signature
     # - tempo change
 
+    supported_time_signatures = get_supported_time_signature()
+    largest_possible_position = get_largest_possible_position(paras['nth'], supported_time_signatures)
+
     event_multi_note_shapes = (
         [tokens.NOTE_EVENTS_CHAR, tokens.NOTE_EVENTS_CHAR+'~']
         + [tokens.MULTI_NOTE_EVENTS_CHAR+shape for shape in bpe_shapes_list]
     )
     event_track_instrument = [tokens.TRACK_EVENTS_CHAR]
     event_position = (
-        [tokens.POSITION_EVENTS_CHAR+int2b36str(i) for i in range(get_largest_possible_position(paras['nth']))]
+        [tokens.POSITION_EVENTS_CHAR+int2b36str(i) for i in range(largest_possible_position)]
         if paras['position_method'] == 'event' else
         []
     )
     event_measure_time_sig = [
-        f'{tokens.MEASURE_EVENTS_CHAR}{int2b36str(n)}/{int2b36str(d)}' for n, d in SUPPORTED_TIME_SIGNATURES
+        f'{tokens.MEASURE_EVENTS_CHAR}{int2b36str(n)}/{int2b36str(d)}' for n, d in supported_time_signatures
     ]
     tempo_min, tempo_max, tempo_step = paras['tempo_quantization']
     event_tempo = [
         tokens.TEMPO_EVENTS_CHAR+int2b36str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
     ]
+
+    # remove time signatures that dont appears in target corpus
+    existed_measure_time_sigs = set()
+    token_count_per_piece = []
+    for piece in corpus_reader:
+        text_list = piece.split(' ')
+        token_count_per_piece.append(len(text_list))
+        for text in text_list:
+            if text[0] == tokens.MEASURE_EVENTS_CHAR:
+                existed_measure_time_sigs.update(text)
+    event_measure_time_sig = [t for t in event_measure_time_sig if t in existed_measure_time_sigs]
 
     # padding token HAVE TO be at first
     event_vocab = (
@@ -136,10 +149,7 @@ def build_vocabs(
     tempo_vocab = pad_token + event_tempo
     time_sig_vocab = pad_token + event_measure_time_sig
 
-    token_count_per_piece = []
-    for piece in corpus_reader:
-        text_list = piece.split(' ')
-        token_count_per_piece.append(len(text_list))
+    
 
     summary_string = (
         f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
