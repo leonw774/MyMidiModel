@@ -102,13 +102,15 @@ def main():
         logging.info('Dataset size (%d) is smaller than given sample number (%d)', dataset_size, args.sample_number)
         args.sample_number = dataset_size
     eval_features_per_piece: List[ Dict[str, float] ] = []
-    start_time = time()
+    sample_able_indices = set(range(dataset_size))
 
+    start_time = time()
     while len(eval_features_per_piece) < args.sample_number:
-        if args.sample_number >= dataset_size:
-            sampled_indices = list(range(dataset_size))
+        if args.sample_number >= len(sample_able_indices):
+            sampled_indices = list(sample_able_indices)
         else:
-            sampled_indices = random.sample(list(range(dataset_size)), args.sample_number - len(eval_features_per_piece))
+            sampled_indices = random.sample(list(sample_able_indices), args.sample_number - len(eval_features_per_piece))
+            sample_able_indices = sample_able_indices.difference_update(sampled_indices)
         eval_args_dict_list = [
             {'midi_file_path': file_path_list[idx], 'max_pairs_number': args.max_pairs_number}
             for idx in sampled_indices
