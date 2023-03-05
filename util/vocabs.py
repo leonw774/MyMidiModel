@@ -142,12 +142,10 @@ def build_vocabs(
 
     # measure number are just increasing integer that generated dynamically in corpus.text_to_array, no vocab needed
     # position vocab need to use pure b36 int string because we have posattr setting
-    position_vocab = pad_token + list(map(int2b36str, range(get_largest_possible_position(paras['nth']))))
+    position_vocab = pad_token + list(map(int2b36str, range(largest_possible_position)))
     # these two vocabs are just same as their event counterparts just with PAD
     tempo_vocab = pad_token + event_tempo
     time_sig_vocab = pad_token + event_measure_time_sig
-
-    
 
     summary_string = (
         f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\

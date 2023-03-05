@@ -70,10 +70,6 @@ def get_largest_possible_position(nth: int, supported_time_signatures: set) -> i
         for s in supported_time_signatures
     )
 
-def is_supported_time_signature(numerator, denominator):
-    return (numerator, denominator) in SUPPORTED_TIME_SIGNATURES
-
-
 # python support up to base=36 in int function
 TOKEN_INT2STR_BASE = 36
 

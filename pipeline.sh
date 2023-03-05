@@ -42,7 +42,7 @@ touch $LOG_PATH
 
 CORPUS_DIR_PATH="data/corpus/${DATA_NAME}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}_v${VELOCITY_STEP}_t${TEMPO_MIN}_${TEMPO_MAX}_${TEMPO_STEP}_pos${POSITION_METHOD}"
 
-DO_MIDI_TO_TEXT=true
+DO_MIDI_TO_CORPUS=true
 DO_BPE=false
 if [ $BPE_ITER -ne 0 ]; then
     DO_BPE=true
@@ -53,7 +53,7 @@ if [ $BPE_ITER -ne 0 ]; then
             echo "Flag --use-existed is set" | tee -a $LOG_PATH
             echo "Learn bpe vocab is skipped" | tee -a $LOG_PATH
             DO_BPE=false
-            DO_MIDI_TO_TEXT=false
+            DO_MIDI_TO_CORPUS=false
         else
             echo "BPE Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already has corpus and shape_vocab file. Remove? (y=remove/n=skip bpe)" | tee -a $LOG_PATH
             read yn
@@ -61,7 +61,7 @@ if [ $BPE_ITER -ne 0 ]; then
             # this grammar (the #[] operator) means that, in the variable $yn, any Y or y in 1st position will be dropped if they exist.
                 # enter this block if yn != [Yy]
                 DO_BPE=false
-                DO_MIDI_TO_TEXT=false
+                DO_MIDI_TO_CORPUS=false
                 echo "Learn bpe vocab is skipped" | tee -a $LOG_PATH
             else
                 rm -f "${CORPUS_DIR_PATH_WITH_BPE}/*"
@@ -70,11 +70,11 @@ if [ $BPE_ITER -ne 0 ]; then
     fi
 fi
 
-if [ "$DO_MIDI_TO_TEXT" == true ]; then
+if [ "$DO_MIDI_TO_CORPUS" == true ]; then
     MIDI_TO_TEXT_OTHER_ARGUMENTS=""
     test "$CONTINUING_NOTE" == true && MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --use-continuing-note"
     test "$USE_MERGE_DRUMS" == true && MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --use-merge-drums"
-    test "$MIDI_TO_TEXT_VERBOSE" == true && MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --verbose"
+    test "$MIDI_TO_CORPUS_VERBOSE" == true && MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --verbose"
     test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended ${MIDI_TO_TEXT_OTHER_ARGUMENTS} to midi_to_text's argument" | tee -a $LOG_PATH ; }
 
     echo "Corpus dir: ${CORPUS_DIR_PATH}"
