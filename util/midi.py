@@ -9,7 +9,7 @@ from .tokens import (
     BeginOfScoreToken, SectionSeperatorToken, EndOfScoreToken,
     NoteToken, TempoToken, PositionToken, MeasureToken, TrackToken,
     TYPE_PRIORITY,
-    is_supported_time_signature,
+    get_supported_time_signature,
     token_to_str,
     b36str2int,
 )
@@ -194,7 +194,8 @@ def get_time_structure_tokens(
         midi: MidiFile,
         note_token_list: list,
         nth: int,
-        tempo_quantization: Tuple[int, int, int]) -> Tuple[list, list]:
+        tempo_quantization: Tuple[int, int, int],
+        supported_time_signatures: set) -> Tuple[list, list]:
     """
         This return measure list and tempo list. The first measure have to contain the
         first note and the last note must end in the last measure
@@ -229,7 +230,7 @@ def get_time_structure_tokens(
 
     measure_token_list = []
     for i, time_sig in enumerate(time_sig_list):
-        assert is_supported_time_signature(time_sig.numerator, time_sig.denominator), \
+        assert (time_sig.numerator, time_sig.denominator) in supported_time_signatures, \
             'Unsupported time signature'
             # f'Unsupported time signature {(time_sig.numerator, time_sig.denominator)}'
         # print(f'TimeSig {i}:', cur_timesig_start, next_timesig_start, nth_per_measure)
@@ -405,11 +406,12 @@ def midi_to_token_list(
         velocity_step: int,
         use_cont_note: bool,
         tempo_quantization: Tuple[int, int, int],
-        position_method: str) -> list:
+        position_method: str,
+        supported_time_signatures: set) -> list:
 
     note_token_list = get_note_tokens(midi, max_duration, velocity_step, use_cont_note)
     assert len(note_token_list) > 0, 'No notes in midi'
-    measure_token_list, tempo_token_list = get_time_structure_tokens(midi, note_token_list, nth, tempo_quantization)
+    measure_token_list, tempo_token_list = get_time_structure_tokens(midi, note_token_list, nth, tempo_quantization, supported_time_signatures)
     assert measure_token_list[0].onset <= note_token_list[0].onset, 'First measure is after first note'
     pos_token_list = get_position_infos(note_token_list, measure_token_list, tempo_token_list, position_method)
     body_token_list = pos_token_list + note_token_list + measure_token_list + tempo_token_list
@@ -429,7 +431,10 @@ def midi_to_text_list(
         use_cont_note: bool,
         tempo_quantization: Tuple[int, int, int], # [tempo_min, tempo_max, tempo_step]
         position_method: str,
-        use_merge_drums: bool) -> list:
+        use_merge_drums: bool,
+        numerator_max: int = 32,
+        denominator_log2_max: int = 4,
+        nd_raio_max: float = 3) -> list:
     """
         Parameters:
         - midi_file_path: midi file path
@@ -445,6 +450,7 @@ def midi_to_text_list(
             the token will be placed after the position token and before the note tokens in the same position
         - tempo_quantization: (min, max, step), where min and max are INCLUSIVE
         - use_merge_drums: to merge drums tracks or not
+        - numerator_max, denominator_log2_max, and nd_raio_max: parameter for supported time signatures. hard-coded, dont alter.
     """
 
     assert nth > 4 and nth % 4 == 0, 'nth is not multiple of 4'
@@ -460,10 +466,21 @@ def midi_to_text_list(
 
     merge_tracks(midi, max_track_number, use_merge_drums)
 
+    supported_time_signatures = get_supported_time_signature(numerator_max, denominator_log2_max, nd_raio_max)
+
     for i, track in enumerate(midi.instruments):
         if track.is_drum:
             midi.instruments[i].program = 128
-    token_list = midi_to_token_list(midi, nth, max_duration, velocity_step, use_cont_note, tempo_quantization, position_method)
+    token_list = midi_to_token_list(
+        midi,
+        nth,
+        max_duration,
+        velocity_step,
+        use_cont_note,
+        tempo_quantization,
+        position_method,
+        supported_time_signatures
+    )
 
     text_list = list(map(token_to_str, token_list))
 
