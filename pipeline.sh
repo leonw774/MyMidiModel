@@ -17,11 +17,11 @@ fi
 
 # check if all argument is a file and execute them to get their vars
 FULL_CONFIG_NAME=$1"-"$2"-"$3
-MIDI_CONFIG="configs/corpus/"$1".sh"
+CORPUS_CONFIG="configs/corpus/"$1".sh"
 BPE_CONFIG="configs/bpe/"$2".sh"
 TRAIN_CONFIG="configs/train/"$3".sh"
 
-for CONFIG_PATH in $MIDI_CONFIG $BPE_CONFIG $TRAIN_CONFIG
+for CONFIG_PATH in $CORPUS_CONFIG $BPE_CONFIG $TRAIN_CONFIG
 do
     if [ -f "$CONFIG_PATH" ]; then
         if source $CONFIG_PATH; then
