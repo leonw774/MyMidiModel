@@ -124,9 +124,7 @@ def build_vocabs(
     for piece in corpus_reader:
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
-        for text in text_list:
-            if text[0] == tokens.MEASURE_EVENTS_CHAR:
-                existed_measure_time_sigs.update(text)
+        existed_measure_time_sigs.update({text for text in text_list if text[0] == tokens.MEASURE_EVENTS_CHAR})
     event_measure_time_sig = [t for t in event_measure_time_sig if t in existed_measure_time_sigs]
 
     # padding token HAVE TO be at first
