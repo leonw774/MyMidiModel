@@ -447,7 +447,7 @@ def generate_sample(
                 last_logits = [
                     l[0, -1].to('cpu')
                     # l has shape (1, seq_length, attr_vocab_size)
-                    for l in batched_logits 
+                    for l in batched_logits
                 ]
 
             last_probs = [

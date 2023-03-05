@@ -1,6 +1,7 @@
 import bisect
 import itertools
 from math import log, isnan
+from math import e as math_e
 import random
 from typing import Dict
 
@@ -11,7 +12,7 @@ from .tokens import get_largest_possible_position, b36str2int, MEASURE_EVENTS_CH
 from .midi import piece_to_midi, midi_to_text_list
 
 
-def _entropy(x: list) -> float:
+def _entropy(x: list, base: math_e) -> float:
     if len(x) == 0:
         raise ValueError()
     sum_x = sum(x)
@@ -19,7 +20,7 @@ def _entropy(x: list) -> float:
         raise ValueError()
     norm_x = [i / sum_x for i in x]
     entropy = -sum([
-        i * log(i)
+        i * log(i, base)
         for i in norm_x
         if i != 0
     ])
@@ -129,7 +130,7 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) ->
         pitch_histogram[p] += 1
         pitch_class_histogram[p%12] += 1
     try:
-        pitch_class_entropy = _entropy(pitch_class_histogram)
+        pitch_class_entropy = _entropy(pitch_class_histogram, base=2)
     except ValueError:
         pitch_class_entropy = float('nan')
     pitchs_mean = np.mean(pitchs) if len(pitchs) > 0 else float('nan')
