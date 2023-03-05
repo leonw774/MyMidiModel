@@ -20,7 +20,7 @@
 Corpi are located at `data/corpus`. A complete "corpus" is directory containing at least 5 files in the following list. The name of the corpus directory is in the format of
 
 ```
-{CORPUS_NAME}_nth{NTH}_r{MAX_TRACK_NUMBER}_d{MAX_DURATION}_v{VELOCITY_STEP}_t{TEMPO_MIN}_{TEMPO_MAX}_{TEMPO_STEP}_pos{POSITION_METHOD}_bpe{BPE_ITER}_{SCORE_FUNC}_{MERGE_CONDITION}_{SAMPLE_RATE}
+{CORPUS_NAME}_nth{NTH}_r{MAX_TRACK_NUMBER}_d{MAX_DURATION}_v{VELOCITY_STEP}_t{TEMPO_MIN}_{TEMPO_MAX}_{TEMPO_STEP}_pos{POSITION_METHOD}_bpe{BPE_ITER}_{MERGE_CONDITION}_{SAMPLE_RATE}
 ```
 
 if is processed by Multi-note BPE. Otherwise, it is
