@@ -252,7 +252,7 @@ class MidiDataset(Dataset):
 
         if self.permute_track_number:
             # use self._piece_body_start_index to know how many tracks there are in this piece
-            track_count = body_start_index - 1
+            track_count = body_start_index - 2
             # add one because there is a padding token at the beginning of the vocab
             perm_array = np.random.permutation(track_count) + 1
             # view body's track number col
@@ -265,13 +265,14 @@ class MidiDataset(Dataset):
             for i in range(track_count):
                 body_trn_column[body_trn_column_expand[i]] = perm_array[i]
             # permute head's track instruments with the inverse of the permutation array
-            if body_start_index > 0:
+            if track_count > 1:
                 # head_start_index = 1
                 inv_perm_array = np.empty(track_count, dtype=np.int16)
                 inv_perm_array[perm_array-1] = (np.arange(track_count) + 1)
                 track_permuted_ins = np.empty(track_count, dtype=np.int16)
                 track_permuted_ins = self.pieces[str(filenum)][inv_perm_array, ins_col_index]
-                sampled_array[1:body_start_index, ins_col_index] = track_permuted_ins
+                sampled_array[1:body_start_index-1, ins_col_index] = track_permuted_ins
+                # index 0 is BOS and index body_start_index-1 is SEP
 
         mps_sep_indices_list = []
         if self.permute_mps:
