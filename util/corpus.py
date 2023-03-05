@@ -248,7 +248,10 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
     """
     assert len(array.shape) == 2 and array.shape[0] > 0, f'Bad numpy array shape: {array.shape}'
     if is_output:
-        assert array.shape[1] == len(OUTPUT_ATTR_NAME) - 1, f'Bad numpy array shape: {array.shape}'
+        if vocabs.combine_track_instrument:
+            assert array.shape[1] == len(OUTPUT_ATTR_NAME) - 1, f'Bad numpy array shape: {array.shape}'
+        else:
+            assert array.shape[1] == len(OUTPUT_ATTR_NAME), f'Bad numpy array shape: {array.shape}'
     else:
         assert array.shape[1] == len(COMPLETE_ATTR_NAME), f'Bad numpy array shape: {array.shape}'
 
