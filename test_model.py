@@ -7,7 +7,7 @@ from util.corpus import to_vocabs_file_path
 from util.model import MyMidiTransformer, get_seq_mask, calc_losses
 
 vocabs_dict = json.load(
-    open(to_vocabs_file_path('data/corpus/test_midis_nth96_r32_d96_v4_t24_200_1_posattribute'), 'r', encoding='utf8')
+    open(to_vocabs_file_path('data/corpus/test_midis_nth96_r32_d96_v4_t24_200_16'), 'r', encoding='utf8')
 )
 
 start_time = time()

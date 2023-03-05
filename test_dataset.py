@@ -7,7 +7,7 @@ from util.dataset import MidiDataset, collate_mididataset
 
 
 dataset = MidiDataset(
-    data_dir_path='data/corpus/test_midis_nth32_r32_d32_v4_t24_200_16_posevent',
+    data_dir_path='data/corpus/test_midis_nth32_r32_d32_v4_t24_200_16',
     max_seq_length=32, # to be printed on screen, so small
     use_permutable_subseq_loss=False,
     measure_sample_step_ratio=0.25,
