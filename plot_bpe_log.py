@@ -140,10 +140,11 @@ def main(corpus_dir_path, log_file_path):
     plt.figure(figsize=(16.8, 6.4))
     plt.title('Distribution of shapes')
     plt.bar(
-        x=sorted_shape_freq,
+        x=list(range(len(sorted_shape_freq)))
+        height=sorted_shape_freq,
         label=sorted_shape_label
     )
-    plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_corpus_shape_distribution.png'))
+    plt.savefig(os.path.join(corpus_stats_dir_path, 'bpe_corpus_shape_distribution.png'))
     plt.clf()
 
     print('Write bpe_stats json and png done.')
