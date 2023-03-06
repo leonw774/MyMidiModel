@@ -115,9 +115,9 @@ NOTE_TIME_LIMIT = 0x1FFFFF # 2^21 - 1
 # In midi format, time-delta is representated in variable-length bytes
 # the format is 1xxxxxxx 1xxxxxxx ... 0xxxxxxx, the msb of each byte is 1 if it is not the last byte
 # in this format, three bytes can represent up to 2^21 - 1
-# when nth is 96, in tempo of bpm 240, 2^21 - 1 ticks is 364 minute
+# when ticks_per_beat is 48, in tempo of bpm 240, 2^21 - 1 ticks is about 182 minute
 NOTE_DURATION_LIMIT = 0x3FFFF # 2^18 - 1
-# if a note has duration > 45-ish minute, we think the file is likely corrupted
+# if a note has duration > 22 minute, we think the file is likely corrupted
 
 def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_cont_note: bool) -> list:
     """
@@ -206,6 +206,7 @@ def get_time_structure_tokens(
     last_note_end = note_token_list[-1].onset + note_token_list[-1].duration
     # print('first, last:', first_note_start, last_note_end)
 
+    # default time signature is 4/4 but nah
     assert len(midi.time_signature_changes) > 0, 'No time signature information'
 
     time_sig_list = []
@@ -216,9 +217,8 @@ def get_time_structure_tokens(
             time_sig_list.append(time_sig)
         prev_nd = (time_sig.numerator, time_sig.denominator)
 
-    # Some midi file has their first time signature begin at 1, but the rest of the time signature's
-    # changing time are set as if the first time signature started at 0. Weird.
-    # Not sure if we should "fix" it or just let them get excluded.
+    # Some midi file has their first time signature begin at 1, but the rest of the time signatures'
+    # changing times are set as if the first time signature started at 0. Weird.
     if time_sig_list[0].time == 1:
         if len(time_sig_list) > 1:
             nth_per_measure = round(nth_per_beat * time_sig_list[0].numerator * (4 / time_sig_list[0].denominator))

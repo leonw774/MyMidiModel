@@ -33,13 +33,14 @@ def main():
                 total_token_count += array.shape[0]
                 for token in array:
                     # use string instead of int tuple to save space
-                    t = ':'.join(map(str, [t for t in token]))
+                    t = ':'.join(['' if s == '0' else s for s in map(str, [t for t in token])])
                     entropy_counter[t] += 1
         entropy = 0
         for v in entropy_counter.values():
             p = v / total_token_count
             entropy -= p * np.log2(p)
-        print(corpus_dir_path, ':', entropy)
+        print('- total_token_count:', total_token_count)
+        print('- log2 entropy:', entropy)
 
 
 if __name__ == '__main__':
