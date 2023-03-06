@@ -215,11 +215,21 @@ def main():
 
         distributions = {
             'instrument': Counter(),
+            'shape': Counter(),
             'tokens_number': {
-                t: list() for t in token_types
+                t: [] for t in token_types
             }
         }
         for piece in corpus_reader:
+            for text in piece.split():
+                if text[0] == tokens.NOTE_EVENTS_CHAR:
+                    if len(text) == 1:
+                        distributions['shape']['0,0,1;'] += 1
+                    else:
+                        distributions['shape']['0,0,1~;'] += 1
+                elif text[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
+                    distributions['shape'][text[1:]] += 1
+
             head_end = piece.find(tokens.SEP_TOKEN_STR) # find separator
             tracks_text = piece[4:head_end]
             track_tokens = tracks_text.split()
@@ -260,6 +270,17 @@ def main():
         instrument_count[program] = count
     plt.bar(tokens.INSTRUMENT_NAMES, instrument_count)
     plt.savefig(os.path.join(stats_dir_path, 'instrument_distribution.png'))
+    plt.clf()
+
+    sorted_shape_counter = sorted([(count, shape) for shape, count in distributions['shape'].items()], reverse=True)
+    total_shape_num = sum([c for c, _ in sorted_shape_counter])
+    plt.figure(figsize=(16.8, 6.4))
+    plt.title('shapes distribution')
+    plt.bar(
+        x=[s for _, s in sorted_shape_counter],
+        height=[c / total_shape_num for c, _ in sorted_shape_counter],
+    )
+    plt.savefig(os.path.join(stats_dir_path, 'shape_distribution.png'))
     plt.clf()
 
     plt.figure(figsize=(16.8, 6.4))

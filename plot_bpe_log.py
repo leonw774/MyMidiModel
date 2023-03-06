@@ -1,13 +1,9 @@
-from collections import Counter
 import json
 import os
 import sys
 
 from matplotlib import pyplot as plt
 from pandas import Series
-
-from util.tokens import NOTE_EVENTS_CHAR, MULTI_NOTE_EVENTS_CHAR
-from util.corpus import CorpusReader
 
 
 def main(corpus_dir_path, log_file_path):
@@ -116,36 +112,6 @@ def main(corpus_dir_path, log_file_path):
                 plt.hist(col_list, bins=list(range(max(col_list)+1)))
                 plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}_hist.png'))
                 plt.clf()
-
-    # plot shape distribution
-    shape_counter = Counter()
-    with CorpusReader(corpus_dir_path) as corpus_reader:
-        for piece in corpus_reader:
-            for text in piece.split():
-                if text[0] == NOTE_EVENTS_CHAR:
-                    if len(text) == 1:
-                        shape_counter['0,0,1;'] += 1
-                    else:
-                        shape_counter['0,0,1~;'] += 1
-                elif text[0] == MULTI_NOTE_EVENTS_CHAR:
-                    shape_counter[text[1:]] += 1
-
-    shape_counter = dict(shape_counter)
-    sorted_shape_counter = sorted([(count, shape) for shape, count in shape_counter.items()])
-    sorted_shape_freq = [c for c, _ in sorted_shape_counter]
-    total_shape_num = sum(sorted_shape_freq)
-    sorted_shape_freq = [c / total_shape_num for c in sorted_shape_freq]
-    sorted_shape_label = [s for _, s in sorted_shape_counter]
-
-    plt.figure(figsize=(16.8, 6.4))
-    plt.title('Distribution of shapes')
-    plt.bar(
-        x=list(range(len(sorted_shape_freq))),
-        height=sorted_shape_freq,
-        label=sorted_shape_label
-    )
-    plt.savefig(os.path.join(corpus_stats_dir_path, 'bpe_corpus_shape_distribution.png'))
-    plt.clf()
 
     print('Write bpe_stats json and png done.')
 
