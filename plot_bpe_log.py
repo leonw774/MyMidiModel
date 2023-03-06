@@ -140,7 +140,7 @@ def main(corpus_dir_path, log_file_path):
     plt.figure(figsize=(16.8, 6.4))
     plt.title('Distribution of shapes')
     plt.bar(
-        x=list(range(len(sorted_shape_freq)))
+        x=list(range(len(sorted_shape_freq))),
         height=sorted_shape_freq,
         label=sorted_shape_label
     )
