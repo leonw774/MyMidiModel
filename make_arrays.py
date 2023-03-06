@@ -276,7 +276,7 @@ def main():
         [(count, shape) for shape, count in distributions['shape'].items() if len(shape) > 7],
         reverse=True
     )
-    total_shape_num = sum([c for c, _ in sorted_shape_counter])
+    total_shape_num = sum([v for v in distributions['shape'].values()])
     plt.figure(figsize=(16.8, 7.2))
     plt.title('bpe learned shapes distribution')
     plt.xticks(rotation=90, fontsize='small')
