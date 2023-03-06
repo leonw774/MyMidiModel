@@ -129,7 +129,7 @@ def main(corpus_dir_path, log_file_path):
                         shape_counter['0,0,1~;'] += 1
                 elif text[0] == MULTI_NOTE_EVENTS_CHAR:
                     shape_counter[text[1:]] += 1
-    
+
     shape_counter = dict(shape_counter)
     sorted_shape_counter = sorted([(count, shape) for shape, count in shape_counter.items()])
     sorted_shape_freq = [c for c, _ in sorted_shape_counter]
@@ -140,8 +140,8 @@ def main(corpus_dir_path, log_file_path):
     plt.figure(figsize=(16.8, 6.4))
     plt.title('Distribution of shapes')
     plt.bar(
-        x=[c for c, _ in sorted_shape_freq],
-        label=[s for _, s in sorted_shape_label]
+        x=sorted_shape_freq,
+        label=sorted_shape_label
     )
     plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_corpus_shape_distribution.png'))
     plt.clf()
