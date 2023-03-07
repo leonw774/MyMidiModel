@@ -312,7 +312,9 @@ class MidiDataset(Dataset):
         # checking for bad numbers
         for fname, fidx in TOKEN_ATTR_INDEX.items():
             if len(fname) > 3:
-                assert np.min(sampled_array) >= 0, f'number in {fname} is below zero'
+                assert np.min(sampled_array) >= 0,\
+                    (f'number in {fname} is below zero\n'
+                    f'{get_input_array_format_string(sampled_array, None, self.vocabs)}')
                 if fname == 'measure_numbers':
                     assert np.max(sampled_array[:, fidx]) < self.max_seq_length,\
                         (f'number in {fname} larger than vocab size\n'
