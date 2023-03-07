@@ -567,8 +567,9 @@ def calc_losses(
         for k, input_tensor in enumerate(input_tensors)
     ]
     if weighted_by_nonpadding_number:
-        token_number = target_labels.shape[0] * target_labels.shape[1]
-        head_losses = [hl / token_number for hl in head_losses]
+        # dunno why but this is what SymphonyNet's implementation do
+        # it changes the scale of the gradient
+        head_losses = [l / target_labels.shape[0] for l in head_losses]
     return head_losses
 
 

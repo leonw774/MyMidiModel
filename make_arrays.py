@@ -7,7 +7,8 @@ import os
 import shutil
 from time import strftime, time
 from traceback import format_exc
-from typing import Dict, List
+from typing import Dict
+from zipfile import ZipFile, ZIP_STORED, ZIP_DEFLATED
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -179,7 +180,10 @@ def main():
         # zip all the npy files into one file with '.npz' extension
         start_time = time()
         logging.info('Zipping npys')
-        shutil.make_archive(npy_dir_path, 'zip', root_dir=npy_dir_path)
+        with ZipFile(npy_zip_path, 'x', compression=ZIP_DEFLATED, compresslevel=1) as npz_file:
+            for file_name in tqdm(os.listdir(npy_dir_path)):
+                # arcname is file_name -> file should be at root
+                npz_file.write(os.path.join(npy_dir_path, file_name), file_name)
         os.rename(npy_zip_path, npz_path)
         # delete the npys
         shutil.rmtree(npy_dir_path)
@@ -220,15 +224,11 @@ def main():
                 t: [] for t in token_types
             }
         }
-        for piece in corpus_reader:
-            for text in piece.split():
-                if text[0] == tokens.NOTE_EVENTS_CHAR:
-                    if len(text.split(':')[0]) == 1:
-                        distributions['shape']['0,0,1;'] += 1
-                    else:
-                        distributions['shape']['0,0,1~;'] += 1
-                elif text[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
-                    distributions['shape'][text[1:].split(':')[0]] += 1
+        for piece in tqdm(corpus_reader):
+            distributions['shape']['0,0,1;'] += piece.count(' '+tokens.NOTE_EVENTS_CHAR+':')
+            distributions['shape']['0,0,1~;'] += piece.count(' '+tokens.NOTE_EVENTS_CHAR+'~:')
+            for shape in bpe_shapes_list:
+                distributions['shape'][shape] += piece.count(' '+tokens.MULTI_NOTE_EVENTS_CHAR+shape)
 
             head_end = piece.find(tokens.SEP_TOKEN_STR) # find separator
             tracks_text = piece[4:head_end]
@@ -272,7 +272,7 @@ def main():
     plt.savefig(os.path.join(stats_dir_path, 'instrument_distribution.png'))
     plt.clf()
 
-    sorted_shape_counter = sorted(
+    sorted_nondefault_shape_count = sorted(
         [(count, shape) for shape, count in distributions['shape'].items() if len(shape) > 7],
         reverse=True
     )
@@ -283,8 +283,8 @@ def main():
     plt.ylabel('Appearance frequency in corpus')
     plt.subplots_adjust(left=0.075, right=1-0.025, bottom=0.25)
     plt.bar(
-        x=[s[:25]+'...' if len(s) > 25 else s for _, s in sorted_shape_counter],
-        height=[c / total_shape_num for c, _ in sorted_shape_counter],
+        x=[s[:25]+'...' if len(s) > 25 else s for _, s in sorted_nondefault_shape_count],
+        height=[c / total_shape_num for c, _ in sorted_nondefault_shape_count],
     )
     plt.savefig(os.path.join(stats_dir_path, 'nondefault_shape_distribution.png'))
     plt.clf()

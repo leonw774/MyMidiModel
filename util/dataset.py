@@ -12,7 +12,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
 from . import tokens
-from .corpus import get_corpus_vocabs, TOKEN_ATTR_INDEX
+from .corpus import get_corpus_vocabs, TOKEN_ATTR_INDEX, get_input_array_format_string
 
 class MidiDataset(Dataset):
 
@@ -275,6 +275,7 @@ class MidiDataset(Dataset):
                 # index 0 is BOS and index body_start_index-1 is SEP
 
         mps_sep_indices_list = []
+        mps_sep_indices = None
         if self.permute_mps:
             mps_tokens_ranges = []
             mps_sep_indices_list_head = [
@@ -307,9 +308,21 @@ class MidiDataset(Dataset):
                     mps_sep_indices_list,
                     dtype=np.int16
                 )
-                return from_numpy(sampled_array), mps_sep_indices
 
-        return from_numpy(sampled_array), None
+        # checking for bad numbers
+        for fname, fidx in TOKEN_ATTR_INDEX.items():
+            if len(fname) > 3:
+                assert np.min(sampled_array) >= 0, f'number in {fname} is below zero'
+                if fname == 'measure_numbers':
+                    assert np.max(sampled_array[:, fidx]) < self.max_seq_length,\
+                        (f'number in {fname} larger than vocab size\n'
+                        f'{get_input_array_format_string(sampled_array, None, self.vocabs)}')
+                else:
+                    assert np.max(sampled_array[:, fidx]) < getattr(self.vocabs, fname).size,\
+                        (f'number in {fname} larger than vocab size\n'
+                        f'{get_input_array_format_string(sampled_array, None, self.vocabs)}')
+
+        return from_numpy(sampled_array), mps_sep_indices
 
 
     def __len__(self):

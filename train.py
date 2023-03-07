@@ -151,7 +151,7 @@ def parse_args():
     global_parser.add_argument(
         '--dataloader-worker-number',
         type=int,
-        default=2
+        default=4
     )
     global_parser.add_argument(
         '--use-device',

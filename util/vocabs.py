@@ -157,7 +157,7 @@ def build_vocabs(
     summary_string = (
         f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
         f'Event vocab size: {len(event_vocab)}\n'\
-        f'- Measure-time signature: {len(event_measure_time_sig)} (existed_measure_time_sigs: {len(existed_measure_time_sigs)})\n'\
+        f'- Measure-time signature: {len(event_measure_time_sig)} (Existed in corpus: {len(existed_measure_time_sigs)})\n'\
         f'- Position: {len(position_vocab)}\n'\
         f'- Tempo: {len(event_tempo)} ({event_tempo})\n'\
         f'- Shape: {len(event_multi_note_shapes)}\n'\

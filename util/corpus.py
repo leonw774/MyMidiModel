@@ -344,7 +344,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
         typename = text[0]
         if typename == 'R':
             total_track_number += 1
-            track_number, instrument = (b36str2int(x) for x in text[1:].split(':'))
+            instrument, track_number = (b36str2int(x) for x in text[1:].split(':'))
             if instrument == 128:
                 drum_tracks.add(track_number)
 
