@@ -487,14 +487,14 @@ def generate_sample(
                             ignore_pending_note_error=ignore_pending_note_error
                         )
                     # compute complete attribute array and second format checking
-                    try_text_list_array, array_to_text_list_memory = text_list_to_array(
+                    try_text_list_array, try_array_to_text_list_memory = text_list_to_array(
                         [try_token_text],
                         vocabs=model.vocabs,
                         input_memory=array_to_text_list_memory,
                         output_memory=True
                     )
                     try_text_list_tensor = torch.from_numpy(
-                        try_text_list_array
+                        try_text_list_array.astype('int32')
                     ).unsqueeze(0).int() # shape = (1, 1, complete_attr_num)
                     # check_format_time += time() - bt
                 except (AssertionError, ValueError) as e:
@@ -507,6 +507,7 @@ def generate_sample(
                 if try_token_text == tokens.SEP_TOKEN_STR:
                     is_head = False
                 input_seq = try_text_list_tensor
+                array_to_text_list_memory = try_array_to_text_list_memory
                 text_list = try_text_list
                 break
             # end while try

@@ -279,7 +279,7 @@ def main():
 
     ckpt_dir_path = os.path.join(args.model_dir_path, 'ckpt')
     if is_main_process:
-        logging.info(strftime('=== train.py start at %Y%m%d-%H%M%S ==='))
+        logging.info(strftime('==== train.py start at %Y%m%d-%H%M%S ===='))
         if not os.path.isdir(args.model_dir_path):
             logging.info('Invalid model dir path: %s', args.model_dir_path)
             return 1
