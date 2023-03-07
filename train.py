@@ -469,7 +469,6 @@ def main():
                         prediction,
                         batch_target_seqs,
                         batch_mps_sep_indices,
-                        'nll',
                         args.train_args.loss_weighted_by_nonpadding_number
                     )
                     # print('\ncalc_permutable_subseq_losses use time:', time() - start_backward_time)
@@ -477,7 +476,6 @@ def main():
                     head_losses = compute_losses(
                         prediction,
                         batch_target_seqs,
-                        'nll',
                         args.train_args.loss_weighted_by_nonpadding_number
                     )
                         # print('\ncompute_losses use time:', time() - start_backward_time)
@@ -536,7 +534,6 @@ def main():
                     head_losses = calc_permutable_subseq_losses(
                         prediction,
                         batch_target_seqs,
-                        'nll',
                         batch_mps_sep_indices,
                         False
                     )
@@ -544,7 +541,6 @@ def main():
                     head_losses = compute_losses(
                         prediction,
                         batch_target_seqs,
-                        'nll',
                         False
                     )
                 if is_main_process:

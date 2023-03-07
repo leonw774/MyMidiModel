@@ -198,14 +198,14 @@ class MyMidiTransformer(nn.Module):
                 length_mask
             )
         transformer_output = self.layer_norm(transformer_output)
-        logits = tuple(
+        logits_tuple = tuple(
             proj(transformer_output) for proj in self.project_linears
         )
         # assert all(not torch.isnan(lg).any() for lg in logits), [torch.isnan(lg).nonzero(as_tuple=True) for lg in logits]
         if self.use_linear_attn and self.inferencing:
-            return logits, memory
+            return logits_tuple, memory
         else:
-            return logits
+            return logits_tuple
 
     # Override the eval() and train() method to integrate the self.inferencing flag
     # Also added self.inference()
@@ -536,7 +536,6 @@ def generate_sample(
 def compute_losses(
         pred_logits: List[Tensor],
         target_labels: Tensor,
-        loss_function=str,
         weighted_by_nonpadding_number=False) -> List[Tensor]:
     """
         pred_logits is a list
@@ -548,19 +547,9 @@ def compute_losses(
     # basically treat seq_size as one of the K dimensions and K = 1
     # target_labels have to be long int
     target_labels = target_labels.long()
-    if loss_function == 'cross_entropy':
-        func = F.cross_entropy
-        input_tensors = [logits.transpose(1, 2) for logits in pred_logits]
-    elif loss_function == 'nll':
-        func = F.nll_loss
-        # should apply log softmax before input to negtive log liklihood
-        input_tensors = [torch.log_softmax(logits, dim=2).transpose(1, 2) for logits in pred_logits]
-    else:
-        raise ValueError('argument loss_function should either "cross_entropy" or "nll"')
-
     head_losses = [
-        func(
-            input=input_tensor,
+        F.cross_entropy(
+            input=logits.transpose(1, 2),
             # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
             target=target_labels[..., k], # (batch_size, seq_size)
             ignore_index=0, # padding is index 0
@@ -568,7 +557,7 @@ def compute_losses(
             # because some attributes have more non-padding occurence than others
             # we can reflect this by them having different "weight" of loss using "sum"
         )
-        for k, input_tensor in enumerate(input_tensors)
+        for k, logits in enumerate(pred_logits)
     ]
     if weighted_by_nonpadding_number:
         number_of_nonpaddings = torch.count_nonzero(target_labels[..., TOKEN_ATTR_INDEX['evt']])
@@ -580,7 +569,6 @@ def calc_permutable_subseq_losses(
         pred_logits: List[Tensor],
         target_labels: Tensor,
         batched_mps_indices: List,
-        loss_function: str,
         weighted_by_nonpadding_number=False):
     """
         pred_logits is a list
@@ -628,7 +616,6 @@ def calc_permutable_subseq_losses(
     head_losses = compute_losses(
         pred_logits,
         cpp_modified_target_labels.to(target_labels.device),
-        loss_function,
         weighted_by_nonpadding_number
     )
     return head_losses
