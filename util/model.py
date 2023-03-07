@@ -369,7 +369,9 @@ def generate_sample(
         elif start_seq.shape[0] != 1 or start_seq.shape[1] < 1 or start_seq.shape[2] != len(COMPLETE_ATTR_NAME):
             raise AssertionError(exception_msg)
     else:
-        start_seq = torch.from_numpy(text_list_to_array([tokens.BEGIN_TOKEN_STR], model.vocabs)).unsqueeze(0).int()
+        start_seq = torch.from_numpy(
+            text_list_to_array([tokens.BEGIN_TOKEN_STR], model.vocabs).astype('int32') # was uint16, which torch don't suuport
+        ).unsqueeze(0).int()
 
     # get model device
     model_device = next(model.parameters()).device
