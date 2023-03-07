@@ -225,10 +225,14 @@ def main():
             }
         }
         for piece in tqdm(corpus_reader):
-            distributions['shape']['0,0,1;'] += piece.count(' '+tokens.NOTE_EVENTS_CHAR+':')
-            distributions['shape']['0,0,1~;'] += piece.count(' '+tokens.NOTE_EVENTS_CHAR+'~:')
-            for shape in bpe_shapes_list:
-                distributions['shape'][shape] += piece.count(' '+tokens.MULTI_NOTE_EVENTS_CHAR+shape)
+            for text in piece.split():
+                if text[0] == tokens.NOTE_EVENTS_CHAR:
+                    if text[1] == ':':
+                        distributions['shape']['0,0,1;'] += 1
+                    else:
+                        distributions['shape']['0,0,1~;'] += 1
+                elif text[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
+                    distributions['shape'][text[1:].split(':')[0]] += 1
 
             head_end = piece.find(tokens.SEP_TOKEN_STR) # find separator
             tracks_text = piece[4:head_end]
