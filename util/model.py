@@ -554,7 +554,7 @@ def compute_losses(
     elif loss_function == 'nll':
         func = F.nll_loss
         # should apply log softmax before input to negtive log liklihood
-        input_tensors = [torch.log(F.softmax(logits, dim=2).transpose(1, 2)) for logits in pred_logits]
+        input_tensors = [torch.log_softmax(logits, dim=2).transpose(1, 2) for logits in pred_logits]
     else:
         raise ValueError('argument loss_function should either "cross_entropy" or "nll"')
 
