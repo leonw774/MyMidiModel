@@ -533,7 +533,7 @@ def generate_sample(
     return text_list
 
 
-def calc_losses(
+def compute_losses(
         pred_logits: List[Tensor],
         target_labels: Tensor,
         loss_function=str,
@@ -625,7 +625,7 @@ def calc_permutable_subseq_losses(
         # print('========')
         # assert (modified_target_labels == cpp_modified_target_labels).all().item()
 
-    head_losses = calc_losses(
+    head_losses = compute_losses(
         pred_logits,
         cpp_modified_target_labels.to(target_labels.device),
         loss_function,

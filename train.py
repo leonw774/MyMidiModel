@@ -26,7 +26,7 @@ from util.dataset import MidiDataset, collate_mididataset
 from util.model import (
     MyMidiTransformer,
     generate_sample,
-    calc_losses,
+    compute_losses,
     calc_permutable_subseq_losses
 )
 
@@ -474,13 +474,13 @@ def main():
                     )
                     # print('\ncalc_permutable_subseq_losses use time:', time() - start_backward_time)
                 else:
-                    head_losses = calc_losses(
+                    head_losses = compute_losses(
                         prediction,
                         batch_target_seqs,
                         'nll',
                         args.train_args.loss_weighted_by_nonpadding_number
                     )
-                        # print('\ncalc_losses use time:', time() - start_backward_time)
+                        # print('\ncompute_losses use time:', time() - start_backward_time)
             # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=32))
                 # assert all(not torch.isnan(hl).any() for hl in head_losses)
                 loss = torch.mean(torch.stack(head_losses))
@@ -541,7 +541,7 @@ def main():
                         False
                     )
                 else:
-                    head_losses = calc_losses(
+                    head_losses = compute_losses(
                         prediction,
                         batch_target_seqs,
                         'nll',
