@@ -227,7 +227,7 @@ class MidiDataset(Dataset):
         # if last token is EOS, body_end_index is length of sample array - 1
         body_end_index = -1 if sampled_array[-1, TOKEN_ATTR_INDEX['mea']] == 0 else sampled_array.shape[0]
         min_measure_number = np.min(sampled_array[body_start_index:body_end_index, TOKEN_ATTR_INDEX['mea']])
-        if min_measure_number > 1:
+        if min_measure_number != 1:
             sampled_array[body_start_index:body_end_index, TOKEN_ATTR_INDEX['mea']] -= (min_measure_number - 1)
         # if there are still measure numbers that bigger than max_seq_length, panic
         # max_measure_number = np.max(sampled_array[body_start_index:body_end_index, TOKEN_ATTR_INDEX['mea']])
