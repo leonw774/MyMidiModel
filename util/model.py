@@ -559,7 +559,7 @@ def calc_losses(
             input=input_tensor,
             # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
             target=target_labels[..., k], # (batch_size, seq_size)
-            ignore_index=0, # assume padding is index 0
+            ignore_index=0, # padding is index 0
             reduction=('sum' if weighted_by_nonpadding_number else 'mean')
             # because some attributes have more non-padding occurence than others
             # we can reflect this by them having different "weight" of loss using "sum"
@@ -567,9 +567,8 @@ def calc_losses(
         for k, input_tensor in enumerate(input_tensors)
     ]
     if weighted_by_nonpadding_number:
-        # dunno why but this is what SymphonyNet's implementation do
-        # it changes the scale of the gradient
-        head_losses = [l / target_labels.shape[0] for l in head_losses]
+        number_of_nonpaddings = torch.count_nonzero(target_labels[..., TOKEN_ATTR_INDEX['evt']])
+        head_losses = [l / number_of_nonpaddings for l in head_losses]
     return head_losses
 
 
