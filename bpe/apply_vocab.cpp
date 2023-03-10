@@ -82,7 +82,10 @@ int main(int argc, char *argv[]) {
     maxDur = stoi(paras[std::string("max_duration")]);
     maxTrackNum = stoi(paras[std::string("max_track_number")]);
     if (nth <= 0 || maxDur <= 0 || maxDur > 255 || maxTrackNum <= 0) {
-        std::cout << "Corpus parameter error" << std::endl;
+        std::cout << "Corpus parameter error" << '\n'
+            << 'nth: ' << nth << '\n'
+            << 'maxDuration:' << maxDur << '\n'
+            << 'maxTrackNum' << maxTrackNum << std::endl;
         return 1;
     }
 
