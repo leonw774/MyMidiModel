@@ -16,7 +16,7 @@ else:
 
 dataset = MidiDataset(
     data_dir_path=data_dir_path,
-    max_seq_length=32, # to be printed on screen, so small
+    max_seq_length=40, # to be printed on screen, so small
     use_permutable_subseq_loss=False,
     measure_sample_step_ratio=0.25,
     permute_mps=True,
