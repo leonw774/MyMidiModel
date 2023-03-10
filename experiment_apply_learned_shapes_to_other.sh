@@ -11,6 +11,9 @@ mkdir $BASE_PATH
 mkdir "${BASE_PATH}/corpus"
 mkdir "${BASE_PATH}/logs"
 
+# make sure bpe programs are new
+make -C ./bpe
+
 ## vocab source -- applied corpus
 
 mkdir "${BASE_PATH}/corpus/lmd--snd_ours_1.0"
