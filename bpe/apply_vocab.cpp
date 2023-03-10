@@ -89,13 +89,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // read notes from corpus
-    Corpus corpus = readCorpusFile(inCorpusFile, nth);
-    std::cout << "Reading done. There are " << corpus.piecesTP.size() << " pieces" << std::endl;
-
-    std::vector<Shape> shapeDict = getDefaultShapeDict();
-
     // read shapes from vocab file
+    std::vector<Shape> shapeDict = getDefaultShapeDict();
     vocabFile.seekg(0, std::ios::beg);
     std::string line;
     while (vocabFile.good()) {
@@ -132,6 +127,10 @@ int main(int argc, char *argv[]) {
         return 0;
     }
     std::cout << "Shape vocab size: " << shapeDict.size() - 2 << "(+2)" << std::endl;
+
+    // read notes from corpus
+    Corpus corpus = readCorpusFile(inCorpusFile, nth);
+    std::cout << "Reading done. There are " << corpus.piecesTP.size() << " pieces" << std::endl;
 
     // sort and count notes
     corpus.sortAllTracks();
