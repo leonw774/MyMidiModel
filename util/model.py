@@ -240,9 +240,8 @@ def adjust_probs_with_context(
         vocabs: Vocabs,
         event_family_indices: Tuple[set]):
     """
-        Set to large negative numeric value the probs of the attribute values that would definitily raise exception
-        if the next token in context_text_list has them
-        and force the position tokens to be ordered increasingly in time
+        Set to zero to the probs of the attribute values that would definitily raise exception
+        if the next token in context_text_list has them and force the position tokens to be ordered increasingly in time
     """
     assert len(context_text_list) > 0, 'Empty context_text_list'
     assert len(probs) == len(OUTPUT_ATTR_NAME) or len(probs) == len(OUTPUT_ATTR_NAME) - 1, 'Bad probs'
@@ -267,10 +266,15 @@ def adjust_probs_with_context(
     is_sep = context_text_list[-1] == tokens.SEP_TOKEN_STR
     if is_head:
         # if the section is head, then only track-instrument and separater allowed
-        # but if it is only BOS, then only track-instrument allowed
         for i in range(vocabs.events.size):
-            if i not in track_instrument_indices and (i != sep_index or len(context_text_list) == 0):
+            if i not in track_instrument_indices and i != sep_index:
                 probs[TOKEN_ATTR_INDEX['evt']][i] = 0
+        # the id of track number is 0:padding, 1:0, 2:1, ...
+        # if the context text list is ['BOS', 'RD:0'] the next track number must be 1, and '1' has id of 2
+        # so the length of context text list is the id of the next track number
+        for i in range(vocabs.track_numbers.size):
+            if i != len(context_text_list):
+                probs[TOKEN_ATTR_INDEX['trn']][i] = 0
     elif is_sep:
         # if is separater, then only measure tokens are allowed
         for i in range(vocabs.events.size):
@@ -368,6 +372,7 @@ def generate_sample(
             raise AssertionError(exception_msg)
         elif start_seq.shape[0] != 1 or start_seq.shape[1] < 1 or start_seq.shape[2] != len(COMPLETE_ATTR_NAME):
             raise AssertionError(exception_msg)
+        assert start_seq.dtype == torch.int32
     else:
         start_seq = torch.from_numpy(
             text_list_to_array([tokens.BEGIN_TOKEN_STR], model.vocabs).astype('int32') # was uint16, which torch don't suuport
@@ -453,7 +458,7 @@ def generate_sample(
                 for l in last_logits # l has shape (attr_vocab_size,)
             ]
             if use_prob_adjustment:
-                # prevent many bad format in advance, but not restricting the order of track number in head section
+                # prevent many bad format in advance
                 last_probs = adjust_probs_with_context(last_probs, text_list, model.vocabs, event_family_indices)
             # get_logit_time += time() - bt
             # print('\n'.join([repr(p) for p in last_probs]))
@@ -479,7 +484,7 @@ def generate_sample(
                 try:
                     try_text_list = text_list + [try_token_text]
                     # format checking
-                    if not use_prob_adjustment or is_head:
+                    if not use_prob_adjustment:
                         # have to append EOS at the end to not raise error
                         piece_to_midi(
                             piece=' '.join(try_text_list + [tokens.END_TOKEN_STR]),
@@ -565,7 +570,7 @@ def compute_losses(
     return head_losses
 
 
-def calc_permutable_subseq_losses(
+def compute_permutable_subseq_losses(
         pred_logits: List[Tensor],
         target_labels: Tensor,
         batched_mps_indices: List,

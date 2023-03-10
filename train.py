@@ -27,7 +27,7 @@ from util.model import (
     MyMidiTransformer,
     generate_sample,
     compute_losses,
-    calc_permutable_subseq_losses
+    compute_permutable_subseq_losses
 )
 
 def parse_args():
@@ -465,13 +465,13 @@ def main():
                 # start_backward_time = time()
             # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
                 if args.data_args.use_permutable_subseq_loss:
-                    head_losses = calc_permutable_subseq_losses(
+                    head_losses = compute_permutable_subseq_losses(
                         prediction,
                         batch_target_seqs,
                         batch_mps_sep_indices,
                         args.train_args.loss_weighted_by_nonpadding_number
                     )
-                    # print('\ncalc_permutable_subseq_losses use time:', time() - start_backward_time)
+                    # print('\ncompute_permutable_subseq_losses use time:', time() - start_backward_time)
                 else:
                     head_losses = compute_losses(
                         prediction,
@@ -531,7 +531,7 @@ def main():
                 prediction = model(batch_input_seqs)
 
                 if args.data_args.use_permutable_subseq_loss:
-                    head_losses = calc_permutable_subseq_losses(
+                    head_losses = compute_permutable_subseq_losses(
                         prediction,
                         batch_target_seqs,
                         batch_mps_sep_indices,
