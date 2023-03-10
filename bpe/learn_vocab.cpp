@@ -104,9 +104,9 @@ int main(int argc, char *argv[]) {
     maxTrackNum = stoi(paras[std::string("max_track_number")]);
     if (nth <= 0 || maxDur <= 0 || maxDur > 255 || maxTrackNum <= 0) {
         std::cout << "Corpus parameter error" << '\n'
-            << "nth: " << nth << '\n'
-            << "maxDuration: " << maxDur << '\n'
-            << "maxTrackNum: " << maxTrackNum << std::endl;
+                << "nth: " << nth << '\n'
+                << "maxDuration: " << maxDur << '\n'
+                << "maxTrackNum: " << maxTrackNum << std::endl;
         return 1;
     }
 
@@ -127,10 +127,10 @@ int main(int argc, char *argv[]) {
     double avgMulpi = startAvgMulpi;
 
     std::cout << "Start Multinote count: " << multinoteCount
-        << ", Start average mulpi: " << avgMulpi
-        << ", Start shape entropy: " << startShapeEntropy
-        << ", Start all attribute entropy: " << startAllEntropy
-        << ", Reading used time: " << (std::chrono::system_clock::now() - ioStartTimePoint) / oneSencondDur << std::endl;
+            << ", Start average mulpi: " << avgMulpi
+            << ", Start shape entropy: " << startShapeEntropy
+            << ", Start all attribute entropy: " << startAllEntropy
+            << ", Reading used time: " << (std::chrono::system_clock::now() - ioStartTimePoint) / oneSencondDur << std::endl;
 
     if (multinoteCount == 0) {
         std::cout << "No notes to merge. Exited." << std::endl;
@@ -145,8 +145,8 @@ int main(int argc, char *argv[]) {
     double shapeEntropy = 0.0, allEntropy = 0.0;
     if (doLog) {
         std::cout << "Iter, Avg neighbor number, Found shapes count, Shape, Score, "
-                  << "Multinote count, Shape entropy, All attribute entropy, "
-                  << "Iteration time, Find best shape time, Merge time" << std::endl;
+                << "Multinote count, Shape entropy, All attribute entropy, "
+                << "Iteration time, Find best shape time, Merge time" << std::endl;
     }
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
         iterStartTimePoint = std::chrono::system_clock::now();

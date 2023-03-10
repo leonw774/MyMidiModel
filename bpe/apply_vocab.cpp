@@ -83,9 +83,9 @@ int main(int argc, char *argv[]) {
     maxTrackNum = stoi(paras[std::string("max_track_number")]);
     if (nth <= 0 || maxDur <= 0 || maxDur > 255 || maxTrackNum <= 0) {
         std::cout << "Corpus parameter error" << '\n'
-            << "nth: " << nth << '\n'
-            << "maxDuration: " << maxDur << '\n'
-            << "maxTrackNum: " << maxTrackNum << std::endl;
+                << "nth: " << nth << '\n'
+                << "maxDuration: " << maxDur << '\n'
+                << "maxTrackNum: " << maxTrackNum << std::endl;
         return 1;
     }
 
@@ -141,15 +141,14 @@ int main(int argc, char *argv[]) {
     double avgMulpi = startAvgMulpi;
 
     std::cout << "Start multinote count: " << multinoteCount
-        << ", Start average mulpi: " << avgMulpi
-        << ", Reading used time: " <<  (std::chrono::system_clock::now() - ioStartTimePoint) / oneSencondDur << std::endl;
+            << ", Start average mulpi: " << avgMulpi
+            << ", Reading used time: " <<  (std::chrono::system_clock::now() - ioStartTimePoint) / oneSencondDur << std::endl;
 
     if (multinoteCount == 0) {
         std::cout << "No notes to merge. Exited." << std::endl;
         return 1;
     }
 
-    std::vector<std::pair<Shape, unsigned int>> shapeScoreFreq;
     std::vector<std::pair<Shape, double>> shapeScoreWPlike;
     std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint;
     std::chrono::time_point<std::chrono::system_clock>partStartTimePoint;
@@ -157,8 +156,8 @@ int main(int argc, char *argv[]) {
     double shapeEntropy = 0.0, allEntropy = 0.0;
     if (doLog) {
         std::cout << "Index, Avg neighbor number, Shape, "
-                  << "Multinote count, Shape entropy, All attribute entropy, "
-                  << "Iteration time, Merge time" << std::endl;
+                << "Multinote count, Shape entropy, All attribute entropy, "
+                << "Iteration time, Merge time" << std::endl;
     }
     // start from 2 because index 0, 1 are default shapes
     for (int shapeIndex = 2; shapeIndex < shapeDict.size(); ++shapeIndex) {
@@ -174,8 +173,7 @@ int main(int argc, char *argv[]) {
         Shape mergingShape = shapeDict[shapeIndex];
         if (doLog){
             std::cout << ", " << (double) totalNeighborNumber / multinoteCount << ", "
-                    << shapeScoreFreq.size() << ", "
-                    << "\"" << shape2str(mergingShape) << "\", ";
+                      << "\"" << shape2str(mergingShape) << "\", ";
         }
 
         partStartTimePoint = std::chrono::system_clock::now();
