@@ -269,9 +269,9 @@ class MidiDataset(Dataset):
                 # head_start_index = 1
                 inv_perm_array = np.empty(track_count, dtype=np.int16)
                 inv_perm_array[perm_array-1] = (np.arange(track_count) + 1)
-                track_permuted_ins = np.empty(track_count, dtype=np.int16)
-                track_permuted_ins = self.pieces[str(filenum)][inv_perm_array, evt_ins_col_index]
-                sampled_array[1:body_start_index-1, evt_ins_col_index] = track_permuted_ins
+                track_permuted_evt_ins = np.empty((track_count, 2), dtype=np.int16)
+                track_permuted_evt_ins = self.pieces[str(filenum)][inv_perm_array, evt_ins_col_index]
+                sampled_array[1:body_start_index-1, evt_ins_col_index] = track_permuted_evt_ins
                 # index 0 is BOS and index body_start_index-1 is SEP
 
         mps_sep_indices_list = []
