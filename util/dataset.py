@@ -261,16 +261,16 @@ class MidiDataset(Dataset):
                 (body_trn_column == i + 1) for i in range(track_count)
             ])
             # permute body's track number
-            evt_ins_col_index = np.array([TOKEN_ATTR_INDEX['evt'], TOKEN_ATTR_INDEX['ins']])
+            evt_ins_col_index = [TOKEN_ATTR_INDEX['evt'], TOKEN_ATTR_INDEX['ins']]
             for i in range(track_count):
                 body_trn_column[body_trn_column_expand[i]] = perm_array[i]
             # permute head's events and instruments with the inverse of the permutation array
             if track_count > 1:
                 # head_start_index = 1
-                inv_perm_array = np.empty(track_count, dtype=np.int16)
+                inv_perm_array = np.empty(track_count, dtype=np.int32)
                 inv_perm_array[perm_array-1] = (np.arange(track_count) + 1)
-                track_permuted_evt_ins = np.empty((track_count, 2), dtype=np.int16)
-                track_permuted_evt_ins = self.pieces[str(filenum)][inv_perm_array, evt_ins_col_index]
+                track_permuted_evt_ins = np.empty((track_count, 2), dtype=np.int32)
+                track_permuted_evt_ins = self.pieces[str(filenum)][inv_perm_array][:, evt_ins_col_index]
                 sampled_array[1:body_start_index-1, evt_ins_col_index] = track_permuted_evt_ins
                 # index 0 is BOS and index body_start_index-1 is SEP
 
