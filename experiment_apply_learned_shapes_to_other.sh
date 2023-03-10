@@ -17,7 +17,7 @@ make -C ./bpe
 ## vocab source -- applied corpus
 
 mkdir "${BASE_PATH}/corpus/lmd--snd_ours_1.0"
-./bpe/apply_vocab \
+./bpe/apply_vocab -log \
     $SND_ORIG_PATH \
     "${BASE_PATH}/corpus/lmd--snd_ours_1.0/corpus" \
     "${LMD_BPE_PATH}/shape_vocab" | tee "${BASE_PATH}/logs/lmd--snd_ours_1.0.log" -a
@@ -29,7 +29,7 @@ python3 make_array.py --bpe 128 --log "${BASE_PATH}/logs/lmd--snd_ours_1.0.log" 
 
 
 mkdir "${BASE_PATH}/corpus/snd--lmd_ours_1.0"
-./bpe/apply_vocab \
+./bpe/apply_vocab -log \
     $LMD_ORIG_PATH \
     "${BASE_PATH}/corpus/snd--lmd_ours_1.0/corpus" \
     "${SND_BPE_PATH}/shape_vocab" | tee "${BASE_PATH}/logs/snd--lmd_ours_1.0.log" -a
