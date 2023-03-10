@@ -1,4 +1,5 @@
 import json
+import sys
 from time import time
 
 from torch import randint
@@ -6,8 +7,15 @@ from torch import randint
 from util.corpus import to_vocabs_file_path
 from util.model import MyMidiTransformer, get_seq_mask, calc_losses
 
+if len(sys.argv) == 1:
+    data_dir_path = 'data/corpus/test_midis_nth32_r32_d32_v16_t24_200_16'
+elif len(sys.argv) == 2:
+    data_dir_path = sys.argv[1]
+else:
+    raise ValueError()
+
 vocabs_dict = json.load(
-    open(to_vocabs_file_path('data/corpus/test_midis_nth96_r32_d96_v16_t24_200_16'), 'r', encoding='utf8')
+    open(to_vocabs_file_path(data_dir_path), 'r', encoding='utf8')
 )
 
 start_time = time()
@@ -21,7 +29,7 @@ model = MyMidiTransformer(
 print(model)
 print('model construction time:', time()-start_time)
 
-test_seq = randint(0, 16, (4, 8, len(model._embeddings)))
+test_seq = randint(0, 16, (4, 8, len(model.embedding_dim)))
 test_mask = get_seq_mask(test_seq.shape[1])
 
 print(test_seq.shape)

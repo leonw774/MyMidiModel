@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 from torch.utils.data import random_split, DataLoader
 
@@ -5,9 +7,15 @@ from util.corpus import get_input_array_format_string
 from util.dataset import MidiDataset, collate_mididataset
 # from util.model import MidiTransformerDecoder
 
+if len(sys.argv) == 1:
+    data_dir_path = 'data/corpus/test_midis_nth32_r32_d32_v16_t24_200_16'
+elif len(sys.argv) == 2:
+    data_dir_path = sys.argv[1]
+else:
+    raise ValueError()
 
 dataset = MidiDataset(
-    data_dir_path='data/corpus/test_midis_nth32_r32_d32_v16_t24_200_16',
+    data_dir_path=data_dir_path,
     max_seq_length=32, # to be printed on screen, so small
     use_permutable_subseq_loss=False,
     measure_sample_step_ratio=0.25,
