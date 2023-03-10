@@ -2,10 +2,10 @@
 
 # experiment on applying vocabulary from corpus A to corpus B
 BASE_PATH="data/corpus/experiment_apply_learned_bpe_on_other"
-LMD_ORIG_PATH="data/corpus/lmd_full_nth32_r32_d96_v16_t24_200_16"
-LMD_BPE_PATH="data/corpus/lmd_full_nth32_r32_d96_v16_t24_200_16_bpe128_ours_1.0"
-SND_ORIG_PATH="data/corpus/snd_nth32_r32_d96_v16_t24_200_16"
-SND_BPE_PATH="data/corpus/snd_nth32_r32_d96_v16_t24_200_16_bpe128_ours_1.0"
+LMD_ORIG_PATH="data/corpus/lmd_full_nth32_r32_d32_v16_t24_200_16"
+LMD_BPE_PATH="data/corpus/lmd_full_nth32_r32_d32_v16_t24_200_16_bpe128_ours_1.0"
+SND_ORIG_PATH="data/corpus/snd_nth32_r32_d32_v16_t24_200_16"
+SND_BPE_PATH="data/corpus/snd_nth32_r32_d32_v16_t24_200_16_bpe128_ours_1.0"
 mkdir ${BASE_PATH}
 mkdir "${BASE_PATH}/corpus"
 mkdir "${BASE_PATH}/logs"
