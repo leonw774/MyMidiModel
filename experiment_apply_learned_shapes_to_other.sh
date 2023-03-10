@@ -25,7 +25,7 @@ mkdir "${BASE_PATH}/corpus/lmd--snd_ours_1.0"
 sed -i 's/\r/\n/g ; s/\x1B\[2K//g' ${BASE_PATH}/logs/lmd--snd_ours_1.0.log
 python3 plot_bpe_log.py ${BASE_PATH}/corpus/lmd--snd_ours_1.0 ${BASE_PATH}/logs/lmd--snd_ours_1.0.log
 
-python3 make_array.py --bpe --log "${BASE_PATH}/logs/lmd--snd_ours_1.0.log" --debug "${BASE_PATH}/corpus/lmd--snd_ours_1.0"
+python3 make_arrays.py --bpe --log "${BASE_PATH}/logs/lmd--snd_ours_1.0.log" --debug "${BASE_PATH}/corpus/lmd--snd_ours_1.0"
 
 
 mkdir "${BASE_PATH}/corpus/snd--lmd_ours_1.0"
@@ -37,5 +37,5 @@ mkdir "${BASE_PATH}/corpus/snd--lmd_ours_1.0"
 sed -i 's/\r/\n/g ; s/\x1B\[2K//g' ${BASE_PATH}/logs/snd--lmd_ours_1.0.log
 python3 plot_bpe_log.py ${BASE_PATH}/corpus/snd--lmd_ours_1.0 ${BASE_PATH}/logs/snd--lmd_ours_1.0.log
 
-python3 make_array.py --bpe --log "${BASE_PATH}/logs/snd--lmd_ours_1.0.log" --debug "${BASE_PATH}/corpus/snd--lmd_ours_1.0"
+python3 make_arrays.py --bpe --log "${BASE_PATH}/logs/snd--lmd_ours_1.0.log" --debug "${BASE_PATH}/corpus/snd--lmd_ours_1.0"
 
