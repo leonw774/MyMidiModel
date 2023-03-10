@@ -46,9 +46,8 @@ def parse_args():
     parser.add_argument(
         '--bpe',
         type=int,
-        default=0,
-        help='The number of iteration the BPE algorithm did. Default is %(default)s.\
-            If the number is integer that greater than 0, it implicated that BPE was performed.'
+        action='store_true',
+        help='If set, it means that BPE was performed, and we will try to read the shape_vocab file under corpus_dir_path.'
     )
     parser.add_argument(
         '--combine-track-instrument',
@@ -107,8 +106,8 @@ def main():
         exit(1)
 
     bpe_shapes_list = []
-    if args.bpe > 0:
-        logging.info('Used BPE: %d', args.bpe)
+    if args.bpe:
+        logging.info('Used BPE: True')
         with open(to_shape_vocab_file_path(args.corpus_dir_path), 'r', encoding='utf8') as vocabs_file:
             bpe_shapes_list = vocabs_file.read().splitlines()
 
