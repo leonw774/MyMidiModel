@@ -311,7 +311,7 @@ def adjust_probs_with_context(
                 probs[TOKEN_ATTR_INDEX['evt']][i] = 0
 
     # adjust track attribute logit
-    if not is_head and not is_sep:
+    if not is_head or not is_sep:
         # if the section is body, then only allow the defined track
         sep_index_in_text_list = context_text_list.index(tokens.SEP_TOKEN_STR)
         try:
@@ -331,6 +331,8 @@ def adjust_probs_with_context(
 
     # re-normalized it
     probs = [p / p.sum() for p in probs]
+    # if in some attribute all events are fill with zero, something is wrong
+    assert any(torch.isnan(p).any() for p in probs)
     return probs
 
 
@@ -342,8 +344,7 @@ def nucleus_sample(probs, threshold):
     nucleus_number = sum(cumsum_probs < threshold) + 1
     if nucleus_number == 1:
         return torch.unsqueeze(sorted_indices[0], dim=0) # returned dimension have to be 1
-    else:
-        nucleus_probs = sorted_probs[:nucleus_number]
+    nucleus_probs = sorted_probs[:nucleus_number]
     sampled_nuclei = torch.multinomial(nucleus_probs, 1)
     sampled_index = sorted_indices[sampled_nuclei]
     return sampled_index
@@ -410,7 +411,6 @@ def generate_sample(
         )
 
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
-    is_head = tokens.SEP_TOKEN_STR not in text_list
 
     input_seq = start_seq
     primer_length = input_seq.shape[1]
