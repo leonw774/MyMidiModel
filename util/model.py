@@ -275,8 +275,8 @@ def adjust_probs_with_context(
         # BUT IF context_text_list == vocabs.track_numbers.size, THE UPPER LIMIT IS REACHED
         # NO TRACK EVENT WILL BE DRAWN, SO WE DON'T NEED TO DO THIS
         if len(context_text_list) < vocabs.track_numbers.size:
-            probs[TOKEN_ATTR_INDEX['trn']][0:i] = 0
-            probs[TOKEN_ATTR_INDEX['trn']][i+1:] = 0
+            probs[TOKEN_ATTR_INDEX['trn']][0:len(context_text_list)] = 0
+            probs[TOKEN_ATTR_INDEX['trn']][len(context_text_list)+1:] = 0
 
     elif is_sep:
         # if is separater, then only measure tokens are allowed
@@ -285,15 +285,16 @@ def adjust_probs_with_context(
                 probs[TOKEN_ATTR_INDEX['evt']][i] = 0
     else: # if the section is body
         # the next token's event can not be track-instrument or sep
-        for i in track_instrument_indices:
-            probs[TOKEN_ATTR_INDEX['evt']][i] = 0
+        probs[TOKEN_ATTR_INDEX['evt']][list(track_instrument_indices)] = 0
         probs[TOKEN_ATTR_INDEX['evt']][sep_index] = 0
 
         # if the last token in context_text_list token is measure
         # then the next token's event can not be multi-note or tempo
         if context_text_list[-1][0] == tokens.MEASURE_EVENTS_CHAR:
-            for i in multinote_indices.union(tempo_indices):
-                probs[TOKEN_ATTR_INDEX['evt']][i] = 0
+            multinote_and_tempo_indices = multinote_indices.union(tempo_indices)
+            for i in range(vocabs.events.size):
+                if i not in multinote_and_tempo_indices: 
+                    probs[TOKEN_ATTR_INDEX['evt']][i] = 0
 
         # this part prohibits the position tokens that is "behind" the current position
         k = len(context_text_list) - 1
@@ -310,8 +311,7 @@ def adjust_probs_with_context(
         while context_text_list[k][0] not in (tokens.POSITION_EVENTS_CHAR, tokens.TEMPO_EVENTS_CHAR) and k > 0:
             k -= 1
         if context_text_list[k][0] == tokens.TEMPO_EVENTS_CHAR:
-            for i in tempo_indices:
-                probs[TOKEN_ATTR_INDEX['evt']][i] = 0
+            probs[TOKEN_ATTR_INDEX['evt']][list(tempo_indices)] = 0
 
     # adjust track attribute logit
     if not (is_head or is_sep):
@@ -333,10 +333,10 @@ def adjust_probs_with_context(
             probs[TOKEN_ATTR_INDEX['trn']][i] = 0
 
     # re-normalized it
-    probs = [p / p.sum() for p in probs]
+    normed_probs = [p / p.sum() for p in probs]
     # if in some attribute all events are fill with zero, something is wrong
-    assert any(torch.isnan(p).any() for p in probs)
-    return probs
+    assert not any([torch.isnan(p).any() for p in normed_probs]), f'Text List: {context_text_list}\nAdjusted: {probs}\nRe-normalized: {normed_probs}'
+    return normed_probs
 
 
 def nucleus_sample(probs, threshold):
@@ -387,7 +387,7 @@ def generate_sample(
     prev_training_state = model.training
     model.inference()
 
-    # prepare vocab for logit adjustment
+    # prepare famlity indices for probs adjustment
     if use_prob_adjustment:
         multinote_indices = set()
         position_indices = set()
