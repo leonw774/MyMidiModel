@@ -45,7 +45,6 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
         '--bpe',
-        type=int,
         action='store_true',
         help='If set, it means that BPE was performed, and we will try to read the shape_vocab file under corpus_dir_path.'
     )
