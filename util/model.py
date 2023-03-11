@@ -272,9 +272,12 @@ def adjust_probs_with_context(
         # the id of track number is 0:padding, 1:0, 2:1, ...
         # if the context text list is ['BOS', 'RD:0'] the next track number must be 1, and '1' has id of 2
         # so the length of context text list is the id of the next track number
-        for i in range(vocabs.track_numbers.size):
-            if i != len(context_text_list):
-                probs[TOKEN_ATTR_INDEX['trn']][i] = 0
+        # BUT IF context_text_list == vocabs.track_numbers.size, THE UPPER LIMIT IS REACHED
+        # NO TRACK EVENT WILL BE DRAWN, SO WE DON'T NEED TO DO THIS
+        if len(context_text_list) < vocabs.track_numbers.size:
+            probs[TOKEN_ATTR_INDEX['trn']][0:i] = 0
+            probs[TOKEN_ATTR_INDEX['trn']][i+1:] = 0
+
     elif is_sep:
         # if is separater, then only measure tokens are allowed
         for i in range(vocabs.events.size):
@@ -311,7 +314,7 @@ def adjust_probs_with_context(
                 probs[TOKEN_ATTR_INDEX['evt']][i] = 0
 
     # adjust track attribute logit
-    if not is_head or not is_sep:
+    if not (is_head or is_sep):
         # if the section is body, then only allow the defined track
         sep_index_in_text_list = context_text_list.index(tokens.SEP_TOKEN_STR)
         try:
