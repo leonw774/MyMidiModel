@@ -273,10 +273,12 @@ def adjust_probs_with_context(
         # if the context text list is ['BOS', 'RD:0'] the next track number must be 1, and '1' has id of 2
         # so the length of context text list is the id of the next track number
         # BUT IF context_text_list == vocabs.track_numbers.size, THE UPPER LIMIT IS REACHED
-        # NO TRACK EVENT WILL BE DRAWN, SO WE DON'T NEED TO DO THIS
+        # ONLY SEPARATOR WILL BE DRAWN, SO WE DON'T NEED TO DO THIS
         if len(context_text_list) < vocabs.track_numbers.size:
             probs[TOKEN_ATTR_INDEX['trn']][0:len(context_text_list)] = 0
             probs[TOKEN_ATTR_INDEX['trn']][len(context_text_list)+1:] = 0
+        else:
+            probs[TOKEN_ATTR_INDEX['evt']][list(track_instrument_indices)] = 0
 
     elif is_sep:
         # if is separater, then only measure tokens are allowed
@@ -335,11 +337,12 @@ def adjust_probs_with_context(
     # re-normalized it
     normed_probs = [p / p.sum() for p in probs]
     # if in some attribute all events are fill with zero, something is wrong
-    assert not any([torch.isnan(p).any() for p in normed_probs]), f'Text List: {context_text_list}\nAdjusted: {probs}\nRe-normalized: {normed_probs}'
+    assert not any([torch.isnan(p).any() for p in normed_probs]), \
+        f'Text List: {context_text_list}\nAdjusted: {probs}\nRe-normalized: {normed_probs}'
     return normed_probs
 
 
-def nucleus_sample(probs, threshold):
+def nucleus_sampling(probs, threshold):
     if threshold == 1.0:
         return torch.multinomial(probs, 1)
     sorted_probs, sorted_indices = torch.sort(probs, dim=-1, descending=True)
@@ -469,7 +472,7 @@ def generate_sample(
             while try_count < try_count_limit:
                 # bt = time()
                 sampled_attrs = [
-                    nucleus_sample(p, nucleus_sampling_threshold)
+                    nucleus_sampling(p, nucleus_sampling_threshold)
                     for p in last_probs
                 ]
 
