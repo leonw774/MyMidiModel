@@ -40,6 +40,8 @@ LOG_PATH="logs/$(date '+%Y%m%d-%H%M%S')-${FULL_CONFIG_NAME}.log"
 echo "Log file: $LOG_PATH"
 touch $LOG_PATH
 
+######## MAKE CORPUS ########
+
 CORPUS_DIR_PATH="data/corpus/${DATA_NAME}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}_v${VELOCITY_STEP}_t${TEMPO_MIN}_${TEMPO_MAX}_${TEMPO_STEP}"
 
 DO_MIDI_TO_CORPUS=true
@@ -143,6 +145,8 @@ fi
 python3 make_arrays.py --debug $DO_BPE $COMBINE_TRACK_INST --mp-worker-number $PROCESS_WORKERS --log $LOG_PATH $CORPUS_DIR_PATH $USE_EXISTED
 test $? -ne 0 && { echo "text_to_array.py failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
+######## TRAIN MODEL ########
+
 # test if NO_TRAIN is a set variables
 if [ -n "${NO_TRAIN+x}" ]; then
     echo "Not training" | tee -a $LOG_PATH
@@ -213,11 +217,13 @@ $LAUNCH_COMMAND train.py --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation-r
 
 test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
-if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_feature_stats.json" ] ; then
+######## EVALUATE MODEL ########
+
+if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_features.json" ] ; then
     echo "Midi dataset ${MIDI_DIR_PATH} already has feature stats file. get_eval_features_of_dataset.py is skipped."
 else
     echo "Get evaluation features of ${MIDI_DIR_PATH}"
-    python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS $MIDI_DIR_PATH
+    python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS $MIDI_DIR_PATH --output-sampled-file-paths
     test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 fi
 
@@ -227,7 +233,7 @@ python3 generate_with_model.py --nucleus-sampling-threshold $NUCLEUS_THRESHOLD -
 
 echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples"
 python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
-    --reference-file-path $MIDI_DIR_PATH/eval_feature_stats.json $MODEL_DIR_PATH/eval_samples
+    --reference-file-path $MIDI_DIR_PATH/eval_features.json $MODEL_DIR_PATH/eval_samples
 
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 

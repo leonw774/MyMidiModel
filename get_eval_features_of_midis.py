@@ -37,6 +37,11 @@ def parse_args():
         default=min(cpu_count(), 4)
     )
     parser.add_argument(
+        '--output-sampled-file-paths',
+        action='store_true',
+        help='If set, the paths of the sampled files would be output to \"MIDI_DIR_PATH/eval_pathlist.txt\"'
+    )
+    parser.add_argument(
         '--max-pairs-number',
         type=int,
         default=int(1e6)
@@ -103,25 +108,27 @@ def main():
         args.sample_number = dataset_size
     eval_features_per_piece: List[ Dict[str, float] ] = []
     sample_able_indices = set(range(dataset_size))
+    sampled_midi_file_paths = list()
 
     start_time = time()
     while len(eval_features_per_piece) < args.sample_number:
         if args.sample_number >= len(sample_able_indices):
-            sampled_indices = list(sample_able_indices)
+            random_indices = list(sample_able_indices)
         else:
-            sampled_indices = random.sample(list(sample_able_indices), args.sample_number - len(eval_features_per_piece))
-            sample_able_indices.difference_update(sampled_indices)
+            random_indices = random.sample(list(sample_able_indices), args.sample_number - len(eval_features_per_piece))
+            sample_able_indices.difference_update(random_indices)
+        sampled_midi_file_paths.extend([file_path_list[idx] for idx in random_indices])
         eval_args_dict_list = [
             {'midi_file_path': file_path_list[idx], 'max_pairs_number': args.max_pairs_number}
-            for idx in sampled_indices
+            for idx in random_indices
         ]
         with Pool(args.workers) as p:
             eval_features = list(tqdm(
                 p.imap_unordered(midi_to_features_wrapper, eval_args_dict_list),
-                total=len(sampled_indices)
+                total=len(random_indices)
             ))
             eval_features = [f for f in eval_features if f is not None]
-            print(f'Processed {len(eval_features)} uncorrupted files out of {len(sampled_indices)} random indices')
+            print(f'Processed {len(eval_features)} uncorrupted files out of {len(random_indices)} random indices')
             eval_features_per_piece += eval_features
 
     logging.info(
@@ -172,12 +179,18 @@ def main():
                 reference_eval_features_stats[fname]
             )
     else:
-        logging.info('%s is invalid path forreference result JSON file', args.reference_file_path)
+        logging.info('%s is invalid path for reference result JSON file', args.reference_file_path)
 
-    eval_stat_file_path = os.path.join(args.midi_dir_path, 'eval_feature_stats.json')
-    with open(eval_stat_file_path, 'w+', encoding='utf8') as eval_stat_file:
-        json.dump(eval_features_stats, eval_stat_file)
-        logging.info('Outputed evaluation feature stats JSON at %s', eval_stat_file_path)
+    eval_feat_file_path = os.path.join(args.midi_dir_path, 'eval_features.json')
+    with open(eval_feat_file_path, 'w+', encoding='utf8') as eval_feat_file:
+        json.dump(eval_features_stats, eval_feat_file)
+        logging.info('Outputed evaluation features JSON at %s', eval_feat_file_path)
+
+    if args.output_path_list:
+        eval_pathlist_file_path = os.path.join(args.midi_dir_path, 'eval_pathlist.txt')
+        with open(eval_pathlist_file_path, 'w+', encoding='utf8') as eval_pathlist_file:
+            eval_pathlist_file.write('\n'.sampled_midi_file_paths)
+            logging.info('Outputed evaluation sampled file paths at %s', eval_pathlist_file_path)
 
     logging.info(strftime('=== get_eval_features_of_midis.py exit ==='))
     return 0
