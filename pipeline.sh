@@ -219,6 +219,7 @@ test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH 
 
 ######## EVALUATE MODEL ########
 
+# Get evaluation features of dataset if not there
 if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_features.json" ] ; then
     echo "Midi dataset ${MIDI_DIR_PATH} already has feature stats file. get_eval_features_of_dataset.py is skipped."
 else
@@ -227,6 +228,7 @@ else
     test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 fi
 
+# Evaluate unconditional generation
 echo "Generating $EVAL_SAMPLE_NUMBER unconditional samples for evaluating model performance"
 python3 generate_with_model.py --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --sample-number $EVAL_SAMPLE_NUMBER --no-tqdm --output-txt \
     $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/uncond
@@ -234,6 +236,12 @@ python3 generate_with_model.py --nucleus-sampling-threshold $NUCLEUS_THRESHOLD -
 echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples"
 python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
     --reference-file-path $MIDI_DIR_PATH/eval_features.json $MODEL_DIR_PATH/eval_samples
+
+# Evaluate instrument-conditiond generation
+# WIP
+
+# Evaluate prime continuation
+# WIP
 
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 

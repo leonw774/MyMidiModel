@@ -186,7 +186,7 @@ def main():
         json.dump(eval_features_stats, eval_feat_file)
         logging.info('Outputed evaluation features JSON at %s', eval_feat_file_path)
 
-    if args.output_path_list:
+    if args.output_sampled_file_paths:
         eval_pathlist_file_path = os.path.join(args.midi_dir_path, 'eval_pathlist.txt')
         with open(eval_pathlist_file_path, 'w+', encoding='utf8') as eval_pathlist_file:
             eval_pathlist_file.write('\n'.sampled_midi_file_paths)

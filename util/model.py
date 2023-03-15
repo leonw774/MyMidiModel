@@ -272,11 +272,10 @@ def adjust_probs_with_context(
         # the id of track number is 0:padding, 1:0, 2:1, ...
         # if the context text list is ['BOS', 'RD:0'] the next track number must be 1, and '1' has id of 2
         # so the length of context text list is the id of the next track number
-        # BUT IF context_text_list == vocabs.track_numbers.size, THE UPPER LIMIT IS REACHED
-        # ONLY SEPARATOR WILL BE DRAWN, SO WE DON'T NEED TO DO THIS
         if len(context_text_list) < vocabs.track_numbers.size:
             probs[TOKEN_ATTR_INDEX['trn']][0:len(context_text_list)] = 0
             probs[TOKEN_ATTR_INDEX['trn']][len(context_text_list)+1:] = 0
+        # but if context_text_list == vocabs.track_numbers.size, the upper limit is reached, only separtor is valid
         else:
             probs[TOKEN_ATTR_INDEX['evt']][list(track_instrument_indices)] = 0
 
@@ -515,8 +514,6 @@ def generate_sample(
                     # check_format_time += time() - bt
                     continue # keep sampling until no error
                 # no error
-                if try_token_text == tokens.SEP_TOKEN_STR:
-                    is_head = False
                 input_seq = try_text_list_tensor
                 array_to_text_list_memory = try_array_to_text_list_memory
                 text_list = try_text_list
@@ -565,14 +562,17 @@ def compute_losses(
             target=target_labels[..., k], # (batch_size, seq_size)
             ignore_index=0, # padding is index 0
             reduction=('sum' if weighted_by_nonpadding_number else 'mean')
-            # because some attributes have more non-padding occurence than others
-            # we can reflect this by them having different "weight" of loss using "sum"
+            # some attributes have more non-padding occurence than others
+            # we can reflect this by them having different "weight" of loss by using 'sum'
         )
         for k, logits in enumerate(pred_logits)
     ]
+
     if weighted_by_nonpadding_number:
-        number_of_nonpaddings = torch.count_nonzero(target_labels[..., TOKEN_ATTR_INDEX['evt']])
-        head_losses = [l / number_of_nonpaddings for l in head_losses]
+        # "normalize" the losses by number of non-padding events
+        number_of_nonpadding_events = torch.count_nonzero(target_labels[..., TOKEN_ATTR_INDEX['evt']])
+        head_losses = [l / number_of_nonpadding_events for l in head_losses]
+
     return head_losses
 
 
