@@ -1,4 +1,6 @@
 import bisect
+from collections import Counter
+from fractions import Fraction
 import itertools
 from math import log, isnan
 from math import e as math_e
@@ -27,7 +29,7 @@ def _entropy(x: list, base: math_e) -> float:
     return entropy
 
 
-def kl_divergence(pred, true):
+def kl_divergence(pred, true, epsilon=1e-9):
     if isinstance(pred, list) and isinstance(true, list):
         assert len(pred) == len(true) and len(true) > 0
         sum_pred = sum(pred)
@@ -50,9 +52,10 @@ def kl_divergence(pred, true):
             raise ValueError()
         norm_pred = {k: pred[k]/sum_pred for k in pred}
         norm_true = {k: true[k]/sum_true for k in true}
-        valid_keys = {x for x in norm_pred if x != 0}.intersection({x for x in norm_true if x != 0})
+        valid_keys = {x for x in norm_pred}.union({x for x in norm_true})
+        print(valid_keys)
         kld = sum([
-            norm_true[x] * log(norm_true[x]/norm_pred[x])
+            norm_true.get(x, epsilon) * log(norm_true.get(x, epsilon)/norm_pred.get(x, epsilon))
             for x in valid_keys
         ])
         return kld
@@ -117,10 +120,12 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) ->
     pitchs = []
     durations = []
     velocities = []
+
     for track in midi.instruments:
         for note in track.notes:
             pitchs.append(note.pitch)
-            durations.append((note.end - note.start) / nth * 4) # use quarter note as unit
+            # use quarter note as unit for duration
+            durations.append(Fraction((note.end - note.start) * 4, nth))
             velocities.append(note.velocity)
 
     pitch_histogram = {p:0 for p in range(128)}
@@ -135,14 +140,10 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) ->
     pitchs_mean = np.mean(pitchs) if len(pitchs) > 0 else float('nan')
     pitchs_var = np.var(pitchs) if len(pitchs) > 0 else float('nan')
 
-    duration_distribution = dict()
-    for d in durations:
-        if d in duration_distribution:
-            duration_distribution[d] += 1
-        else:
-            duration_distribution[d] = 1
-    durations_mean = np.mean(durations) if len(durations) > 0 else float('nan')
-    durations_var = np.var(durations) if len(durations) > 0 else float('nan')
+    duration_distribution = Counter([f'{d.numerator}/{d.denominator}' for d in durations])
+    durations_as_float = [float(d) for d in durations]
+    durations_mean = np.mean(durations_as_float) if len(durations) > 0 else float('nan')
+    durations_var = np.var(durations_as_float) if len(durations) > 0 else float('nan')
 
     velocity_histogram = {v:0 for v in range(128)}
     for v in velocities:

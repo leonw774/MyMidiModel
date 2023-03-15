@@ -267,7 +267,7 @@ def adjust_probs_with_context(
     if is_head:
         # if the section is head, then only track-instrument and separater allowed
         for i in range(vocabs.events.size):
-            if i not in track_instrument_indices and i != sep_index:
+            if i not in track_instrument_indices and (i != sep_index or len(context_text_list) == 1):
                 probs[TOKEN_ATTR_INDEX['evt']][i] = 0
         # the id of track number is 0:padding, 1:0, 2:1, ...
         # if the context text list is ['BOS', 'RD:0'] the next track number must be 1, and '1' has id of 2

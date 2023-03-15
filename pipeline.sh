@@ -221,9 +221,9 @@ test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH 
 
 # Get evaluation features of dataset if not there
 if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_features.json" ] ; then
-    echo "Midi dataset ${MIDI_DIR_PATH} already has feature stats file. get_eval_features_of_dataset.py is skipped."
+    echo "Midi dataset ${MIDI_DIR_PATH} already has feature stats file."
 else
-    echo "Get evaluation features of ${MIDI_DIR_PATH}"
+    echo "Getting evaluation features of ${MIDI_DIR_PATH}"
     python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS $MIDI_DIR_PATH --output-sampled-file-paths
     test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 fi

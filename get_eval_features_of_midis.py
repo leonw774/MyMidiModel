@@ -68,7 +68,7 @@ def midi_to_features_wrapper(args_dict: dict):
         midifile_obj = MidiFile(args_dict['midi_file_path'])
         features = midi_to_features(midi=midifile_obj, max_pairs_number=args_dict['max_pairs_number'])
     except Exception:
-        logging.debug(format_exc())
+        # print(format_exc())
         return None
     return features
 
@@ -111,9 +111,10 @@ def main():
     sampled_midi_file_paths = list()
 
     start_time = time()
-    while len(eval_features_per_piece) < args.sample_number:
+    while len(eval_features_per_piece) < args.sample_number and len(sample_able_indices) > 0:
         if args.sample_number >= len(sample_able_indices):
             random_indices = list(sample_able_indices)
+            sample_able_indices.clear()
         else:
             random_indices = random.sample(list(sample_able_indices), args.sample_number - len(eval_features_per_piece))
             sample_able_indices.difference_update(random_indices)
@@ -151,7 +152,7 @@ def main():
         fname_description = dict(Series(aggr_scalar_eval_features[fname]).dropna().describe())
         fname_description: Dict[str, np.float64]
         eval_features_stats[fname] = {
-            k : float(v) for k, v in fname_description.items()
+            k: float(v) for k, v in fname_description.items()
         }
 
     for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
@@ -159,27 +160,31 @@ def main():
             [Counter(features[fname]) for features in eval_features_per_piece],
             Counter() # starting value of empty counter
         ))
+        # cast the keys into strings!!! because the reference distribution is read from json, and their keys are strings
+        eval_features_stats[fname] = {str(k): v for k, v in eval_features_stats[fname].items()}
 
-    if os.path.isfile(args.reference_file_path):
-        with open(args.reference_file_path, 'r', encoding='utf8') as reference_file:
-            try:
-                reference_eval_features_stats = json.load(reference_file)
-            except Exception:
-                logging.info('json.load(%s) failed', args.reference_file_path)
-                logging.info(format_exc())
-                return 1
-        logging.info(
-            'Computing KL-divergance of pitch, duration, and velocity of midis in %s from %s',
-            args.midi_dir_path,
-            args.reference_file_path
-        )
-        for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
-            eval_features_stats[fname+'_KLD'] = kl_divergence(
-                eval_features_stats[fname],
-                reference_eval_features_stats[fname]
+    if args.reference_file_path != '':
+        if os.path.isfile(args.reference_file_path):
+            with open(args.reference_file_path, 'r', encoding='utf8') as reference_file:
+                try:
+                    reference_eval_features_stats = json.load(reference_file)
+                    # 
+                except Exception:
+                    logging.info('json.load(%s) failed', args.reference_file_path)
+                    logging.info(format_exc())
+                    return 1
+            logging.info(
+                'Computing KL-divergance of pitch, duration, and velocity of midis in %s from %s',
+                args.midi_dir_path,
+                args.reference_file_path
             )
-    else:
-        logging.info('%s is invalid path for reference result JSON file', args.reference_file_path)
+            for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
+                eval_features_stats[fname+'_KLD'] = kl_divergence(
+                    eval_features_stats[fname],
+                    reference_eval_features_stats[fname]
+                )
+        else:
+            logging.info('%s is invalid path for reference result JSON file', args.reference_file_path)
 
     eval_feat_file_path = os.path.join(args.midi_dir_path, 'eval_features.json')
     with open(eval_feat_file_path, 'w+', encoding='utf8') as eval_feat_file:
@@ -189,7 +194,7 @@ def main():
     if args.output_sampled_file_paths:
         eval_pathlist_file_path = os.path.join(args.midi_dir_path, 'eval_pathlist.txt')
         with open(eval_pathlist_file_path, 'w+', encoding='utf8') as eval_pathlist_file:
-            eval_pathlist_file.write('\n'.sampled_midi_file_paths)
+            eval_pathlist_file.write('\n'.join(sampled_midi_file_paths))
             logging.info('Outputed evaluation sampled file paths at %s', eval_pathlist_file_path)
 
     logging.info(strftime('=== get_eval_features_of_midis.py exit ==='))
