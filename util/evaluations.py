@@ -224,7 +224,7 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) ->
         'duration_distribution': duration_distribution,
         'durations_mean': durations_mean,
         'durations_var': durations_var,
-        'velocity_histogram': duration_distribution,
+        'velocity_histogram': velocity_histogram,
         'velocities_mean': velocities_mean,
         'velocities_var': velocities_var,
         'instrumentation_self_similarity': instrumentation_self_similarity,
