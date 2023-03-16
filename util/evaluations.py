@@ -53,7 +53,7 @@ def kl_divergence(pred, true, epsilon=1e-9):
         norm_pred = {k: pred[k]/sum_pred for k in pred}
         norm_true = {k: true[k]/sum_true for k in true}
         valid_keys = {x for x in norm_pred}.union({x for x in norm_true})
-        print(valid_keys)
+        # print(valid_keys)
         kld = sum([
             norm_true.get(x, epsilon) * log(norm_true.get(x, epsilon)/norm_pred.get(x, epsilon))
             for x in valid_keys
