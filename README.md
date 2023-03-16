@@ -83,6 +83,7 @@ They should compile to:
   - Implement function for generating sample from model
 - `token.py`
   - Define representation tokens and their "main form" (text form)
+  - And some 
 - `vocabs.py`
   - Define `Vocabs`, a class that record the vocabulary set, vocabulary building configurations and midi preprocessing parameters.
   - Implement vocabulary building function. Input: midi preprocessing parameters and bpe shape list.

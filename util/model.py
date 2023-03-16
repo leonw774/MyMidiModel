@@ -32,7 +32,7 @@ from . import tokens
 from .tokens import b36str2int
 from .midi import piece_to_midi
 from .vocabs import Vocabs
-from .corpus import TOKEN_ATTR_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, array_to_text_list, text_list_to_array
+from .corpus import ATTR_NAME_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, array_to_text_list, text_list_to_array
 
 
 class MyMidiTransformer(nn.Module):
@@ -65,16 +65,19 @@ class MyMidiTransformer(nn.Module):
         # Input attributess
 
         # the indices of input attrs in complete attribute list
-        self.input_attrs_indices = [
-            TOKEN_ATTR_INDEX[fname]
-            for fname in COMPLETE_ATTR_NAME
-            if not (input_no_tempo and fname=='tempos') or not (input_no_time_signature and fname=='time_signatures')
-        ]
+        self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in COMPLETE_ATTR_NAME]
+        if input_no_tempo:
+            self.input_attrs_indices.remove(ATTR_NAME_INDEX['tempos'])
+        if input_no_time_signature:
+            self.input_attrs_indices.remove(ATTR_NAME_INDEX['time_signatures'])
+
         self.embedding_vocabs_size = [
-            ( getattr(vocabs, fname).size if fname != 'measure_numbers' else max_seq_length )
-            for fname in COMPLETE_ATTR_NAME
-            if not (input_no_tempo and fname=='tempos') or not (input_no_time_signature and fname=='time_signatures')
+            max_seq_length
+            if COMPLETE_ATTR_NAME[idx] == 'measure_numbers' else
+            getattr(vocabs, COMPLETE_ATTR_NAME[idx]).size
+            for idx in self.input_attrs_indices
         ]
+
         self.embeddings = nn.ModuleList([
             nn.Embedding(
                 num_embeddings=vsize,
@@ -88,11 +91,11 @@ class MyMidiTransformer(nn.Module):
 
         # Output attributes
         self.output_attrs_indices = [
-            TOKEN_ATTR_INDEX[fname]
+            ATTR_NAME_INDEX[fname]
             for fname in OUTPUT_ATTR_NAME
         ]
         if vocabs.combine_track_instrument:
-            self.output_attrs_indices.remove(TOKEN_ATTR_INDEX['instruments'])
+            self.output_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
         self.logit_vocabs_size = [
             getattr(vocabs, OUTPUT_ATTR_NAME[i]).size
             for i in self.output_attrs_indices
@@ -233,6 +236,40 @@ class MyMidiTransformer(nn.Module):
 # end class MyMidiTransformer
 
 
+def compute_losses(
+        pred_logits: List[Tensor],
+        target_labels: Tensor,
+        weighted_by_nonpadding_number=False) -> List[Tensor]:
+    """
+        pred_logits is a list
+        - length: out_attr_number
+        - elements are tenors with shape: (batch_size, seq_size, attr_vocab_size)
+        target_labels has shape: (batch_size, seq_size, out_attr_number)
+        return a list of losses of each head
+    """
+    # basically treat seq_size as one of the K dimensions and K = 1
+    # target_labels have to be long int
+    target_labels = target_labels.long()
+    head_losses = [
+        F.cross_entropy(
+            input=logits.transpose(1, 2),
+            # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
+            target=target_labels[..., k], # (batch_size, seq_size)
+            ignore_index=0, # padding is index 0
+            reduction=('sum' if weighted_by_nonpadding_number else 'mean')
+            # some attributes have more non-padding occurence than others
+            # we can reflect this by them having different "weight" of loss by using 'sum'
+        )
+        for k, logits in enumerate(pred_logits)
+    ]
+
+    if weighted_by_nonpadding_number:
+        # "normalize" the losses by number of non-padding events
+        number_of_nonpadding_events = torch.count_nonzero(target_labels[..., ATTR_NAME_INDEX['evt']])
+        head_losses = [l / number_of_nonpadding_events for l in head_losses]
+
+    return head_losses
+
 
 def adjust_probs_with_context(
         probs: List[Tensor],
@@ -257,7 +294,7 @@ def adjust_probs_with_context(
     ) = event_family_indices
 
     # BOS token is redundent, will not be used in generation
-    probs[TOKEN_ATTR_INDEX['evt']][bos_index] = 0
+    probs[ATTR_NAME_INDEX['evt']][bos_index] = 0
     # predict PAD is not allowed in generation time
     for attr_probs in probs:
         attr_probs[0] = 0
@@ -268,26 +305,26 @@ def adjust_probs_with_context(
         # if the section is head, then only track-instrument and separater allowed
         for i in range(vocabs.events.size):
             if i not in track_instrument_indices and (i != sep_index or len(context_text_list) == 1):
-                probs[TOKEN_ATTR_INDEX['evt']][i] = 0
+                probs[ATTR_NAME_INDEX['evt']][i] = 0
         # the id of track number is 0:padding, 1:0, 2:1, ...
         # if the context text list is ['BOS', 'RD:0'] the next track number must be 1, and '1' has id of 2
         # so the length of context text list is the id of the next track number
         if len(context_text_list) < vocabs.track_numbers.size:
-            probs[TOKEN_ATTR_INDEX['trn']][0:len(context_text_list)] = 0
-            probs[TOKEN_ATTR_INDEX['trn']][len(context_text_list)+1:] = 0
+            probs[ATTR_NAME_INDEX['trn']][0:len(context_text_list)] = 0
+            probs[ATTR_NAME_INDEX['trn']][len(context_text_list)+1:] = 0
         # but if context_text_list == vocabs.track_numbers.size, the upper limit is reached, only separtor is valid
         else:
-            probs[TOKEN_ATTR_INDEX['evt']][list(track_instrument_indices)] = 0
+            probs[ATTR_NAME_INDEX['evt']][list(track_instrument_indices)] = 0
 
     elif is_sep:
         # if is separater, then only measure tokens are allowed
         for i in range(vocabs.events.size):
             if i not in measure_indices:
-                probs[TOKEN_ATTR_INDEX['evt']][i] = 0
+                probs[ATTR_NAME_INDEX['evt']][i] = 0
     else: # if the section is body
         # the next token's event can not be track-instrument or sep
-        probs[TOKEN_ATTR_INDEX['evt']][list(track_instrument_indices)] = 0
-        probs[TOKEN_ATTR_INDEX['evt']][sep_index] = 0
+        probs[ATTR_NAME_INDEX['evt']][list(track_instrument_indices)] = 0
+        probs[ATTR_NAME_INDEX['evt']][sep_index] = 0
 
         # if the last token in context_text_list token is measure
         # then the next token's event can not be multi-note or tempo
@@ -295,7 +332,7 @@ def adjust_probs_with_context(
             multinote_and_tempo_indices = multinote_indices.union(tempo_indices)
             for i in range(vocabs.events.size):
                 if i not in multinote_and_tempo_indices: 
-                    probs[TOKEN_ATTR_INDEX['evt']][i] = 0
+                    probs[ATTR_NAME_INDEX['evt']][i] = 0
 
         # this part prohibits the position tokens that is "behind" the current position
         k = len(context_text_list) - 1
@@ -305,14 +342,14 @@ def adjust_probs_with_context(
             cur_position = b36str2int(context_text_list[k][1:])
             for i in position_indices:
                 if b36str2int(vocabs.events.id2text[i][1:]) <= cur_position:
-                    probs[TOKEN_ATTR_INDEX['evt']][i] = 0
+                    probs[ATTR_NAME_INDEX['evt']][i] = 0
 
         # this part prohibit the tempo tokens if there is already a tempo token in the current position
         k = len(context_text_list) - 1
         while context_text_list[k][0] not in (tokens.POSITION_EVENTS_CHAR, tokens.TEMPO_EVENTS_CHAR) and k > 0:
             k -= 1
         if context_text_list[k][0] == tokens.TEMPO_EVENTS_CHAR:
-            probs[TOKEN_ATTR_INDEX['evt']][list(tempo_indices)] = 0
+            probs[ATTR_NAME_INDEX['evt']][list(tempo_indices)] = 0
 
     # adjust track attribute logit
     if not (is_head or is_sep):
@@ -331,7 +368,7 @@ def adjust_probs_with_context(
         # first +1 is because index 0 is padding
         # second +1 is because we want indices that greater than max_track_number+1
         for i in range(max_track_number+1+1, vocabs.track_numbers.size):
-            probs[TOKEN_ATTR_INDEX['trn']][i] = 0
+            probs[ATTR_NAME_INDEX['trn']][i] = 0
 
     # re-normalized it
     normed_probs = [p / p.sum() for p in probs]
@@ -539,41 +576,6 @@ def generate_sample(
 
     model.train(prev_training_state)
     return text_list
-
-
-def compute_losses(
-        pred_logits: List[Tensor],
-        target_labels: Tensor,
-        weighted_by_nonpadding_number=False) -> List[Tensor]:
-    """
-        pred_logits is a list
-        - length: out_attr_number
-        - elements are tenors with shape: (batch_size, seq_size, attr_vocab_size)
-        target_labels has shape: (batch_size, seq_size, out_attr_number)
-        return a list of losses of each head
-    """
-    # basically treat seq_size as one of the K dimensions and K = 1
-    # target_labels have to be long int
-    target_labels = target_labels.long()
-    head_losses = [
-        F.cross_entropy(
-            input=logits.transpose(1, 2),
-            # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
-            target=target_labels[..., k], # (batch_size, seq_size)
-            ignore_index=0, # padding is index 0
-            reduction=('sum' if weighted_by_nonpadding_number else 'mean')
-            # some attributes have more non-padding occurence than others
-            # we can reflect this by them having different "weight" of loss by using 'sum'
-        )
-        for k, logits in enumerate(pred_logits)
-    ]
-
-    if weighted_by_nonpadding_number:
-        # "normalize" the losses by number of non-padding events
-        number_of_nonpadding_events = torch.count_nonzero(target_labels[..., TOKEN_ATTR_INDEX['evt']])
-        head_losses = [l / number_of_nonpadding_events for l in head_losses]
-
-    return head_losses
 
 
 def compute_permutable_subseq_losses(

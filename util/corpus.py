@@ -102,7 +102,7 @@ class CorpusReader:
             result = self.file.read(self.line_pos[index+1]-self.line_pos[index]-1)
             return result
 
-TOKEN_ATTR_INDEX = {
+ATTR_NAME_INDEX = {
     'evt': 0, 'events': 0,
     'pit': 1, 'pitchs': 1,
     'dur': 2, 'durations': 2,
@@ -124,6 +124,11 @@ OUTPUT_ATTR_NAME = [
     'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments'
 ]
 
+def piece_to_array(piece: str, vocabs: Vocabs, input_memory: Union[dict, None] = None, output_memory: bool = False) -> np.ndarray:
+    return text_list_to_array(piece.split(' '), vocabs, input_memory, output_memory)
+
+def array_to_piece(array, vocabs: Vocabs, is_output=False):
+    return ' '.join(array_to_text_list(array, vocabs, is_output))
 
 def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict, None] = None, output_memory: bool = False) -> np.ndarray:
     """
@@ -133,7 +138,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             event, pitch, duration, velocity, track_number, instrument, position, measure_number, tempo, time signature
 
         If a token doesn't have an attribute, fill it with the index of PAD (which should be zero).
-        If a token has an attrbute, but it is not in the dictionary, fill the index of UNK.
+        If a token has an attrbute, but it is not in the vocabs, error would be raised
     """
     # in build_vocabs, padding token is made to be the 0th element
     padding = 0
@@ -167,7 +172,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         i = h + last_array_len
 
         if text in tokens.SPECIAL_TOKENS_STR:
-            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
+            x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
 
         elif typename == tokens.TRACK_EVENTS_CHAR:
             if vocabs.combine_track_instrument:
@@ -177,53 +182,53 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
                 event_text, track_number = text.split(':')
                 event_text, instrument = event_text[0], event_text[1:]
             tracks_count += 1
-            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
-            x[i][TOKEN_ATTR_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
-            x[i][TOKEN_ATTR_INDEX['ins']] = vocabs.instruments.text2id[instrument]
+            x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
+            x[i][ATTR_NAME_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
+            x[i][ATTR_NAME_INDEX['ins']] = vocabs.instruments.text2id[instrument]
 
         elif typename == tokens.MEASURE_EVENTS_CHAR:
             cur_position_id = vocabs.positions.text2id['0']
             cur_time_sig_id = vocabs.time_signatures.text2id[text]
             cur_measure_number += 1
-            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
-            x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
-            x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
+            x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
+            x[i][ATTR_NAME_INDEX['pos']] = cur_position_id
+            x[i][ATTR_NAME_INDEX['mea']] = cur_measure_number
             # x[i][TOKEN_ATTR_INDEX['tmp']] = padding
-            x[i][TOKEN_ATTR_INDEX['tis']] = cur_time_sig_id
+            x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
 
         elif typename == tokens.TEMPO_EVENTS_CHAR:
             event_text, *attr = text = text.split(':')
             cur_tempo_id = vocabs.tempos.text2id[event_text]
             # because tempo come after position and the position token was assigned to previous tempo's id
-            x[cur_position_cursor][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
-            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
-            x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
-            x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
-            x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
-            x[i][TOKEN_ATTR_INDEX['tis']] = cur_time_sig_id
+            x[cur_position_cursor][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
+            x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
+            x[i][ATTR_NAME_INDEX['pos']] = cur_position_id
+            x[i][ATTR_NAME_INDEX['mea']] = cur_measure_number
+            x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
+            x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
 
         elif typename == tokens.POSITION_EVENTS_CHAR:
             cur_position_id = vocabs.positions.text2id[text[1:]]
             cur_position_cursor = i
-            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[text]
-            x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
-            x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
-            x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
-            x[i][TOKEN_ATTR_INDEX['tis']] = cur_time_sig_id
+            x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
+            x[i][ATTR_NAME_INDEX['pos']] = cur_position_id
+            x[i][ATTR_NAME_INDEX['mea']] = cur_measure_number
+            x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
+            x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
 
         elif typename == tokens.NOTE_EVENTS_CHAR or typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             event_text, *attr = text.split(':')
-            x[i][TOKEN_ATTR_INDEX['evt']] = vocabs.events.text2id[event_text]
-            x[i][TOKEN_ATTR_INDEX['pit']] = vocabs.pitchs.text2id[attr[0]]
-            x[i][TOKEN_ATTR_INDEX['dur']] = vocabs.durations.text2id[attr[1]]
-            x[i][TOKEN_ATTR_INDEX['vel']] = vocabs.velocities.text2id[attr[2]]
-            x[i][TOKEN_ATTR_INDEX['trn']] = vocabs.track_numbers.text2id[attr[3]]
+            x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
+            x[i][ATTR_NAME_INDEX['pit']] = vocabs.pitchs.text2id[attr[0]]
+            x[i][ATTR_NAME_INDEX['dur']] = vocabs.durations.text2id[attr[1]]
+            x[i][ATTR_NAME_INDEX['vel']] = vocabs.velocities.text2id[attr[2]]
+            x[i][ATTR_NAME_INDEX['trn']] = vocabs.track_numbers.text2id[attr[3]]
             assert b36str2int(attr[3]) < tracks_count, 'Invalid track number'
-            x[i][TOKEN_ATTR_INDEX['ins']] = x[b36str2int(attr[3])+1, TOKEN_ATTR_INDEX['ins']]
-            x[i][TOKEN_ATTR_INDEX['pos']] = cur_position_id
-            x[i][TOKEN_ATTR_INDEX['mea']] = cur_measure_number
-            x[i][TOKEN_ATTR_INDEX['tmp']] = cur_tempo_id
-            x[i][TOKEN_ATTR_INDEX['tis']] = cur_time_sig_id
+            x[i][ATTR_NAME_INDEX['ins']] = x[b36str2int(attr[3])+1, ATTR_NAME_INDEX['ins']]
+            x[i][ATTR_NAME_INDEX['pos']] = cur_position_id
+            x[i][ATTR_NAME_INDEX['mea']] = cur_measure_number
+            x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
+            x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
 
         else:
             raise ValueError('unknown typename')
@@ -259,7 +264,7 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
     text_list = []
     for i in range(array.shape[0]):
         # in json, key can only be string
-        event_text = vocabs.events.id2text[array[i][TOKEN_ATTR_INDEX['evt']]]
+        event_text = vocabs.events.id2text[array[i][ATTR_NAME_INDEX['evt']]]
         typename = event_text[0]
 
         if event_text in tokens.SPECIAL_TOKENS_STR:
@@ -270,13 +275,13 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
             if vocabs.combine_track_instrument:
                 token_text = (
                     event_text + ':'
-                    + vocabs.track_numbers.id2text[array[i][TOKEN_ATTR_INDEX['trn']]]
+                    + vocabs.track_numbers.id2text[array[i][ATTR_NAME_INDEX['trn']]]
                 )
             else:
                 token_text = (
                     event_text
-                    + vocabs.instruments.id2text[array[i][TOKEN_ATTR_INDEX['ins']]] + ':'
-                    + vocabs.track_numbers.id2text[array[i][TOKEN_ATTR_INDEX['trn']]]
+                    + vocabs.instruments.id2text[array[i][ATTR_NAME_INDEX['ins']]] + ':'
+                    + vocabs.track_numbers.id2text[array[i][ATTR_NAME_INDEX['trn']]]
                 )
             text_list.append(token_text)
 
@@ -291,12 +296,12 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
 
         elif typename == tokens.NOTE_EVENTS_CHAR or typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             # subtract one because there is padding token at the beginning of the vocab
-            track_number = array[i][TOKEN_ATTR_INDEX['trn']] - 1
+            track_number = array[i][ATTR_NAME_INDEX['trn']] - 1
             token_text = (
                 event_text + ':'
-                + vocabs.pitchs.id2text[array[i][TOKEN_ATTR_INDEX['pit']]] + ':'
-                + vocabs.durations.id2text[array[i][TOKEN_ATTR_INDEX['dur']]] + ':'
-                + vocabs.velocities.id2text[array[i][TOKEN_ATTR_INDEX['vel']]] + ':'
+                + vocabs.pitchs.id2text[array[i][ATTR_NAME_INDEX['pit']]] + ':'
+                + vocabs.durations.id2text[array[i][ATTR_NAME_INDEX['dur']]] + ':'
+                + vocabs.velocities.id2text[array[i][ATTR_NAME_INDEX['vel']]] + ':'
                 + int2b36str(track_number)
             )
             text_list.append(token_text)
@@ -306,6 +311,26 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
             raise ValueError(f'unknown typename of event_text: {event_text}')
     # print(track_number_to_event)
     return text_list
+
+
+def get_input_array_format_string(input_array: np.ndarray, mps_sep_indices, vocabs: Vocabs):
+    array_text_byteio = io.BytesIO()
+    np.savetxt(array_text_byteio, input_array, fmt='%d')
+    array_savetxt_list = array_text_byteio.getvalue().decode().split('\n')
+    reconstructed_text_list = array_to_text_list(input_array, vocabs=vocabs)
+    if mps_sep_indices is None:
+        mps_sep_indices = []
+    debug_str = ' evt  pit  dur  vel  trn  ins  pos  mea  tmp  tis  reconstructed_text\n'
+    debug_str += (
+        '\n'.join([
+            ' '.join([f'{s:>4}' for s in a.split()])
+            + f'  {z:<16}' + (' MPS_SEP' if i in mps_sep_indices else '')
+            for i, (a, z) in enumerate(zip(array_savetxt_list, reconstructed_text_list))
+        ])
+    )
+    if isinstance(mps_sep_indices, np.ndarray):
+        debug_str += '\nmps_sep_indices: ' + str(mps_sep_indices)
+    return debug_str
 
 
 PIANOROLL_MEASURELINE_COLOR = (0.8, 0.8, 0.8, 1.0)
@@ -452,23 +477,3 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
     plt.margins(x=0)
     plt.tight_layout()
     return plt.gcf()
-
-
-def get_input_array_format_string(input_array: np.ndarray, mps_sep_indices, vocabs: Vocabs):
-    array_text_byteio = io.BytesIO()
-    np.savetxt(array_text_byteio, input_array, fmt='%d')
-    array_savetxt_list = array_text_byteio.getvalue().decode().split('\n')
-    reconstructed_text_list = array_to_text_list(input_array, vocabs=vocabs)
-    if mps_sep_indices is None:
-        mps_sep_indices = []
-    debug_str = ' evt  pit  dur  vel  trn  ins  pos  mea  tmp  tis  reconstructed_text\n'
-    debug_str += (
-        '\n'.join([
-            ' '.join([f'{s:>4}' for s in a.split()])
-            + f'  {z:<16}' + (' MPS_SEP' if i in mps_sep_indices else '')
-            for i, (a, z) in enumerate(zip(array_savetxt_list, reconstructed_text_list))
-        ])
-    )
-    if isinstance(mps_sep_indices, np.ndarray):
-        debug_str += '\nmps_sep_indices: ' + str(mps_sep_indices)
-    return debug_str

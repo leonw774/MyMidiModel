@@ -12,7 +12,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
 from . import tokens
-from .corpus import get_corpus_vocabs, TOKEN_ATTR_INDEX, get_input_array_format_string
+from .corpus import get_corpus_vocabs, ATTR_NAME_INDEX, get_input_array_format_string
 
 class MidiDataset(Dataset):
 
@@ -144,7 +144,7 @@ class MidiDataset(Dataset):
             self._piece_lengths[filenum] = cur_piece_lengths
 
             j = 2 # because first token is BOS and second must be track as we excluded all empty midis
-            while self.pieces[str(filenum)][j][TOKEN_ATTR_INDEX['evt']] != self._sep_id:
+            while self.pieces[str(filenum)][j][ATTR_NAME_INDEX['evt']] != self._sep_id:
                 j += 1
             self._piece_body_start_index[filenum] = j + 1
             self._virtual_piece_start_index[filenum][0] = j + 1
@@ -154,7 +154,7 @@ class MidiDataset(Dataset):
                 if self.pieces[filename].shape[0] > max_seq_length:
                     measure_indices = list(
                         np.flatnonzero(
-                            np.isin(self.pieces[filename][:, TOKEN_ATTR_INDEX['evt']], self._measure_ids)
+                            np.isin(self.pieces[filename][:, ATTR_NAME_INDEX['evt']], self._measure_ids)
                         )
                     )
                     start_vp_num = 1
@@ -169,7 +169,7 @@ class MidiDataset(Dataset):
             if permute_mps:
                 # find all seperater's index in body
                 mps_sep_indices = np.flatnonzero(
-                    np.isin(self.pieces[filename][:, TOKEN_ATTR_INDEX['evt']], self._mps_seperators)
+                    np.isin(self.pieces[filename][:, ATTR_NAME_INDEX['evt']], self._mps_seperators)
                 )
                 for i in range(mps_sep_indices.shape[0] - 1):
                     self._file_mps_sep_indices[filenum].append(mps_sep_indices[i])
@@ -187,11 +187,11 @@ class MidiDataset(Dataset):
                         self._file_mps_sep_indices[filenum].append(mps_sep_indices[i] + 1)
 
             if self.pitch_augmentation_range != 0:
-                is_multinote_token = (self.pieces[filename][:, TOKEN_ATTR_INDEX['pit']]) != 0
+                is_multinote_token = (self.pieces[filename][:, ATTR_NAME_INDEX['pit']]) != 0
                 # the pitch attribute of drums / percussion instrument does not means actual note pitch
                 # but different percussion sound
                 # assume instrument vocabulary is 0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
-                not_percussion_notes = (self.pieces[filename][:, TOKEN_ATTR_INDEX['ins']]) != 129
+                not_percussion_notes = (self.pieces[filename][:, ATTR_NAME_INDEX['ins']]) != 129
                 self._augmentable_pitches[filenum] = np.logical_and(is_multinote_token, not_percussion_notes)
 
             cur_index += len(self._virtual_piece_start_index[filenum]) * self._pitch_augmentation_factor
@@ -225,10 +225,10 @@ class MidiDataset(Dataset):
 
         # to make sure measure number is smaller than max_seq_length
         # if last token is EOS, body_end_index is length of sample array - 1
-        body_end_index = -1 if sampled_array[-1, TOKEN_ATTR_INDEX['mea']] == 0 else sampled_array.shape[0]
-        min_measure_number = np.min(sampled_array[body_start_index:body_end_index, TOKEN_ATTR_INDEX['mea']])
+        body_end_index = -1 if sampled_array[-1, ATTR_NAME_INDEX['mea']] == 0 else sampled_array.shape[0]
+        min_measure_number = np.min(sampled_array[body_start_index:body_end_index, ATTR_NAME_INDEX['mea']])
         if min_measure_number != 1:
-            sampled_array[body_start_index:body_end_index, TOKEN_ATTR_INDEX['mea']] -= (min_measure_number - 1)
+            sampled_array[body_start_index:body_end_index, ATTR_NAME_INDEX['mea']] -= (min_measure_number - 1)
         # if there are still measure numbers that bigger than max_seq_length, panic
         # max_measure_number = np.max(sampled_array[body_start_index:body_end_index, TOKEN_ATTR_INDEX['mea']])
         # assert max_measure_number < self.max_seq_length
@@ -238,7 +238,7 @@ class MidiDataset(Dataset):
         if pitch_augment != 0:
             sampled_augmentable_pitches = self._augmentable_pitches[filenum][start_index:end_index]
             # sometimes the sampled array does not contain any pitch-augmentable token
-            sampled_body_pitch_col = sampled_array[body_start_index:, TOKEN_ATTR_INDEX['pit']]
+            sampled_body_pitch_col = sampled_array[body_start_index:, ATTR_NAME_INDEX['pit']]
             if np.any(sampled_augmentable_pitches):
                 if pitch_augment > 0:
                     max_pitch = np.max((sampled_body_pitch_col)[sampled_augmentable_pitches])
@@ -256,12 +256,12 @@ class MidiDataset(Dataset):
             # add one because there is a padding token at the beginning of the vocab
             perm_array = np.random.permutation(track_count) + 1
             # view body's track number col
-            body_trn_column = sampled_array[body_start_index:, TOKEN_ATTR_INDEX['trn']]
+            body_trn_column = sampled_array[body_start_index:, ATTR_NAME_INDEX['trn']]
             body_trn_column_expand = np.asarray([
                 (body_trn_column == i + 1) for i in range(track_count)
             ])
             # permute body's track number
-            evt_ins_col_index = [TOKEN_ATTR_INDEX['evt'], TOKEN_ATTR_INDEX['ins']]
+            evt_ins_col_index = [ATTR_NAME_INDEX['evt'], ATTR_NAME_INDEX['ins']]
             for i in range(track_count):
                 body_trn_column[body_trn_column_expand[i]] = perm_array[i]
             # permute head's events and instruments with the inverse of the permutation array
@@ -310,7 +310,7 @@ class MidiDataset(Dataset):
                 )
 
         # checking for bad numbers
-        for fname, fidx in TOKEN_ATTR_INDEX.items():
+        for fname, fidx in ATTR_NAME_INDEX.items():
             if len(fname) > 3: # not abbr
                 assert np.min(sampled_array[:, fidx]) >= 0,\
                     (f'number in {fname} is below zero\n'
