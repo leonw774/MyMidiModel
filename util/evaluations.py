@@ -11,7 +11,7 @@ import numpy as np
 from miditoolkit import MidiFile
 
 from .tokens import get_largest_possible_position, get_supported_time_signatures, b36str2int, MEASURE_EVENTS_CHAR
-from .midi import piece_to_midi, midi_to_text_list
+from .midi import piece_to_midi, midi_to_piece
 
 
 def _entropy(x: list, base: math_e) -> float:
@@ -94,7 +94,7 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
 
 def midi_to_features(midi: MidiFile, max_pairs_number: int = int(1e6)) -> Dict[str, float]:
     nth = midi.ticks_per_beat * 4
-    temp_piece = ' '.join(midi_to_text_list(
+    temp_piece = midi_to_piece(
         midi,
         nth=nth,
         max_track_number=len(midi.instruments),
@@ -103,7 +103,7 @@ def midi_to_features(midi: MidiFile, max_pairs_number: int = int(1e6)) -> Dict[s
         use_cont_note=True,
         tempo_quantization=(1,1,65536),
         use_merge_drums=False
-    ))
+    )
     return piece_to_features(temp_piece, nth, max_pairs_number)
 
 

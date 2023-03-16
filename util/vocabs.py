@@ -125,13 +125,13 @@ def build_vocabs(
         tokens.TEMPO_EVENTS_CHAR+int2b36str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
     ]
 
-    # remove time signatures that dont appears in target corpus
     existed_measure_time_sigs = set()
     token_count_per_piece = []
     for piece in corpus_reader:
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
         existed_measure_time_sigs.update({text for text in text_list if text[0] == tokens.MEASURE_EVENTS_CHAR})
+    # should we remove time signatures that dont appears in target corpus?
     # event_measure_time_sig = [t for t in event_measure_time_sig if t in existed_measure_time_sigs]
 
     # padding token HAVE TO be at first

@@ -15,7 +15,7 @@ from miditoolkit import MidiFile
 from psutil import cpu_count
 from tqdm import tqdm
 
-from util.midi import midi_to_text_list
+from util.midi import midi_to_piece
 from util.corpus import to_paras_file_path, to_corpus_file_path, to_pathlist_file_path, dump_corpus_paras
 
 
@@ -133,8 +133,8 @@ def handler(args_dict: dict):
         return 'RuntimeError(\'miditoolkit failed to parse the file\')'
 
     try:
-        text_list = midi_to_text_list(**args_dict)
-        piece_bytes = ' '.join(text_list).encode()
+        piece = midi_to_piece(**args_dict)
+        piece_bytes = piece.encode()
         # return compressed text because memory issue
         return zlib.compress(piece_bytes)
     except KeyboardInterrupt as e:

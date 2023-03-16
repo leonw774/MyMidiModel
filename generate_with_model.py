@@ -9,7 +9,7 @@ import torch
 from miditoolkit import MidiFile
 
 from util.tokens import BEGIN_TOKEN_STR, END_TOKEN_STR
-from util.midi import midi_to_text_list, piece_to_midi, get_first_k_measures, get_first_k_nths
+from util.midi import midi_to_piece, piece_to_midi, get_first_k_measures, get_first_k_nths
 from util.corpus import CorpusReader, text_list_to_array, to_corpus_file_path, to_paras_file_path, dump_corpus_paras
 from util.model import MyMidiTransformer, generate_sample
 
@@ -166,13 +166,13 @@ def main():
     if args.primer is not None:
         primer_text_list = []
         if args.primer.endswith('.mid') or args.primer.endswith('.midi'):
-            primer_text_list = midi_to_text_list(MidiFile(args.primer), **model.vocabs.paras)
+            primer_piece = midi_to_piece(MidiFile(args.primer), **model.vocabs.paras)
 
             if len(model.vocabs.bpe_shapes_list) > 0:
                 # model use BPE, then apply it
                 with tempfile.TemporaryDirectory() as tmp_in_corpus_dir_path:
                     with open(to_corpus_file_path(tmp_in_corpus_dir_path), 'w+', encoding='utf8') as tmp_corpus_file:
-                        tmp_corpus_file.write(' '.join(primer_text_list) + '\n')
+                        tmp_corpus_file.write(primer_piece + '\n')
                     with open(to_paras_file_path(tmp_in_corpus_dir_path), 'w+', encoding='utf8') as tmp_paras_file:
                         tmp_paras_file.write(dump_corpus_paras(model.vocabs.paras))
                     tmp_shape_vocab_file_path = os.path.join(tmp_in_corpus_dir_path, 'shape_vocab')

@@ -111,6 +111,7 @@ def quantize_tempo(tempo: int, tempo_quantization: Tuple[int, int, int]) -> int:
     t = min(tempo_quantization[1], max(tempo_quantization[0], t))
     return t
 
+
 NOTE_TIME_LIMIT = 0x1FFFFF # 2^21 - 1
 # In midi format, time-delta is representated in variable-length bytes
 # the format is 1xxxxxxx 1xxxxxxx ... 0xxxxxxx, the msb of each byte is 1 if it is not the last byte
@@ -129,7 +130,7 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
     for track in midi.instruments:
         for i, note in enumerate(track.notes):
             # sometimes mido/miditoolkit gives weird value to note.start and note.end that
-            # some extra 1s appears in significant bits
+            # some extra 1s appear in significant bits
             # sometimes the file itself is corrupted already
             assert note.start <= NOTE_TIME_LIMIT and note.end <= NOTE_TIME_LIMIT, 'Note start/end too large, likely corrupted'
             assert note.end - note.start <= NOTE_DURATION_LIMIT, 'Note duration too large, likely corrupted'
@@ -393,26 +394,31 @@ def midi_to_token_list(
 
     note_token_list = get_note_tokens(midi, max_duration, velocity_step, use_cont_note)
     assert len(note_token_list) > 0, 'No notes in midi'
-    measure_token_list, tempo_token_list = get_time_structure_tokens(midi, note_token_list, nth, tempo_quantization, supported_time_signatures)
+    measure_token_list, tempo_token_list = get_time_structure_tokens(
+        midi, note_token_list, nth, tempo_quantization, supported_time_signatures
+    )
     assert measure_token_list[0].onset <= note_token_list[0].onset, 'First measure is after first note'
     pos_token_list = get_position_infos(note_token_list, measure_token_list, tempo_token_list)
     body_token_list = pos_token_list + note_token_list + measure_token_list + tempo_token_list
     body_token_list.sort()
 
     head_token_list = get_head_tokens(midi)
-    full_token_list = [BeginOfScoreToken()] + head_token_list + [SectionSeperatorToken()] + body_token_list + [EndOfScoreToken()]
+    full_token_list = (
+        [BeginOfScoreToken()] + head_token_list + [SectionSeperatorToken()] + body_token_list + [EndOfScoreToken()]
+    )
 
     return full_token_list
 
-def midi_to_text_list(
+
+def midi_to_piece(
         midi: MidiFile,
         nth: int,
         max_track_number: int,
         max_duration: int,
         velocity_step: int,
         use_cont_note: bool,
-        tempo_quantization: Tuple[int, int, int], # [tempo_min, tempo_max, tempo_step]
-        use_merge_drums: bool) -> list:
+        tempo_quantization: Tuple[int, int, int],
+        use_merge_drums: bool) -> str:
     """
         Parameters:
         - midi_file_path: midi file path
@@ -465,14 +471,14 @@ def midi_to_text_list(
         if consecutive_measure_token_count >= 64:
             raise AssertionError('Very long silence detected, likely corrupted')
 
-    return text_list
+    return ' '.join(text_list)
 
 
 def handle_note_continuation(
         is_cont: bool,
         note_attrs: Tuple[int, int, int, int],
         cur_time: int,
-        pending_cont_notes: Dict[int, Dict[Tuple[int, int, int], List[int]]]):
+        pending_cont_notes: Dict[int, Dict[Tuple[int, int, int], List[int]]]) -> Union[None, Note]:
     # pending_cont_notes is dict object so it is pass by reference
     pitch, duration, velocity, track_number = note_attrs
     info = (pitch, velocity, track_number)

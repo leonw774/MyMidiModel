@@ -63,7 +63,7 @@ def get_supported_time_signatures(
         for numerator in range(1, min(numerator_max+1, denominator*nd_raio_max+1))
     }
 
-# if use default (hard-coded), should be 96
+# if use default (hard-coded), should be 66
 def get_largest_possible_position(nth: int, supported_time_signatures: set = None) -> int:
     if supported_time_signatures is None:
         return max(
