@@ -76,4 +76,4 @@ for i, (s, e) in enumerate(zip(batched_samples, batched_mps_sep_indices)):
     if args.output_midi:
         if not piece.endswith('EOS'):
             piece += ' EOS'
-        piece_to_midi(p, vocabs.paras['nth']).dump(f'debug_dataset_batched{i}.mid')
+        piece_to_midi(piece, vocabs.paras['nth']).dump(f'debug_dataset_batched{i}.mid')
