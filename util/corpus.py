@@ -268,7 +268,10 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
         typename = event_text[0]
 
         if event_text in tokens.SPECIAL_TOKENS_STR:
-            text_list.append(event_text) # no additional attribute needed
+            if event_text == tokens.PADDING_TOKEN_STR:
+                continue
+            else:
+                text_list.append(event_text) # no additional attribute needed
 
         elif typename == tokens.TRACK_EVENTS_CHAR:
             # track token has instrument attribute

@@ -71,9 +71,9 @@ if len(batched_mps_sep_indices) == 0:
 for i, (s, e) in enumerate(zip(batched_samples, batched_mps_sep_indices)):
     print(f'BATCHED[{i}]')
     print(get_input_array_format_string(s.numpy(), e, vocabs))
-    p = ' '.join(array_to_text_list(s.numpy(), vocabs))
-    print(p)
+    piece = ' '.join(array_to_text_list(s.numpy(), vocabs))
+    print(piece)
     if args.output_midi:
-        if not p.endswith('EOS'):
-            p += ' EOS'
+        if not piece.endswith('EOS'):
+            piece += ' EOS'
         piece_to_midi(p, vocabs.paras['nth']).dump(f'debug_dataset_batched{i}.mid')
