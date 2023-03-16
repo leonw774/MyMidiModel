@@ -168,10 +168,11 @@ class MidiDataset(Dataset):
 
             if permute_mps:
                 # find all seperater's index in body
+                # the result array is sorted in increaing order
                 mps_sep_indices = np.flatnonzero(
                     np.isin(self.pieces[filename][:, ATTR_NAME_INDEX['evt']], self._mps_separators)
                 )
-                for i in range(mps_sep_indices.shape[0] - 1):
+                for i in range(mps_sep_indices.shape[0]):
                     self._file_mps_sep_indices[filenum].append(mps_sep_indices[i])
                     # M = Measure, P = Position, N = Multi-note
                     # consider this sequence: M  P  N  N  N  P  N  N  P  N  M  P  N  N
@@ -183,8 +184,9 @@ class MidiDataset(Dataset):
                     #                         1  2  3  3  3  4  5  5  6  7  8  9  10 10
                     # then seperate the mps by the begining index of them:
                     #                        [0, 1, 2,       5, 6,    8, 9, 10,11,12]
-                    if mps_sep_indices[i+1] != mps_sep_indices[i] + 1:
-                        self._file_mps_sep_indices[filenum].append(mps_sep_indices[i] + 1)
+                    if i + 1 < mps_sep_indices.shape[0]:
+                        if mps_sep_indices[i+1] != mps_sep_indices[i] + 1:
+                            self._file_mps_sep_indices[filenum].append(mps_sep_indices[i] + 1)
 
             if self.pitch_augmentation_range != 0:
                 is_multinote_token = (self.pieces[filename][:, ATTR_NAME_INDEX['pit']]) != 0
