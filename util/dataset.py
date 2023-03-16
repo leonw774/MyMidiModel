@@ -182,7 +182,7 @@ class MidiDataset(Dataset):
                     # X means it is separator, number represents different mps
                     # if see separator as mps of length 1, we get mps like this:
                     #                         1  2  3  3  3  4  5  5  6  7  8  9  10 10
-                    # then seperate the mps by the begining index of them:
+                    # then just store the mps by their beginning index:
                     #                        [0, 1, 2,       5, 6,    8, 9, 10,11,12]
                     if i + 1 < mps_sep_indices.shape[0]:
                         if mps_sep_indices[i+1] != mps_sep_indices[i] + 1:
