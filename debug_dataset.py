@@ -1,4 +1,5 @@
 import sys
+from argparse import ArgumentParser
 
 import numpy as np
 from torch.utils.data import random_split, DataLoader
@@ -8,17 +9,23 @@ from util.corpus import get_input_array_format_string, array_to_text_list
 from util.dataset import MidiDataset, collate_mididataset
 # from util.model import MidiTransformerDecoder
 
-if len(sys.argv) == 1:
-    data_dir_path = 'data/corpus/test_midis_nth32_r32_d32_v16_t24_200_16'
-elif len(sys.argv) == 2:
-    data_dir_path = sys.argv[1]
-else:
-    raise ValueError()
+parser = ArgumentParser()
+parser.add_argument(
+    '--max-seq-length',
+    type=int,
+    default=48
+)
+parser.add_argument(
+    'data_dir_path',
+    type=str,
+    default='data/corpus/test_midis_nth32_r32_d32_v16_t24_200_16'
+)
+args = parser.parse_args()
 
 dataset = MidiDataset(
-    data_dir_path=data_dir_path,
-    max_seq_length=48, # to be printed on screen, so small
-    use_permutable_subseq_loss=False,
+    data_dir_path=args.data_dir_path,
+    max_seq_length=args.max_seq_length,
+    use_permutable_subseq_loss=True, # to print out mps indices
     measure_sample_step_ratio=0.25,
     permute_mps=True,
     permute_track_number=True,
