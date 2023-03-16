@@ -83,9 +83,9 @@ class MidiDataset(Dataset):
             print('Processing')
         # The seperators of maximal permutable subsequence are:
         # BOS, EOS, SEP, PADDING, track-instrument token, measure tokens, position tokens
-        # we stores their index number in _mps_seperators
-        # _mps_seperators is empty when `permute_mps` is False
-        self._mps_seperators = list()
+        # we stores their index number in _mps_separators
+        # _mps_separators is empty when `permute_mps` is False
+        self._mps_separators = list()
         self._bos_id = self.vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
         self._sep_id = self.vocabs.events.text2id[tokens.SEP_TOKEN_STR]
         self._eos_id = self.vocabs.events.text2id[tokens.END_TOKEN_STR]
@@ -108,16 +108,16 @@ class MidiDataset(Dataset):
             elif text[0] == tokens.TRACK_EVENTS_CHAR:
                 self._track_ids.add(index)
         if permute_mps:
-            self._mps_seperators = set([
+            self._mps_separators = set([
                 self._pad_id,
                 self._bos_id,
                 self._sep_id,
                 self._eos_id,
             ])
-            self._mps_seperators.update(self._track_ids)
-            self._mps_seperators.update(self._measure_ids)
-            self._mps_seperators.update(self._position_ids)
-            self._mps_seperators = np.sort(np.array(list(self._mps_seperators)))
+            self._mps_separators.update(self._track_ids)
+            self._mps_separators.update(self._measure_ids)
+            self._mps_separators.update(self._position_ids)
+            self._mps_separators = np.sort(np.array(list(self._mps_separators)))
         # numpy.isin can work on set, but turn it into sorted 1d array helps search speed
         self._note_ids = np.sort(np.array(self._note_ids))
         self._position_ids = np.sort(np.array(self._position_ids))
@@ -169,7 +169,7 @@ class MidiDataset(Dataset):
             if permute_mps:
                 # find all seperater's index in body
                 mps_sep_indices = np.flatnonzero(
-                    np.isin(self.pieces[filename][:, ATTR_NAME_INDEX['evt']], self._mps_seperators)
+                    np.isin(self.pieces[filename][:, ATTR_NAME_INDEX['evt']], self._mps_separators)
                 )
                 for i in range(mps_sep_indices.shape[0] - 1):
                     self._file_mps_sep_indices[filenum].append(mps_sep_indices[i])
