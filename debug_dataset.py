@@ -1,7 +1,5 @@
-import sys
 from argparse import ArgumentParser
 
-import numpy as np
 from torch.utils.data import random_split, DataLoader
 
 from util.midi import piece_to_midi
@@ -14,6 +12,10 @@ parser.add_argument(
     '--max-seq-length',
     type=int,
     default=48
+)
+parser.add_argument(
+    '--output-midi',
+    action='store_true'
 )
 parser.add_argument(
     'data_dir_path',
@@ -71,6 +73,7 @@ for i, (s, e) in enumerate(zip(batched_samples, batched_mps_sep_indices)):
     print(get_input_array_format_string(s.numpy(), e, vocabs))
     p = ' '.join(array_to_text_list(s.numpy(), vocabs))
     print(p)
-    # if not p.endswith('EOS'):
-    #     p += ' EOS'
-    # piece_to_midi(p, vocabs.paras['nth']).dump(f'debug_dataset_batched{i}.mid')
+    if args.output_midi:
+        if not p.endswith('EOS'):
+            p += ' EOS'
+        piece_to_midi(p, vocabs.paras['nth']).dump(f'debug_dataset_batched{i}.mid')
