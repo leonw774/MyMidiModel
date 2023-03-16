@@ -9,6 +9,11 @@ from util.dataset import MidiDataset, collate_mididataset
 
 parser = ArgumentParser()
 parser.add_argument(
+    '--batch-size',
+    type=int,
+    default=4
+)
+parser.add_argument(
     '--max-seq-length',
     type=int,
     default=48
@@ -61,7 +66,7 @@ print('TEST DATA CORRECTNESS')
 
 train_dataloader = DataLoader(
     dataset=train_set,
-    batch_size=4,
+    batch_size=args.batch_size,
     shuffle=False,
     collate_fn=collate_mididataset
 )
