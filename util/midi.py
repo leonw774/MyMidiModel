@@ -520,7 +520,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
 
     text_list = piece.split(' ')
     assert text_list[0] == tokens.BEGIN_TOKEN_STR and text_list[-1] == tokens.END_TOKEN_STR, \
-        f'No BOS and EOS at start and end, instead: {list(text_list[0])} and {list(text_list[-1])}'
+        f'No BOS and EOS at start and end, instead: {text_list[0]} and {text_list[-1]}'
 
     cur_time = 0
     is_head = True
