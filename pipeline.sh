@@ -245,7 +245,6 @@ python3 generate_with_model.py --nucleus-sampling-threshold $NUCLEUS_THRESHOLD -
     $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/uncond/sample
 
 echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples/uncond"
-mkdir $MODEL_DIR_PATH/eval_samples/uncond
 python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
     --reference-file-path $MIDI_DIR_PATH/eval_features.json $MODEL_DIR_PATH/eval_samples/uncond/
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
