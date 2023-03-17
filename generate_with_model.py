@@ -28,8 +28,8 @@ def read_args():
     parser.add_argument(
         '--primer-length', '-l',
         type=int,
-        default=1,
-        help='How long from the start the primer music should be used. Default is 1.\
+        default=0,
+        help='How long from the start the primer music should be used. Default is %(default)s.\
             The unit of these number is controlled with "--unit" option.\n\
             When --unit is "nth", the the length is counted with the token\'s start time.'
     )
@@ -168,7 +168,7 @@ def main():
         if args.primer.endswith('.mid') or args.primer.endswith('.midi'):
             primer_piece = midi_to_piece(MidiFile(args.primer), **model.vocabs.paras)
 
-            if len(model.vocabs.bpe_shapes_list) > 0:
+            if len(model.vocabs.bpe_shapes_list) > 0 and args.primer_length > 0:
                 # model use BPE, then apply it
                 with tempfile.TemporaryDirectory() as tmp_in_corpus_dir_path:
                     with open(to_corpus_file_path(tmp_in_corpus_dir_path), 'w+', encoding='utf8') as tmp_corpus_file:
@@ -201,8 +201,10 @@ def main():
 
                         # get content from output
                         with open(to_corpus_file_path(tmp_out_corpus_dir_path), 'r', encoding='utf8') as tmp_out_corpus:
-                            piece = tmp_out_corpus.readline() # get first piece
-                        primer_text_list = piece.split()
+                            merged_piece = tmp_out_corpus.readline() # get first piece
+                        primer_text_list = merged_piece.split(' ')
+            else:
+                primer_text_list = primer_piece.split(' ')
 
         else:
             # we expect the corpus file has same midi parameters as the model
