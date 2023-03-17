@@ -119,6 +119,8 @@ def main():
     if dataset_size < args.sample_number:
         logging.info('Dataset size (%d) is smaller than given sample number (%d)', dataset_size, args.sample_number)
         args.sample_number = dataset_size
+    args.workers = min(args.workers, dataset_size)
+
     eval_features_per_piece: List[ Dict[str, float] ] = []
     sample_able_indices = set(range(dataset_size))
     sampled_midi_file_paths = list()
@@ -131,6 +133,7 @@ def main():
         else:
             random_indices = random.sample(list(sample_able_indices), args.sample_number - len(eval_features_per_piece))
             sample_able_indices.difference_update(random_indices)
+
         sampled_midi_file_paths.extend([file_path_list[idx] for idx in random_indices])
         eval_args_dict_list = [
             {
@@ -166,7 +169,7 @@ def main():
 
     eval_features_stats = dict()
     for fname in EVAL_SCALAR_FEATURE_NAMES:
-        fname_description = dict(Series(aggr_scalar_eval_features[fname]).dropna().describe())
+        fname_description = dict(Series(aggr_scalar_eval_features[fname], dtype='float64').dropna().describe())
         fname_description: Dict[str, np.float64]
         eval_features_stats[fname] = {
             k: float(v) for k, v in fname_description.items()
@@ -185,7 +188,6 @@ def main():
             with open(args.reference_file_path, 'r', encoding='utf8') as reference_file:
                 try:
                     reference_eval_features_stats = json.load(reference_file)
-                    # 
                 except Exception:
                     logging.info('json.load(%s) failed', args.reference_file_path)
                     logging.info(format_exc())
