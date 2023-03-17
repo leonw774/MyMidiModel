@@ -11,7 +11,7 @@ import numpy as np
 from miditoolkit import MidiFile
 
 from .tokens import get_largest_possible_position, get_supported_time_signatures, b36str2int, MEASURE_EVENTS_CHAR
-from .midi import piece_to_midi, midi_to_piece
+from .midi import piece_to_midi, midi_to_piece, get_after_k_measures
 
 
 def _entropy(x: list, base: math_e) -> float:
@@ -92,7 +92,7 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
     return head + sampled_body
 
 
-def midi_to_features(midi: MidiFile, max_pairs_number: int = int(1e6)) -> Dict[str, float]:
+def midi_to_features(midi: MidiFile, primer_length: int = 0, max_pairs_number: int = int(1e6)) -> Dict[str, float]:
     nth = midi.ticks_per_beat * 4
     temp_piece = midi_to_piece(
         midi,
@@ -104,10 +104,10 @@ def midi_to_features(midi: MidiFile, max_pairs_number: int = int(1e6)) -> Dict[s
         tempo_quantization=(1,1,65536),
         use_merge_drums=False
     )
-    return piece_to_features(temp_piece, nth, max_pairs_number)
+    return piece_to_features(temp_piece, nth, primer_length, max_pairs_number)
 
 
-def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) -> Dict[str, float]:
+def piece_to_features(piece: str, nth: int, primer_length: int = 0, max_pairs_number: int = int(1e6)) -> Dict[str, float]:
     '''
         Return:
         - pitch class histogram entropy
@@ -116,6 +116,9 @@ def piece_to_features(piece: str, nth: int, max_pairs_number: int = int(1e6)) ->
         - instrumentation self-similarity
         - grooving self-similarity
     '''
+    if primer_length > 0:
+        piece = ' '.join(get_after_k_measures(piece.split(' '), primer_length))
+
     midi = piece_to_midi(piece, nth, ignore_pending_note_error=True)
     pitchs = []
     durations = []

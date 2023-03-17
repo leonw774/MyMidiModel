@@ -207,42 +207,77 @@ if [ "$USE_PARALLEL" == true ]; then
 else
     LAUNCH_COMMAND="python3"
 fi
-$LAUNCH_COMMAND train.py --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation-range $PITCH_AUGMENTATION_RANGE --measure-sample-step-ratio $MEASURE_SAMPLE_STEP_RATIO \
+$LAUNCH_COMMAND train.py \
+    --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation-range $PITCH_AUGMENTATION_RANGE --measure-sample-step-ratio $MEASURE_SAMPLE_STEP_RATIO \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
     --batch-size $BATCH_SIZE --max-steps $MAX_STEPS --grad-clip-norm $GRAD_CLIP_NORM --split-ratio $SPLIT_RATIO \
     --validation-interval $VALIDATION_INTERVAL --validation-steps $VALIDATION_STEPS --early-stop $EARLY_STOP --nucleus-sampling-threshold $NUCLEUS_THRESHOLD \
     --lr-peak $LEARNING_RATE_PEAK --lr-warmup-steps $LEARNING_RATE_WARMUP_STEPS \
     --lr-decay-end-steps $LEARNING_RATE_DECAY_END_STEPS --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
-    --use-device $USE_DEVICE --log $LOG_PATH $TRAIN_OTHER_ARGUMENTS $CORPUS_DIR_PATH $MODEL_DIR_PATH
+    --use-device $USE_DEVICE --primer-length $PRIMER_LENGTH --log $LOG_PATH $TRAIN_OTHER_ARGUMENTS $CORPUS_DIR_PATH $MODEL_DIR_PATH
 
 test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
 ######## EVALUATE MODEL ########
 
 # Get evaluation features of dataset if not there
-if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_features.json" ] ; then
+if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_features.json" ] && [ -f "${MIDI_DIR_PATH}/eval_pathlist.txt" ] && [ -d "${MIDI_DIR_PATH}/primers" ]; then
     echo "Midi dataset ${MIDI_DIR_PATH} already has feature stats file."
 else
     echo "Getting evaluation features of ${MIDI_DIR_PATH}"
-    python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS $MIDI_DIR_PATH --output-sampled-file-paths
+    python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS --output-sampled-file-paths $MIDI_DIR_PATH
     test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+    # Copy sampled files into "$MIDI_DIR_PATH/primers"
+    rm -r $MIDI_DIR_PATH/primers
+    mkdir $MIDI_DIR_PATH/primers
+    while read SAMPLED_MIDI_PATH; do
+        cp $SAMPLED_MIDI_PATH $MIDI_DIR_PATH/primers
+    done < "${MIDI_DIR_PATH}/eval_pathlist.txt"
+    echo "Getting evaluation features without first ${PRIMER_LENGTH} measures of ${MIDI_DIR_PATH}"
+    python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --primer-length $PRIMER_LENGTH --workers $PROCESS_WORKERS $MIDI_DIR_PATH/primers
 fi
 
-# Evaluate unconditional generation
-echo "Generating $EVAL_SAMPLE_NUMBER unconditional samples for evaluating model performance"
+### Evaluate unconditional generation
+
+echo "Generating $EVAL_SAMPLE_NUMBER unconditional samples"
+mkdir $MODEL_DIR_PATH/eval_samples/uncond
 python3 generate_with_model.py --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --sample-number $EVAL_SAMPLE_NUMBER --no-tqdm --output-txt \
-    $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/uncond
+    $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/uncond/sample
 
-echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples"
+echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples/uncond"
+mkdir $MODEL_DIR_PATH/eval_samples/uncond
 python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
-    --reference-file-path $MIDI_DIR_PATH/eval_features.json $MODEL_DIR_PATH/eval_samples
+    --reference-file-path $MIDI_DIR_PATH/eval_features.json $MODEL_DIR_PATH/eval_samples/uncond/sample
+test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
-# Evaluate instrument-conditiond generation
-# WIP
+### Evaluate instrument-conditiond generation
 
-# Evaluate prime continuation
-# WIP
+echo "Generating $EVAL_SAMPLE_NUMBER instrument-conditioned samples"
+mkdir $MODEL_DIR_PATH/eval_samples/instr_cond
+# Loop each line in "${MIDI_DIR_PATH}/eval_pathlist.txt"
+while read SAMPLED_MIDI_PATH; do
+    python3 generate_with_model.py -p $SAMPLED_MIDI_PATH -l 0 --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --no-tqdm --output-txt \
+    $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/instr_cond/$(basename $SAMPLED_MIDI_PATH .mid)
+done < "${MIDI_DIR_PATH}/eval_pathlist.txt"
 
+echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples/instr-cond"
+python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
+    --reference-file-path $MIDI_DIR_PATH/eval_features.json $MODEL_DIR_PATH/eval_samples/instr_cond/
+test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+
+### Evaluate prime continuation
+
+echo "Generating $EVAL_SAMPLE_NUMBER prime-continuation samples"
+mkdir $MODEL_DIR_PATH/eval_samples/primer_cont
+# Loop each line in "${MIDI_DIR_PATH}/eval_pathlist.txt"
+while read SAMPLED_MIDI_PATH; do
+    python3 generate_with_model.py -p $SAMPLED_MIDI_PATH -l $PRIMER_LENGTH --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --no-tqdm --output-txt \
+    $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/primer_cont/$(basename $SAMPLED_MIDI_PATH .mid)
+done < "${MIDI_DIR_PATH}/eval_pathlist.txt"
+
+echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples/primer_cont"
+python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
+    --reference-file-path $MIDI_DIR_PATH/primers/eval_features.json $MODEL_DIR_PATH/eval_samples/primer_cont/
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
 echo "pipeline.sh done."

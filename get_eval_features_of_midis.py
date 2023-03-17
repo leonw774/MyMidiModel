@@ -32,6 +32,15 @@ def parse_args():
         default=100
     )
     parser.add_argument(
+        '--primer-length',
+        type=int,
+        default=0,
+        metavar='k',
+        help='If this option is not set, the features are computed from the whole piece.\
+            If this option is set to %(metavar)s, which should be a positive integer, \
+            the features are computed from the number %(metavar)s+1 to the last measure of the piece.'
+    )
+    parser.add_argument(
         '--workers',
         type=int,
         default=min(cpu_count(), 4)
@@ -66,7 +75,11 @@ def parse_args():
 def midi_to_features_wrapper(args_dict: dict):
     try:
         midifile_obj = MidiFile(args_dict['midi_file_path'])
-        features = midi_to_features(midi=midifile_obj, max_pairs_number=args_dict['max_pairs_number'])
+        features = midi_to_features(
+            midi=midifile_obj,
+            primer_length=args_dict['primer_length'],
+            max_pairs_number=args_dict['max_pairs_number']
+        )
     except Exception:
         # print(format_exc())
         return None
@@ -120,7 +133,11 @@ def main():
             sample_able_indices.difference_update(random_indices)
         sampled_midi_file_paths.extend([file_path_list[idx] for idx in random_indices])
         eval_args_dict_list = [
-            {'midi_file_path': file_path_list[idx], 'max_pairs_number': args.max_pairs_number}
+            {
+                'midi_file_path': file_path_list[idx],
+                'primer_length': args.primer_length,
+                'max_pairs_number': args.max_pairs_number
+            }
             for idx in random_indices
         ]
         with Pool(args.workers) as p:

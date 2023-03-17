@@ -676,7 +676,12 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
     return midi
 
 
-def get_first_k_measures(text_list: str, k):
+def get_first_k_measures(text_list: str, k: int):
+    """
+        input expect a valid, well-formated text list of piece
+        return the text list of the number 1 to k (inclusive) measures of the piece
+    """
+    assert isinstance(k, int) and k > 0, f'k must be positive integer, get {k}'
     m_count = 0
     end_index = 0
     for i, text in enumerate(text_list):
@@ -686,8 +691,30 @@ def get_first_k_measures(text_list: str, k):
             end_index = i
             break
     if end_index == 0:
-        raise ValueError(f'Music of text_list is shorter than k={k} measure unit.')
+        raise ValueError(f'Music of text_list is shorter than {k} measures.')
     return text_list[:end_index]
+
+
+def get_after_k_measures(text_list: str, k: int):
+    """
+        input expect a valid, well-formated text list of piece
+        return the text list of the number k + 1 to the last measures of the piece
+    """
+    assert isinstance(k, int) and k > 0, f'k must be positive integer, get {k}'
+    m_count = 0
+    head_end_index = 0
+    begin_index = 0
+    for i, text in enumerate(text_list):
+        if text[0] == tokens.MEASURE_EVENTS_CHAR:
+            m_count += 1
+        if text[0] == tokens.SEP_TOKEN_STR:
+            head_end_index = i + 1
+        if m_count > k:
+            begin_index = i
+            break
+    if begin_index == 0:
+        raise ValueError(f'Music of text_list is shorter than or equal to {k} measures.')
+    return text_list[:head_end_index] + text_list[begin_index:]
 
 
 def get_first_k_nths(text_list: str, nth, k):
