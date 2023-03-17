@@ -211,7 +211,7 @@ def main():
     if args.output_sampled_file_paths:
         eval_pathlist_file_path = os.path.join(args.midi_dir_path, 'eval_pathlist.txt')
         with open(eval_pathlist_file_path, 'w+', encoding='utf8') as eval_pathlist_file:
-            eval_pathlist_file.write('\n'.join(sampled_midi_file_paths))
+            eval_pathlist_file.write('\n'.join(sampled_midi_file_paths)+'\n')
             logging.info('Outputed evaluation sampled file paths at %s', eval_pathlist_file_path)
 
     logging.info(strftime('=== get_eval_features_of_midis.py exit ==='))
