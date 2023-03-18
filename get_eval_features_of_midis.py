@@ -134,7 +134,6 @@ def main():
             random_indices = random.sample(list(sample_able_indices), args.sample_number - len(eval_features_per_piece))
             sample_able_indices.difference_update(random_indices)
 
-        sampled_midi_file_paths.extend([file_path_list[idx] for idx in random_indices])
         eval_args_dict_list = [
             {
                 'midi_file_path': file_path_list[idx],
@@ -145,10 +144,11 @@ def main():
         ]
         with Pool(args.workers) as p:
             eval_features = list(tqdm(
-                p.imap_unordered(midi_to_features_wrapper, eval_args_dict_list),
+                p.imap(midi_to_features_wrapper, eval_args_dict_list),
                 total=len(random_indices)
             ))
             eval_features = [f for f in eval_features if f is not None]
+            sampled_midi_file_paths.extend([file_path_list[idx] for n, idx in enumerate(random_indices) if eval_features[n] is not None])
             print(f'Processed {len(eval_features)} uncorrupted files out of {len(random_indices)} random indices')
             eval_features_per_piece += eval_features
 
