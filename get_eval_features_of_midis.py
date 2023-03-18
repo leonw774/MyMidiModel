@@ -147,8 +147,12 @@ def main():
                 p.imap(midi_to_features_wrapper, eval_args_dict_list),
                 total=len(random_indices)
             ))
+            sampled_midi_file_paths.extend([
+                file_path_list[idx]
+                for n, idx in enumerate(random_indices)
+                if eval_features[n] is not None
+            ])
             eval_features = [f for f in eval_features if f is not None]
-            sampled_midi_file_paths.extend([file_path_list[idx] for n, idx in enumerate(random_indices) if eval_features[n] is not None])
             print(f'Processed {len(eval_features)} uncorrupted files out of {len(random_indices)} random indices')
             eval_features_per_piece += eval_features
 
