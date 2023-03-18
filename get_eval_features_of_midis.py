@@ -104,7 +104,7 @@ def main():
             format='%(message)s'
         )
 
-    logging.info(strftime('=== get_eval_features_of_midis.py start at %Y%m%d-%H%M%S ==='))
+    logging.info(strftime('==== get_eval_features_of_midis.py start at %Y%m%d-%H%M%S ===='))
 
     if not os.path.isdir(args.midi_dir_path):
         logging.info('Invalid dir path: %s', args.midi_dir_path)
@@ -208,6 +208,7 @@ def main():
                         reference_eval_features_stats[fname]
                     )
                 except Exception as e:
+                    print(fname)
                     print('pred:', eval_features_stats[fname])
                     print('true:', reference_eval_features_stats[fname])
                     raise e
@@ -225,7 +226,7 @@ def main():
             eval_pathlist_file.write('\n'.join(sampled_midi_file_paths)+'\n')
             logging.info('Outputed evaluation sampled file paths at %s', eval_pathlist_file_path)
 
-    logging.info(strftime('=== get_eval_features_of_midis.py exit ==='))
+    logging.info(strftime('==== get_eval_features_of_midis.py exit ===='))
     return 0
 
 

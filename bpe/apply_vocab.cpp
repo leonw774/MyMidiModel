@@ -152,11 +152,9 @@ int main(int argc, char *argv[]) {
     std::chrono::time_point<std::chrono::system_clock>iterStartTimePoint;
     std::chrono::time_point<std::chrono::system_clock>partStartTimePoint;
     double iterTime, mergeTime, metricsTime = 0.0;
-    double shapeEntropy = 0.0, allEntropy = 0.0;
     if (doLog) {
         std::cout << "Index, Avg neighbor number, Shape, "
-                << "Multinote count, Shape entropy, All attribute entropy, "
-                << "Iteration time, Merge time" << std::endl;
+                << "Multinote count, Iteration time, Merge time" << std::endl;
     }
     // start from 2 because index 0, 1 are default shapes
     for (int shapeIndex = 2; shapeIndex < shapeDict.size(); ++shapeIndex) {
@@ -236,13 +234,10 @@ int main(int argc, char *argv[]) {
         iterTime = (std::chrono::system_clock::now() - iterStartTimePoint) / oneSencondDur;
         if (doLog) {
             partStartTimePoint = std::chrono::system_clock::now();
-            shapeEntropy = calculateShapeEntropy(corpus);
-            allEntropy = calculateAllAttributeEntropy(corpus);
             multinoteCount = corpus.getMultiNoteCount();
             // To exclude the time used on calculating metrics
             metricsTime += (std::chrono::system_clock::now() - partStartTimePoint) / oneSencondDur;
-            std::cout << multinoteCount << ", " << shapeEntropy << ", " << allEntropy << ", ";
-            std::cout << iterTime << ", " << mergeTime;
+            std::cout << multinoteCount << ", " << iterTime << ", " << mergeTime;
             if (clearLine)  std::cout.flush();
             else            std::cout << std::endl;
         }
@@ -252,15 +247,11 @@ int main(int argc, char *argv[]) {
         std::cout << '\n';
     }
     if (!doLog) {
-        shapeEntropy = calculateShapeEntropy(corpus);
-        allEntropy = calculateAllAttributeEntropy(corpus);
         multinoteCount = corpus.getMultiNoteCount();
     }
     avgMulpi = calculateAvgMulpiSize(corpus);
     std::cout << "Ending multinote count: " << multinoteCount
         << ", Ending average mulpi: " << avgMulpi
-        << ", End shape entropy: " << shapeEntropy
-        << ", End all attribute entropy: " << allEntropy
         << ", Multinote reduce rate: " << 1 - (double) multinoteCount / startMultinoteCount
         << ", Average mulpi reduce rate: " << 1 - avgMulpi / startAvgMulpi << std::endl;
 

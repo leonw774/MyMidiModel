@@ -14,10 +14,6 @@ Shape getShapeOfMultiNotePair(
 
 double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton=false);
 
-double calculateShapeEntropy(const Corpus& corpus);
-
-double calculateAllAttributeEntropy(const Corpus& corpus);
-
 std::vector<std::pair<Shape, unsigned int>> shapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
