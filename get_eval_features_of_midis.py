@@ -202,10 +202,15 @@ def main():
                 args.reference_file_path
             )
             for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
-                eval_features_stats[fname+'_KLD'] = kl_divergence(
-                    eval_features_stats[fname],
-                    reference_eval_features_stats[fname]
-                )
+                try:
+                    eval_features_stats[fname+'_KLD'] = kl_divergence(
+                        eval_features_stats[fname],
+                        reference_eval_features_stats[fname]
+                    )
+                except Exception as e:
+                    print('pred:', eval_features_stats[fname])
+                    print('true:', reference_eval_features_stats[fname])
+                    raise e
         else:
             logging.info('%s is invalid path for reference result JSON file', args.reference_file_path)
 

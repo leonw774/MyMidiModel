@@ -101,7 +101,7 @@ They should compile to:
 
 Pythons scripts
 
-- `debug_dataset.py`: Print out the result of dataset related things including random split and dataloader.
+- `debug_dataset.py`: Print out the results of dataset `__getitem__` and other related things.
 - `extract.py`: Extract piece(s) from the given corpus directory into text representation(s), midi file(s), or piano-roll graph(s) in png.
 - `generate_with_models.py`: Use trained model to generate midi files, with or without a primer.
 - `get_eval_features_of_midis.py`: Do as per its name. It will sample midi files in a directory. Output results as a JSON file `eval_feature_stats.json` right at the directory.

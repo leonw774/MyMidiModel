@@ -101,7 +101,7 @@ def midi_to_features(midi: MidiFile, primer_length: int = 0, max_pairs_number: i
         max_duration=nth,
         velocity_step=1,
         use_cont_note=True,
-        tempo_quantization=(1,1,65536),
+        tempo_quantization=(1,65536,1),
         use_merge_drums=False
     )
     return piece_to_features(temp_piece, nth, primer_length, max_pairs_number)

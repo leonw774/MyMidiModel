@@ -221,6 +221,7 @@ test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH 
 ######## EVALUATE MODEL ########
 
 # Get evaluation features of dataset if not there
+
 if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_features.json" ] && [ -f "${MIDI_DIR_PATH}/eval_pathlist.txt" ] && [ -d "${MIDI_DIR_PATH}/primers" ]; then
     echo "Midi dataset ${MIDI_DIR_PATH} already has feature stats file."
 else

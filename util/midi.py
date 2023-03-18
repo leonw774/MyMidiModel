@@ -706,10 +706,10 @@ def get_after_k_measures(text_list: str, k: int):
     head_end_index = 0
     begin_index = 0
     for i, text in enumerate(text_list):
-        if text[0] == tokens.MEASURE_EVENTS_CHAR:
-            m_count += 1
-        if text[0] == tokens.SEP_TOKEN_STR:
+        if text == tokens.SEP_TOKEN_STR:
             head_end_index = i + 1
+        elif text[0] == tokens.MEASURE_EVENTS_CHAR:
+            m_count += 1
         if m_count > k:
             begin_index = i
             break
