@@ -255,6 +255,7 @@ echo "Generating $EVAL_SAMPLE_NUMBER instrument-conditioned samples"
 mkdir $MODEL_DIR_PATH/eval_samples/instr_cond
 # Loop each line in "${MIDI_DIR_PATH}/eval_pathlist.txt"
 while read SAMPLED_MIDI_PATH; do
+    echo "Primer file: ${SAMPLED_MIDI_PATH}"
     python3 generate_with_model.py -p $SAMPLED_MIDI_PATH -l 0 --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --no-tqdm --output-txt \
     $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/instr_cond/$(basename $SAMPLED_MIDI_PATH .mid)
 done < "${MIDI_DIR_PATH}/eval_pathlist.txt"
@@ -270,6 +271,7 @@ echo "Generating $EVAL_SAMPLE_NUMBER prime-continuation samples"
 mkdir $MODEL_DIR_PATH/eval_samples/primer_cont
 # Loop each line in "${MIDI_DIR_PATH}/eval_pathlist.txt"
 while read SAMPLED_MIDI_PATH; do
+    echo "Primer file: ${SAMPLED_MIDI_PATH}"
     python3 generate_with_model.py -p $SAMPLED_MIDI_PATH -l $PRIMER_LENGTH --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --no-tqdm --output-txt \
     $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/primer_cont/$(basename $SAMPLED_MIDI_PATH .mid)
 done < "${MIDI_DIR_PATH}/eval_pathlist.txt"
