@@ -40,6 +40,7 @@ class MyMidiTransformer(nn.Module):
             vocabs: Vocabs,
             use_linear_attn: bool,
             max_seq_length: int,
+            permute_mps: bool,
             layers_number: int,
             attn_heads_number: int,
             embedding_dim: int,
@@ -53,6 +54,7 @@ class MyMidiTransformer(nn.Module):
 
         self.vocabs = vocabs
         self.max_seq_length = max_seq_length
+        self.permute_mps = permute_mps
         self.layers_number = layers_number
         self.attn_heads_number = attn_heads_number
         self.embedding_dim = embedding_dim
@@ -76,19 +78,6 @@ class MyMidiTransformer(nn.Module):
             if COMPLETE_ATTR_NAME[idx] == 'measure_numbers' else
             getattr(vocabs, COMPLETE_ATTR_NAME[idx]).size
             for idx in self.input_attrs_indices
-        ]
-
-        # remove the attributes that only has size of two (a padding and a not-padding)
-        # I'm looking at you, velocity
-        self.input_attrs_indices = [
-            idx
-            for pos, idx in enumerate(self.input_attrs_indices)
-            if self.embedding_vocabs_size[pos] > 2
-        ]
-        self.embedding_vocabs_size = [
-            size
-            for size in enumerate(self.embedding_vocabs_size)
-            if size > 2
         ]
 
         self.embeddings = nn.ModuleList([
@@ -527,7 +516,13 @@ def generate_sample(
             ]
             if use_prob_adjustment:
                 # prevent many bad format in advance
-                last_probs = adjust_probs_with_context(last_probs, text_list, model.vocabs, event_family_indices)
+                last_probs = adjust_probs_with_context(
+                    last_probs,
+                    text_list,
+                    model.vocabs,
+                    event_family_indices,
+                    getattr(model, 'permute_mps', False) # backward compatible
+                )
             # get_logit_time += time() - bt
             # print('\n'.join([repr(p) for p in last_probs]))
             try_count = 0

@@ -243,6 +243,9 @@ def log_losses(
 
 
 def main():
+
+    ######## Check args and print
+
     args = parse_args()
     if not torch.cuda.is_available():
         args.use_device = 'cpu'
@@ -297,9 +300,11 @@ def main():
         logging.info(args_str)
         logging.info('gradient_accumulation_steps:%d', gradient_accumulation_steps)
 
+    ######## Prepare loss.csv
+
     vocabs = get_corpus_vocabs(args.corpus_dir_path)
 
-    # loss csv file is in the checkpoint directory
+    # loss csv file is in the root of model directory
     loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
     with open(loss_file_path, 'w+', encoding='utf8') as loss_file:
         loss_csv_head = 'step,'
@@ -324,7 +329,8 @@ def main():
                 torch.cuda.device_count(), torch.cuda.current_device()
             )
 
-    # make dataset
+    ######## Make dataset
+
     complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args), verbose=is_main_process)
     if is_main_process:
         logging.info('Made MidiDataset')
@@ -343,7 +349,8 @@ def main():
         logging.info('Size of training set: %d', len(train_dataset))
         logging.info('Size of validation set: %d', len(valid_dataset))
 
-    # get random conditional primer from complete_dataset
+    ######## Get random conditional primer from complete_dataset
+
     while True:
         try:
             cond_primer_index = np.random.randint(len(complete_dataset.pieces))
@@ -358,7 +365,8 @@ def main():
     if is_main_process:
         logging.info('Conditional generation primer is #%d', cond_primer_index)
 
-    # make dataloader
+    ######## Make dataloader
+
     # cannot handle multiprocessing if use npz mmap
     if not isinstance(complete_dataset.pieces, dict):
         args.dataloader_worker_number = 1
@@ -379,10 +387,12 @@ def main():
     if is_main_process:
         logging.info('Made DataLoaders')
 
-    # make model
+    ######## Make model
+
     model = MyMidiTransformer(
         vocabs=vocabs,
         max_seq_length=args.data_args.max_seq_length,
+        permute_mps=args.data_args.permute_mps,
         **vars(args.model_args)
     )
     if is_main_process:
@@ -393,7 +403,8 @@ def main():
     to_input_attrs = model.to_input_attrs
     to_output_attrs = model.to_output_attrs
 
-    # use torchinfo
+    ######## Use torchinfo
+
     if is_main_process:
         summary_str = str(torchinfo.summary(
             model,
@@ -406,7 +417,8 @@ def main():
         ))
         logging.info(summary_str)
 
-    # make optimizer
+    ######## Make optimizer
+
     optimizer = AdamW(model.parameters(), args.train_args.lr_peak, betas=(0.9, 0.98), eps=1e-6, weight_decay=1e-2)
     scheduler = lr_scheduler.LambdaLR(
         optimizer,
@@ -418,7 +430,8 @@ def main():
         )
     )
 
-    # move things to devices
+    ######## Move model to devices
+
     if args.use_parallel:
         model, optimizer, train_dataloader, valid_dataloader = accelerator.prepare(
             model, optimizer, train_dataloader, valid_dataloader
@@ -426,7 +439,8 @@ def main():
     else:
         model = model.to(args.use_device)
 
-    # training start
+    ######## Training start
+
     if is_main_process:
         logging.info('Begin training')
     train_dataloader_iter = iter(train_dataloader)
@@ -463,7 +477,6 @@ def main():
                 # forward_time += time() - start_forward_time
 
                 # start_backward_time = time()
-            # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
                 if args.data_args.use_permutable_subseq_loss:
                     head_losses = compute_permutable_subseq_losses(
                         prediction,
@@ -471,19 +484,16 @@ def main():
                         batch_mps_sep_indices,
                         args.train_args.loss_weighted_by_nonpadding_number
                     )
-                    # print('\ncompute_permutable_subseq_losses use time:', time() - start_backward_time)
+                    # print('compute_permutable_subseq_losses use time:', time() - start_backward_time)
                 else:
                     head_losses = compute_losses(
                         prediction,
                         batch_target_seqs,
                         args.train_args.loss_weighted_by_nonpadding_number
                     )
-                        # print('\ncompute_losses use time:', time() - start_backward_time)
-            # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=32))
+                    # print('compute_losses use time:', time() - start_backward_time)
                 # assert all(not torch.isnan(hl).any() for hl in head_losses)
                 loss = torch.mean(torch.stack(head_losses))
-                # dot=torchviz.make_dot(loss, params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
-                # dot.render(filename='lossbackward_mps', format='png')
 
                 if is_main_process:
                     train_loss_list.append([hl.item() for hl in head_losses])
@@ -575,6 +585,7 @@ def main():
             except Exception:
                 print('Error when dumping uncond gen MidiFile object')
                 print(format_exc())
+
             cond_gen_text_list = generate_sample(
                 unwrapped_model if args.use_parallel else model,
                 steps=args.data_args.max_seq_length,
@@ -603,13 +614,15 @@ def main():
                     min_avg_valid_loss = avg_valid_loss
                     shutil.copyfile(ckpt_model_file_path, os.path.join(args.model_dir_path, 'best_model.pt'))
                     logging.info('New best model.')
-    # training end
+
+    ######## Training end
 
     # Don't need this unless we use trackers in accelerator
     # if args.use_parallel:
     #     accelerator.end_training()
 
-    # remove all checkpoints
+    ######## Remove all checkpoints
+
     if is_main_process:
         ckpt_file_paths = glob.glob(os.path.join(ckpt_dir_path, '*.pt'), recursive=True)
         for ckpt_file_path in ckpt_file_paths:

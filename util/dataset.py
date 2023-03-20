@@ -227,7 +227,8 @@ class MidiDataset(Dataset):
 
         # to make sure measure number is smaller than max_seq_length
         # if last token is EOS, body_end_index is length of sample array - 1
-        body_end_index = -1 if sampled_array[-1, ATTR_NAME_INDEX['mea']] == 0 else sampled_array.shape[0]
+        end_with_eos = sampled_array[-1, ATTR_NAME_INDEX['evt']] == self._eos_id
+        body_end_index = -1 if end_with_eos else sampled_array.shape[0]
         min_measure_number = np.min(sampled_array[body_start_index:body_end_index, ATTR_NAME_INDEX['mea']])
         if min_measure_number != 1:
             sampled_array[body_start_index:body_end_index, ATTR_NAME_INDEX['mea']] -= (min_measure_number - 1)
@@ -278,14 +279,15 @@ class MidiDataset(Dataset):
 
             # if not using mps permutation, we want each mps to be sorted increasingly by track number, pitch, then duration
             if not self.permute_mps:
+                body_section = sampled_array[body_start_index:body_end_index]
                 order = np.lexsort((
-                    sampled_array[body_start_index:, ATTR_NAME_INDEX['dur']], # sort by this last
-                    sampled_array[body_start_index:, ATTR_NAME_INDEX['pit']],
-                    sampled_array[body_start_index:, ATTR_NAME_INDEX['trn']],
-                    sampled_array[body_start_index:, ATTR_NAME_INDEX['pos']],
-                    sampled_array[body_start_index:, ATTR_NAME_INDEX['mea']], # sort by this first
+                    body_section[:, ATTR_NAME_INDEX['dur']], # sort by this last
+                    body_section[:, ATTR_NAME_INDEX['pit']],
+                    body_section[:, ATTR_NAME_INDEX['trn']],
+                    body_section[:, ATTR_NAME_INDEX['pos']],
+                    body_section[:, ATTR_NAME_INDEX['mea']], # sort by this first
                 ))
-                sampled_array[body_start_index:] = sampled_array[body_start_index:][order]
+                sampled_array[body_start_index:body_end_index] = body_section[order]
 
         mps_sep_indices_list = []
         mps_sep_indices = None

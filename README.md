@@ -4,7 +4,7 @@
 
 1. Create environment with conda: `conda env create --name {ENV_NAME} --file environment.yml`. You may need to clear cache first by `pip cache purge` and `conda clean --all`.
 2. Make you own copy of config files (e.g.: `./config/midi/my_setting.sh`) if you want to make some changes to the settings.
-3. Run `./pipeline.sh {midi_preprocess_config_filename} {bpe_config_filename} {training_config_filename}` to do everything from pre-processing to model training at once.
+3. Run `./pipeline.sh {corpus_config_filename} {bpe_config_filename} {training_config_filename}` to do everything from pre-processing to model training at once.
    - You can add `--use-existed` at the end of the command to tell `pipeline.sh` to just use the existing data.
    - The config files are placed in `configs/corpus`, `configs/bpe` and `configs/train`.
    - You can recreate our experiment by running `experiment*.sh` files.
@@ -122,3 +122,4 @@ Shell scripts
   3. Make arrays file and vocabs file of the corpus with `make_arrays.py`
   4. Train a model on the corpus with `train.py`
   5. Get evaluation features of training midi files the model generated midi files with the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`
+
