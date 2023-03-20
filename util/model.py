@@ -78,6 +78,19 @@ class MyMidiTransformer(nn.Module):
             for idx in self.input_attrs_indices
         ]
 
+        # remove the attributes that only has size of two (a padding and a not-padding)
+        # I'm looking at you, velocity
+        self.input_attrs_indices = [
+            idx
+            for pos, idx in enumerate(self.input_attrs_indices)
+            if self.embedding_vocabs_size[pos] > 2
+        ]
+        self.embedding_vocabs_size = [
+            size
+            for size in enumerate(self.embedding_vocabs_size)
+            if size > 2
+        ]
+
         self.embeddings = nn.ModuleList([
             nn.Embedding(
                 num_embeddings=vsize,
