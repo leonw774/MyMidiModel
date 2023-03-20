@@ -25,6 +25,7 @@ parser.add_argument(
 parser.add_argument(
     'data_dir_path',
     type=str,
+    nargs='?',
     default='data/corpus/test_midis_nth32_r32_d32_v16_t24_200_16'
 )
 args = parser.parse_args()
@@ -32,9 +33,9 @@ args = parser.parse_args()
 dataset = MidiDataset(
     data_dir_path=args.data_dir_path,
     max_seq_length=args.max_seq_length,
-    use_permutable_subseq_loss=True, # to print out mps indices
+    use_permutable_subseq_loss=False, # to print out mps indices
     measure_sample_step_ratio=0.25,
-    permute_mps=True,
+    permute_mps=False,
     permute_track_number=True,
     pitch_augmentation_range=2,
     verbose=True

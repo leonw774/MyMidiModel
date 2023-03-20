@@ -276,6 +276,17 @@ class MidiDataset(Dataset):
                 sampled_array[1:body_start_index-1, evt_ins_col_index] = track_permuted_evt_ins
                 # index 0 is BOS and index body_start_index-1 is SEP
 
+            # if not using mps permutation, we want each mps to be sorted increasingly by track number, pitch, then duration
+            if not self.permute_mps:
+                order = np.lexsort((
+                    sampled_array[body_start_index:, ATTR_NAME_INDEX['dur']], # sort by this last
+                    sampled_array[body_start_index:, ATTR_NAME_INDEX['pit']],
+                    sampled_array[body_start_index:, ATTR_NAME_INDEX['trn']],
+                    sampled_array[body_start_index:, ATTR_NAME_INDEX['pos']],
+                    sampled_array[body_start_index:, ATTR_NAME_INDEX['mea']], # sort by this first
+                ))
+                sampled_array[body_start_index:] = sampled_array[body_start_index:][order]
+
         mps_sep_indices_list = []
         mps_sep_indices = None
         if self.permute_mps:

@@ -288,7 +288,8 @@ def adjust_probs_with_context(
         probs: List[Tensor],
         context_text_list: List[str],
         vocabs: Vocabs,
-        event_family_indices: Tuple[set]):
+        event_family_indices: Tuple[set],
+        permute_mps: bool = True):
     """
         Set to zero to the probs of the attribute values that would definitily raise exception
         if the next token in context_text_list has them and force the position tokens to be ordered increasingly in time
@@ -344,10 +345,10 @@ def adjust_probs_with_context(
         if context_text_list[-1][0] == tokens.MEASURE_EVENTS_CHAR:
             multinote_and_tempo_indices = multinote_indices.union(tempo_indices)
             for i in range(vocabs.events.size):
-                if i not in multinote_and_tempo_indices: 
+                if i not in multinote_and_tempo_indices:
                     probs[ATTR_NAME_INDEX['evt']][i] = 0
 
-        # this part prohibits the position tokens that is "behind" the current position
+        # this prohibits the position tokens that is "behind" the current position
         k = len(context_text_list) - 1
         while context_text_list[k][0] not in (tokens.POSITION_EVENTS_CHAR, tokens.MEASURE_EVENTS_CHAR) and k > 0:
             k -= 1
@@ -357,12 +358,23 @@ def adjust_probs_with_context(
                 if b36str2int(vocabs.events.id2text[i][1:]) <= cur_position:
                     probs[ATTR_NAME_INDEX['evt']][i] = 0
 
-        # this part prohibit the tempo tokens if there is already a tempo token in the current position
+        # this prohibit the tempo tokens if there is already a tempo token in the current position
         k = len(context_text_list) - 1
         while context_text_list[k][0] not in (tokens.POSITION_EVENTS_CHAR, tokens.TEMPO_EVENTS_CHAR) and k > 0:
             k -= 1
         if context_text_list[k][0] == tokens.TEMPO_EVENTS_CHAR:
             probs[ATTR_NAME_INDEX['evt']][list(tempo_indices)] = 0
+
+        # this prohibits the multi-note token to have the track number smaller than the previous multi-note token
+        if not permute_mps:
+            prev_token_type = context_text_list[-1][0]
+            if prev_token_type == tokens.MULTI_NOTE_EVENTS_CHAR or prev_token_type == tokens.NOTE_EVENTS_CHAR:
+                prev_token_track_number = b36str2int(context_text_list[-1].split(':')[-1])
+                # prohibits track number from '0' to 'prev_token_track_number - 1'
+                # id of track number '0' is 1
+                # id of track number 'prev_token_track_number - 1' is prev_token_track_number
+                probs[ATTR_NAME_INDEX['trn']][1:prev_token_track_number+1] = 0
+
 
     # adjust track attribute logit
     if not (is_head or is_sep):
