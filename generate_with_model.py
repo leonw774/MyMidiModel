@@ -148,7 +148,7 @@ def main():
     if not args.use_device.startswith('cuda') and args.use_device != 'cpu':
         raise ValueError(f'Bad device name {args.use_device}')
     if not torch.cuda.is_available():
-        print('--use-device is set to \'cuda\' but no CUDA device is found. Changed to CPU.')
+        print('--use-device is set to \'cuda\' but found no CUDA device. Changed to CPU.')
         args.use_device = 'cpu'
 
     # model
@@ -183,7 +183,7 @@ def main():
                     assert os.path.abspath(os.getcwd()) == os.path.dirname(os.path.abspath(__file__))
 
                     # make sure the program is there and new
-                    subprocess.run(['make', '-C', './bpe'], check=True)
+                    subprocess.run(['make', '-C', './bpe'], check=True, stdout=subprocess.DEVNULL)
 
                     with tempfile.TemporaryDirectory() as tmp_out_corpus_dir_path:
                         tmp_out_corpus_file_path = to_corpus_file_path(tmp_out_corpus_dir_path)
@@ -197,7 +197,7 @@ def main():
                             tmp_out_corpus_file_path,
                             tmp_shape_vocab_file_path
                         ]
-                        subprocess.run(apply_args, check=True)
+                        subprocess.run(apply_args, check=True, stdout=subprocess.DEVNULL)
 
                         # get content from output
                         with open(to_corpus_file_path(tmp_out_corpus_dir_path), 'r', encoding='utf8') as tmp_out_corpus:

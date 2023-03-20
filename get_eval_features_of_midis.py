@@ -178,6 +178,11 @@ def main():
         eval_features_stats[fname] = {
             k: float(v) for k, v in fname_description.items()
         }
+    # We actually only want 'mean' and 'var'
+    print('\n'.join([
+        f'{fname}: {eval_features_stats[fname]["mean"]} ± {eval_features_stats[fname]["std"]}'
+        for fname in EVAL_SCALAR_FEATURE_NAMES
+    ]))
 
     for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
         eval_features_stats[fname] = dict(sum(
@@ -212,6 +217,9 @@ def main():
                     print('pred:', eval_features_stats[fname])
                     print('true:', reference_eval_features_stats[fname])
                     raise e
+            print('\n'.join([
+                f'{fname}_KLD: {eval_features_stats[fname+"_KLD"]}'
+            ]))
         else:
             logging.info('%s is invalid path for reference result JSON file', args.reference_file_path)
 

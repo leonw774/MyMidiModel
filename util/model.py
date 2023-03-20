@@ -453,6 +453,7 @@ def generate_sample(
         )
 
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
+    # is_head = (tokens.SEP_TOKEN_STR not in text_list)
 
     input_seq = start_seq
     primer_length = input_seq.shape[1]
