@@ -18,12 +18,12 @@ from tqdm import tqdm
 import util.tokens as tokens
 from util.tokens import b36str2int
 from util.vocabs import build_vocabs
+from util.corpus_reader import CorpusReader
 from util.corpus import (
     to_shape_vocab_file_path,
     to_vocabs_file_path,
     to_arrays_file_path,
     get_corpus_paras,
-    CorpusReader,
     text_list_to_array,
     get_input_array_format_string,
 )

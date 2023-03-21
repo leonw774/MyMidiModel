@@ -9,7 +9,8 @@ from traceback import format_exc
 from tqdm import tqdm
 
 from util.midi import piece_to_midi
-from util.corpus import CorpusReader, get_corpus_paras
+from util.corpus_reader import CorpusReader
+from util.corpus import get_corpus_paras
 
 def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -> bool:
     try:

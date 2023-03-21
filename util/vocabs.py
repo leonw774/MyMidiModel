@@ -4,6 +4,7 @@ from .tokens import (
     get_largest_possible_position,
     get_supported_time_signatures
 )
+from .corpus_reader import CorpusReader
 
 class Vocabs:
 
@@ -21,7 +22,7 @@ class Vocabs:
                 self.id2text = {int(k): v for k, v in init_obj['id2text'].items()} # key are string in json
                 self.text2id = init_obj['text2id']
             else:
-                raise TypeError(f'AttrVocab\'s init_obj can only be list or dict. Got {init_obj}')
+                raise TypeError(f'AttrVocab\'s init_obj can only be list or dict. Got {type(init_obj)}')
         def __len__(self) -> int:
             return self.size
 
@@ -36,10 +37,13 @@ class Vocabs:
     track_numbers: AttrVocab
     instruments: AttrVocab
     positions: AttrVocab
+    max_measure_number: int
     tempos: AttrVocab
+    time_signatures: AttrVocab
 
     def __init__(self, paras: dict, bpe_shapes_list: list, padding_token: str, combine_track_instrument: bool,
-            events, pitchs, durations, velocities, track_numbers, instruments, positions, tempos, time_signatures) -> None:
+            events, pitchs, durations, velocities, track_numbers,
+            instruments, positions, max_measure_number, tempos, time_signatures) -> None:
         self.paras = paras
         self.bpe_shapes_list = bpe_shapes_list
         self.padding_token = padding_token
@@ -51,17 +55,16 @@ class Vocabs:
         self.track_numbers = Vocabs.AttrVocab(track_numbers)
         self.instruments = Vocabs.AttrVocab(instruments)
         self.positions = Vocabs.AttrVocab(positions)
+        self.max_measure_number = max_measure_number
         self.tempos = Vocabs.AttrVocab(tempos)
         self.time_signatures = Vocabs.AttrVocab(time_signatures)
 
     @classmethod
     def from_dict(cls, d):
         return cls(
-            d['paras'], d['bpe_shapes_list'], d['padding_token'],
-            d['combine_track_instrument'],
-            d['events'], d['pitchs'], d['durations'],
-            d['velocities'], d['track_numbers'], d['instruments'],
-            d['positions'], d['tempos'], d['time_signatures']
+            d['paras'], d['bpe_shapes_list'], d['padding_token'], d['combine_track_instrument'],
+            d['events'], d['pitchs'], d['durations'], d['velocities'], d['track_numbers'],
+            d['instruments'], d['positions'], d['max_measure_number'], d['tempos'], d['time_signatures']
         )
 
     def to_dict(self) -> dict:
@@ -77,13 +80,14 @@ class Vocabs:
             'track_numbers': vars(self.track_numbers),
             'instruments': vars(self.instruments),
             'positions': vars(self.positions),
+            'max_measure_number': self.max_measure_number,
             'tempos': vars(self.tempos),
             'time_signatures': vars(self.time_signatures),
         }
 
 
 def build_vocabs(
-        corpus_reader,
+        corpus_reader: CorpusReader,
         paras: dict,
         bpe_shapes_list: list,
         combine_track_instrument: bool):
@@ -125,9 +129,12 @@ def build_vocabs(
         tokens.TEMPO_EVENTS_CHAR+int2b36str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
     ]
 
+    max_measure_number = 0
     existed_measure_time_sigs = set()
     token_count_per_piece = []
     for piece in corpus_reader:
+        m = piece.count(' '+tokens.MEASURE_EVENTS_CHAR)
+        max_measure_number = max(max_measure_number, m)
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
         existed_measure_time_sigs.update({text for text in text_list if text[0] == tokens.MEASURE_EVENTS_CHAR})
@@ -164,6 +171,7 @@ def build_vocabs(
         f'Duration vocab size: {len(duration_vocab)}\n'\
         f'Velocity vocab size: {len(velocity_vocab)} ({velocity_vocab})\n'\
         f'Track number vocab size: {paras["max_track_number"]}'\
+        f'Max measure number: {max_measure_number}'
     )
     # print(f'Vocabulary build time: {time()-start_time}')
 
@@ -180,6 +188,7 @@ def build_vocabs(
         track_numbers=track_number_vocab,
         instruments=instrument_vocab,
         positions=position_vocab,
+        max_measure_number=max_measure_number,
         tempos=tempo_vocab,
         time_signatures=time_sig_vocab
     )

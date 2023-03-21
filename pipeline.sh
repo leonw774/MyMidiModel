@@ -129,20 +129,14 @@ fi
 if [ $BPE_ITER -ne 0 ]; then
     # replace CORPUS_DIR_PATH to CORPUS_DIR_PATH_WITH_BPE
     CORPUS_DIR_PATH=$CORPUS_DIR_PATH_WITH_BPE
+    BPE_OPTION="--bpe"
 fi
 
 if [ "$COMBINE_TRACK_INST" == true ]; then
     COMBINE_TRACK_INST="--combine-track-instrument"
-else
-    COMBINE_TRACK_INST=""
 fi
 
-if [ "$DO_BPE" == true ]; then
-    DO_BPE="--bpe"
-else
-    DO_BPE=""
-fi
-python3 make_arrays.py --debug $DO_BPE $COMBINE_TRACK_INST --mp-worker-number $PROCESS_WORKERS --log $LOG_PATH $CORPUS_DIR_PATH $USE_EXISTED
+python3 make_arrays.py --debug $BPE_OPTION $COMBINE_TRACK_INST --mp-worker-number $PROCESS_WORKERS --log $LOG_PATH $CORPUS_DIR_PATH $USE_EXISTED
 test $? -ne 0 && { echo "text_to_array.py failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
 ######## TRAIN MODEL ########
