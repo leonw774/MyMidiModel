@@ -77,11 +77,11 @@ def parse_args():
         type=int
     )
     model_parser.add_argument(
-        '--input-no-tempo',
+        '--input-instruments',
         action='store_true',
     )
     model_parser.add_argument(
-        '--input-no-time-signature',
+        '--output-instruments',
         action='store_true',
     )
 
@@ -92,7 +92,7 @@ def parse_args():
         nargs=2,
         default=[9, 1],
         help='The split ratio for training and validation. \
-            If one is set to -1, for example (-1, 200), it means (len(complete_dataset) - 200, 200) \
+            If one is set to -1 and the other N, for exmaple (-1, N) it means (len(complete_dataset) - N, N) \
             Default is %(default)s.'
     )
     train_parser.add_argument(
@@ -310,8 +310,8 @@ def main():
         loss_csv_head = 'step,'
         train_output_attr_name = ['train_' + n for n in OUTPUT_ATTR_NAME]
         valid_output_attr_name = ['valid_' + n for n in OUTPUT_ATTR_NAME]
-        if vocabs.combine_track_instrument:
-            # remove instrument from output attribute names
+        if not args.model_args.output_instruments:
+            # remove instruments from output attribute names
             train_output_attr_name = train_output_attr_name[:-1]
             valid_output_attr_name = valid_output_attr_name[:-1]
         loss_csv_head += ','.join(

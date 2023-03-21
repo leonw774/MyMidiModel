@@ -132,11 +132,7 @@ if [ $BPE_ITER -ne 0 ]; then
     BPE_OPTION="--bpe"
 fi
 
-if [ "$COMBINE_TRACK_INST" == true ]; then
-    COMBINE_TRACK_INST="--combine-track-instrument"
-fi
-
-python3 make_arrays.py --debug $BPE_OPTION $COMBINE_TRACK_INST --mp-worker-number $PROCESS_WORKERS --log $LOG_PATH $CORPUS_DIR_PATH $USE_EXISTED
+python3 make_arrays.py --debug $BPE_OPTION --mp-worker-number $PROCESS_WORKERS --log $LOG_PATH $CORPUS_DIR_PATH $USE_EXISTED
 test $? -ne 0 && { echo "text_to_array.py failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
 ######## TRAIN MODEL ########
@@ -175,8 +171,8 @@ fi
 test "$PERMUTE_MPS" == true                && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-mps"
 test "$PERMUTE_TRACK_NUMBER" == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-track-number"
 test "$USE_LINEAR_ATTENTION" == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-linear-attn"
-test "$INPUT_NO_TEMPO" == true             && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-tempo"
-test "$INPUT_NO_TIME_SIGNATURE" == true    && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-time-signature"
+test "$INPUT_INSTRUMENTS" == true          && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-instruments"
+test "$OUTPUT_INSTRUMENTS" == true         && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --output-instruments"
 test "$WEIGHT_LOSS_BY_NONPAD_NUM" == true  && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --loss-weighted-by-nonpadding-number"
 test -n "$MAX_PIECE_PER_GPU"               && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --max-pieces-per-gpu ${MAX_PIECE_PER_GPU}"
 test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended${TRAIN_OTHER_ARGUMENTS} to train.py's argument" | tee -a $LOG_PATH ; }
