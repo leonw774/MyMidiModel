@@ -398,7 +398,8 @@ def main():
     if is_main_process:
         logging.info('Embedding size:')
         logging.info('\n'.join([
-            f'{i} - {name} {vsize}' for i, (name, vsize) in enumerate(zip(COMPLETE_ATTR_NAME, model.embedding_vocabs_size))
+            f'{i} - {COMPLETE_ATTR_NAME[idx]} {vsize}'
+            for i, (idx, vsize) in enumerate(zip(model.input_attrs_indices, model.embedding_vocabs_size))
         ]))
     to_input_attrs = model.to_input_attrs
     to_output_attrs = model.to_output_attrs

@@ -182,7 +182,7 @@ test "$PERMUTE_MPS" == true                && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTH
 test "$PERMUTE_TRACK_NUMBER" == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-track-number"
 test "$USE_LINEAR_ATTENTION" == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-linear-attn"
 test "$INPUT_NO_TEMPO" == true             && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-tempo"
-test "$INPUT_NO_TIME_SIGNATURE" == true    && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-time-signatrue"
+test "$INPUT_NO_TIME_SIGNATURE" == true    && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-no-time-signature"
 test "$WEIGHT_LOSS_BY_NONPAD_NUM" == true  && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --loss-weighted-by-nonpadding-number"
 test -n "$MAX_PIECE_PER_GPU"               && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --max-pieces-per-gpu ${MAX_PIECE_PER_GPU}"
 test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended${TRAIN_OTHER_ARGUMENTS} to train.py's argument" | tee -a $LOG_PATH ; }
