@@ -211,11 +211,12 @@ test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH 
 
 ######## EVALUATE MODEL ########
 
-EVAL_PRIMERS_DIR_PATH="${MIDI_DIR_PATH}/eval_primers"
+EVAL_PRIMERS_DIR_PATH="${MIDI_DIR_PATH}/eval_primers_${EVAL_SAMPLE_NUMBER}"
+EVAL_PRIMERS_PATHLIST_FILE_PATH="${MIDI_DIR_PATH}/eval_pathlist_${EVAL_SAMPLE_NUMBER}.txt"
 
 # Get evaluation features of dataset if not there
 
-if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_features.json" ] && [ -f "${MIDI_DIR_PATH}/eval_pathlist.txt" ] && [ -d "$EVAL_PRIMERS_DIR_PATH" ]; then
+if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_features.json" ] && [ -f "${EVAL_PRIMERS_PATHLIST_FILE_PATH}" ] && [ -d "$EVAL_PRIMERS_DIR_PATH" ]; then
     echo "Midi dataset ${MIDI_DIR_PATH} already has feature stats file."
 else
     echo "Getting evaluation features of ${MIDI_DIR_PATH}"
@@ -227,7 +228,7 @@ else
     mkdir $MIDI_DIR_PATH/primers
     while read SAMPLED_MIDI_PATH; do
         cp $SAMPLED_MIDI_PATH $MIDI_DIR_PATH/primers
-    done < "${MIDI_DIR_PATH}/eval_pathlist.txt"
+    done < "${EVAL_PRIMERS_PATHLIST_FILE_PATH}"
     echo "Getting evaluation features without first ${PRIMER_LENGTH} measures of ${MIDI_DIR_PATH}"
     python3 get_eval_features_of_midis.py --log $LOG_PATH --workers $PROCESS_WORKERS \
         --sample-number $EVAL_SAMPLE_NUMBER --primer-measure-length $PRIMER_LENGTH $EVAL_PRIMERS_DIR_PATH
@@ -249,12 +250,12 @@ test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PAT
 
 echo "Generating $EVAL_SAMPLE_NUMBER instrument-conditioned samples"
 mkdir $MODEL_DIR_PATH/eval_samples/instr_cond
-# Loop each line in "${MIDI_DIR_PATH}/eval_pathlist.txt"
+# Loop each line in EVAL_PRIMERS_PATHLIST_FILE_PATH
 while read SAMPLED_MIDI_PATH; do
     echo "Primer file: ${SAMPLED_MIDI_PATH}"
     python3 generate_with_model.py -p $SAMPLED_MIDI_PATH -l 0 --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --no-tqdm --output-txt \
     $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/instr_cond/$(basename $SAMPLED_MIDI_PATH .mid)
-done < "${MIDI_DIR_PATH}/eval_pathlist.txt"
+done < "${EVAL_PRIMERS_PATHLIST_FILE_PATH}"
 
 echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples/instr-cond"
 python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
@@ -265,12 +266,12 @@ test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PAT
 
 echo "Generating $EVAL_SAMPLE_NUMBER prime-continuation samples"
 mkdir $MODEL_DIR_PATH/eval_samples/primer_cont
-# Loop each line in "${MIDI_DIR_PATH}/eval_pathlist.txt"
+# Loop each line in EVAL_PRIMERS_PATHLIST_FILE_PATH
 while read SAMPLED_MIDI_PATH; do
     echo "Primer file: ${SAMPLED_MIDI_PATH}"
     python3 generate_with_model.py -p $SAMPLED_MIDI_PATH -l $PRIMER_LENGTH --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --no-tqdm --output-txt \
     $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/primer_cont/$(basename $SAMPLED_MIDI_PATH .mid)
-done < "${MIDI_DIR_PATH}/eval_pathlist.txt"
+done < "${EVAL_PRIMERS_PATHLIST_FILE_PATH}"
 
 echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples/primer_cont"
 python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
