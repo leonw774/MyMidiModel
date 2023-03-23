@@ -10,7 +10,7 @@ from typing import Dict
 import numpy as np
 from miditoolkit import MidiFile
 
-from .tokens import get_largest_possible_position, get_supported_time_signatures, b36str2int, MEASURE_EVENTS_CHAR
+from .tokens import get_largest_possible_position, get_supported_time_signatures, b36str2int, MEASURE_EVENTS_CHAR, END_TOKEN_STR
 from .midi import piece_to_midi, midi_to_piece, get_after_k_measures
 
 
@@ -130,7 +130,10 @@ def piece_to_features(
         piece = ' '.join(get_after_k_measures(piece.split(' '), primer_measure_length))
 
     if max_token_number > 0:
-        piece = ' '.join(piece.split(' ')[:max_token_number])
+        text_list = piece.split(' ')[:max_token_number]
+        if text_list[-1] != END_TOKEN_STR:
+            text_list.append(END_TOKEN_STR)
+        piece = ' '.join(text_list)
 
     midi = piece_to_midi(piece, nth, ignore_pending_note_error=True)
     pitchs = []
