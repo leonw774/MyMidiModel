@@ -212,7 +212,7 @@ test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH 
 ######## EVALUATE MODEL ########
 
 EVAL_PRIMERS_DIR_PATH="${MIDI_DIR_PATH}/eval_primers_${EVAL_SAMPLE_NUMBER}"
-EVAL_PRIMERS_PATHLIST_FILE_PATH="${MIDI_DIR_PATH}/eval_pathlist_${EVAL_SAMPLE_NUMBER}.txt"
+EVAL_PRIMERS_PATHLIST_FILE_PATH="${MIDI_DIR_PATH}/eval_pathlist.txt"
 
 # Get evaluation features of dataset if not there
 
