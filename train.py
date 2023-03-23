@@ -109,6 +109,10 @@ def parse_args():
         type=int,
     )
     train_parser.add_argument(
+        '--generate-sample-interval',
+        type=int
+    )
+    train_parser.add_argument(
         '--validation-steps',
         type=int,
     )
@@ -571,37 +575,6 @@ def main():
             logging.info('Time: %d, Learning rate: %.6f', time()-start_time, scheduler.get_last_lr()[0])
             assert train_loss_list
             log_losses(cur_step, train_loss_list, valid_loss_list, loss_file_path)
-            print('Generating conditional and unconditional sample for checkpoint')
-            uncond_gen_text_list = generate_sample(
-                unwrapped_model if args.use_parallel else model,
-                steps=args.data_args.max_seq_length,
-                nucleus_sampling_threshold=args.nucleus_sampling_threshold
-            )
-            uncond_gen_piece = ' '.join(uncond_gen_text_list)
-            with open(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
-                uncond_file.write(uncond_gen_piece)
-            try:
-                midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
-                midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.mid'))
-            except Exception:
-                print('Error when dumping uncond gen MidiFile object')
-                print(format_exc())
-
-            cond_gen_text_list = generate_sample(
-                unwrapped_model if args.use_parallel else model,
-                steps=args.data_args.max_seq_length,
-                start_seq=cond_primer_array,
-                nucleus_sampling_threshold=args.nucleus_sampling_threshold
-            )
-            cond_gen_piece = ' '.join(cond_gen_text_list)
-            with open(os.path.join(ckpt_dir_path, f'{cur_step}_cond.txt'), 'w+', encoding='utf8') as cond_file:
-                cond_file.write(cond_gen_piece)
-            try:
-                midiobj = piece_to_midi(cond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
-                midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_cond.mid'))
-            except Exception:
-                print('Error when dumping cond gen MidiFile object')
-                print(format_exc())
 
             if args.train_args.early_stop > 0:
                 avg_valid_loss = sum([sum(valid_head_losses) for valid_head_losses in valid_loss_list]) / len(valid_loss_list)
@@ -615,6 +588,39 @@ def main():
                     min_avg_valid_loss = avg_valid_loss
                     shutil.copyfile(ckpt_model_file_path, os.path.join(args.model_dir_path, 'best_model.pt'))
                     logging.info('New best model.')
+
+            if cur_step % args.train_args.generate_sample_interval == 0:
+                print('Generating conditional and unconditional sample for checkpoint')
+                uncond_gen_text_list = generate_sample(
+                    unwrapped_model if args.use_parallel else model,
+                    steps=args.data_args.max_seq_length,
+                    nucleus_sampling_threshold=args.nucleus_sampling_threshold
+                )
+                uncond_gen_piece = ' '.join(uncond_gen_text_list)
+                with open(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
+                    uncond_file.write(uncond_gen_piece)
+                try:
+                    midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
+                    midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.mid'))
+                except Exception:
+                    print('Error when dumping uncond gen MidiFile object')
+                    print(format_exc())
+
+                cond_gen_text_list = generate_sample(
+                    unwrapped_model if args.use_parallel else model,
+                    steps=args.data_args.max_seq_length,
+                    start_seq=cond_primer_array,
+                    nucleus_sampling_threshold=args.nucleus_sampling_threshold
+                )
+                cond_gen_piece = ' '.join(cond_gen_text_list)
+                with open(os.path.join(ckpt_dir_path, f'{cur_step}_cond.txt'), 'w+', encoding='utf8') as cond_file:
+                    cond_file.write(cond_gen_piece)
+                try:
+                    midiobj = piece_to_midi(cond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
+                    midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_cond.mid'))
+                except Exception:
+                    print('Error when dumping cond gen MidiFile object')
+                    print(format_exc())
 
     ######## Training end
 
