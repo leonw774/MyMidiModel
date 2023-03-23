@@ -220,7 +220,7 @@ else
     python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS --output-sampled-file-paths $MIDI_DIR_PATH
     test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
     # Copy sampled files into "$MIDI_DIR_PATH/primers"
-    rm -r $MIDI_DIR_PATH/primers
+    test -d $MIDI_DIR_PATH/primers && rm -r $MIDI_DIR_PATH/primers
     mkdir $MIDI_DIR_PATH/primers
     while read SAMPLED_MIDI_PATH; do
         cp $SAMPLED_MIDI_PATH $MIDI_DIR_PATH/primers

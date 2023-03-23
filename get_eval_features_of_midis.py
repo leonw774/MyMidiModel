@@ -219,6 +219,7 @@ def main():
                     raise e
             print('\n'.join([
                 f'{fname}_KLD: {eval_features_stats[fname+"_KLD"]}'
+                for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
             ]))
         else:
             logging.info('%s is invalid path for reference result JSON file', args.reference_file_path)
