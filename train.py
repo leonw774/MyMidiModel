@@ -186,7 +186,7 @@ def parse_args():
         help='The probability threshold nuclues sampling. Default is %(default)s.'
     )
     global_parser.add_argument(
-        '--primer-length',
+        '--primer-measure-length',
         type=int,
         default=4
     )
@@ -360,7 +360,7 @@ def main():
             cond_primer_index = np.random.randint(len(complete_dataset.pieces))
             cond_primer_array = complete_dataset.pieces[str(cond_primer_index)]
             cond_primer_text_list = array_to_text_list(cond_primer_array, vocabs)
-            cond_primer_text_list = get_first_k_measures(cond_primer_text_list, args.primer_length)
+            cond_primer_text_list = get_first_k_measures(cond_primer_text_list, args.primer_measure_length)
             cond_primer_array = text_list_to_array(cond_primer_text_list, vocabs).astype(np.int32)
             break
         except Exception:

@@ -205,7 +205,7 @@ $LAUNCH_COMMAND train.py \
     --generate-sample-interval $GEN_SAMPLE_INTERVAL --nucleus-sampling-threshold $NUCLEUS_THRESHOLD \
     --lr-peak $LEARNING_RATE_PEAK --lr-warmup-steps $LEARNING_RATE_WARMUP_STEPS \
     --lr-decay-end-steps $LEARNING_RATE_DECAY_END_STEPS --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
-    --use-device $USE_DEVICE --primer-length $PRIMER_LENGTH --log $LOG_PATH $TRAIN_OTHER_ARGUMENTS $CORPUS_DIR_PATH $MODEL_DIR_PATH
+    --use-device $USE_DEVICE --primer-measure-length $PRIMER_LENGTH --log $LOG_PATH $TRAIN_OTHER_ARGUMENTS $CORPUS_DIR_PATH $MODEL_DIR_PATH
 
 test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
@@ -226,7 +226,7 @@ else
         cp $SAMPLED_MIDI_PATH $MIDI_DIR_PATH/primers
     done < "${MIDI_DIR_PATH}/eval_pathlist.txt"
     echo "Getting evaluation features without first ${PRIMER_LENGTH} measures of ${MIDI_DIR_PATH}"
-    python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --primer-length $PRIMER_LENGTH --workers $PROCESS_WORKERS $MIDI_DIR_PATH/primers
+    python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --primer-measure-length $PRIMER_LENGTH --workers $PROCESS_WORKERS $MIDI_DIR_PATH/primers
 fi
 
 ### Evaluate unconditional generation
