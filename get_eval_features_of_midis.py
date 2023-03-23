@@ -217,7 +217,7 @@ def main():
                     print('pred:', eval_features_stats[fname])
                     print('true:', reference_eval_features_stats[fname])
                     raise e
-            print('\n'.join([
+            logging.info('\n'.join([
                 f'{fname}_KLD: {eval_features_stats[fname+"_KLD"]}'
                 for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
             ]))

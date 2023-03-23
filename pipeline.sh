@@ -275,7 +275,7 @@ done < "${EVAL_PRIMERS_PATHLIST_FILE_PATH}"
 
 echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples/primer_cont"
 python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
-    --reference-file-path $MIDI_DIR_PATH/primers/eval_features.json $MODEL_DIR_PATH/eval_samples/primer_cont/
+    --reference-file-path $EVAL_PRIMERS_DIR_PATH/eval_features.json $MODEL_DIR_PATH/eval_samples/primer_cont/
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
 
 echo "pipeline.sh done."
