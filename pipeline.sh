@@ -223,11 +223,11 @@ else
     python3 get_eval_features_of_midis.py --log $LOG_PATH --workers $PROCESS_WORKERS \
         --sample-number $EVAL_SAMPLE_NUMBER --output-sampled-file-paths $MIDI_DIR_PATH
     test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
-    # Copy sampled files into "$MIDI_DIR_PATH/primers"
-    test -d $MIDI_DIR_PATH/primers && rm -r $MIDI_DIR_PATH/primers
-    mkdir $MIDI_DIR_PATH/primers
+    # Copy sampled files into EVAL_PRIMERS_DIR_PATH
+    test -d $EVAL_PRIMERS_DIR_PATH && rm -r $EVAL_PRIMERS_DIR_PATH
+    mkdir $EVAL_PRIMERS_DIR_PATH
     while read SAMPLED_MIDI_PATH; do
-        cp $SAMPLED_MIDI_PATH $MIDI_DIR_PATH/primers
+        cp $SAMPLED_MIDI_PATH $EVAL_PRIMERS_DIR_PATH
     done < "${EVAL_PRIMERS_PATHLIST_FILE_PATH}"
     echo "Getting evaluation features without first ${PRIMER_LENGTH} measures of ${MIDI_DIR_PATH}"
     python3 get_eval_features_of_midis.py --log $LOG_PATH --workers $PROCESS_WORKERS \
