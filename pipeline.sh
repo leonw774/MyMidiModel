@@ -211,13 +211,16 @@ test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH 
 
 ######## EVALUATE MODEL ########
 
+EVAL_PRIMERS_DIR_PATH="${MIDI_DIR_PATH}/eval_primers"
+
 # Get evaluation features of dataset if not there
 
-if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_features.json" ] && [ -f "${MIDI_DIR_PATH}/eval_pathlist.txt" ] && [ -d "${MIDI_DIR_PATH}/primers" ]; then
+if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_features.json" ] && [ -f "${MIDI_DIR_PATH}/eval_pathlist.txt" ] && [ -d "$EVAL_PRIMERS_DIR_PATH" ]; then
     echo "Midi dataset ${MIDI_DIR_PATH} already has feature stats file."
 else
     echo "Getting evaluation features of ${MIDI_DIR_PATH}"
-    python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS --output-sampled-file-paths $MIDI_DIR_PATH
+    python3 get_eval_features_of_midis.py --log $LOG_PATH --workers $PROCESS_WORKERS \
+        --sample-number $EVAL_SAMPLE_NUMBER --output-sampled-file-paths $MIDI_DIR_PATH
     test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
     # Copy sampled files into "$MIDI_DIR_PATH/primers"
     test -d $MIDI_DIR_PATH/primers && rm -r $MIDI_DIR_PATH/primers
@@ -226,7 +229,8 @@ else
         cp $SAMPLED_MIDI_PATH $MIDI_DIR_PATH/primers
     done < "${MIDI_DIR_PATH}/eval_pathlist.txt"
     echo "Getting evaluation features without first ${PRIMER_LENGTH} measures of ${MIDI_DIR_PATH}"
-    python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --primer-measure-length $PRIMER_LENGTH --workers $PROCESS_WORKERS $MIDI_DIR_PATH/primers
+    python3 get_eval_features_of_midis.py --log $LOG_PATH --workers $PROCESS_WORKERS \
+        --sample-number $EVAL_SAMPLE_NUMBER --primer-measure-length $PRIMER_LENGTH $EVAL_PRIMERS_DIR_PATH
 fi
 
 ### Evaluate unconditional generation
