@@ -144,7 +144,7 @@ def main():
         ]
         with Pool(args.workers) as p:
             eval_features = list(tqdm(
-                p.imap_unordered(midi_to_features_wrapper, eval_args_dict_list),
+                p.imap(midi_to_features_wrapper, eval_args_dict_list),
                 total=len(random_indices)
             ))
             sampled_midi_file_paths.extend([
