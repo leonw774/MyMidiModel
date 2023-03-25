@@ -252,7 +252,7 @@ def piece_to_features(
     }
     return features
 
-EVAL_SCALAR_FEATURE_NAMES = {
+EVAL_SCALAR_FEATURE_NAMES = [
     'pitch_class_entropy',
     'pitchs_mean',
     'pitchs_var',
@@ -262,10 +262,10 @@ EVAL_SCALAR_FEATURE_NAMES = {
     'velocities_var',
     'instrumentation_self_similarity',
     'grooving_self_similarity'
-}
+]
 
-EVAL_DISTRIBUTION_FEATURE_NAMES = {
+EVAL_DISTRIBUTION_FEATURE_NAMES = [
     'pitch_histogram',
     'duration_distribution',
     'velocity_histogram'
-}
+]

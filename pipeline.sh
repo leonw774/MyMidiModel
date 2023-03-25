@@ -180,7 +180,7 @@ test -n "$train_other_args" && { echo "Appended $train_other_args to train.py's 
 if [ "$USE_PARALLEL" == true ]; then
     num_CUDA_VISIBLE_DEVICE=$(echo $CUDA_VISIBLE_DEVICES | tr -cd , | wc -c ;)
     num_CUDA_VISIBLE_DEVICE=$(($num_CUDA_VISIBLE_DEVICE+1)) # arithmetic expression
-    num_CUDA_DEVICE=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)
+    num_CUDA_DEVICE=$(nvidia-smi --list-gpus | wc -l)
     if [ $num_CUDA_DEVICE -lt $num_CUDA_VISIBLE_DEVICE ]; then
         num_CUDA_VISIBLE_DEVICE=$num_CUDA_DEVICE
     fi
@@ -241,7 +241,7 @@ python3 generate_with_model.py --nucleus-sampling-threshold $NUCLEUS_THRESHOLD -
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/uncond"
 python3 get_eval_features_of_midis.py --log $log_path --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
-    --reference-file-path "${MIDI_DIR_PATH}/eval_features.json" "${model_dir_path}/eval_samples/uncond/"
+    --reference-file-path "${MIDI_DIR_PATH}/eval_features.json" "${model_dir_path}/eval_samples/uncond"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
 ### Evaluate instrument-conditiond generation
@@ -257,7 +257,7 @@ done < $eval_primers_pathlist_file_path
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/instr-cond"
 python3 get_eval_features_of_midis.py --log $log_path --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
-    --reference-file-path "${MIDI_DIR_PATH}/eval_features.json" "${model_dir_path}/eval_samples/instr_cond/"
+    --reference-file-path "${MIDI_DIR_PATH}/eval_features.json" "${model_dir_path}/eval_samples/instr_cond"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
 ### Evaluate prime continuation
@@ -273,7 +273,7 @@ done < $eval_primers_pathlist_file_path
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/primer_cont"
 python3 get_eval_features_of_midis.py --log $log_path --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
-    --reference-file-path "${eval_primers_dir_path}/eval_features.json" "${model_dir_path}/eval_samples/primer_cont/"
+    --reference-file-path "${eval_primers_dir_path}/eval_features.json" "${model_dir_path}/eval_samples/primer_cont"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
-echo "pipeline.sh done."
+echo "All done. pipeline.sh exit."
