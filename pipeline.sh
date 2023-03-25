@@ -1,9 +1,9 @@
 #!/bin/bash
 echo "pipeline.sh start."
-USE_EXISTED=""
+use_existed=""
 if [ $# -eq 4 ]; then
     if [ $4 == '--use-existed' ]; then
-        USE_EXISTED="--use-existed"
+        use_existed="--use-existed"
     else
         echo "Expect arguments to be three configuration file name for midi preprocessing, bpe setting and training/model setting, and an optional '--use-existed' flag at the fourth position."
         exit 1
@@ -16,188 +16,186 @@ else
 fi
 
 # check if all argument is a file and execute them to get their vars
-FULL_CONFIG_NAME=$1"-"$2"-"$3
-CORPUS_CONFIG="configs/corpus/"$1".sh"
-BPE_CONFIG="configs/bpe/"$2".sh"
-TRAIN_CONFIG="configs/train/"$3".sh"
+full_config_name=$1"-"$2"-"$3
+corpus_config_file_path="configs/corpus/"$1".sh"
+bpe_config_file_path="configs/bpe/"$2".sh"
+train_config_file_path="configs/train/"$3".sh"
 
-for CONFIG_PATH in $CORPUS_CONFIG $BPE_CONFIG $TRAIN_CONFIG
+for config_file_path in $corpus_config_file_path $bpe_config_file_path $train_config_file_path
 do
-    if [ -f "$CONFIG_PATH" ]; then
-        if source $CONFIG_PATH; then
-            echo "source $CONFIG_PATH: success"
+    if [ -f $config_file_path ]; then
+        if source $config_file_path; then
+            echo "source ${config_file_path}: success"
         else
-            echo "source $CONFIG_PATH: fail"
+            echo "source ${config_file_path}: fail"
             exit 1
         fi
     else
-        echo "'$CONFIG_PATH' file not exists"
+        echo "'${config_file_path}' file not exists"
         exit 1
     fi
 done
 
-LOG_PATH="logs/$(date '+%Y%m%d-%H%M%S')-${FULL_CONFIG_NAME}.log"
-echo "Log file: $LOG_PATH"
-touch $LOG_PATH
+log_path="logs/$(date '+%Y%m%d-%H%M%S')-${full_config_name}.log"
+echo "Log file: $log_path"
+touch $log_path
 
 ######## MAKE CORPUS ########
 
-CORPUS_DIR_PATH="data/corpus/${DATA_NAME}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}_v${VELOCITY_STEP}_t${TEMPO_MIN}_${TEMPO_MAX}_${TEMPO_STEP}"
+corpus_dir_path="data/corpus/${DATA_NAME}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}_v${VELOCITY_STEP}_t${TEMPO_MIN}_${TEMPO_MAX}_${TEMPO_STEP}"
 
-DO_MIDI_TO_CORPUS=true
-DO_BPE=false
+do_midi_to_corpus=true
+do_bpe=false
 if [ $BPE_ITER -ne 0 ]; then
-    DO_BPE=true
-    CORPUS_DIR_PATH_WITH_BPE="${CORPUS_DIR_PATH}_bpe${BPE_ITER}_${MERGE_CONDITION}_${SAMPLE_RATE}"
-    if [ -d $CORPUS_DIR_PATH_WITH_BPE ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/corpus" ] && [ -f "${CORPUS_DIR_PATH_WITH_BPE}/shape_vocab" ]; then
-        if [ -n "${USE_EXISTED}" ]; then
-            echo "BPE Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already has corpus and shape_vocab file." | tee -a $LOG_PATH
-            echo "Flag --use-existed is set" | tee -a $LOG_PATH
-            echo "Learn bpe vocab is skipped" | tee -a $LOG_PATH
-            DO_BPE=false
-            DO_MIDI_TO_CORPUS=false
+    do_bpe=true
+    bpe_corpus_dir_path="${corpus_dir_path}_bpe${BPE_ITER}_${MERGE_CONDITION}_${SAMPLE_RATE}"
+    if [ -d $bpe_corpus_dir_path ] && [ -f "${bpe_corpus_dir_path}/corpus" ] && [ -f "${bpe_corpus_dir_path}/shape_vocab" ]; then
+        if [ -n "$use_existed" ]; then
+            echo "BPE Output directory: $bpe_corpus_dir_path already has corpus and shape_vocab file." | tee -a $log_path
+            echo "Flag --use-existed is set" | tee -a $log_path
+            echo "Learn bpe vocab is skipped" | tee -a $log_path
+            do_bpe=false
+            do_midi_to_corpus=false
         else
-            echo "BPE Output directory: ${CORPUS_DIR_PATH_WITH_BPE} already has corpus and shape_vocab file. Remove? (y=remove/n=skip bpe)" | tee -a $LOG_PATH
+            echo "BPE Output directory: $bpe_corpus_dir_path already has corpus and shape_vocab file. Remove? (y=remove/n=skip bpe)" | tee -a $log_path
             read yn
             if [ "$yn" == "${yn#[Yy]}" ]; then 
             # this grammar (the #[] operator) means that, in the variable $yn, any Y or y in 1st position will be dropped if they exist.
                 # enter this block if yn != [Yy]
-                DO_BPE=false
-                DO_MIDI_TO_CORPUS=false
-                echo "Learn bpe vocab is skipped" | tee -a $LOG_PATH
+                do_bpe=false
+                do_midi_to_corpus=false
+                echo "Learn bpe vocab is skipped" | tee -a $log_path
             else
-                rm -f "${CORPUS_DIR_PATH_WITH_BPE}/*"
+                rm -f "${bpe_corpus_dir_path}/*"
             fi
         fi
     fi
 fi
 
-if [ "$DO_MIDI_TO_CORPUS" == true ]; then
-    MIDI_TO_TEXT_OTHER_ARGUMENTS=""
-    test "$CONTINUING_NOTE" == true && MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --use-continuing-note"
-    test "$USE_MERGE_DRUMS" == true && MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --use-merge-drums"
-    test "$MIDI_TO_CORPUS_VERBOSE" == true && MIDI_TO_TEXT_OTHER_ARGUMENTS="${MIDI_TO_TEXT_OTHER_ARGUMENTS} --verbose"
-    test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended ${MIDI_TO_TEXT_OTHER_ARGUMENTS} to midi_to_text's argument" | tee -a $LOG_PATH ; }
+if [ "$do_midi_to_corpus" == true ]; then
+    midi_to_corpus_other_args=""
+    test "$CONTINUING_NOTE" == true && midi_to_corpus_other_args="$midi_to_corpus_other_args --use-continuing-note"
+    test "$USE_MERGE_DRUMS" == true && midi_to_corpus_other_args="$midi_to_corpus_other_args --use-merge-drums"
+    test "$MIDI_TO_CORPUS_VERBOSE" == true && midi_to_corpus_other_args="$midi_to_corpus_other_args --verbose"
+    test -n "$train_other_args" && { echo "Appended $midi_to_corpus_other_args to midi_to_corpus's argument" | tee -a $log_path ; }
 
-    echo "Corpus dir: ${CORPUS_DIR_PATH}"
+    echo "Corpus dir: ${corpus_dir_path}"
 
     python3 midi_to_corpus.py --nth $NTH --max-track-number $MAX_TRACK_NUMBER --max-duration $MAX_DURATION --velocity-step $VELOCITY_STEP \
-        --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --position-method $POSITION_METHOD $MIDI_TO_TEXT_OTHER_ARGUMENTS $USE_EXISTED \
-        --log $LOG_PATH -w $PROCESS_WORKERS -r -o $CORPUS_DIR_PATH $MIDI_DIR_PATH
-    test $? -ne 0 && { echo "midi_to_text.py failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+        --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --position-method $POSITION_METHOD $midi_to_corpus_other_args $use_existed \
+        --log $log_path -w $PROCESS_WORKERS -r -o $corpus_dir_path $MIDI_DIR_PATH
+    test $? -ne 0 && { echo "midi_to_text.py failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 fi
 
-if [ "$DO_BPE" == true ]; then
-    echo "Start learn bpe vocab" | tee -a $LOG_PATH
+if [ "$do_bpe" == true ]; then
+    echo "Start learn bpe vocab" | tee -a $log_path
     # compile
     make -C ./bpe
-    test $? -ne 0 && { echo "Compile error. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+    test $? -ne 0 && { echo "Compile error. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
     # create new dir 
-    if [ -d $CORPUS_DIR_PATH_WITH_BPE ]; then
-        rm -f "${CORPUS_DIR_PATH_WITH_BPE}/*"
+    if [ -d $bpe_corpus_dir_path ]; then
+        rm -f "${bpe_corpus_dir_path}/*"
     else
-        mkdir $CORPUS_DIR_PATH_WITH_BPE
+        mkdir $bpe_corpus_dir_path
     fi
 
     # copy paras and pathlist
-    cp "${CORPUS_DIR_PATH}/paras" $CORPUS_DIR_PATH_WITH_BPE
-    cp "${CORPUS_DIR_PATH}/pathlist" $CORPUS_DIR_PATH_WITH_BPE
+    cp "${corpus_dir_path}/paras" $bpe_corpus_dir_path
+    cp "${corpus_dir_path}/pathlist" $bpe_corpus_dir_path
 
     # run learn_vocab
-    bpe/learn_vocab $BPE_DOLOG $BPE_CLEARLINE $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT | tee -a $LOG_PATH
+    bpe/learn_vocab $BPE_DOLOG $BPE_CLEARLINE $corpus_dir_path $bpe_corpus_dir_path $BPE_ITER $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT | tee -a $log_path
     
-    BPE_EXIT_CODE=${PIPESTATUS[0]}
-    if [ $BPE_EXIT_CODE -ne 0 ]; then
-        echo "learn_vocab failed. exit code: $BPE_EXIT_CODE. pipeline.sh exit." | tee -a $LOG_PATH
-        echo "bpe/learn_vocab $BPE_DOLOG $BPE_CLEARLINE $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $BPE_ITER $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT"
-        rm -r "${CORPUS_DIR_PATH_WITH_BPE}"
+    bpe_exit_code=${PIPESTATUS[0]}
+    if [ $bpe_exit_code -ne 0 ]; then
+        echo "learn_vocab failed. exit code: $bpe_exit_code. pipeline.sh exit." | tee -a $log_path
+        echo "bpe/learn_vocab $BPE_DOLOG $BPE_CLEARLINE $corpus_dir_path $bpe_corpus_dir_path $BPE_ITER $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT"
+        rm -r "$bpe_corpus_dir_path"
         exit 1
     fi
 
     # process bpe log
-    echo "sed -i 's/\r/\n/g ; s/\x1B\[2K//g' ${LOG_PATH}"
-    sed -i 's/\r/\n/g ; s/\x1B\[2K//g' $LOG_PATH
-    python3 plot_bpe_log.py $CORPUS_DIR_PATH_WITH_BPE $LOG_PATH
+    echo "sed -i 's/\r/\n/g ; s/\x1B\[2K//g' $log_path"
+    sed -i 's/\r/\n/g ; s/\x1B\[2K//g' $log_path
+    python3 plot_bpe_log.py $bpe_corpus_dir_path $log_path
 
     # check if tokenized corpus is equal to original corpus
-    python3 verify_corpus_equality.py $CORPUS_DIR_PATH $CORPUS_DIR_PATH_WITH_BPE $PROCESS_WORKERS | tee -a $LOG_PATH
-    VERIFY_EXIT_CODE=${PIPESTATUS[0]}
-    test $VERIFY_EXIT_CODE -ne 0 && { echo "Corpus equality verification failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+    python3 verify_corpus_equality.py $corpus_dir_path $bpe_corpus_dir_path $PROCESS_WORKERS | tee -a $log_path
+    verify_exit_code=${PIPESTATUS[0]}
+    test $verify_exit_code -ne 0 && { echo "Corpus equality verification failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 fi
 
 if [ $BPE_ITER -ne 0 ]; then
-    # replace CORPUS_DIR_PATH to CORPUS_DIR_PATH_WITH_BPE
-    CORPUS_DIR_PATH=$CORPUS_DIR_PATH_WITH_BPE
+    # replace corpus_dir_path to bpe_corpus_dir_path
+    corpus_dir_path=$bpe_corpus_dir_path
     BPE_OPTION="--bpe"
 fi
 
-python3 make_arrays.py --debug $BPE_OPTION --mp-worker-number $PROCESS_WORKERS --log $LOG_PATH $CORPUS_DIR_PATH $USE_EXISTED
-test $? -ne 0 && { echo "text_to_array.py failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+python3 make_arrays.py --debug $BPE_OPTION --mp-worker-number $PROCESS_WORKERS --log $log_path $corpus_dir_path $use_existed
+test $? -ne 0 && { echo "text_to_array.py failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
 ######## TRAIN MODEL ########
 
 # test if NO_TRAIN is a set variables
 if [ -n "${NO_TRAIN+x}" ]; then
-    echo "Not training" | tee -a $LOG_PATH
+    echo "Not training" | tee -a $log_path
     echo "pipeline.sh exit."
     exit 0
 fi
 
-MODEL_DIR_PATH="models/$(date '+%Y%m%d-%H%M%S')-"$FULL_CONFIG_NAME
-if [ -d $MODEL_DIR_PATH ]; then
-        rm -rf ${MODEL_DIR_PATH}
+model_dir_path="models/$(date '+%Y%m%d-%H%M%S')-"$full_config_name
+if [ -d $model_dir_path ]; then
+        rm -rf $model_dir_path
     else
-        mkdir $MODEL_DIR_PATH
-        mkdir "${MODEL_DIR_PATH}/ckpt"
-        mkdir "${MODEL_DIR_PATH}/eval_samples"
+        mkdir $model_dir_path
+        mkdir "${model_dir_path}/ckpt"
+        mkdir "${model_dir_path}/eval_samples"
     fi
-echo "Model dir: $MODEL_DIR_PATH"
+echo "Model dir: $model_dir_path"
 
-TRAIN_OTHER_ARGUMENTS=""
+train_other_args=""
 if [ "$USE_PERMUTABLE_SUBSEQ_LOSS" == true ]; then
     python3 -c "import torch;import mps_loss" 2>&1 | grep ModuleNotFoundError
-    # if module not exist
+    # if module not exist, install
     if [ $? -eq 0 ]; then
         cd util/pytorch/mps_loss
         python3 setup.py install
         cd ../../..
+        # check if success
+        python3 -c "import torch;import mps_loss" 2>&1 | grep ModuleNotFoundError
+        test $? -eq 0 && { echo "mps_loss extension setup failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
     fi
-    # check if success
-    python3 -c "import torch;import mps_loss" 2>&1 | grep ModuleNotFoundError
-    test $? -eq 0 && { echo "mps_loss extension setup failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
-    TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-permutable-subseq-loss"
+    train_other_args="$train_other_args --use-permutable-subseq-loss"
 fi
-test "$PERMUTE_MPS" == true                && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-mps"
-test "$PERMUTE_TRACK_NUMBER" == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --permute-track-number"
-test "$USE_LINEAR_ATTENTION" == true       && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-linear-attn"
-test "$INPUT_INSTRUMENTS" == true          && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --input-instruments"
-test "$OUTPUT_INSTRUMENTS" == true         && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --output-instruments"
-test "$WEIGHT_LOSS_BY_NONPAD_NUM" == true  && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --loss-weighted-by-nonpadding-number"
-test -n "$MAX_PIECE_PER_GPU"               && TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --max-pieces-per-gpu ${MAX_PIECE_PER_GPU}"
-test -n "$TRAIN_OTHER_ARGUMENTS" && { echo "Appended${TRAIN_OTHER_ARGUMENTS} to train.py's argument" | tee -a $LOG_PATH ; }
+test "$PERMUTE_MPS" == true                && train_other_args="$train_other_args --permute-mps"
+test "$PERMUTE_TRACK_NUMBER" == true       && train_other_args="$train_other_args --permute-track-number"
+test "$USE_LINEAR_ATTENTION" == true       && train_other_args="$train_other_args --use-linear-attn"
+test "$INPUT_INSTRUMENTS" == true          && train_other_args="$train_other_args --input-instruments"
+test "$OUTPUT_INSTRUMENTS" == true         && train_other_args="$train_other_args --output-instruments"
+test "$WEIGHT_LOSS_BY_NONPAD_NUM" == true  && train_other_args="$train_other_args --loss-weighted-by-nonpadding-number"
+test -n "$MAX_PIECE_PER_GPU"               && train_other_args="$train_other_args --max-pieces-per-gpu ${MAX_PIECE_PER_GPU}"
+test -n "$train_other_args" && { echo "Appended $train_other_args to train.py's argument" | tee -a $log_path ; }
 
-
-# change CUDA_VISIABLE_DEVICES according to the machine it runs on
 if [ "$USE_PARALLEL" == true ]; then
-    NUM_OF_CUDA_VISIBLE_DEVICE=$(echo $CUDA_VISIBLE_DEVICES | tr -cd , | wc -c ;)
-    NUM_OF_CUDA_VISIBLE_DEVICE=$(($NUM_OF_CUDA_VISIBLE_DEVICE+1)) # perform arithmetic expression with $((...))
-    NUM_OF_ACTUAL_CUDA_DEVICE=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)
-    if [ $NUM_OF_ACTUAL_CUDA_DEVICE -lt $NUM_OF_CUDA_VISIBLE_DEVICE ]; then
-        NUM_OF_CUDA_VISIBLE_DEVICE=$NUM_OF_ACTUAL_CUDA_DEVICE
+    num_CUDA_VISIBLE_DEVICE=$(echo $CUDA_VISIBLE_DEVICES | tr -cd , | wc -c ;)
+    num_CUDA_VISIBLE_DEVICE=$(($num_CUDA_VISIBLE_DEVICE+1)) # arithmetic expression
+    num_CUDA_DEVICE=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)
+    if [ $num_CUDA_DEVICE -lt $num_CUDA_VISIBLE_DEVICE ]; then
+        num_CUDA_VISIBLE_DEVICE=$num_CUDA_DEVICE
     fi
-    if [ "$NUM_OF_CUDA_VISIBLE_DEVICE" == "1" ]; then
-        LAUNCH_COMMAND="python3"
-        "$USE_PARALLEL" == false
+    if [ $num_CUDA_VISIBLE_DEVICE == "1" ]; then
+        launch_command="python3"
+        $USE_PARALLEL == false
     else
-        LAUNCH_COMMAND="accelerate launch --multi_gpu --num_processes $NUM_OF_CUDA_VISIBLE_DEVICE --num_machine 1"
-        TRAIN_OTHER_ARGUMENTS="${TRAIN_OTHER_ARGUMENTS} --use-parallel"
+        accelerate config default
+        launch_command="accelerate launch --multi_gpu --num_processes $num_CUDA_VISIBLE_DEVICE --num_machine 1"
+        train_other_args="$train_other_args --use-parallel"
     fi
-    accelerate config default
 else
-    LAUNCH_COMMAND="python3"
+    launch_command="python3"
 fi
-$LAUNCH_COMMAND train.py \
+$launch_command train.py \
     --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation-range $PITCH_AUGMENTATION_RANGE --measure-sample-step-ratio $MEASURE_SAMPLE_STEP_RATIO \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
     --batch-size $BATCH_SIZE --max-steps $MAX_STEPS --grad-clip-norm $GRAD_CLIP_NORM --split-ratio $SPLIT_RATIO \
@@ -205,77 +203,77 @@ $LAUNCH_COMMAND train.py \
     --generate-sample-interval $GEN_SAMPLE_INTERVAL --nucleus-sampling-threshold $NUCLEUS_THRESHOLD \
     --lr-peak $LEARNING_RATE_PEAK --lr-warmup-steps $LEARNING_RATE_WARMUP_STEPS \
     --lr-decay-end-steps $LEARNING_RATE_DECAY_END_STEPS --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
-    --use-device $USE_DEVICE --primer-measure-length $PRIMER_LENGTH --log $LOG_PATH $TRAIN_OTHER_ARGUMENTS $CORPUS_DIR_PATH $MODEL_DIR_PATH
+    --use-device $USE_DEVICE --primer-measure-length $PRIMER_LENGTH --log $log_path $train_other_args $corpus_dir_path $model_dir_path
 
-test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
 ######## EVALUATE MODEL ########
 
-EVAL_PRIMERS_DIR_PATH="${MIDI_DIR_PATH}/eval_primers_${EVAL_SAMPLE_NUMBER}"
-EVAL_PRIMERS_PATHLIST_FILE_PATH="${MIDI_DIR_PATH}/eval_pathlist.txt"
+eval_primers_dir_path="${MIDI_DIR_PATH}/eval_primers_${EVAL_SAMPLE_NUMBER}"
+eval_primers_pathlist_file_path="${MIDI_DIR_PATH}/eval_pathlist.txt"
 
 # Get evaluation features of dataset if not there
 
-if [ -n "$USE_EXISTED" ] && [ -f "${MIDI_DIR_PATH}/eval_features.json" ] && [ -f "${EVAL_PRIMERS_PATHLIST_FILE_PATH}" ] && [ -d "$EVAL_PRIMERS_DIR_PATH" ]; then
-    echo "Midi dataset ${MIDI_DIR_PATH} already has feature stats file."
+if [ -n "$use_existed" ] && [ -f "${MIDI_DIR_PATH}/eval_features.json" ] && [ -f "$eval_primers_pathlist_file_path" ] && [ -d "$eval_primers_dir_path" ]; then
+    echo "Midi dataset $MIDI_DIR_PATH already has feature stats file."
 else
-    echo "Getting evaluation features of ${MIDI_DIR_PATH}"
-    python3 get_eval_features_of_midis.py --log $LOG_PATH --workers $PROCESS_WORKERS \
+    echo "Getting evaluation features of $MIDI_DIR_PATH"
+    python3 get_eval_features_of_midis.py --log $log_path --workers $PROCESS_WORKERS \
         --sample-number $EVAL_SAMPLE_NUMBER --output-sampled-file-paths $MIDI_DIR_PATH
-    test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
-    # Copy sampled files into EVAL_PRIMERS_DIR_PATH
-    test -d $EVAL_PRIMERS_DIR_PATH && rm -r $EVAL_PRIMERS_DIR_PATH
-    mkdir $EVAL_PRIMERS_DIR_PATH
-    while read SAMPLED_MIDI_PATH; do
-        cp $SAMPLED_MIDI_PATH $EVAL_PRIMERS_DIR_PATH
-    done < "${EVAL_PRIMERS_PATHLIST_FILE_PATH}"
-    echo "Getting evaluation features without first ${PRIMER_LENGTH} measures of ${MIDI_DIR_PATH}"
-    python3 get_eval_features_of_midis.py --log $LOG_PATH --workers $PROCESS_WORKERS \
-        --sample-number $EVAL_SAMPLE_NUMBER --primer-measure-length $PRIMER_LENGTH $EVAL_PRIMERS_DIR_PATH
+    test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
+    # Copy sampled files into eval_primers_dir_path
+    test -d $eval_primers_dir_path && rm -r $eval_primers_dir_path
+    mkdir $eval_primers_dir_path
+    while read eval_sample_midi_path; do
+        cp $eval_sample_midi_path $eval_primers_dir_path
+    done < $eval_primers_pathlist_file_path
+    echo "Getting evaluation features without first $PRIMER_LENGTH measures of $MIDI_DIR_PATH"
+    python3 get_eval_features_of_midis.py --log $log_path --workers $PROCESS_WORKERS \
+        --sample-number $EVAL_SAMPLE_NUMBER --primer-measure-length $PRIMER_LENGTH $eval_primers_dir_path
 fi
 
 ### Evaluate unconditional generation
 
 echo "Generating $EVAL_SAMPLE_NUMBER unconditional samples"
-mkdir $MODEL_DIR_PATH/eval_samples/uncond
+mkdir "${model_dir_path}/eval_samples/uncond"
 python3 generate_with_model.py --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --sample-number $EVAL_SAMPLE_NUMBER --no-tqdm --output-txt \
-    $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/uncond/sample
+    "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/uncond/sample"
 
-echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples/uncond"
-python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
-    --reference-file-path $MIDI_DIR_PATH/eval_features.json $MODEL_DIR_PATH/eval_samples/uncond/
-test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+echo "Get evaluation features of ${model_dir_path}/eval_samples/uncond"
+python3 get_eval_features_of_midis.py --log $log_path --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
+    --reference-file-path "${MIDI_DIR_PATH}/eval_features.json" "${model_dir_path}/eval_samples/uncond/"
+test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
 ### Evaluate instrument-conditiond generation
 
 echo "Generating $EVAL_SAMPLE_NUMBER instrument-conditioned samples"
-mkdir $MODEL_DIR_PATH/eval_samples/instr_cond
-# Loop each line in EVAL_PRIMERS_PATHLIST_FILE_PATH
-while read SAMPLED_MIDI_PATH; do
-    echo "Primer file: ${SAMPLED_MIDI_PATH}"
-    python3 generate_with_model.py -p $SAMPLED_MIDI_PATH -l 0 --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --no-tqdm --output-txt \
-    $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/instr_cond/$(basename $SAMPLED_MIDI_PATH .mid)
-done < "${EVAL_PRIMERS_PATHLIST_FILE_PATH}"
+mkdir "${model_dir_path}/eval_samples/instr_cond"
+# Loop each line in eval_primers_pathlist_file_path
+while read eval_sample_midi_path; do
+    echo "Primer file: $eval_sample_midi_path"
+    python3 generate_with_model.py -p $eval_sample_midi_path -l 0 --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --no-tqdm --output-txt \
+    "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/$(basename $eval_sample_midi_path .mid)"
+done < $eval_primers_pathlist_file_path
 
-echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples/instr-cond"
-python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
-    --reference-file-path $MIDI_DIR_PATH/eval_features.json $MODEL_DIR_PATH/eval_samples/instr_cond/
-test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+echo "Get evaluation features of ${model_dir_path}/eval_samples/instr-cond"
+python3 get_eval_features_of_midis.py --log $log_path --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
+    --reference-file-path "${MIDI_DIR_PATH}/eval_features.json" "${model_dir_path}/eval_samples/instr_cond/"
+test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
 ### Evaluate prime continuation
 
 echo "Generating $EVAL_SAMPLE_NUMBER prime-continuation samples"
-mkdir $MODEL_DIR_PATH/eval_samples/primer_cont
-# Loop each line in EVAL_PRIMERS_PATHLIST_FILE_PATH
-while read SAMPLED_MIDI_PATH; do
-    echo "Primer file: ${SAMPLED_MIDI_PATH}"
-    python3 generate_with_model.py -p $SAMPLED_MIDI_PATH -l $PRIMER_LENGTH --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --no-tqdm --output-txt \
-    $MODEL_DIR_PATH/best_model.pt $MODEL_DIR_PATH/eval_samples/primer_cont/$(basename $SAMPLED_MIDI_PATH .mid)
-done < "${EVAL_PRIMERS_PATHLIST_FILE_PATH}"
+mkdir "${model_dir_path}/eval_samples/primer_cont"
+# Loop each line in eval_primers_pathlist_file_path
+while read eval_sample_midi_path; do
+    echo "Primer file: $eval_sample_midi_path"
+    python3 generate_with_model.py -p $eval_sample_midi_path -l $PRIMER_LENGTH --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --no-tqdm --output-txt \
+    "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/$(basename $eval_sample_midi_path .mid)"
+done < $eval_primers_pathlist_file_path
 
-echo "Get evaluation features of ${MODEL_DIR_PATH}/eval_samples/primer_cont"
-python3 get_eval_features_of_midis.py --log $LOG_PATH --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
-    --reference-file-path $EVAL_PRIMERS_DIR_PATH/eval_features.json $MODEL_DIR_PATH/eval_samples/primer_cont/
-test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $LOG_PATH ; } && exit 1
+echo "Get evaluation features of ${model_dir_path}/eval_samples/primer_cont"
+python3 get_eval_features_of_midis.py --log $log_path --sample-number $EVAL_SAMPLE_NUMBER --workers $PROCESS_WORKERS \
+    --reference-file-path "${eval_primers_dir_path}/eval_features.json" "${model_dir_path}/eval_samples/primer_cont/"
+test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
 echo "pipeline.sh done."
