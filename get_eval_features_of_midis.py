@@ -178,8 +178,7 @@ def main():
         eval_features_stats[fname] = {
             k: float(v) for k, v in fname_description.items()
         }
-    # We actually only want 'mean' and 'var'
-    print('\n'.join([
+    logging.info('\n'.join([
         f'{fname}: {eval_features_stats[fname]["mean"]} ± {eval_features_stats[fname]["std"]}'
         for fname in EVAL_SCALAR_FEATURE_NAMES
     ]))

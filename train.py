@@ -233,7 +233,7 @@ def log_losses(
     avg_avg_train_losses = sum(avg_train_losses) / len(avg_train_losses)
     avg_avg_valid_losses = sum(avg_valid_losses) / len(avg_valid_losses)
     logging.info(
-        'Avg. train head losses: %s Avg. train loss: %.6f \nAvg. valid head losses: %s Avg. valid loss: %.6f',
+        'Avg. train head losses: %s Avg. train loss: %.12f \nAvg. valid head losses: %s Avg. valid loss: %.12f',
         ', '.join([f'{l:.6f}' for l in avg_train_losses]), avg_avg_train_losses,
         ', '.join([f'{l:.6f}' for l in avg_valid_losses]), avg_avg_valid_losses
     )
@@ -241,8 +241,8 @@ def log_losses(
         with open(loss_file_path, 'a', encoding='utf8') as loss_file:
             loss_file.write(
                 f'{start_step},'
-                + f'{",".join([f"{l:.6f}" for l in avg_train_losses])},{avg_avg_train_losses},'
-                + f'{",".join([f"{l:.6f}" for l in avg_valid_losses])},{avg_avg_valid_losses}\n'
+                + f'{",".join([f"{l:.6f}" for l in avg_train_losses])},{avg_avg_train_losses:.12f},'
+                + f'{",".join([f"{l:.6f}" for l in avg_valid_losses])},{avg_avg_valid_losses:.12f}\n'
             )
 
 
