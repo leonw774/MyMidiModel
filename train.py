@@ -130,7 +130,6 @@ def parse_args():
     )
     train_parser.add_argument(
         '--lr-peak',
-        dest='lr_peak',
         type=float
     )
     train_parser.add_argument(
@@ -266,6 +265,9 @@ def main():
         args.train_args.batch_size = args.max_pieces_per_gpu * parallel_devices_count
     elif gradient_accumulation_steps == 0:
         gradient_accumulation_steps = 1
+    
+    # https://stackoverflow.com/questions/75701437/why-do-we-multiply-learning-rate-by-gradient-accumulation-steps-in-pytorch
+    args.lr_peak *= gradient_accumulation_steps
 
     # root logger
     if args.log_file_path != '':
