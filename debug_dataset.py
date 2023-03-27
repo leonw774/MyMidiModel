@@ -33,18 +33,18 @@ args = parser.parse_args()
 dataset = MidiDataset(
     data_dir_path=args.data_dir_path,
     max_seq_length=args.max_seq_length,
-    use_permutable_subseq_loss=False, # to print out mps indices
+    use_permutable_subseq_loss=True, # to print out mps indices
     measure_sample_step_ratio=0.25,
-    permute_mps=False,
+    permute_mps=True,
     permute_track_number=True,
     pitch_augmentation_range=2,
     verbose=True
 )
 vocabs = dataset.vocabs
-print('max_seq_length', dataset.max_seq_length)
-print('use_permutable_subseq_loss', dataset.use_permutable_subseq_loss)
-print('permute_mps', dataset.permute_mps)
-print('permute_track_number', dataset.permute_track_number)
+print('max_seq_length:', dataset.max_seq_length)
+print('use_permutable_subseq_loss:', dataset.use_permutable_subseq_loss)
+print('permute_mps:', dataset.permute_mps)
+print('permute_track_number:', dataset.permute_track_number)
 
 print('TEST RANDOM SPLIT')
 

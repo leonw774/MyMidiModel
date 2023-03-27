@@ -188,6 +188,18 @@ class MidiDataset(Dataset):
                         if mps_sep_indices[i+1] != mps_sep_indices[i] + 1:
                             self._file_mps_sep_indices[filenum].append(mps_sep_indices[i] + 1)
 
+                if verbose:
+                    mps_lengths = [] # only count if length > 1
+                    for mps_sep_indices in self._file_mps_sep_indices:
+                        mps_lengths.extend(
+                            filter(
+                                lambda x: x > 1,
+                                [j2 - j1 for j1, j2 in zip(mps_sep_indices[:-1], mps_sep_indices[1:])]
+                            )
+                        )
+                    print('Number mps:', len(mps_lengths))
+                    print('Average mps length:', sum(mps_lengths)/len(mps_lengths))
+
             if self.pitch_augmentation_range != 0:
                 is_multinote_token = (self.pieces[filename][:, ATTR_NAME_INDEX['pit']]) != 0
                 # the pitch attribute of drums / percussion instrument does not means actual note pitch
