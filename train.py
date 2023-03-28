@@ -196,11 +196,11 @@ def parse_args():
     )
     # make them as dicts first
     global_args = dict()
-    global_args['data_args'], others = data_parser.parse_known_args()
+    global_args['data'], others = data_parser.parse_known_args()
     # print(others)
-    global_args['model_args'], others = model_parser.parse_known_args(others)
+    global_args['model'], others = model_parser.parse_known_args(others)
     # print(others)
-    global_args['train_args'], others = train_parser.parse_known_args(others)
+    global_args['train'], others = train_parser.parse_known_args(others)
     # print(others)
     global_args.update(
         vars(global_parser.parse_known_args(others)[0])
@@ -257,11 +257,12 @@ def main():
         args.use_parallel = False
     accelerator = accelerate.Accelerator() if args.use_parallel else None
     is_main_process = accelerator.is_main_process if args.use_parallel else True
-    gradient_accumulation_steps = int(args.train_args.batch_size / (args.max_pieces_per_gpu * parallel_devices_count))
+    gradient_accumulation_steps = int(args.train.batch_size / (args.max_pieces_per_gpu * parallel_devices_count))
     if gradient_accumulation_steps > 1:
-        args.train_args.batch_size = args.max_pieces_per_gpu * parallel_devices_count
+        args.train.batch_size = args.max_pieces_per_gpu * parallel_devices_count
     elif gradient_accumulation_steps == 0:
         gradient_accumulation_steps = 1
+    args.train.lr_peak *= gradient_accumulation_steps
 
     # root logger
     if args.log_file_path != '':
@@ -290,9 +291,9 @@ def main():
             logging.info('Invalid model ckpt dir path: %s', ckpt_dir_path)
             return 1
 
-        data_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.data_args).items()])
-        model_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.model_args).items()])
-        train_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.train_args).items()])
+        data_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.data).items()])
+        model_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.model).items()])
+        train_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.train).items()])
         args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args).items() if not isinstance(v, Namespace)])
         logging.info(data_args_str)
         logging.info(model_args_str)
@@ -331,10 +332,10 @@ def main():
 
     ######## Make dataset
 
-    complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data_args), verbose=is_main_process)
+    complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data), verbose=is_main_process)
     if is_main_process:
         logging.info('Made MidiDataset')
-    train_ratio, valid_ratio = args.train_args.split_ratio
+    train_ratio, valid_ratio = args.train.split_ratio
     if train_ratio == valid_ratio == -1:
         raise ValueError('split_ratio (-1, -1) is not allowed')
     else:
@@ -373,14 +374,14 @@ def main():
     train_dataloader = DataLoader(
         dataset=train_dataset,
         num_workers=args.dataloader_worker_number,
-        batch_size=args.train_args.batch_size // parallel_devices_count,
+        batch_size=args.train.batch_size // parallel_devices_count,
         shuffle=False, # no need to shuffle because random_split did
         collate_fn=collate_mididataset
     )
     valid_dataloader = DataLoader(
         dataset=valid_dataset,
         num_workers=args.dataloader_worker_number,
-        batch_size=args.train_args.batch_size // parallel_devices_count,
+        batch_size=args.train.batch_size // parallel_devices_count,
         shuffle=False,
         collate_fn=collate_mididataset
     )
@@ -391,9 +392,9 @@ def main():
 
     model = MyMidiTransformer(
         vocabs=vocabs,
-        max_seq_length=args.data_args.max_seq_length,
-        permute_mps=args.data_args.permute_mps,
-        **vars(args.model_args)
+        max_seq_length=args.data.max_seq_length,
+        permute_mps=args.data.permute_mps,
+        **vars(args.model)
     )
     if is_main_process:
         logging.info('Embedding size:')
@@ -410,7 +411,7 @@ def main():
         summary_str = str(torchinfo.summary(
             model,
             input_size=[
-                (args.train_args.batch_size, args.data_args.max_seq_length, len(model.input_attrs_indices))
+                (args.train.batch_size, args.data.max_seq_length, len(model.input_attrs_indices))
             ],
             dtypes=[torch.long],
             device=args.use_device,
@@ -420,14 +421,14 @@ def main():
 
     ######## Make optimizer
 
-    optimizer = AdamW(model.parameters(), args.train_args.lr_peak, betas=(0.9, 0.98), eps=1e-6, weight_decay=1e-2)
+    optimizer = AdamW(model.parameters(), args.train.lr_peak, betas=(0.9, 0.98), eps=1e-6, weight_decay=1e-2)
     scheduler = lr_scheduler.LambdaLR(
         optimizer,
         lr_lambda=lambda step: lr_warmup_and_linear_decay(
             step,
-            args.train_args.lr_warmup_steps,
-            args.train_args.lr_decay_end_ratio,
-            args.train_args.lr_decay_end_steps
+            args.train.lr_warmup_steps,
+            args.train.lr_decay_end_ratio,
+            args.train.lr_decay_end_steps
         )
     )
 
@@ -450,15 +451,15 @@ def main():
     early_stop_counter = 0
 
     start_time = time()
-    for start_step in range(0, args.train_args.max_steps, args.train_args.validation_interval):
+    for start_step in range(0, args.train.max_steps, args.train.validation_interval):
         if is_main_process:
-            logging.info('Training: %d/%d', start_step, args.train_args.max_steps)
+            logging.info('Training: %d/%d', start_step, args.train.max_steps)
         model.train()
         train_loss_list = []
         train_loss_list: List[List[float]]
         # forward_time = 0
         # backward_time = 0
-        for _ in tqdm(range(args.train_args.validation_interval), disable=not is_main_process):
+        for _ in tqdm(range(args.train.validation_interval), disable=not is_main_process):
             for _ in range(gradient_accumulation_steps):
                 try:
                     batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
@@ -478,19 +479,19 @@ def main():
                 # forward_time += time() - start_forward_time
 
                 # start_backward_time = time()
-                if args.data_args.use_permutable_subseq_loss:
+                if args.data.use_permutable_subseq_loss:
                     head_losses = compute_permutable_subseq_losses(
                         prediction,
                         batch_target_seqs,
                         batch_mps_sep_indices,
-                        args.train_args.loss_weighted_by_nonpadding_number
+                        args.train.loss_weighted_by_nonpadding_number
                     )
                     # print('compute_permutable_subseq_losses use time:', time() - start_backward_time)
                 else:
                     head_losses = compute_losses(
                         prediction,
                         batch_target_seqs,
-                        args.train_args.loss_weighted_by_nonpadding_number
+                        args.train.loss_weighted_by_nonpadding_number
                     )
                     # print('compute_losses use time:', time() - start_backward_time)
                 # assert all(not torch.isnan(hl).any() for hl in head_losses)
@@ -510,12 +511,12 @@ def main():
                 # backward_time += time() - start_backward_time
             # end for range(gradient_accumulation_steps)
 
-            if args.train_args.grad_clip_norm > 0:
+            if args.train.grad_clip_norm > 0:
                 if args.use_parallel:
                     if accelerator.sync_gradients:
-                        accelerator.clip_grad_norm_(model.parameters(), args.train_args.grad_clip_norm)
+                        accelerator.clip_grad_norm_(model.parameters(), args.train.grad_clip_norm)
                 else:
-                    clip_grad_norm_(model.parameters(), args.train_args.grad_clip_norm)
+                    clip_grad_norm_(model.parameters(), args.train.grad_clip_norm)
 
             optimizer.step()
             scheduler.step()
@@ -527,7 +528,7 @@ def main():
         model.eval()
         valid_loss_list = []
         with torch.no_grad():
-            for _ in tqdm(range(min(args.train_args.validation_steps, len(valid_dataloader))), disable=not is_main_process):
+            for _ in tqdm(range(min(args.train.validation_steps, len(valid_dataloader))), disable=not is_main_process):
                 try:
                     batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
                 except StopIteration:
@@ -541,7 +542,7 @@ def main():
                     batch_target_seqs = batch_target_seqs.to(args.use_device)
                 prediction = model(batch_input_seqs)
 
-                if args.data_args.use_permutable_subseq_loss:
+                if args.data.use_permutable_subseq_loss:
                     head_losses = compute_permutable_subseq_losses(
                         prediction,
                         batch_target_seqs,
@@ -557,7 +558,7 @@ def main():
                 if is_main_process:
                     valid_loss_list.append([hl.item() for hl in head_losses])
 
-        cur_step = start_step + args.train_args.validation_interval
+        cur_step = start_step + args.train.validation_interval
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
         unwrapped_model = None
         if args.use_parallel:
@@ -574,7 +575,7 @@ def main():
             print('Generating conditional and unconditional sample for checkpoint')
             uncond_gen_text_list = generate_sample(
                 unwrapped_model if args.use_parallel else model,
-                steps=args.data_args.max_seq_length,
+                steps=args.data.max_seq_length,
                 nucleus_sampling_threshold=args.nucleus_sampling_threshold
             )
             uncond_gen_piece = ' '.join(uncond_gen_text_list)
@@ -589,7 +590,7 @@ def main():
 
             cond_gen_text_list = generate_sample(
                 unwrapped_model if args.use_parallel else model,
-                steps=args.data_args.max_seq_length,
+                steps=args.data.max_seq_length,
                 start_seq=cond_primer_array,
                 nucleus_sampling_threshold=args.nucleus_sampling_threshold
             )
@@ -603,12 +604,12 @@ def main():
                 print('Error when dumping cond gen MidiFile object')
                 print(format_exc())
 
-            if args.train_args.early_stop > 0:
+            if args.train.early_stop > 0:
                 avg_valid_loss = sum([sum(valid_head_losses) for valid_head_losses in valid_loss_list]) / len(valid_loss_list)
                 if avg_valid_loss >= min_avg_valid_loss:
                     early_stop_counter += 1
-                    if early_stop_counter >= args.train_args.early_stop:
-                        logging.info('Early stopped: No improvement for %d validations.', args.train_args.early_stop)
+                    if early_stop_counter >= args.train.early_stop:
+                        logging.info('Early stopped: No improvement for %d validations.', args.train.early_stop)
                         break
                 else:
                     early_stop_counter = 0
