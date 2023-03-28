@@ -46,6 +46,8 @@ class MyMidiTransformer(nn.Module):
             embedding_dim: int,
             input_no_tempo: bool,
             input_no_time_signature: bool,
+            input_instruments: bool = False,
+            output_instruments: bool = True,
             embedding_dropout_rate=0.1
             ) -> None:
         super().__init__()
@@ -68,6 +70,8 @@ class MyMidiTransformer(nn.Module):
 
         # the indices of input attrs in complete attribute list
         self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in COMPLETE_ATTR_NAME]
+        if not input_instruments:
+            self.input_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
         if input_no_tempo:
             self.input_attrs_indices.remove(ATTR_NAME_INDEX['tempos'])
         if input_no_time_signature:
@@ -96,7 +100,7 @@ class MyMidiTransformer(nn.Module):
             ATTR_NAME_INDEX[fname]
             for fname in OUTPUT_ATTR_NAME
         ]
-        if vocabs.combine_track_instrument:
+        if not output_instruments:
             self.output_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
         self.logit_vocabs_size = [
             getattr(vocabs, OUTPUT_ATTR_NAME[i]).size
