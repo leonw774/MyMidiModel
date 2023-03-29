@@ -14,7 +14,7 @@ from .tokens import get_largest_possible_position, get_supported_time_signatures
 from .midi import piece_to_midi, midi_to_piece, get_after_k_measures
 
 
-def _entropy(x: list, base: math_e) -> float:
+def _entropy(x: list, base: float = math_e) -> float:
     if len(x) == 0:
         raise ValueError()
     sum_x = sum(x)
@@ -29,7 +29,7 @@ def _entropy(x: list, base: math_e) -> float:
     return entropy
 
 
-def kl_divergence(pred, true, epsilon=1e-9):
+def kl_divergence(pred, true, epsilon = 1e-9):
     if isinstance(pred, list) and isinstance(true, list):
         assert len(pred) == len(true) and len(true) > 0
         sum_pred = sum(pred)
@@ -147,8 +147,8 @@ def piece_to_features(
             durations.append(Fraction((note.end - note.start) * 4, nth))
             velocities.append(note.velocity)
 
-    pitch_histogram = {p:0 for p in range(128)}
-    pitch_class_histogram = {pc:0 for pc in range(12)}
+    pitch_histogram = [0 for _ in range(128)]
+    pitch_class_histogram = [0 for _ in range(12)]
     for p in pitchs:
         pitch_histogram[p] += 1
         pitch_class_histogram[p%12] += 1
