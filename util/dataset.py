@@ -133,6 +133,7 @@ class MidiDataset(Dataset):
         self._virtual_piece_start_index = [[0] for _ in range(self.number_of_pieces)]
 
         self._file_mps_sep_indices = [[] for _ in range(self.number_of_pieces)]
+        
         self._augmentable_pitches = [np.empty((0,), dtype=np.bool8) for _ in range(self.number_of_pieces)]
         self._pitch_augmentation_factor = self.pitch_augmentation_range * 2 + 1 # length of (-pa, ..., -1, 0, 1, ..., pa)
 
@@ -201,6 +202,16 @@ class MidiDataset(Dataset):
         self._max_index = cur_index
 
         if verbose:
+            if permute_mps:
+                mps_lengths = []
+                for mps_sep_indices in self._file_mps_sep_indices:
+                    mps_lengths.extend([
+                        j2 - j1
+                        for j1, j2 in zip(mps_sep_indices[:-1], mps_sep_indices[1:])
+                        if j2 > j1 + 1
+                    ])
+                print('Number of mps:', len(mps_lengths))
+                print('Average mps length:', sum(mps_lengths)/len(mps_lengths))
             self_size = sum(
                 sys.getsizeof(getattr(self, attr_name))
                 for attr_name in dir(self)

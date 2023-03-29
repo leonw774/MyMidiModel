@@ -10,7 +10,7 @@ from typing import Dict
 import numpy as np
 from miditoolkit import MidiFile
 
-from .tokens import get_largest_possible_position, get_supported_time_signatures, b36str2int, MEASURE_EVENTS_CHAR
+from .tokens import get_largest_possible_position, get_supported_time_signatures, b36str2int, MEASURE_EVENTS_CHAR, END_TOKEN_STR
 from .midi import piece_to_midi, midi_to_piece, get_after_k_measures
 
 
@@ -92,7 +92,11 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
     return head + sampled_body
 
 
-def midi_to_features(midi: MidiFile, primer_length: int = 0, max_pairs_number: int = int(1e6)) -> Dict[str, float]:
+def midi_to_features(
+        midi: MidiFile,
+        primer_measure_length: int = 0,
+        max_pairs_number: int = int(1e6),
+        max_token_number: int = int(1e4)) -> Dict[str, float]:
     nth = midi.ticks_per_beat * 4
     temp_piece = midi_to_piece(
         midi,
@@ -104,10 +108,15 @@ def midi_to_features(midi: MidiFile, primer_length: int = 0, max_pairs_number: i
         tempo_quantization=(1,4096,1),
         use_merge_drums=False
     )
-    return piece_to_features(temp_piece, nth, primer_length, max_pairs_number)
+    return piece_to_features(temp_piece, nth, primer_measure_length, max_pairs_number, max_token_number)
 
 
-def piece_to_features(piece: str, nth: int, primer_length: int = 0, max_pairs_number: int = int(1e6)) -> Dict[str, float]:
+def piece_to_features(
+        piece: str,
+        nth: int,
+        primer_measure_length: int = 0,
+        max_pairs_number: int = int(1e6),
+        max_token_number: int = int(1e4)) -> Dict[str, float]:
     '''
         Return:
         - pitch class histogram entropy
@@ -116,8 +125,15 @@ def piece_to_features(piece: str, nth: int, primer_length: int = 0, max_pairs_nu
         - instrumentation self-similarity
         - grooving self-similarity
     '''
-    if primer_length > 0:
-        piece = ' '.join(get_after_k_measures(piece.split(' '), primer_length))
+
+    if primer_measure_length > 0:
+        piece = ' '.join(get_after_k_measures(piece.split(' '), primer_measure_length))
+
+    if max_token_number > 0:
+        text_list = piece.split(' ')[:max_token_number]
+        if text_list[-1] != END_TOKEN_STR:
+            text_list.append(END_TOKEN_STR)
+        piece = ' '.join(text_list)
 
     midi = piece_to_midi(piece, nth, ignore_pending_note_error=True)
     pitchs = []
@@ -236,7 +252,7 @@ def piece_to_features(piece: str, nth: int, primer_length: int = 0, max_pairs_nu
     }
     return features
 
-EVAL_SCALAR_FEATURE_NAMES = {
+EVAL_SCALAR_FEATURE_NAMES = [
     'pitch_class_entropy',
     'pitchs_mean',
     'pitchs_var',
@@ -246,10 +262,10 @@ EVAL_SCALAR_FEATURE_NAMES = {
     'velocities_var',
     'instrumentation_self_similarity',
     'grooving_self_similarity'
-}
+]
 
-EVAL_DISTRIBUTION_FEATURE_NAMES = {
+EVAL_DISTRIBUTION_FEATURE_NAMES = [
     'pitch_histogram',
     'duration_distribution',
     'velocity_histogram'
-}
+]

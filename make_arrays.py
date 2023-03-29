@@ -49,12 +49,6 @@ def parse_args():
         help='If set, it means that BPE was performed, and we will try to read the shape_vocab file under corpus_dir_path.'
     )
     parser.add_argument(
-        '--combine-track-instrument',
-        action='store_true',
-        help='If this is set, "instrument" will become a contextual attribute instead of essential one.\
-            The track symbol will expand into 129 track+instrument symbols.'
-    )
-    parser.add_argument(
         '--mp-worker-number',
         type=int,
         default=1
@@ -137,7 +131,7 @@ def main():
     with CorpusReader(args.corpus_dir_path) as corpus_reader:
         assert len(corpus_reader) > 0, f'empty corpus: {args.corpus_dir_path}'
 
-        vocabs, summary_string = build_vocabs(corpus_reader, corpus_paras, bpe_shapes_list, args.combine_track_instrument)
+        vocabs, summary_string = build_vocabs(corpus_reader, corpus_paras, bpe_shapes_list)
         with open(vocab_path, 'w+', encoding='utf8') as vocabs_file:
             json.dump(vocabs.to_dict(), vocabs_file)
         logging.info(summary_string)
@@ -223,14 +217,15 @@ def main():
             }
         }
         for piece in tqdm(corpus_reader):
-            for text in piece.split():
-                if text[0] == tokens.NOTE_EVENTS_CHAR:
-                    if text[1] == ':':
-                        distributions['shape']['0,0,1;'] += 1
-                    else:
-                        distributions['shape']['0,0,1~;'] += 1
-                elif text[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
-                    distributions['shape'][text[1:].split(':')[0]] += 1
+            if args.bpe:
+                for text in piece.split():
+                    if text[0] == tokens.NOTE_EVENTS_CHAR:
+                        if text[1] == ':':
+                            distributions['shape']['0,0,1;'] += 1
+                        else:
+                            distributions['shape']['0,0,1~;'] += 1
+                    elif text[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
+                        distributions['shape'][text[1:].split(':')[0]] += 1
 
             head_end = piece.find(tokens.SEP_TOKEN_STR) # find separator
             tracks_text = piece[4:head_end]
@@ -274,22 +269,23 @@ def main():
     plt.savefig(os.path.join(stats_dir_path, 'instrument_distribution.png'))
     plt.clf()
 
-    sorted_nondefault_shape_count = sorted(
-        [(count, shape) for shape, count in distributions['shape'].items() if len(shape) > 7],
-        reverse=True
-    )
-    total_shape_num = sum([v for v in distributions['shape'].values()])
-    plt.figure(figsize=(16.8, 7.2))
-    plt.title('bpe learned shapes distribution')
-    plt.xticks(rotation=90, fontsize='small')
-    plt.ylabel('Appearance frequency in corpus')
-    plt.subplots_adjust(left=0.075, right=1-0.025, bottom=0.25)
-    plt.bar(
-        x=[s[:25]+'...' if len(s) > 25 else s for _, s in sorted_nondefault_shape_count],
-        height=[c / total_shape_num for c, _ in sorted_nondefault_shape_count],
-    )
-    plt.savefig(os.path.join(stats_dir_path, 'nondefault_shape_distribution.png'))
-    plt.clf()
+    if args.bpe:
+        sorted_nondefault_shape_count = sorted(
+            [(count, shape) for shape, count in distributions['shape'].items() if len(shape) > 7],
+            reverse=True
+        )
+        total_shape_num = sum([v for v in distributions['shape'].values()])
+        plt.figure(figsize=(16.8, 7.2))
+        plt.title('bpe learned shapes distribution')
+        plt.xticks(rotation=90, fontsize='small')
+        plt.ylabel('Appearance frequency in corpus')
+        plt.subplots_adjust(left=0.075, right=1-0.025, bottom=0.25)
+        plt.bar(
+            x=[s[:25]+'...' if len(s) > 25 else s for _, s in sorted_nondefault_shape_count],
+            height=[c / total_shape_num for c, _ in sorted_nondefault_shape_count],
+        )
+        plt.savefig(os.path.join(stats_dir_path, 'nondefault_shape_distribution.png'))
+        plt.clf()
 
     plt.figure(figsize=(16.8, 6.4))
     plt.title('track_number distribution')

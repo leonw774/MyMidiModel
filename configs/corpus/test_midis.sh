@@ -13,6 +13,3 @@ PROCESS_WORKERS=1
 MIDI_DIR_PATH="data/test_midis"
 DATA_NAME="test_midis"
 MIDI_TO_CORPUS_VERBOSE=true
-
-# vocab setting
-COMBINE_TRACK_INST=true

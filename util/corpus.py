@@ -54,16 +54,16 @@ ATTR_NAME_INDEX = {
     'dur': 2, 'durations': 2,
     'vel': 3, 'velocities': 3,
     'trn': 4, 'track_numbers': 4,
-    'ins': 5, 'instruments': 5,
-    'pos': 6, 'positions': 6,
-    'mea': 7, 'measure_numbers': 7,
-    'tmp': 8, 'tempos': 8,
-    'tis': 9, 'time_signatures': 9,
+    'ins': 5, 'instruments': 5, # context
+    'pos': 6, 'positions': 6, # positional
+    'mea': 7, 'measure_numbers': 7, # positional
+    'tmp': 8, 'tempos': 8, # context
+    'tis': 9, 'time_signatures': 9 # context
 }
 
 COMPLETE_ATTR_NAME = [
-    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments',
-    'positions', 'measure_numbers', 'tempos', 'time_signatures'
+    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions', 'measure_numbers',
+    'tempos', 'time_signatures'
 ]
 
 OUTPUT_ATTR_NAME = [
@@ -93,21 +93,21 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         last_array_len = 0
         x = np.full((len(text_list), len(COMPLETE_ATTR_NAME)), fill_value=padding, dtype=np.uint16)
         tracks_count = 0
+        cur_position_cursor = 0
         cur_position_id = 0
         cur_measure_number = 0 # measure_number starts at 1, 0 is padding
         cur_tempo_id = padding
         cur_time_sig_id = padding
-        cur_position_cursor = 0
     elif isinstance(input_memory, dict):
         last_array_len = input_memory['last_array'].shape[0]
         x = np.full((last_array_len+len(text_list), len(COMPLETE_ATTR_NAME)), fill_value=padding, dtype=np.uint16)
         x[:last_array_len] = input_memory['last_array']
         tracks_count = input_memory['tracks_count']
+        cur_position_cursor = input_memory['cur_position_cursor']
         cur_position_id = input_memory['cur_position_id']
         cur_measure_number = input_memory['cur_measure_number']
         cur_tempo_id = input_memory['cur_tempo_id']
         cur_time_sig_id = input_memory['cur_time_sig_id']
-        cur_position_cursor = input_memory['cur_position_cursor']
     else:
         raise ValueError('input_memory is not None nor a dictionary')
     for h, text in enumerate(text_list):
@@ -121,12 +121,8 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
 
         elif typename == tokens.TRACK_EVENTS_CHAR:
-            if vocabs.combine_track_instrument:
-                event_text, track_number = text.split(':')
-                instrument = event_text[1:]
-            else:
-                event_text, track_number = text.split(':')
-                event_text, instrument = event_text[0], event_text[1:]
+            event_text, track_number = text.split(':')
+            instrument = event_text[1:]
             tracks_count += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][ATTR_NAME_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
@@ -134,7 +130,6 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
 
         elif typename == tokens.MEASURE_EVENTS_CHAR:
             cur_position_id = vocabs.positions.text2id['0']
-            cur_time_sig_id = vocabs.time_signatures.text2id[text]
             cur_measure_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
             x[i][ATTR_NAME_INDEX['pos']] = cur_position_id
@@ -144,14 +139,15 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
 
         elif typename == tokens.TEMPO_EVENTS_CHAR:
             event_text, *attr = text = text.split(':')
-            cur_tempo_id = vocabs.tempos.text2id[event_text]
-            # because tempo come after position and the position token was assigned to previous tempo's id
-            x[cur_position_cursor][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][ATTR_NAME_INDEX['pos']] = cur_position_id
             x[i][ATTR_NAME_INDEX['mea']] = cur_measure_number
             x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
             x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
+
+            # because tempo come after position and the position token was assigned to previous tempo's id
+            cur_tempo_id = vocabs.tempos.text2id[event_text]
+            x[cur_position_cursor][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
 
         elif typename == tokens.POSITION_EVENTS_CHAR:
             cur_position_id = vocabs.positions.text2id[text[1:]]
@@ -182,11 +178,11 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         return x, {
                 'last_array': x,
                 'tracks_count': tracks_count,
+                'cur_position_cursor': cur_position_cursor,
                 'cur_position_id': cur_position_id,
                 'cur_measure_number': cur_measure_number,
                 'cur_tempo_id': cur_tempo_id,
                 'cur_time_sig_id': cur_time_sig_id,
-                'cur_position_cursor': cur_position_cursor,
             }
     else:
         return x
@@ -199,10 +195,9 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
     """
     assert len(array.shape) == 2 and array.shape[0] > 0, f'Bad numpy array shape: {array.shape}'
     if is_output:
-        if vocabs.combine_track_instrument:
-            assert array.shape[1] == len(OUTPUT_ATTR_NAME) - 1, f'Bad numpy array shape: {array.shape}'
-        else:
-            assert array.shape[1] == len(OUTPUT_ATTR_NAME), f'Bad numpy array shape: {array.shape}'
+        # because it may or may not output instrument
+        assert array.shape[1] in (len(OUTPUT_ATTR_NAME), len(OUTPUT_ATTR_NAME) - 1), \
+            f'Bad numpy array shape: {array.shape}'
     else:
         assert array.shape[1] == len(COMPLETE_ATTR_NAME), f'Bad numpy array shape: {array.shape}'
 
@@ -221,17 +216,7 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
 
         elif typename == tokens.TRACK_EVENTS_CHAR:
             # track token has instrument attribute
-            if vocabs.combine_track_instrument:
-                token_text = (
-                    event_text + ':'
-                    + vocabs.track_numbers.id2text[array[i][ATTR_NAME_INDEX['trn']]]
-                )
-            else:
-                token_text = (
-                    event_text
-                    + vocabs.instruments.id2text[array[i][ATTR_NAME_INDEX['ins']]] + ':'
-                    + vocabs.track_numbers.id2text[array[i][ATTR_NAME_INDEX['trn']]]
-                )
+            token_text = event_text + ':' + vocabs.track_numbers.id2text[array[i][ATTR_NAME_INDEX['trn']]]
             text_list.append(token_text)
 
         elif typename == tokens.MEASURE_EVENTS_CHAR:
@@ -313,7 +298,6 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
     cur_time = 0
     cur_measure_length = 0
     cur_measure_onset = 0
-    # cur_time_signature = None
     for text in text_list[1:-1]:
         typename = text[0]
         if typename == 'R':

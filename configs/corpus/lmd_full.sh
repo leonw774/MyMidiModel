@@ -12,6 +12,3 @@ TEMPO_STEP=16
 PROCESS_WORKERS=24
 MIDI_DIR_PATH="data/midis/lmd_full"
 DATA_NAME="lmd_full"
-
-# vocab setting
-COMBINE_TRACK_INST=true

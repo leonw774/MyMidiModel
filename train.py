@@ -77,11 +77,15 @@ def parse_args():
         type=int
     )
     model_parser.add_argument(
-        '--input-no-tempo',
+        '--input-context',
         action='store_true',
     )
     model_parser.add_argument(
-        '--input-no-time-signature',
+        '--input-instruments',
+        action='store_true',
+    )
+    model_parser.add_argument(
+        '--output-instruments',
         action='store_true',
     )
 
@@ -92,7 +96,7 @@ def parse_args():
         nargs=2,
         default=[9, 1],
         help='The split ratio for training and validation. \
-            If one is set to -1, for example (-1, 200), it means (len(complete_dataset) - 200, 200) \
+            If one is set to -1 and the other N, for exmaple (-1, N) it means (len(complete_dataset) - N, N) \
             Default is %(default)s.'
     )
     train_parser.add_argument(
@@ -107,6 +111,10 @@ def parse_args():
     train_parser.add_argument(
         '--validation-interval',
         type=int,
+    )
+    train_parser.add_argument(
+        '--generate-sample-interval',
+        type=int
     )
     train_parser.add_argument(
         '--validation-steps',
@@ -126,7 +134,6 @@ def parse_args():
     )
     train_parser.add_argument(
         '--lr-peak',
-        dest='lr_peak',
         type=float
     )
     train_parser.add_argument(
@@ -182,7 +189,7 @@ def parse_args():
         help='The probability threshold nuclues sampling. Default is %(default)s.'
     )
     global_parser.add_argument(
-        '--primer-length',
+        '--primer-measure-length',
         type=int,
         default=4
     )
@@ -229,7 +236,7 @@ def log_losses(
     avg_avg_train_losses = sum(avg_train_losses) / len(avg_train_losses)
     avg_avg_valid_losses = sum(avg_valid_losses) / len(avg_valid_losses)
     logging.info(
-        'Avg. train head losses: %s Avg. train loss: %.6f \nAvg. valid head losses: %s Avg. valid loss: %.6f',
+        'Avg. train head losses: %s Avg. train loss: %.12f \nAvg. valid head losses: %s Avg. valid loss: %.12f',
         ', '.join([f'{l:.6f}' for l in avg_train_losses]), avg_avg_train_losses,
         ', '.join([f'{l:.6f}' for l in avg_valid_losses]), avg_avg_valid_losses
     )
@@ -237,8 +244,8 @@ def log_losses(
         with open(loss_file_path, 'a', encoding='utf8') as loss_file:
             loss_file.write(
                 f'{start_step},'
-                + f'{",".join([f"{l:.6f}" for l in avg_train_losses])},{avg_avg_train_losses},'
-                + f'{",".join([f"{l:.6f}" for l in avg_valid_losses])},{avg_avg_valid_losses}\n'
+                + f'{",".join([f"{l:.6f}" for l in avg_train_losses])},{avg_avg_train_losses:.12f},'
+                + f'{",".join([f"{l:.6f}" for l in avg_valid_losses])},{avg_avg_valid_losses:.12f}\n'
             )
 
 
@@ -262,6 +269,9 @@ def main():
         args.train.batch_size = args.max_pieces_per_gpu * parallel_devices_count
     elif gradient_accumulation_steps == 0:
         gradient_accumulation_steps = 1
+    args.train.lr_peak *= gradient_accumulation_steps
+
+    # https://stackoverflow.com/questions/75701437/why-do-we-multiply-learning-rate-by-gradient-accumulation-steps-in-pytorch
     args.train.lr_peak *= gradient_accumulation_steps
 
     # root logger
@@ -311,8 +321,8 @@ def main():
         loss_csv_head = 'step,'
         train_output_attr_name = ['train_' + n for n in OUTPUT_ATTR_NAME]
         valid_output_attr_name = ['valid_' + n for n in OUTPUT_ATTR_NAME]
-        if vocabs.combine_track_instrument:
-            # remove instrument from output attribute names
+        if not args.model.output_instruments:
+            # remove instruments from output attribute names
             train_output_attr_name = train_output_attr_name[:-1]
             valid_output_attr_name = valid_output_attr_name[:-1]
         loss_csv_head += ','.join(
@@ -357,7 +367,7 @@ def main():
             cond_primer_index = np.random.randint(len(complete_dataset.pieces))
             cond_primer_array = complete_dataset.pieces[str(cond_primer_index)]
             cond_primer_text_list = array_to_text_list(cond_primer_array, vocabs)
-            cond_primer_text_list = get_first_k_measures(cond_primer_text_list, args.primer_length)
+            cond_primer_text_list = get_first_k_measures(cond_primer_text_list, args.primer_measure_length)
             cond_primer_array = text_list_to_array(cond_primer_text_list, vocabs).astype(np.int32)
             break
         except Exception:
@@ -572,37 +582,6 @@ def main():
             logging.info('Time: %d, Learning rate: %.6f', time()-start_time, scheduler.get_last_lr()[0])
             assert train_loss_list
             log_losses(cur_step, train_loss_list, valid_loss_list, loss_file_path)
-            print('Generating conditional and unconditional sample for checkpoint')
-            uncond_gen_text_list = generate_sample(
-                unwrapped_model if args.use_parallel else model,
-                steps=args.data.max_seq_length,
-                nucleus_sampling_threshold=args.nucleus_sampling_threshold
-            )
-            uncond_gen_piece = ' '.join(uncond_gen_text_list)
-            with open(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
-                uncond_file.write(uncond_gen_piece)
-            try:
-                midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
-                midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.mid'))
-            except Exception:
-                print('Error when dumping uncond gen MidiFile object')
-                print(format_exc())
-
-            cond_gen_text_list = generate_sample(
-                unwrapped_model if args.use_parallel else model,
-                steps=args.data.max_seq_length,
-                start_seq=cond_primer_array,
-                nucleus_sampling_threshold=args.nucleus_sampling_threshold
-            )
-            cond_gen_piece = ' '.join(cond_gen_text_list)
-            with open(os.path.join(ckpt_dir_path, f'{cur_step}_cond.txt'), 'w+', encoding='utf8') as cond_file:
-                cond_file.write(cond_gen_piece)
-            try:
-                midiobj = piece_to_midi(cond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
-                midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_cond.mid'))
-            except Exception:
-                print('Error when dumping cond gen MidiFile object')
-                print(format_exc())
 
             if args.train.early_stop > 0:
                 avg_valid_loss = sum([sum(valid_head_losses) for valid_head_losses in valid_loss_list]) / len(valid_loss_list)
@@ -616,6 +595,39 @@ def main():
                     min_avg_valid_loss = avg_valid_loss
                     shutil.copyfile(ckpt_model_file_path, os.path.join(args.model_dir_path, 'best_model.pt'))
                     logging.info('New best model.')
+
+            if cur_step % args.train.generate_sample_interval == 0:
+                print('Generating conditional and unconditional sample for checkpoint')
+                uncond_gen_text_list = generate_sample(
+                    unwrapped_model if args.use_parallel else model,
+                    steps=args.data.max_seq_length,
+                    nucleus_sampling_threshold=args.nucleus_sampling_threshold
+                )
+                uncond_gen_piece = ' '.join(uncond_gen_text_list)
+                with open(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
+                    uncond_file.write(uncond_gen_piece)
+                try:
+                    midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
+                    midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.mid'))
+                except Exception:
+                    print('Error when dumping uncond gen MidiFile object')
+                    print(format_exc())
+
+                cond_gen_text_list = generate_sample(
+                    unwrapped_model if args.use_parallel else model,
+                    steps=args.data.max_seq_length,
+                    start_seq=cond_primer_array,
+                    nucleus_sampling_threshold=args.nucleus_sampling_threshold
+                )
+                cond_gen_piece = ' '.join(cond_gen_text_list)
+                with open(os.path.join(ckpt_dir_path, f'{cur_step}_cond.txt'), 'w+', encoding='utf8') as cond_file:
+                    cond_file.write(cond_gen_piece)
+                try:
+                    midiobj = piece_to_midi(cond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
+                    midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_cond.mid'))
+                except Exception:
+                    print('Error when dumping cond gen MidiFile object')
+                    print(format_exc())
 
     ######## Training end
 

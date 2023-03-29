@@ -32,7 +32,7 @@ def parse_args():
         default=100
     )
     parser.add_argument(
-        '--primer-length',
+        '--primer-measure-length',
         type=int,
         default=0,
         metavar='k',
@@ -77,7 +77,7 @@ def midi_to_features_wrapper(args_dict: dict):
         midifile_obj = MidiFile(args_dict['midi_file_path'])
         features = midi_to_features(
             midi=midifile_obj,
-            primer_length=args_dict['primer_length'],
+            primer_measure_length=args_dict['primer_measure_length'],
             max_pairs_number=args_dict['max_pairs_number']
         )
     except Exception:
@@ -137,7 +137,7 @@ def main():
         eval_args_dict_list = [
             {
                 'midi_file_path': file_path_list[idx],
-                'primer_length': args.primer_length,
+                'primer_measure_length': args.primer_measure_length,
                 'max_pairs_number': args.max_pairs_number
             }
             for idx in random_indices
@@ -178,8 +178,7 @@ def main():
         eval_features_stats[fname] = {
             k: float(v) for k, v in fname_description.items()
         }
-    # We actually only want 'mean' and 'var'
-    print('\n'.join([
+    logging.info('\n'.join([
         f'{fname}: {eval_features_stats[fname]["mean"]} ± {eval_features_stats[fname]["std"]}'
         for fname in EVAL_SCALAR_FEATURE_NAMES
     ]))
@@ -217,8 +216,9 @@ def main():
                     print('pred:', eval_features_stats[fname])
                     print('true:', reference_eval_features_stats[fname])
                     raise e
-            print('\n'.join([
+            logging.info('\n'.join([
                 f'{fname}_KLD: {eval_features_stats[fname+"_KLD"]}'
+                for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
             ]))
         else:
             logging.info('%s is invalid path for reference result JSON file', args.reference_file_path)

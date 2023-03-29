@@ -29,7 +29,6 @@ class Vocabs:
     paras: dict
     bpe_shapes_list: list
     padding_token: str
-    combine_track_instrument: bool
     events: AttrVocab
     pitchs: AttrVocab
     durations: AttrVocab
@@ -41,13 +40,12 @@ class Vocabs:
     tempos: AttrVocab
     time_signatures: AttrVocab
 
-    def __init__(self, paras: dict, bpe_shapes_list: list, padding_token: str, combine_track_instrument: bool,
-            events, pitchs, durations, velocities, track_numbers,
-            instruments, positions, max_measure_number, tempos, time_signatures) -> None:
+    def __init__(self, paras: dict, bpe_shapes_list: list, padding_token: str,
+            events, pitchs, durations, velocities, track_numbers, instruments,
+            positions, max_measure_number, tempos, time_signatures) -> None:
         self.paras = paras
         self.bpe_shapes_list = bpe_shapes_list
         self.padding_token = padding_token
-        self.combine_track_instrument = combine_track_instrument
         self.events = Vocabs.AttrVocab(events)
         self.pitchs = Vocabs.AttrVocab(pitchs)
         self.durations = Vocabs.AttrVocab(durations)
@@ -62,7 +60,7 @@ class Vocabs:
     @classmethod
     def from_dict(cls, d):
         return cls(
-            d['paras'], d['bpe_shapes_list'], d['padding_token'], d['combine_track_instrument'],
+            d['paras'], d['bpe_shapes_list'], d['padding_token'],
             d['events'], d['pitchs'], d['durations'], d['velocities'], d['track_numbers'],
             d['instruments'], d['positions'], d['max_measure_number'], d['tempos'], d['time_signatures']
         )
@@ -72,7 +70,6 @@ class Vocabs:
             'paras': self.paras,
             'bpe_shapes_list': self.bpe_shapes_list,
             'padding_token': self.padding_token,
-            'combine_track_instrument': self.combine_track_instrument,
             'events': vars(self.events),
             'pitchs': vars(self.pitchs),
             'durations': vars(self.durations),
@@ -89,8 +86,7 @@ class Vocabs:
 def build_vocabs(
         corpus_reader: CorpusReader,
         paras: dict,
-        bpe_shapes_list: list,
-        combine_track_instrument: bool):
+        bpe_shapes_list: list):
     """
         Parameters:
         - bpe_shapes_list: The multinote shape are learned by bpe algorithms.
@@ -115,18 +111,16 @@ def build_vocabs(
     )
     event_track_instrument = (
         [tokens.TRACK_EVENTS_CHAR+int2b36str(i) for i in range(129)]
-        if combine_track_instrument else
-        [tokens.TRACK_EVENTS_CHAR]
     )
     event_position = (
         [tokens.POSITION_EVENTS_CHAR+int2b36str(i) for i in range(largest_possible_position)]
     )
-    event_measure_time_sig = [
-        f'{tokens.MEASURE_EVENTS_CHAR}{int2b36str(n)}/{int2b36str(d)}' for n, d in supported_time_signatures
-    ]
     tempo_min, tempo_max, tempo_step = paras['tempo_quantization']
     event_tempo = [
         tokens.TEMPO_EVENTS_CHAR+int2b36str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
+    ]
+    event_measure_time_sig = [
+        f'{tokens.MEASURE_EVENTS_CHAR}{int2b36str(n)}/{int2b36str(d)}' for n, d in supported_time_signatures
     ]
 
     max_measure_number = 0
@@ -153,11 +147,8 @@ def build_vocabs(
     velocity_vocab = pad_token + list(map(int2b36str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
     track_number_vocab = pad_token + list(map(int2b36str, range(paras['max_track_number'])))
     instrument_vocab = pad_token + list(map(int2b36str, range(129)))
-
-    # measure number are just increasing integer that generated dynamically in corpus.text_to_array, no vocab needed
-    # position vocab need to use pure b36 int string because we have posattr setting
     position_vocab = pad_token + list(map(int2b36str, range(largest_possible_position)))
-    # these two vocabs are just same as their event counterparts just with PAD
+    # measure number are just increasing integer that generated dynamically in corpus.text_to_array, no vocab needed
     tempo_vocab = pad_token + event_tempo
     time_sig_vocab = pad_token + event_measure_time_sig
 
@@ -170,7 +161,7 @@ def build_vocabs(
         f'- Shape: {len(event_multi_note_shapes)}\n'\
         f'Duration vocab size: {len(duration_vocab)}\n'\
         f'Velocity vocab size: {len(velocity_vocab)} ({velocity_vocab})\n'\
-        f'Track number vocab size: {paras["max_track_number"]}'\
+        f'Track number vocab size: {paras["max_track_number"]}\n'\
         f'Max measure number: {max_measure_number}'
     )
     # print(f'Vocabulary build time: {time()-start_time}')
@@ -179,7 +170,6 @@ def build_vocabs(
     vocabs = Vocabs(
         paras=paras,
         bpe_shapes_list=bpe_shapes_list,
-        combine_track_instrument=combine_track_instrument,
         padding_token=tokens.PADDING_TOKEN_STR,
         events=event_vocab,
         pitchs=pitch_vocab,

@@ -47,8 +47,8 @@ int main(int argc, char *argv[]) {
     double samplingRate = atof(argv[nonOptStartIndex+4]);
     double minScoreLimit = atof(argv[nonOptStartIndex+5]);
     int workersNum = -1; // -1 means use default
-    if (argc - nonOptStartIndex == 8) {
-        workersNum = atoi(argv[nonOptStartIndex+7]);
+    if (argc - nonOptStartIndex == 7) {
+        workersNum = atoi(argv[nonOptStartIndex+6]);
         omp_set_num_threads(workersNum);
     }
     

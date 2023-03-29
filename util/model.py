@@ -44,11 +44,10 @@ class MyMidiTransformer(nn.Module):
             layers_number: int,
             attn_heads_number: int,
             embedding_dim: int,
-            input_no_tempo: bool,
-            input_no_time_signature: bool,
-            input_instruments: bool = False,
-            output_instruments: bool = True,
-            embedding_dropout_rate=0.1
+            input_context: bool,
+            input_instruments: bool,
+            output_instruments: bool,
+            embedding_dropout_rate: float = 0.1
             ) -> None:
         super().__init__()
 
@@ -60,22 +59,29 @@ class MyMidiTransformer(nn.Module):
         self.layers_number = layers_number
         self.attn_heads_number = attn_heads_number
         self.embedding_dim = embedding_dim
-        self.input_no_tempo = input_no_tempo
-        self.input_no_time_signature = input_no_time_signature
+        self.input_context = input_context
+        self.input_instruments = input_instruments
+        self.output_instruments = output_instruments
 
         # set the to True ONLY when generating sample
         self.inferencing = False
 
-        # Input attributess
+        ######## Inputs
 
-        # the indices of input attrs in complete attribute list
         self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in COMPLETE_ATTR_NAME]
-        if not input_instruments:
-            self.input_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
-        if input_no_tempo:
-            self.input_attrs_indices.remove(ATTR_NAME_INDEX['tempos'])
-        if input_no_time_signature:
-            self.input_attrs_indices.remove(ATTR_NAME_INDEX['time_signatures'])
+        if input_context:
+            if input_instruments:
+                pass
+            else:
+                self.input_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
+        else:
+            if input_instruments:
+                self.input_attrs_indices.remove(ATTR_NAME_INDEX['tempos'])
+                self.input_attrs_indices.remove(ATTR_NAME_INDEX['time_signatures'])
+            else:
+                self.input_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
+                self.input_attrs_indices.remove(ATTR_NAME_INDEX['tempos'])
+                self.input_attrs_indices.remove(ATTR_NAME_INDEX['time_signatures'])
 
         self.embedding_vocabs_size = [
             vocabs.max_measure_number
@@ -95,13 +101,15 @@ class MyMidiTransformer(nn.Module):
         ])
         self.embedding_dropout = nn.Dropout(embedding_dropout_rate)
 
-        # Output attributes
+        ######## Outputs
+
         self.output_attrs_indices = [
             ATTR_NAME_INDEX[fname]
             for fname in OUTPUT_ATTR_NAME
         ]
         if not output_instruments:
             self.output_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
+
         self.logit_vocabs_size = [
             getattr(vocabs, OUTPUT_ATTR_NAME[i]).size
             for i in self.output_attrs_indices
@@ -117,6 +125,8 @@ class MyMidiTransformer(nn.Module):
         self.layer_norm = nn.LayerNorm(normalized_shape=embedding_dim, eps=1e-6)
 
         self.use_linear_attn = use_linear_attn
+
+        ######## Attention layer
 
         if use_linear_attn:
             # in fast_transformer's FullMask class, 0 is masked, 1 is keep

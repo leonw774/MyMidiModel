@@ -1,8 +1,6 @@
 #ifndef FUNCS_H
 #define FUNCS_H
 
-#define COUNTING_THREAD_NUM 8
-
 // return sum of all note's neighbor number
 size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit);
 

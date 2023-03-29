@@ -25,7 +25,7 @@ Corpi are located at `data/corpus`. A complete "corpus" is directory containing 
 - `paras`: A yaml file that contains parameters of pre-processing used by `midi_to_corpus.py`. Created by `midi_to_corpus.py`.
 - `pathlist`: A text file. Each `\n`-separated line is the path of midi file corresponding to text representation in `corpus`. Created by `midi_to_corpus.py`.
 - `vocabs.json`: The vocabulary to be used by the model. The format is defined in `util/vocabs.py`. Created by `make_arrays.py`.
-- `arrays.npz`: A zip file of numpy array in `.npy` format. Can be accessed by `numpy.load()` and it will return an instance of `NpzFile` class. This is the "final form" of the representation (i.e. include pre-computed positional-contextual encoding) that would be used to train model. Created by `make_arrays.py`.
+- `arrays.npz`: A zip file of numpy arrays in `.npy` format. Can be accessed by `numpy.load()` and it will return an instance of `NpzFile` class. This is the "final form" of the representation (i.e. include pre-computed positional encoding) that would be used to train model. Created by `make_arrays.py`.
 
 Other possible files and directories:
 
