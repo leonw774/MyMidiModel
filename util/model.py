@@ -44,9 +44,10 @@ class MyMidiTransformer(nn.Module):
             layers_number: int,
             attn_heads_number: int,
             embedding_dim: int,
-            input_instruments: bool = False,
-            output_instruments: bool = True,
-            embedding_dropout_rate=0.1
+            input_context: bool,
+            input_instruments: bool,
+            output_instruments: bool,
+            embedding_dropout_rate: float = 0.1
             ) -> None:
         super().__init__()
 
@@ -58,6 +59,7 @@ class MyMidiTransformer(nn.Module):
         self.layers_number = layers_number
         self.attn_heads_number = attn_heads_number
         self.embedding_dim = embedding_dim
+        self.input_context = input_context
         self.input_instruments = input_instruments
         self.output_instruments = output_instruments
 
@@ -67,8 +69,19 @@ class MyMidiTransformer(nn.Module):
         ######## Inputs
 
         self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in COMPLETE_ATTR_NAME]
-        if not input_instruments:
-            self.input_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
+        if input_context:
+            if input_instruments:
+                pass
+            else:
+                self.input_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
+        else:
+            if input_instruments:
+                self.input_attrs_indices.remove(ATTR_NAME_INDEX['tempos'])
+                self.input_attrs_indices.remove(ATTR_NAME_INDEX['time_signatures'])
+            else:
+                self.input_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
+                self.input_attrs_indices.remove(ATTR_NAME_INDEX['tempos'])
+                self.input_attrs_indices.remove(ATTR_NAME_INDEX['time_signatures'])
 
         self.embedding_vocabs_size = [
             vocabs.max_measure_number

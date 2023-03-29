@@ -77,6 +77,10 @@ def parse_args():
         type=int
     )
     model_parser.add_argument(
+        '--input-context',
+        action='store_true',
+    )
+    model_parser.add_argument(
         '--input-instruments',
         action='store_true',
     )

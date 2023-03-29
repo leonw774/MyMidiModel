@@ -37,9 +37,12 @@ class Vocabs:
     instruments: AttrVocab
     positions: AttrVocab
     max_measure_number: int
+    tempos: AttrVocab
+    time_signatures: AttrVocab
 
     def __init__(self, paras: dict, bpe_shapes_list: list, padding_token: str,
-            events, pitchs, durations, velocities, track_numbers, instruments, positions, max_measure_number) -> None:
+            events, pitchs, durations, velocities, track_numbers, instruments,
+            positions, max_measure_number, tempos, time_signatures) -> None:
         self.paras = paras
         self.bpe_shapes_list = bpe_shapes_list
         self.padding_token = padding_token
@@ -51,13 +54,15 @@ class Vocabs:
         self.instruments = Vocabs.AttrVocab(instruments)
         self.positions = Vocabs.AttrVocab(positions)
         self.max_measure_number = max_measure_number
+        self.tempos = Vocabs.AttrVocab(tempos)
+        self.time_signatures = Vocabs.AttrVocab(time_signatures)
 
     @classmethod
     def from_dict(cls, d):
         return cls(
             d['paras'], d['bpe_shapes_list'], d['padding_token'],
             d['events'], d['pitchs'], d['durations'], d['velocities'], d['track_numbers'],
-            d['instruments'], d['positions'], d['max_measure_number']
+            d['instruments'], d['positions'], d['max_measure_number'], d['tempos'], d['time_signatures']
         )
 
     def to_dict(self) -> dict:
@@ -73,6 +78,8 @@ class Vocabs:
             'instruments': vars(self.instruments),
             'positions': vars(self.positions),
             'max_measure_number': self.max_measure_number,
+            'tempos': vars(self.tempos),
+            'time_signatures': vars(self.time_signatures),
         }
 
 
@@ -108,12 +115,12 @@ def build_vocabs(
     event_position = (
         [tokens.POSITION_EVENTS_CHAR+int2b36str(i) for i in range(largest_possible_position)]
     )
-    event_measure_time_sig = [
-        f'{tokens.MEASURE_EVENTS_CHAR}{int2b36str(n)}/{int2b36str(d)}' for n, d in supported_time_signatures
-    ]
     tempo_min, tempo_max, tempo_step = paras['tempo_quantization']
     event_tempo = [
         tokens.TEMPO_EVENTS_CHAR+int2b36str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
+    ]
+    event_measure_time_sig = [
+        f'{tokens.MEASURE_EVENTS_CHAR}{int2b36str(n)}/{int2b36str(d)}' for n, d in supported_time_signatures
     ]
 
     max_measure_number = 0
@@ -142,6 +149,8 @@ def build_vocabs(
     instrument_vocab = pad_token + list(map(int2b36str, range(129)))
     position_vocab = pad_token + list(map(int2b36str, range(largest_possible_position)))
     # measure number are just increasing integer that generated dynamically in corpus.text_to_array, no vocab needed
+    tempo_vocab = pad_token + event_tempo
+    time_sig_vocab = pad_token + event_measure_time_sig
 
     summary_string = (
         f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
@@ -169,7 +178,9 @@ def build_vocabs(
         track_numbers=track_number_vocab,
         instruments=instrument_vocab,
         positions=position_vocab,
-        max_measure_number=max_measure_number
+        max_measure_number=max_measure_number,
+        tempos=tempo_vocab,
+        time_signatures=time_sig_vocab
     )
 
     return vocabs, summary_string
