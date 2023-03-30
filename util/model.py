@@ -254,8 +254,7 @@ class MyMidiTransformer(nn.Module):
 
 def compute_losses(
         pred_logits: List[Tensor],
-        target_labels: Tensor,
-        weighted_by_nonpadding_number=False) -> List[Tensor]:
+        target_labels: Tensor) -> List[Tensor]:
     """
         pred_logits is a list
         - length: out_attr_number
@@ -272,17 +271,16 @@ def compute_losses(
             # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
             target=target_labels[..., k], # (batch_size, seq_size)
             ignore_index=0, # padding is index 0
-            reduction=('sum' if weighted_by_nonpadding_number else 'mean')
+            reduction='sum'
             # some attributes have more non-padding occurence than others
             # we can reflect this by them having different "weight" of loss by using 'sum'
         )
         for k, logits in enumerate(pred_logits)
     ]
 
-    if weighted_by_nonpadding_number:
-        # "normalize" the losses by number of non-padding events
-        number_of_nonpadding_events = torch.count_nonzero(target_labels[..., ATTR_NAME_INDEX['evt']])
-        head_losses = [l / number_of_nonpadding_events for l in head_losses]
+    # "normalize" the losses by number of non-padding events
+    number_of_nonpadding_events = torch.count_nonzero(target_labels[..., ATTR_NAME_INDEX['evt']])
+    head_losses = [l / number_of_nonpadding_events for l in head_losses]
 
     return head_losses
 
@@ -616,8 +614,7 @@ def generate_sample(
 def compute_permutable_subseq_losses(
         pred_logits: List[Tensor],
         target_labels: Tensor,
-        batched_mps_indices: List,
-        weighted_by_nonpadding_number=False):
+        batched_mps_indices: List) -> List[Tensor]:
     """
         pred_logits is a list
         - length: out_attr_num
@@ -663,8 +660,7 @@ def compute_permutable_subseq_losses(
 
     head_losses = compute_losses(
         pred_logits,
-        cpp_modified_target_labels.to(target_labels.device),
-        weighted_by_nonpadding_number
+        cpp_modified_target_labels.to(target_labels.device)
     )
     return head_losses
 

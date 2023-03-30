@@ -129,10 +129,6 @@ def parse_args():
             Default is %(desult)s.'
     )
     train_parser.add_argument(
-        '--loss-weighted-by-nonpadding-number',
-        action='store_true'
-    )
-    train_parser.add_argument(
         '--lr-peak',
         type=float
     )
@@ -192,6 +188,11 @@ def parse_args():
         '--primer-measure-length',
         type=int,
         default=4
+    )
+    global_parser.add_argument(
+        '--seed',
+        type=int,
+        default=413
     )
     global_parser.add_argument(
         'corpus_dir_path',
@@ -254,6 +255,10 @@ def main():
     ######## Check args and print
 
     args = parse_args()
+    if args.seed is not None:
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+
     if not torch.cuda.is_available():
         args.use_device = 'cpu'
         args.use_parallel = False
@@ -493,15 +498,13 @@ def main():
                     head_losses = compute_permutable_subseq_losses(
                         prediction,
                         batch_target_seqs,
-                        batch_mps_sep_indices,
-                        args.train.loss_weighted_by_nonpadding_number
+                        batch_mps_sep_indices
                     )
                     # print('compute_permutable_subseq_losses use time:', time() - start_backward_time)
                 else:
                     head_losses = compute_losses(
                         prediction,
-                        batch_target_seqs,
-                        args.train.loss_weighted_by_nonpadding_number
+                        batch_target_seqs
                     )
                     # print('compute_losses use time:', time() - start_backward_time)
                 # assert all(not torch.isnan(hl).any() for hl in head_losses)
@@ -557,13 +560,11 @@ def main():
                         prediction,
                         batch_target_seqs,
                         batch_mps_sep_indices,
-                        False
                     )
                 else:
                     head_losses = compute_losses(
                         prediction,
                         batch_target_seqs,
-                        False
                     )
                 if is_main_process:
                     valid_loss_list.append([hl.item() for hl in head_losses])

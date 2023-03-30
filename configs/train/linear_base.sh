@@ -1,4 +1,6 @@
 #!/bin/bash
+SEED=413
+
 # dataset parameters
 MAX_SEQ_LENGTH=2048
 MEASURE_SAMPLE_STEP_RATIO=0.5

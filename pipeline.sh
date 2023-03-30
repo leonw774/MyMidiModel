@@ -168,14 +168,14 @@ if [ "$USE_PERMUTABLE_SUBSEQ_LOSS" == true ]; then
     fi
     train_other_args="$train_other_args --use-permutable-subseq-loss"
 fi
-test "$PERMUTE_MPS" == true                && train_other_args="$train_other_args --permute-mps"
-test "$PERMUTE_TRACK_NUMBER" == true       && train_other_args="$train_other_args --permute-track-number"
-test "$USE_LINEAR_ATTENTION" == true       && train_other_args="$train_other_args --use-linear-attn"
-test "$INPUT_CONTEXT" == true              && train_other_args="$train_other_args --input-context"
-test "$INPUT_INSTRUMENTS" == true          && train_other_args="$train_other_args --input-instruments"
-test "$OUTPUT_INSTRUMENTS" == true         && train_other_args="$train_other_args --output-instruments"
-test "$WEIGHT_LOSS_BY_NONPAD_NUM" == true  && train_other_args="$train_other_args --loss-weighted-by-nonpadding-number"
-test -n "$MAX_PIECE_PER_GPU"               && train_other_args="$train_other_args --max-pieces-per-gpu ${MAX_PIECE_PER_GPU}"
+test "$PERMUTE_MPS" == true            && train_other_args="$train_other_args --permute-mps"
+test "$PERMUTE_TRACK_NUMBER" == true   && train_other_args="$train_other_args --permute-track-number"
+test "$USE_LINEAR_ATTENTION" == true   && train_other_args="$train_other_args --use-linear-attn"
+test "$INPUT_CONTEXT" == true          && train_other_args="$train_other_args --input-context"
+test "$INPUT_INSTRUMENTS" == true      && train_other_args="$train_other_args --input-instruments"
+test "$OUTPUT_INSTRUMENTS" == true     && train_other_args="$train_other_args --output-instruments"
+test -n "$MAX_PIECE_PER_GPU"           && train_other_args="$train_other_args --max-pieces-per-gpu $MAX_PIECE_PER_GPU"
+test -n "$SEED"                        && train_other_args="$train_other_args --seed $SEED"
 test -n "$train_other_args" && { echo "Appended $train_other_args to train.py's argument" | tee -a $log_path ; }
 
 if [ "$USE_PARALLEL" == true ]; then
@@ -210,5 +210,5 @@ test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $log_path 
 
 ######## EVALUATION ########
 
-./eval_model.sh $MIDI_DIR_PATH $EVAL_SAMPLE_NUMBER $PROCESS_WORKERS $PRIMER_LENGTH $log_path $model_dir_path $NUCLEUS_THRESHOLD
+./evaluations.sh $MIDI_DIR_PATH $EVAL_SAMPLE_NUMBER $PROCESS_WORKERS $PRIMER_LENGTH $log_path $model_dir_path $NUCLEUS_THRESHOLD $SEED
 test $? -eq 0 && echo "All done. pipeline.sh exit." | tee -a $log_path

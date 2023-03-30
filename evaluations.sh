@@ -7,6 +7,11 @@ primer_length=$4
 log_path=$5
 model_dir_path=$6
 nucleus_threshold=$7
+# $8 can be unset
+test -n "$8" && seed_option="--seed $8"
+
+echo "midi_dir_path=${midi_dir_path}, eval_sample_number=${eval_sample_number}, process_workers=${process_workers}, primer_length=${primer_length}"
+echo "log_path=${log_path}, model_dir_path=${model_dir_path}, nucleus_threshold=${nucleus_threshold}, seed_option=${seed_option}, "
 
 test -z "$midi_dir_path" && echo "./evaluation.sh midi_dir_path eval_sample_number process_workers primer_length log_path model_dir_path nucleus_threshold" && exit 0
 
@@ -19,7 +24,7 @@ if [ -f "${midi_dir_path}/eval_features.json" ] && [ -f "$eval_primers_pathlist_
     echo "Midi dataset $midi_dir_path already has feature stats file." | tee -a $log_path 
 else
     echo "Getting evaluation features of $midi_dir_path" | tee -a $log_path 
-    python3 get_eval_features_of_midis.py --log $log_path --sample-number $eval_sample_number --workers $process_workers \
+    python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
         --output-sampled-file-paths $midi_dir_path
     test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
     # Copy sampled files into eval_primers_dir_path
@@ -29,7 +34,7 @@ else
         cp $eval_sample_midi_path $eval_primers_dir_path
     done < $eval_primers_pathlist_file_path
     echo "Getting evaluation features without first $primer_length measures of $midi_dir_path" | tee -a $log_path 
-    python3 get_eval_features_of_midis.py --log $log_path --sample-number $eval_sample_number --workers $process_workers \
+    python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
         --primer-measure-length $primer_length $eval_primers_dir_path
 fi
 
@@ -43,7 +48,7 @@ python3 generate_with_model.py --sample-number $eval_sample_number --nucleus-sam
     "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/uncond/sample"
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/uncond" | tee -a $log_path 
-python3 get_eval_features_of_midis.py --log $log_path --sample-number $eval_sample_number --workers $process_workers \
+python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
     --reference-file-path "${midi_dir_path}/eval_features.json" "${model_dir_path}/eval_samples/uncond"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
@@ -59,7 +64,7 @@ while read eval_sample_midi_path; do
 done < $eval_primers_pathlist_file_path
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/instr-cond" | tee -a $log_path
-python3 get_eval_features_of_midis.py --log $log_path --sample-number $eval_sample_number --workers $process_workers \
+python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
     --reference-file-path "${midi_dir_path}/eval_features.json" "${model_dir_path}/eval_samples/instr_cond"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
@@ -75,7 +80,7 @@ while read eval_sample_midi_path; do
 done < $eval_primers_pathlist_file_path
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/primer_cont" | tee -a $log_path
-python3 get_eval_features_of_midis.py --log $log_path --sample-number $eval_sample_number --workers $process_workers \
+python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
     --primer-measure-length $primer_length --reference-file-path "${eval_primers_dir_path}/eval_features.json" "${model_dir_path}/eval_samples/primer_cont"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 

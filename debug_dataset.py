@@ -1,5 +1,7 @@
 from argparse import ArgumentParser
 
+import numpy as np
+import torch
 from torch.utils.data import random_split, DataLoader
 
 from util.midi import piece_to_midi
@@ -23,12 +25,20 @@ parser.add_argument(
     action='store_true'
 )
 parser.add_argument(
+    '--seed',
+    type=int,
+    default=None
+)
+parser.add_argument(
     'corpus_dir_path',
     type=str,
     nargs='?',
     default='data/corpus/test_midis_nth32_r32_d32_v16_t24_200_16'
 )
 args = parser.parse_args()
+if args.seed is not None:
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
 dataset = MidiDataset(
     data_dir_path=args.corpus_dir_path,
@@ -46,20 +56,20 @@ print('use_permutable_subseq_loss:', dataset.use_permutable_subseq_loss)
 print('permute_mps:', dataset.permute_mps)
 print('permute_track_number:', dataset.permute_track_number)
 
-print('TEST RANDOM SPLIT')
-
 train_len = int(len(dataset) * 0.8)
 vel_len = len(dataset) - train_len
 train_set, val_set = random_split(dataset, [train_len, vel_len])
-# print(len(dataset), len(train_set), len(val_set))
+print(len(dataset), len(train_set), len(val_set))
 
-train_sample, train_mps_sep_indices = train_set[0]
-train0 = train_sample.numpy()
+# print('TEST RANDOM SPLIT')
+
+# train_sample, train_mps_sep_indices = train_set[0]
+# train0 = train_sample.numpy()
 # print('TRAIN[0]')
 # print(get_input_array_format_string(train0, train_mps_sep_indices, vocabs))
 
-val_sample, val_mps_sep_indices = val_set[0]
-val0 = val_sample.numpy()
+# val_sample, val_mps_sep_indices = val_set[0]
+# val0 = val_sample.numpy()
 # print('VAL[0]')
 # print(get_input_array_format_string(val0, val_mps_sep_indices, vocabs))
 

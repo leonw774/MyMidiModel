@@ -64,6 +64,11 @@ def parse_args():
             of MIDI_DIR_PATH from the those in Q (That is: KL(P||Q))'
     )
     parser.add_argument(
+        '--seed',
+        type=int,
+        default=None
+    )
+    parser.add_argument(
         'midi_dir_path',
         type=str,
         help='Find all midi files under this directory recursively,\
@@ -87,6 +92,8 @@ def midi_to_features_wrapper(args_dict: dict):
 
 def main():
     args = parse_args()
+    if args.seed is not None:
+        random.seed(args.seed)
     # root logger
     if args.log_file_path != '':
         logging.basicConfig(
