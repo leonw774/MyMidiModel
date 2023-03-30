@@ -1,3 +1,5 @@
+#!/bin/bash
+echo "evaluations.sh start."
 midi_dir_path=$1
 eval_sample_number=$2
 process_workers=$3
@@ -76,3 +78,5 @@ echo "Get evaluation features of ${model_dir_path}/eval_samples/primer_cont" | t
 python3 get_eval_features_of_midis.py --log $log_path --sample-number $eval_sample_number --workers $process_workers \
     --primer-measure-length $primer_length --reference-file-path "${eval_primers_dir_path}/eval_features.json" "${model_dir_path}/eval_samples/primer_cont"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
+
+echo "evaluations.sh exit."

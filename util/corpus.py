@@ -130,6 +130,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
 
         elif typename == tokens.MEASURE_EVENTS_CHAR:
             cur_position_id = vocabs.positions.text2id['0']
+            cur_time_sig_id = vocabs.time_signatures.text2id[text]
             cur_measure_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
             x[i][ATTR_NAME_INDEX['pos']] = cur_position_id

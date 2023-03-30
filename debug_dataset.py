@@ -23,7 +23,7 @@ parser.add_argument(
     action='store_true'
 )
 parser.add_argument(
-    'data_dir_path',
+    'corpus_dir_path',
     type=str,
     nargs='?',
     default='data/corpus/test_midis_nth32_r32_d32_v16_t24_200_16'
@@ -31,7 +31,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 dataset = MidiDataset(
-    data_dir_path=args.data_dir_path,
+    data_dir_path=args.corpus_dir_path,
     max_seq_length=args.max_seq_length,
     use_permutable_subseq_loss=True, # to print out mps indices
     measure_sample_step_ratio=0.25,
