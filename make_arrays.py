@@ -218,13 +218,10 @@ def main():
         }
         for piece in tqdm(corpus_reader):
             if args.bpe:
+                distributions['shape']['0,0,1;'] += piece.count(' ' + tokens.NOTE_EVENTS_CHAR + ':')
+                distributions['shape']['0,0,1~;'] += piece.count(' ' + tokens.NOTE_EVENTS_CHAR + '~:')
                 for text in piece.split():
-                    if text[0] == tokens.NOTE_EVENTS_CHAR:
-                        if text[1] == ':':
-                            distributions['shape']['0,0,1;'] += 1
-                        else:
-                            distributions['shape']['0,0,1~;'] += 1
-                    elif text[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
+                    if text[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
                         distributions['shape'][text[1:].split(':')[0]] += 1
 
             head_end = piece.find(tokens.SEP_TOKEN_STR) # find separator
@@ -272,6 +269,7 @@ def main():
     if args.bpe:
         sorted_nondefault_shape_count = sorted(
             [(count, shape) for shape, count in distributions['shape'].items() if len(shape) > 7],
+            # "if len(shape) > 7" is to remove single note shapes
             reverse=True
         )
         total_shape_num = sum([v for v in distributions['shape'].values()])
