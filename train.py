@@ -274,7 +274,6 @@ def main():
         args.train.batch_size = args.max_pieces_per_gpu * parallel_devices_count
     elif gradient_accumulation_steps == 0:
         gradient_accumulation_steps = 1
-    args.train.lr_peak *= gradient_accumulation_steps
 
     # https://stackoverflow.com/questions/75701437/why-do-we-multiply-learning-rate-by-gradient-accumulation-steps-in-pytorch
     args.train.lr_peak *= gradient_accumulation_steps
