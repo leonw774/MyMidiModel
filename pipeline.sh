@@ -5,12 +5,12 @@ if [ $# -eq 4 ]; then
     if [ $4 == '--use-existed' ]; then
         use_existed="--use-existed"
     else
-        echo "Expect arguments to be three configuration file name for midi preprocessing, bpe setting and training/model setting, and an optional '--use-existed' flag at the fourth position."
+        echo "Expect arguments to be three configuration file name for midi preprocessing, bpe, and training/model setting, and an optional '--use-existed' flag at the fourth position."
         exit 1
     fi
 else
     if [ $# -ne 3 ]; then
-        echo "Expect arguments to be three configuration file name for midi preprocessing, bpe setting and training/model setting, and an optional '--use-existed' flag at the fourth position."
+        echo "Expect arguments to be three configuration file name for midi preprocessing, bpe, and training/model setting, and an optional '--use-existed' flag at the fourth position."
         exit 1
     fi
 fi

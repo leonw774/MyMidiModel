@@ -6,6 +6,8 @@ log_path=$5
 model_dir_path=$6
 nucleus_threshold=$7
 
+test -z "$midi_dir_path" && echo "./evaluation.sh midi_dir_path eval_sample_number process_workers primer_length log_path model_dir_path nucleus_threshold"
+
 eval_primers_dir_path="${midi_dir_path}/eval_primers_${eval_sample_number}"
 eval_primers_pathlist_file_path="${midi_dir_path}/eval_pathlist.txt"
 
