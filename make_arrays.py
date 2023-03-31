@@ -183,22 +183,23 @@ def main():
 
         # for debugging
         if args.debug:
-            p0 = next(iter(corpus_reader))
-            original_text_list = p0.split()
-            array_data = text_list_to_array(p0.split(), vocabs)
-
             debug_txt_path = os.path.join(args.corpus_dir_path, 'make_array_debug.txt')
             print(f'Write debug file: {debug_txt_path}')
 
+            piece_0 = next(iter(corpus_reader))
+            original_text_list = piece_0.split()
+            longest_text_length = max(map(len, original_text_list))
+            original_text_list = ['original_text'] + [text.ljust(longest_text_length) for text in original_text_list]
+
+            array_data = text_list_to_array(piece_0.split(), vocabs)
             debug_str = get_input_array_format_string(array_data, None, vocabs)
             debug_str_list = debug_str.splitlines()
-            original_text_list = ['original_text'] + original_text_list
 
+            merged_lines = [
+                f'{origi} {debug}'
+                for origi, debug in zip(original_text_list, debug_str_list)
+            ]
             with open(debug_txt_path, 'w+', encoding='utf8') as f:
-                merged_lines = [
-                    f'{origi:<49} {debug}'
-                    for origi, debug in zip(original_text_list, debug_str_list)
-                ]
                 f.write('\n'.join(merged_lines))
 
         start_time = time()

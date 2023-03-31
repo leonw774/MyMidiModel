@@ -253,13 +253,15 @@ def get_input_array_format_string(input_array: np.ndarray, mps_sep_indices, voca
     np.savetxt(array_text_byteio, input_array, fmt='%d')
     array_savetxt_list = array_text_byteio.getvalue().decode().split('\n')
     reconstructed_text_list = array_to_text_list(input_array, vocabs=vocabs)
+    longest_text_length = max(map(len, reconstructed_text_list))
+    reconstructed_text_list = [text.ljust(longest_text_length) for text in reconstructed_text_list]
     if mps_sep_indices is None:
         mps_sep_indices = []
     debug_str = ' evt  pit  dur  vel  trn  ins  pos  mea  tmp  tis  reconstructed_text\n'
     debug_str += (
         '\n'.join([
             ' '.join([f'{s:>4}' for s in a.split()])
-            + f'  {z:<16}' + (' MPS_SEP' if i in mps_sep_indices else '')
+            + f'  {z}' + (' MPS_SEP' if i in mps_sep_indices else '')
             for i, (a, z) in enumerate(zip(array_savetxt_list, reconstructed_text_list))
         ])
     )
