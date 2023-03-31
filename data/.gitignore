@@ -1,5 +1,6 @@
 .mscbackup
 corpus
+midis/*
 *.txt
 *.mid
 *.npz

@@ -189,7 +189,8 @@ def main():
             piece_0 = next(iter(corpus_reader))
             original_text_list = piece_0.split()
             longest_text_length = max(map(len, original_text_list))
-            original_text_list = ['original_text'] + [text.ljust(longest_text_length) for text in original_text_list]
+            original_text_list = ['original_text'] + original_text_list
+            original_text_list = [text.ljust(longest_text_length) for text in original_text_list]
 
             array_data = text_list_to_array(piece_0.split(), vocabs)
             debug_str = get_input_array_format_string(array_data, None, vocabs)
