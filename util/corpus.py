@@ -303,7 +303,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
     cur_measure_onset = 0
     for text in text_list[1:-1]:
         typename = text[0]
-        if typename == 'R':
+        if typename == tokens.TRACK_EVENTS_CHAR:
             total_track_number += 1
             instrument, track_number = (b36str2int(x) for x in text[1:].split(':'))
             if instrument == 128:
@@ -405,7 +405,8 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
                 prev_pitch = pitch
                 prev_onset_time = onset_time
         else:
-            raise ValueError(f'bad token string: {text}')
+            if text not in tokens.SPECIAL_TOKENS_STR:
+                raise ValueError(f'bad token string: {text}')
     plt.xlabel('Time')
     plt.ylabel('Pitch')
     plt.xlim(xmin=0)

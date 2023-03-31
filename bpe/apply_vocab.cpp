@@ -130,7 +130,11 @@ int main(int argc, char *argv[]) {
 
     // read notes from corpus
     Corpus corpus = readCorpusFile(inCorpusFile, nth);
-    std::cout << "Reading done. There are " << corpus.piecesTP.size() << " pieces" << std::endl;
+    int numTracks = 0;
+    for (auto p: corpus.piecesTP) {
+        numTracks += p.size();
+    }
+    std::cout << "Reading done. There are " << corpus.piecesTP.size() << " pieces and "  << numTracks << " tracks." << std::endl;
 
     // sort and count notes
     corpus.sortAllTracks();

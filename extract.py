@@ -1,7 +1,8 @@
 from argparse import ArgumentParser, RawTextHelpFormatter
 
 from util.midi import piece_to_midi
-from util.corpus import CorpusReader, get_corpus_paras, piece_to_roll
+from util.corpus_reader import CorpusReader
+from util.corpus import get_corpus_paras, piece_to_roll
 
 def read_args():
     parser = ArgumentParser(formatter_class=RawTextHelpFormatter)
