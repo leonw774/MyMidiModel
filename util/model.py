@@ -278,9 +278,9 @@ def compute_losses(
         for k, logits in enumerate(pred_logits)
     ]
 
-    # "normalize" the losses by number of non-padding events
-    number_of_nonpadding_events = torch.count_nonzero(target_labels[..., ATTR_NAME_INDEX['evt']])
-    head_losses = [l / number_of_nonpadding_events for l in head_losses]
+    # "normalize" the losses by number of non-padding targets
+    number_of_nonpadding = torch.count_nonzero(target_labels)
+    head_losses = [l / number_of_nonpadding for l in head_losses]
 
     return head_losses
 
