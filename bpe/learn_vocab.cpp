@@ -148,11 +148,8 @@ int main(int argc, char *argv[]) {
     }
     for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
         iterStartTimePoint = std::chrono::system_clock::now();
-        if (doLog) {
-            if (clearLine && iterCount != 0) {
-                std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
-            }
-            std::cout << iterCount;
+        if (doLog && clearLine && iterCount != 0) {
+            std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
         }
         size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth); 
 
@@ -161,13 +158,13 @@ int main(int argc, char *argv[]) {
         partStartTimePoint = std::chrono::system_clock::now();
         shapeScoreFreq = shapeScoring(corpus, shapeDict, mergeCondition, samplingRate);
         std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScoreFreq);
-        if (maxValPair.second < minScoreLimit) {
-            std::cout << "\nEnd iterations because found best score < minScoreLimit\n";
+        if (maxValPair.second <= minScoreLimit) {
+            std::cout << "End iterations early because found best score <= minScoreLimit";
             break;
         }
         maxScoreShape = maxValPair.first;
         if (doLog){
-            std::cout << ", " << (double) totalNeighborNumber / multinoteCount << ", "
+            std::cout << iterCount << ", " << (double) totalNeighborNumber / multinoteCount << ", "
                     << shapeScoreFreq.size() << ", "
                     << "\"" << shape2str(maxScoreShape) << "\", "
                     << maxValPair.second << ", ";

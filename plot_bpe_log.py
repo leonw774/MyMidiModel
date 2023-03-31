@@ -15,6 +15,7 @@ def main(corpus_dir_path, log_file_path):
     total_used_time_text = log_texts[total_used_time_start_pos:total_used_time_end_pos]
     total_used_time = float(total_used_time_text.split(': ')[1])
 
+    end_early = 'End iterations early' in log_texts
     bpe_log_start_pos = log_texts.index('Reading done. There are')
     bpe_log_end_pos = log_texts.index('Writing merged corpus file')
     log_texts = log_texts[bpe_log_start_pos:bpe_log_end_pos]
@@ -33,7 +34,7 @@ def main(corpus_dir_path, log_file_path):
     }
 
     iteration_log_column_name =  log_lines[2].split(', ')[1:] # start from 1 because index 0 is iter number
-    iteration_log_lines = log_lines[3:-1]
+    iteration_log_lines = log_lines[3:-2] if end_early else log_lines[3:-1]
     iteration_log_lists = [[] for _ in range(len(iteration_log_column_name))]
     for iter_log_line in iteration_log_lines:
         for i, row_text in enumerate(iter_log_line.split(', ')[1:]):

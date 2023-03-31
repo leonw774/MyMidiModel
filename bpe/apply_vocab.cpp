@@ -163,17 +163,14 @@ int main(int argc, char *argv[]) {
     // start from 2 because index 0, 1 are default shapes
     for (int shapeIndex = 2; shapeIndex < shapeDict.size(); ++shapeIndex) {
         iterStartTimePoint = std::chrono::system_clock::now();
-        if (doLog) {
-            if (clearLine && shapeIndex != 2) {
-                std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
-            }
-            std::cout << shapeIndex;
+        if (doLog && clearLine && shapeIndex != 2) {
+            std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
         }
         size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth);
 
         Shape mergingShape = shapeDict[shapeIndex];
         if (doLog){
-            std::cout << ", " << (double) totalNeighborNumber / multinoteCount << ", "
+            std::cout << shapeIndex << ", " << (double) totalNeighborNumber / multinoteCount << ", "
                       << "\"" << shape2str(mergingShape) << "\", ";
         }
 
