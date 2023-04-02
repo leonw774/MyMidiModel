@@ -254,7 +254,7 @@ class MyMidiTransformer(nn.Module):
 
 def compute_losses(
         pred_logits: List[Tensor],
-        target_labels: Tensor) -> List[Tensor]:
+        target_labels: Tensor) -> Tuple[Tensor, List[Tensor]]:
     """
         pred_logits is a list
         - length: out_attr_number
@@ -273,7 +273,7 @@ def compute_losses(
             ignore_index=0, # padding is index 0
             reduction='sum'
             # some attributes have more non-padding occurence than others
-            # we can reflect this by them having different "weight" of loss by using 'sum'
+            # we reflect this by them having different "weight" of loss by using 'sum'
         )
         for k, logits in enumerate(pred_logits)
     ]
@@ -281,8 +281,9 @@ def compute_losses(
     # "normalize" the losses by number of non-padding targets
     number_of_nonpadding = torch.count_nonzero(target_labels)
     head_losses = [l / number_of_nonpadding for l in head_losses]
+    loss = torch.sum(torch.stack(head_losses))
 
-    return head_losses
+    return loss, head_losses
 
 
 def adjust_probs_with_context(
@@ -614,7 +615,7 @@ def generate_sample(
 def compute_permutable_subseq_losses(
         pred_logits: List[Tensor],
         target_labels: Tensor,
-        batched_mps_indices: List) -> List[Tensor]:
+        batched_mps_indices: List) -> Tuple[Tensor, List[Tensor]]:
     """
         pred_logits is a list
         - length: out_attr_num
@@ -658,11 +659,11 @@ def compute_permutable_subseq_losses(
         # print('========')
         # assert (modified_target_labels == cpp_modified_target_labels).all().item()
 
-    head_losses = compute_losses(
+    loss, head_losses = compute_losses(
         pred_logits,
         cpp_modified_target_labels.to(target_labels.device)
     )
-    return head_losses
+    return loss, head_losses
 
 
 # NOTE: this function is VERY SLOW since it has three level of for-loops and does cross_entropy with O(N^2) data worst case

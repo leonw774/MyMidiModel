@@ -234,8 +234,8 @@ def log_losses(
         loss_file_path: str):
     avg_train_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
     avg_valid_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*valid_loss_list) ]
-    avg_avg_train_losses = sum(avg_train_losses) / len(avg_train_losses)
-    avg_avg_valid_losses = sum(avg_valid_losses) / len(avg_valid_losses)
+    avg_avg_train_losses = sum(avg_train_losses)
+    avg_avg_valid_losses = sum(avg_valid_losses)
     logging.info(
         'Avg. train head losses: %s Avg. train loss: %.12f \nAvg. valid head losses: %s Avg. valid loss: %.12f',
         ', '.join([f'{l:.6f}' for l in avg_train_losses]), avg_avg_train_losses,
@@ -330,8 +330,8 @@ def main():
             train_output_attr_name = train_output_attr_name[:-1]
             valid_output_attr_name = valid_output_attr_name[:-1]
         loss_csv_head += ','.join(
-            train_output_attr_name + ['train_avg']
-            + valid_output_attr_name + ['valid_avg']
+            train_output_attr_name + ['train_loss']
+            + valid_output_attr_name + ['valid_loss']
         )
         loss_file.write(loss_csv_head+'\n')
     if is_main_process:
@@ -494,20 +494,19 @@ def main():
 
                 # start_backward_time = time()
                 if args.data.use_permutable_subseq_loss:
-                    head_losses = compute_permutable_subseq_losses(
+                    loss, head_losses = compute_permutable_subseq_losses(
                         prediction,
                         batch_target_seqs,
                         batch_mps_sep_indices
                     )
                     # print('compute_permutable_subseq_losses use time:', time() - start_backward_time)
                 else:
-                    head_losses = compute_losses(
+                    loss, head_losses = compute_losses(
                         prediction,
                         batch_target_seqs
                     )
                     # print('compute_losses use time:', time() - start_backward_time)
                 # assert all(not torch.isnan(hl).any() for hl in head_losses)
-                loss = torch.mean(torch.stack(head_losses))
 
                 if is_main_process:
                     train_loss_list.append([hl.item() for hl in head_losses])
@@ -555,13 +554,13 @@ def main():
                 prediction = model(batch_input_seqs)
 
                 if args.data.use_permutable_subseq_loss:
-                    head_losses = compute_permutable_subseq_losses(
+                    loss, head_losses = compute_permutable_subseq_losses(
                         prediction,
                         batch_target_seqs,
                         batch_mps_sep_indices,
                     )
                 else:
-                    head_losses = compute_losses(
+                    loss, head_losses = compute_losses(
                         prediction,
                         batch_target_seqs,
                     )
