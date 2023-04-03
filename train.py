@@ -577,23 +577,25 @@ def main():
         else:
             torch.save(model, ckpt_model_file_path)
 
+        if args.train.early_stop > 0:
+            avg_valid_loss = sum([sum(valid_head_losses) for valid_head_losses in valid_loss_list]) / len(valid_loss_list)
+            if avg_valid_loss >= min_avg_valid_loss:
+                early_stop_counter += 1
+                if early_stop_counter >= args.train.early_stop:
+                    if is_main_process:
+                        logging.info('Early stopped: No improvement for %d validations.', args.train.early_stop)
+                    break
+            else:
+                early_stop_counter = 0
+                min_avg_valid_loss = avg_valid_loss
+                if is_main_process:
+                    shutil.copyfile(ckpt_model_file_path, os.path.join(args.model_dir_path, 'best_model.pt'))
+                    logging.info('New best model.')
+
         if is_main_process:
             logging.info('Time: %d, Learning rate: %.6f', time()-start_time, scheduler.get_last_lr()[0])
             assert train_loss_list
             log_losses(cur_step, train_loss_list, valid_loss_list, loss_file_path)
-
-            if args.train.early_stop > 0:
-                avg_valid_loss = sum([sum(valid_head_losses) for valid_head_losses in valid_loss_list]) / len(valid_loss_list)
-                if avg_valid_loss >= min_avg_valid_loss:
-                    early_stop_counter += 1
-                    if early_stop_counter >= args.train.early_stop:
-                        logging.info('Early stopped: No improvement for %d validations.', args.train.early_stop)
-                        break
-                else:
-                    early_stop_counter = 0
-                    min_avg_valid_loss = avg_valid_loss
-                    shutil.copyfile(ckpt_model_file_path, os.path.join(args.model_dir_path, 'best_model.pt'))
-                    logging.info('New best model.')
 
             if cur_step % args.train.generate_sample_interval == 0:
                 print('Generating conditional and unconditional sample for checkpoint')
