@@ -489,6 +489,8 @@ def main():
         # forward_time = 0
         # backward_time = 0
         for _ in tqdm(range(args.train.validation_interval), disable=not is_main_process):
+            if is_main_process:
+                train_loss_list.append([0. for _ in train_output_attr_name])
             for _ in range(gradient_accumulation_steps):
                 try:
                     batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
@@ -521,10 +523,13 @@ def main():
                         batch_target_seqs
                     )
                     # print('compute_losses use time:', time() - start_backward_time)
-                # assert all(not torch.isnan(hl).any() for hl in head_losses)
+                # assert all(not torch.isnan(head_l).any() for head_l in head_losses)
 
                 if is_main_process:
-                    train_loss_list.append([hl.item() for hl in head_losses])
+                    train_loss_list[-1] = [
+                        accu_l + head_l.item() / gradient_accumulation_steps
+                        for head_l, accu_l in zip(head_losses, train_loss_list[-1])
+                    ]
                     # print(train_loss_list[-1])
 
                 loss = loss / gradient_accumulation_steps
@@ -579,7 +584,7 @@ def main():
                         prediction,
                         batch_target_seqs,
                     )
-                valid_loss_list.append([hl.item() for hl in head_losses])
+                valid_loss_list.append([head_l.item() for head_l in head_losses])
 
         cur_step = start_step + args.train.validation_interval
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')

@@ -280,7 +280,7 @@ def compute_losses(
 
     # "normalize" the losses by number of non-padding targets
     number_of_nonpadding = torch.count_nonzero(target_labels)
-    head_losses = [l / number_of_nonpadding for l in head_losses]
+    head_losses = [head_l / number_of_nonpadding for head_l in head_losses]
     loss = sum(head_losses)
 
     return loss, head_losses
