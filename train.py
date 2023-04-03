@@ -260,7 +260,7 @@ def log_losses(
                         + ','.join([f'{l:.3f}' for l in train_head_losses]) + ',' # train head losses
                         + f'{sum(train_head_losses):.6f},' # train loss (sum)
                         + ','.join([f'{l:.3f}' for l in avg_valid_losses]) + ',' # avg valid head losses
-                        + f'{sum_avg_valid_losses:.6f},' # avg valid loss (sum)
+                        + f'{sum_avg_valid_losses:.6f}' # avg valid loss (sum)
                         + '\n'
                     )
 
