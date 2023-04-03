@@ -228,26 +228,41 @@ def lr_warmup_and_linear_decay(step_num: int, warmup_steps: int, decay_end_ratio
 
 
 def log_losses(
-        start_step: int,
+        cur_step: int,
         train_loss_list: List[List[float]],
         valid_loss_list: List[List[float]],
         loss_file_path: str):
     avg_train_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
     avg_valid_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*valid_loss_list) ]
-    avg_avg_train_losses = sum(avg_train_losses)
-    avg_avg_valid_losses = sum(avg_valid_losses)
+    sum_avg_train_losses = sum(avg_train_losses)
+    sum_avg_valid_losses = sum(avg_valid_losses)
     logging.info(
         'Avg. train head losses: %s Avg. train loss: %.12f \nAvg. valid head losses: %s Avg. valid loss: %.12f',
-        ', '.join([f'{l:.6f}' for l in avg_train_losses]), avg_avg_train_losses,
-        ', '.join([f'{l:.6f}' for l in avg_valid_losses]), avg_avg_valid_losses
+        ', '.join([f'{l:.6f}' for l in avg_train_losses]), sum_avg_train_losses,
+        ', '.join([f'{l:.6f}' for l in avg_valid_losses]), sum_avg_valid_losses
     )
     if loss_file_path:
+        valid_steps = len(train_loss_list)
         with open(loss_file_path, 'a', encoding='utf8') as loss_file:
-            loss_file.write(
-                f'{start_step},'
-                + f'{",".join([f"{l:.6f}" for l in avg_train_losses])},{avg_avg_train_losses:.12f},'
-                + f'{",".join([f"{l:.6f}" for l in avg_valid_losses])},{avg_avg_valid_losses:.12f}\n'
-            )
+            for i, train_head_losses in enumerate(train_loss_list):
+                step = cur_step - valid_steps + i + 1
+                if step != cur_step:
+                    loss_file.write(
+                        f'{step},'
+                        + ','.join([f'{l:.6f}' for l in train_head_losses]) + ',' # train head losses
+                        + f'{sum(train_head_losses):.12f},' # train loss (sum)
+                        + (',' * (len(train_head_losses) + 1)) # valid head losses and sum (none)
+                        + '\n'
+                    )
+                else:
+                    loss_file.write(
+                        f'{step},'
+                        + ','.join([f'{l:.6f}' for l in train_head_losses]) + ',' # train head losses
+                        + f'{sum(train_head_losses):.12f},' # train loss (sum)
+                        + ','.join([f'{l:.6f}' for l in avg_valid_losses]) + ',' # avg valid head losses
+                        + f'{sum_avg_valid_losses:.12f},' # avg valid loss (sum)
+                        + '\n'
+                    )
 
 
 def main():
