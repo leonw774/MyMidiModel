@@ -579,8 +579,7 @@ def main():
                         prediction,
                         batch_target_seqs,
                     )
-                if is_main_process:
-                    valid_loss_list.append([hl.item() for hl in head_losses])
+                valid_loss_list.append([hl.item() for hl in head_losses])
 
         cur_step = start_step + args.train.validation_interval
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
