@@ -526,6 +526,7 @@ def main():
                 # assert all(not torch.isnan(head_l).any() for head_l in head_losses)
 
                 if is_main_process:
+                    # note that this only record the loss calculated on main process
                     train_loss_list[-1] = [
                         accu_l + head_l.item() / gradient_accumulation_steps
                         for head_l, accu_l in zip(head_losses, train_loss_list[-1])
@@ -584,7 +585,9 @@ def main():
                         prediction,
                         batch_target_seqs,
                     )
-                valid_loss_list.append([head_l.item() for head_l in head_losses])
+                # need to gather, otherwise each process see different losses
+                gathered_head_losses = accelerator.gather(head_losses)
+                valid_loss_list.append([head_l.item() for head_l in gathered_head_losses])
 
         cur_step = start_step + args.train.validation_interval
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
@@ -651,9 +654,9 @@ def main():
 
     ######## Training end
 
-    # Don't need this unless we use trackers in accelerator
     # if args.use_parallel:
-    #     accelerator.end_training()
+        # Don't need this unless we use trackers in accelerator
+        # accelerator.end_training()
 
     ######## Remove all checkpoints
 
