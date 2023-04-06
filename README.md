@@ -113,6 +113,9 @@ Pythons scripts
 
 Shell scripts
 
+- `evaluated_model.sh`
+   1. Get evaluation features of the training dataset with the randomly sampled midi files using `get_eval_features_of_midis.py`
+   2. Get evaluation features of the unconditional, instrument-informed, and prime continution generation result of the model using the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`
 - `experiment_apply_learned_shapes_to_other.sh`
 - `experiment_bpe_parameters.sh`
 - `experiment_model_and_training_parameters.sh`
@@ -121,5 +124,5 @@ Shell scripts
   2. If `DO_BPE` is "true", then run `bpe/learn_vocab` to create a new merged corpus. After it is done, run `verify_corpus_equality.py` to make sure there are no errors and run `plot_bpe_log.py` to visualize the loggings.
   3. Make arrays file and vocabs file of the corpus with `make_arrays.py`
   4. Train a model on the corpus with `train.py`
-  5. Get evaluation features of training midi files the model generated midi files with the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`
+  5. Get evaluation features of training dataset the model generated midi files with `evaluated_model.sh`
 

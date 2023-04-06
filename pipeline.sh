@@ -210,5 +210,5 @@ test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $log_path 
 
 ######## EVALUATION ########
 
-./evaluations.sh $MIDI_DIR_PATH $EVAL_SAMPLE_NUMBER $PROCESS_WORKERS $PRIMER_LENGTH $log_path $model_dir_path $NUCLEUS_THRESHOLD $SEED
+./evaluated_model.sh $MIDI_DIR_PATH $EVAL_SAMPLE_NUMBER $PROCESS_WORKERS $PRIMER_LENGTH $log_path $model_dir_path $NUCLEUS_THRESHOLD $SEED
 test $? -eq 0 && echo "All done. pipeline.sh exit." | tee -a $log_path

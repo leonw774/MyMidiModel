@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "evaluations.sh start."
+echo "evaluated_model.sh start."
 midi_dir_path=$1
 eval_sample_number=$2
 process_workers=$3
@@ -84,4 +84,4 @@ python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-numb
     --primer-measure-length $primer_length --reference-file-path "${eval_primers_dir_path}/eval_features.json" "${model_dir_path}/eval_samples/primer_cont"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
-echo "evaluations.sh exit."
+echo "evaluated_model.sh exit."
