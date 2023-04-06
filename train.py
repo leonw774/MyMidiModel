@@ -587,6 +587,8 @@ def main():
                     )
                 # need to gather, otherwise each process see different losses
                 gathered_head_losses = accelerator.gather(head_losses)
+                # gathered_head_losses: List[tensor.Tensor]
+                gathered_head_losses = torch.mean(torch.stack(gathered_head_losses), dim=0)
                 valid_loss_list.append([head_l.item() for head_l in gathered_head_losses])
 
         cur_step = start_step + args.train.validation_interval
