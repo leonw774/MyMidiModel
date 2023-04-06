@@ -53,7 +53,8 @@ def parse_args():
     parser.add_argument(
         '--max-pairs-number',
         type=int,
-        default=int(1e6)
+        default=int(1e6),
+        help='Maximal limit of measure pairs for calculating the self-similarities. Default is %(default)s.'
     )
     parser.add_argument(
         '--reference-file-path',

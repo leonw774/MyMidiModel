@@ -29,7 +29,10 @@ def _entropy(x: list, base: float = math_e) -> float:
     return entropy
 
 
-def kl_divergence(pred, true, epsilon = 1e-9):
+def kl_divergence(pred, true, base: float = math_e, ignore_pred_zero: bool = False):
+    """
+        Calculate KL(true || pred)
+    """
     if isinstance(pred, list) and isinstance(true, list):
         assert len(pred) == len(true) and len(true) > 0
         sum_pred = sum(pred)
@@ -40,23 +43,25 @@ def kl_divergence(pred, true, epsilon = 1e-9):
         norm_true = [x / sum_true for x in true]
         kld = sum([
             p * log(p/q)
-            for p, q in zip(norm_pred, norm_true)
+            for p, q in zip(norm_true, norm_pred)
             if p != 0 and q != 0
         ])
         return kld
     elif isinstance(pred, dict) and isinstance(true, dict):
         assert len(true) > 0
+        if ignore_pred_zero:
+            true = {k: v for k, v in true.items() if k in pred}
         sum_pred = sum(pred.values())
         sum_true = sum(true.values())
         if sum_pred == 0 or sum_true == 0:
             raise ValueError()
         norm_pred = {k: pred[k]/sum_pred for k in pred}
         norm_true = {k: true[k]/sum_true for k in true}
-        valid_keys = {x for x in norm_pred}.union({x for x in norm_true})
-        # print(valid_keys)
         kld = sum([
-            norm_true.get(x, 0) * log(norm_true.get(x, epsilon)/norm_pred.get(x, epsilon))
-            for x in valid_keys
+            norm_true[x] * log(norm_true[x]/norm_pred[x], base)
+            if x in norm_pred else
+            float('inf')
+            for x in norm_true
         ])
         return kld
     else:
