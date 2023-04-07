@@ -149,8 +149,8 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
     ]
 
     # handle too long duration
-    # continuing means this note does not have NOTE_OFF and is going to be continued by another note after max_duration
-    # it is represented with negative duration to seperate from notes that's really max_duration long
+    # continuing means this note may not have NOTE_OFF and is going to be continued by another note after its duration
+    # it is represented with negative duration
     continuing_duration = -max_duration if use_cont_note else max_duration
     note_list_length = len(note_token_list)
     for i in range(note_list_length):
@@ -207,27 +207,34 @@ def get_time_structure_tokens(
     last_note_end = note_token_list[-1].onset + note_token_list[-1].duration
     # print('first, last:', first_note_start, last_note_end)
 
-    # default time signature is 4/4 but nah
-    assert len(midi.time_signature_changes) > 0, 'No time signature information'
+    if len(midi.time_signature_changes) == 0:
+        time_sig_list = [TimeSignature(4, 4, 0)]
+    else:
+        time_sig_list = []
+        # remove duplicated time_signatures
+        prev_nd = (None, None)
+        for i, time_sig in enumerate(midi.time_signature_changes):
+            if prev_nd != (time_sig.numerator, time_sig.denominator):
+                time_sig_list.append(time_sig)
+            prev_nd = (time_sig.numerator, time_sig.denominator)
 
-    time_sig_list = []
-    # remove duplicated time_signatures
-    prev_nd = (None, None)
-    for i, time_sig in enumerate(midi.time_signature_changes):
-        if prev_nd != (time_sig.numerator, time_sig.denominator):
-            time_sig_list.append(time_sig)
-        prev_nd = (time_sig.numerator, time_sig.denominator)
+        # some midi file has their first time signature begin at time 1, but the rest of the changing times
+        # are set as if the first time signature started at time 0. weird.
+        if len(time_sig_list) > 0:
+            if time_sig_list[0].time == 1:
+                if len(time_sig_list) > 1:
+                    nth_per_measure = round(nth_per_beat * 4 * time_sig_list[0].numerator / time_sig_list[0].denominator)
+                    if time_sig_list[1].time % nth_per_measure == 0:
+                        time_sig_list[0].time = 0
+                else:
+                    time_sig_list[0].time = 0
+    assert len(time_sig_list) > 0, 'No time signature information retrieved'
+    # print(time_sig_list)
 
-    # Some midi file has their first time signature begin at 1, but the rest of the time signatures'
-    # changing times are set as if the first time signature started at 0. Weird.
-    if time_sig_list[0].time == 1:
-        if len(time_sig_list) > 1:
-            nth_per_measure = round(nth_per_beat * time_sig_list[0].numerator * (4 / time_sig_list[0].denominator))
-            if time_sig_list[1].time % nth_per_measure == 0:
-                time_sig_list[0].time = 0
-    # print(time_sig_dict_list)
-
-    assert time_sig_list[0].time <= first_note_start, 'Time signature undefined before first note'
+    # assert time_sig_list[0].time <= first_note_start, 'Time signature undefined before first note'
+    # If the time signature starts after the first note, let try 4/4 start at time 0
+    if time_sig_list[0].time > first_note_start:
+        time_sig_list = [(TimeSignature(4, 4, 0))] + time_sig_list
 
     measure_token_list = []
     for i, time_sig in enumerate(time_sig_list):
@@ -236,7 +243,7 @@ def get_time_structure_tokens(
             # f'Unsupported time signature {(time_sig.numerator, time_sig.denominator)}'
         # print(f'TimeSig {i}:', cur_timesig_start, next_timesig_start, nth_per_measure)
 
-        nth_per_measure = round(nth_per_beat * time_sig.numerator * (4 / time_sig.denominator))
+        nth_per_measure = round(nth_per_beat * 4 * time_sig.numerator / time_sig.denominator)
         cur_timesig_start = time_sig.time
 
         # if note already end
@@ -281,7 +288,7 @@ def get_time_structure_tokens(
     # check if last measure contain last note
     last_measure = measure_token_list[-1]
     last_measure_onset = last_measure.onset
-    last_measure_length = round(nth_per_beat * last_measure.time_signature[0] * (4 / last_measure.time_signature[1]))
+    last_measure_length = round(nth_per_beat * 4 * last_measure.time_signature[0] / last_measure.time_signature[1])
     assert last_measure_onset <= last_note_end < last_measure_onset + last_measure_length, \
         "Last note did not ends in last measure"
 
@@ -296,21 +303,14 @@ def get_time_structure_tokens(
         for i, tempo in enumerate(midi.tempo_changes):
             if tempo.time > last_note_end:
                 break
-
+            # if tempo change starts before first measure, change time to the start time of first measure
             if tempo.time < measure_token_list[0].onset:
-                if i < len(midi.tempo_changes) - 1:
-                    if midi.tempo_changes[i+1].time > measure_token_list[0].onset:
-                        cur_time = measure_token_list[0].onset
-                    else:
-                        continue
-                else:
-                    cur_time = measure_token_list[0].onset
+                cur_time = measure_token_list[0].onset
             else:
                 cur_time = tempo.time
-
             cur_tempo = quantize_tempo(tempo.tempo, tempo_quantization)
             if cur_tempo != prev_tempo:
-                # if is same time, replace last tempo
+                # if the previous tempo change is same time as current one, replace the previous
                 if prev_time == cur_time:
                     tempo_list.pop()
                 tempo_list.append(TempoChange(cur_tempo, cur_time))
@@ -318,7 +318,7 @@ def get_time_structure_tokens(
             prev_time = cur_time
     assert len(tempo_list) > 0, 'No tempo information retrieved'
 
-    # same issue as time signature, but tempo can appear in any place so this is all we can do
+    # same weird issue as time signature, but tempo can appear in any place so this is all we can do
     if tempo_list[0].time == 1 and measure_token_list[0].onset == 0:
         tempo_list[0].time = 0
 
