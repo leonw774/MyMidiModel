@@ -51,15 +51,15 @@ at::Tensor findMinPermuLossTarget_TriU(
         // std::cout << "curMPSIndices.size() " << curMPSIndices.size() << std::endl;
         for (size_t mpsNum = 0; mpsNum < curMPSIndices.size() - 1; mpsNum++) {
             int beginIndex = curMPSIndices[mpsNum];
-            if (beginIndex < 0) {
-                continue;
-            }
+            // if (beginIndex < 0) {
+            //     continue;
+            // }
             int endIndex = curMPSIndices[mpsNum+1];
             int mpsSize = endIndex - beginIndex;
-            if (mpsSize < 0) {
-                throw std::range_error("Negtive mpsSize");
-            }
-            else if (mpsSize == 2) {
+            // if (mpsSize < 0) {
+            //     throw std::range_error("Negtive mpsSize");
+            // }
+            if (mpsSize == 2) {
                 flattenMPSTargetList.push_back(
                     // batchedTarget[batchNum, beginIndex:endIndex]
                     batchedTarget.index({batchNum, Slice(beginIndex, endIndex)})
@@ -137,26 +137,26 @@ at::Tensor findMinPermuLossTarget_TriU(
                 )
             );
         }
-        // calculate the mean of k attr losses
+        // calculate the sum of k attr losses
         at::Tensor catFlattenMPSLossStack = at::stack(catFlattenMPSLossList); // (outAttrNum, flattenMPSLength)
         // std::cout << catFlattenMPSLossStack << std::endl;
-        // because when an attribute is labeled as padding, its loss would be zero
-        // we want to ignore the zero values
-        at::Tensor catFlattenMPSLossMean =
-            catFlattenMPSLossStack.sum(0) / catFlattenMPSLossStack.count_nonzero(c10::optional<int64_t>(0));
+        // When an attribute is labeled as padding, its loss would be zero
+        // but because we calculate loss by taking sum of the non-paddings of eachs heads
+        // we can just take sum of them
+        at::Tensor catFlattenMPSLossSum = catFlattenMPSLossStack.sum(0);
         // Find argmins and indices to replace
         std::vector<std::pair<int, int>> replaceIndices;
         int curFlattenMPSIndex = 0;
         for (size_t mpsNum = 0; mpsNum < curMPSIndices.size() - 1; mpsNum++) {
             int beginIndex = curMPSIndices[mpsNum];
-            if (beginIndex < 0) {
-                continue;
-            }
+            // if (beginIndex < 0) {
+            //     continue;
+            // }
             int endIndex = curMPSIndices[mpsNum+1];
             int mpsSize = endIndex - beginIndex;
             if (mpsSize == 2) {
-                if (catFlattenMPSLossMean[curFlattenMPSIndex].item<float>()
-                    > catFlattenMPSLossMean[curFlattenMPSIndex+1].item<float>()) {
+                if (catFlattenMPSLossSum[curFlattenMPSIndex].item<float>()
+                    > catFlattenMPSLossSum[curFlattenMPSIndex+1].item<float>()) {
                     replaceIndices.push_back(std::make_pair(beginIndex, beginIndex+1));
                     // std::cout << "(" << beginIndex << ", " << beginIndex+1 << "), ";
                 }
@@ -171,12 +171,12 @@ at::Tensor findMinPermuLossTarget_TriU(
                 at::Tensor curStackedMPSLoss = at::full(
                     {mpsSize-1, mpsSize},
                     std::numeric_limits<float>::max(),
-                    torch::TensorOptions().device(catFlattenMPSLossMean.device())
+                    torch::TensorOptions().device(catFlattenMPSLossSum.device())
                 );
                 // make the flattened become stacked
                 curStackedMPSLoss.index_put_(
                     {curMPSTriu.index({0}), curMPSTriu.index({1})},
-                    catFlattenMPSLossMean.index({Slice(curFlattenMPSIndex, curFlattenMPSIndex+curFlattenMPSLength)})
+                    catFlattenMPSLossSum.index({Slice(curFlattenMPSIndex, curFlattenMPSIndex+curFlattenMPSLength)})
                 );
                 curFlattenMPSIndex += curFlattenMPSLength;
                 // std::cout << curStackedMPSLoss << std::endl;
