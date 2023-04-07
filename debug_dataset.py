@@ -11,14 +11,36 @@ from util.dataset import MidiDataset, collate_mididataset
 
 parser = ArgumentParser()
 parser.add_argument(
-    '--batch-size',
-    type=int,
-    default=4
-)
-parser.add_argument(
     '--max-seq-length',
     type=int,
     default=48
+)
+parser.add_argument(
+    '--use-permutable-subseq-loss',
+    action='store_true'
+)
+parser.add_argument(
+    '--measure-sample-step-ratio',
+    type=float,
+    default=0.25
+)
+parser.add_argument(
+    '--permute-mps',
+    action='store_true'
+)
+parser.add_argument(
+    '--permute-track-number',
+    action='store_true'
+)
+parser.add_argument(
+    '--pitch-augmentation-range',
+    type=int,
+    default=0
+)
+parser.add_argument(
+    '--batch-size',
+    type=int,
+    default=4
 )
 parser.add_argument(
     '--output-midi',
@@ -43,11 +65,11 @@ if args.seed is not None:
 dataset = MidiDataset(
     data_dir_path=args.corpus_dir_path,
     max_seq_length=args.max_seq_length,
-    use_permutable_subseq_loss=True, # to print out mps indices
-    measure_sample_step_ratio=0.25,
-    permute_mps=True,
-    permute_track_number=True,
-    pitch_augmentation_range=2,
+    use_permutable_subseq_loss=args.use_permutable_subseq_loss,
+    measure_sample_step_ratio=args.measure_sample_step_ratio,
+    permute_mps=args.permute_mps,
+    permute_track_number=args.permute_track_number,
+    pitch_augmentation_range=args.pitch_augmentation_range,
     verbose=True
 )
 vocabs = dataset.vocabs
@@ -57,8 +79,8 @@ print('permute_mps:', dataset.permute_mps)
 print('permute_track_number:', dataset.permute_track_number)
 
 train_len = int(len(dataset) * 0.8)
-vel_len = len(dataset) - train_len
-train_set, val_set = random_split(dataset, [train_len, vel_len])
+valid_len = len(dataset) - train_len
+train_set, val_set = random_split(dataset, [train_len, valid_len])
 print(len(dataset), len(train_set), len(val_set))
 
 # print('TEST RANDOM SPLIT')
