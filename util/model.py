@@ -534,7 +534,7 @@ def generate_sample(
                     text_list,
                     model.vocabs,
                     event_family_indices,
-                    getattr(model, 'permute_mps', True) # backward compatible
+                    model.permute_mps
                 )
             # get_logit_time += time() - bt
             # print('\n'.join([repr(p) for p in last_probs]))

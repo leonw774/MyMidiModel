@@ -17,8 +17,6 @@ from torch.utils.data import random_split, DataLoader
 from torch.optim import AdamW, lr_scheduler
 # from torch.profiler import profile, record_function, ProfilerActivity
 import torchinfo
-# import torchviz
-
 
 from util.midi import piece_to_midi, get_first_k_measures
 from util.corpus import COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, get_corpus_vocabs, array_to_text_list, text_list_to_array
@@ -588,7 +586,7 @@ def main():
                 # need to gather, otherwise each process see different losses
                 gathered_head_losses = accelerator.gather(head_losses)
                 # gathered_head_losses: List[tensor.Tensor]
-                # dim 0 is process dimension, dim 1 ~ are original dimensions
+                # dim 0 is process dimension, dim 1 ~ last are original dimensions
                 gathered_head_losses = torch.mean(torch.stack(gathered_head_losses), dim=1)
                 valid_loss_list.append([head_l.item() for head_l in gathered_head_losses])
 
