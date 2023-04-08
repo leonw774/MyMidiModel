@@ -45,7 +45,7 @@ test -z "$model_dir_path" && exit 0
 echo "Generating $eval_sample_number unconditional samples" | tee -a $log_path 
 mkdir "${model_dir_path}/eval_samples/uncond"
 python3 generate_with_model.py --sample-number $eval_sample_number --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-txt \
-    "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/uncond/sample"
+    "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/uncond/uncond"
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/uncond" | tee -a $log_path 
 python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \

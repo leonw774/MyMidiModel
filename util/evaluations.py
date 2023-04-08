@@ -193,13 +193,16 @@ def piece_to_features(
 
     measure_onsets = [0]
     cur_measure_length = 0
+    max_measure_length = 0
     for text in piece.split(' '):
         if text[0] == MEASURE_EVENTS_CHAR:
             measure_onsets.append(measure_onsets[-1] + cur_measure_length)
             numer, denom = (b36str2int(x) for x in text[1:].split('/'))
             cur_measure_length = round(nth * numer / denom)
+            max_measure_length = max(max_measure_length, cur_measure_length)
 
-    # because sometime the last note "in" the measure does not really IN the measure
+    # because multi-note representation
+    # some note events in a multi-note in a measure but does not really start at that measure
     end_note_onset = max(
         note.start
         for track in midi.instruments
@@ -208,14 +211,17 @@ def piece_to_features(
     while measure_onsets[-1] < end_note_onset:
         measure_onsets.append(measure_onsets[-1] + cur_measure_length)
 
-    max_position = get_largest_possible_position(nth, get_supported_time_signatures())
-    instrumentation_per_bar = np.zeros(shape=(len(measure_onsets), 129), dtype=np.bool8)
+    max_position = max_measure_length
+    present_instrument = {track.program for track in midi.instruments}
+    instrument_number = len(present_instrument)
+    instrument_index_mapping = {program: idx for idx, program in enumerate(present_instrument)}
+    instrumentation_per_bar = np.zeros(shape=(len(measure_onsets), instrument_number), dtype=np.bool8)
     grooving_per_bar = np.zeros(shape=(len(measure_onsets), max_position), dtype=np.bool8)
     for track in midi.instruments:
         for note in track.notes:
             # find measure index so that the measure has the largest onset while smaller than note.start
             measure_index = bisect.bisect_right(measure_onsets, note.start) - 1
-            instrumentation_per_bar[measure_index, track.program] |= True
+            instrumentation_per_bar[measure_index, instrument_index_mapping[track.program]] |= True
             position = note.start - measure_onsets[measure_index]
             assert position < max_position, (measure_index, measure_onsets[measure_index-1:measure_index+2], note.start)
             grooving_per_bar[measure_index, position] |= True
@@ -224,22 +230,22 @@ def piece_to_features(
     if len(pairs) > max_pairs_number:
         pairs = random.sample(pairs, max_pairs_number)
 
-    cross_instrumentation_similarities = [
+    instrumentation_similarities = [
         1 - (
-            sum(np.logical_xor(instrumentation_per_bar[a], instrumentation_per_bar[b])) / 129
+            sum(np.logical_xor(instrumentation_per_bar[a], instrumentation_per_bar[b])) / instrument_number
         )
         for a, b in pairs
     ]
 
-    cross_grooving_similarities = [
+    grooving_similarities = [
         1 - (
             sum(np.logical_xor(grooving_per_bar[a], grooving_per_bar[b])) / max_position
         )
         for a, b in pairs
     ]
 
-    instrumentation_self_similarity = np.mean(cross_instrumentation_similarities)
-    grooving_self_similarity = np.mean(cross_grooving_similarities)
+    instrumentation_self_similarity = np.mean(instrumentation_similarities)
+    grooving_self_similarity = np.mean(grooving_similarities)
 
     features = {
         'pitch_histogram': pitch_histogram,
