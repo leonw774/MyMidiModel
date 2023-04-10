@@ -83,10 +83,8 @@ def kl_divergence(pred, true, base: float = math_e, ignore_pred_zero: bool = Fal
     elif isinstance(pred, dict) and isinstance(true, dict):
         assert len(pred) > 0 and len(true) > 0
         if ignore_pred_zero:
-            all_keys = set(pred.keys()).intersection(set(true.keys()))
-            _true = {k: true[k] for k in all_keys}
+            _true = {k: true[k] for k in true if k in pred}
         else:
-            all_keys = set(true.keys())
             _true = true
         sum_pred = sum(pred.values())
         sum_true = sum(_true.values())

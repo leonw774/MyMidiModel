@@ -43,7 +43,7 @@ test -z "$model_dir_path" && exit 0
 ### Evaluate model unconditional generation
 
 has_midis=""
-ls "${model_dir_path}/eval_samples/uncond/*.mid" > /dev/null 2>&1 && has_midis="true"
+ls "${model_dir_path}/eval_samples/uncond/"*.mid > /dev/null 2>&1 && has_midis="true"
 if [ -d "${model_dir_path}/eval_samples/uncond" ] && [ -n "$has_midis" ]; then
     echo "${model_dir_path}/eval_samples/uncond already has midi files."
 else
@@ -61,7 +61,7 @@ test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_pat
 ### Evaluate model instrument-conditiond generation
 
 has_midis=""
-ls "${model_dir_path}/eval_samples/instr_cond/*.mid" > /dev/null 2>&1 && has_midis="true"
+ls "${model_dir_path}/eval_samples/instr_cond/"*.mid > /dev/null 2>&1 && has_midis="true"
 if [ -d "${model_dir_path}/eval_samples/instr_cond" ] && [ -n "$has_midis"  ]; then
     echo "${model_dir_path}/eval_samples/instr_cond already has midi files."
 else
@@ -83,7 +83,7 @@ test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_pat
 ### Evaluate model prime continuation
 
 has_midis=""
-ls "${model_dir_path}/eval_samples/primer_cont/*.mid" > /dev/null 2>&1 && has_midis="true"
+ls "${model_dir_path}/eval_samples/primer_cont/"*.mid > /dev/null 2>&1 && has_midis="true"
 if [ -d "${model_dir_path}/eval_samples/primer_cont" ] && [ -n "$has_midis" ]; then
     echo "${model_dir_path}/eval_samples/primer_cont already has midi files."
 else
