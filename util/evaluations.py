@@ -210,8 +210,8 @@ def piece_to_features(
             durations.append(Fraction((note.end - note.start) * 4, nth))
             velocities.append(note.velocity)
 
-    pitch_histogram = [0 for _ in range(128)]
-    pitch_class_histogram = [0 for _ in range(12)]
+    pitch_histogram = {p: 0 for p in range(128)}
+    pitch_class_histogram = {pc: 0 for pc in range(12)}
     for p in pitchs:
         pitch_histogram[p] += 1
         pitch_class_histogram[p%12] += 1
