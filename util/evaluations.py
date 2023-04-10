@@ -95,13 +95,15 @@ def kl_divergence(
             _true = {k: true[k] for k in true if k in pred}
         else:
             _true = true
+        if len(_true) == 0:
+            # uh-oh
+            return float('nan')
         sum_pred = sum(pred.values())
         sum_true = sum(_true.values())
         if sum_pred == 0 or sum_true == 0:
             raise ValueError()
         norm_pred = {k: pred[k]/sum_pred for k in pred}
         norm_true = {k: _true[k]/sum_true for k in _true}
-
         kld = sum([
             norm_true[x] * log(norm_true[x]/norm_pred[x], base)
             if x in norm_pred else
@@ -133,7 +135,8 @@ def overlapping_area_of_estimated_gaussian(distribution_1: Union[list, dict], di
         std_2 = sqrt(square_mean_2 - mean_2 * mean_2)
     else:
         raise TypeError('pred and true should be both list or dict')
-
+    if std_1 == 0 or std_2 == 0:
+        return float('nan')
     nd_1 = NormalDist(mean_1, std_1)
     nd_2 = NormalDist(mean_2, std_2)
     return nd_1.overlap(nd_2)
