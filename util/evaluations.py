@@ -6,7 +6,7 @@ from math import log, isnan, sqrt
 from math import e as math_e
 import random
 from statistics import NormalDist
-from typing import Dict
+from typing import Dict, Union
 
 import numpy as np
 from miditoolkit import MidiFile
@@ -15,22 +15,27 @@ from .tokens import b36str2int, MEASURE_EVENTS_CHAR, END_TOKEN_STR
 from .midi import piece_to_midi, midi_to_piece, get_after_k_measures
 
 
-def _entropy(x: list, base: float = math_e) -> float:
+def _entropy(x: Union[list, dict], base: float = math_e) -> float:
     if len(x) == 0:
         raise ValueError()
-    sum_x = sum(x)
-    if sum_x == 0:
-        raise ValueError()
-    norm_x = [i / sum_x for i in x]
-    entropy = -sum([
-        i * log(i, base)
-        for i in norm_x
-        if i != 0
-    ])
-    return entropy
+    if isinstance(x, list):
+        sum_x = sum(x)
+        if sum_x == 0:
+            raise ValueError()
+        norm_x = [i / sum_x for i in x]
+        entropy = -sum([
+            i * log(i, base)
+            for i in norm_x
+            if i != 0
+        ])
+        return entropy
+    elif isinstance(x, dict):
+        return _entropy(list(x.values()))
+    else:
+        raise TypeError('x should be both list or dict')
 
 
-def histogram_intersection(pred, true):
+def histogram_intersection(pred: Union[list, dict], true: Union[list, dict]) -> float:
     if isinstance(pred, list) and isinstance(true, list):
         assert len(pred) == len(true) and len(true) > 0
         sum_pred = sum(pred)
@@ -62,7 +67,11 @@ def histogram_intersection(pred, true):
         raise TypeError('pred and true should be both list or dict')
 
 
-def kl_divergence(pred, true, base: float = math_e, ignore_pred_zero: bool = False):
+def kl_divergence(
+        pred: Union[list, dict],
+        true: Union[list, dict],
+        base: float = math_e,
+        ignore_pred_zero: bool = False) -> float:
     """
         Calculate KL(true || pred)
     """
@@ -104,7 +113,7 @@ def kl_divergence(pred, true, base: float = math_e, ignore_pred_zero: bool = Fal
         raise TypeError('pred and true should be both list or dict')
 
 
-def overlapping_area_of_estimated_gaussian(distribution_1, distribution_2):
+def overlapping_area_of_estimated_gaussian(distribution_1: Union[list, dict], distribution_2: Union[list, dict]) -> float:
     if isinstance(distribution_1, list) and isinstance(distribution_2, list):
         assert len(distribution_1) == len(distribution_2) and len(distribution_2) > 0
         mean_1 = np.mean(np.array(distribution_1))
