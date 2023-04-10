@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from collections import Counter
+from fractions import Fraction
 import glob
 import json
 import logging
@@ -16,7 +17,15 @@ import numpy as np
 from pandas import Series
 from tqdm import tqdm
 
-from util.evaluations import EVAL_SCALAR_FEATURE_NAMES, EVAL_DISTRIBUTION_FEATURE_NAMES, midi_to_features, kl_divergence
+from util.evaluations import (
+    EVAL_SCALAR_FEATURE_NAMES,
+    EVAL_DISTRIBUTION_FEATURE_NAMES,
+    midi_to_features,
+    kl_divergence,
+    overlapping_area_of_estimated_gaussian,
+    histogram_intersection
+)
+
 
 def parse_args():
     parser = ArgumentParser()
@@ -209,25 +218,46 @@ def main():
                     logging.info(format_exc())
                     return 1
             logging.info(
-                'Computing KL-divergance of pitch, duration, and velocity of midis in %s from %s',
+                'Computing KLd, OA, and HI of pitch, duration, and velocity of midis in %s from %s',
                 args.midi_dir_path,
                 args.reference_file_path
             )
+
+            # KL Divergence
             for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
-                try:
-                    eval_features_stats[fname+'_KLD'] = kl_divergence(
-                        eval_features_stats[fname],
-                        reference_eval_features_stats[fname]
-                    )
-                except Exception as e:
-                    print(fname)
-                    print('pred:', eval_features_stats[fname])
-                    print('true:', reference_eval_features_stats[fname])
-                    raise e
+                eval_features_stats[fname+'_KLD'] = kl_divergence(
+                    eval_features_stats[fname],
+                    reference_eval_features_stats[fname],
+                    ignore_pred_zero=True
+                )
             logging.info('\n'.join([
                 f'{fname}_KLD: {eval_features_stats[fname+"_KLD"]}'
                 for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
             ]))
+
+            # Overlapping area of estimated gaussian distribution
+            for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
+                # because the keys are strings and are represented as interger (pitch & velocity) and fraction (duration)
+                eval_features_stats[fname+'_OA'] = overlapping_area_of_estimated_gaussian(
+                    {float(Fraction(k)): v for k, v in eval_features_stats[fname].items()},
+                    {float(Fraction(k)): v for k, v in reference_eval_features_stats[fname].items()}
+                )
+            logging.info('\n'.join([
+                f'{fname}_OA: {eval_features_stats[fname+"_OA"]}'
+                for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
+            ]))
+
+            # (Normalized) Histogram intersection
+            for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
+                eval_features_stats[fname+'_HI'] = histogram_intersection(
+                    eval_features_stats[fname],
+                    reference_eval_features_stats[fname]
+                )
+            logging.info('\n'.join([
+                f'{fname}_HI: {eval_features_stats[fname+"_HI"]}'
+                for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
+            ]))
+
         else:
             logging.info('%s is invalid path for reference result JSON file', args.reference_file_path)
 

@@ -42,10 +42,16 @@ test -z "$model_dir_path" && exit 0
 
 ### Evaluate model unconditional generation
 
-echo "Generating $eval_sample_number unconditional samples" | tee -a $log_path 
-mkdir "${model_dir_path}/eval_samples/uncond"
-python3 generate_with_model.py --sample-number $eval_sample_number --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-txt \
-    "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/uncond/uncond"
+has_midis=""
+ls "${model_dir_path}/eval_samples/uncond/*.mid" > /dev/null 2>&1 && has_midis="true"
+if [ -d "${model_dir_path}/eval_samples/uncond" ] && [ -n "$has_midis" ]; then
+    echo "${model_dir_path}/eval_samples/uncond already has midi files."
+else
+    echo "Generating $eval_sample_number unconditional samples" | tee -a $log_path 
+    mkdir "${model_dir_path}/eval_samples/uncond"
+    python3 generate_with_model.py --sample-number $eval_sample_number --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-txt \
+        "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/uncond/uncond"
+fi
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/uncond" | tee -a $log_path 
 python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
@@ -54,14 +60,20 @@ test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_pat
 
 ### Evaluate model instrument-conditiond generation
 
-echo "Generating $eval_sample_number instrument-conditioned samples" | tee -a $log_path
-mkdir "${model_dir_path}/eval_samples/instr_cond"
-# Loop each line in eval_primers_pathlist_file_path
-while read eval_sample_midi_path; do
-    echo "Primer file: $eval_sample_midi_path"
-    python3 generate_with_model.py -p $eval_sample_midi_path -l 0 --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-txt \
-    "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/$(basename $eval_sample_midi_path .mid)"
-done < $eval_primers_pathlist_file_path
+has_midis=""
+ls "${model_dir_path}/eval_samples/instr_cond/*.mid" > /dev/null 2>&1 && has_midis="true"
+if [ -d "${model_dir_path}/eval_samples/instr_cond" ] && [ -n "$has_midis"  ]; then
+    echo "${model_dir_path}/eval_samples/instr_cond already has midi files."
+else
+    echo "Generating $eval_sample_number instrument-conditioned samples" | tee -a $log_path
+    mkdir "${model_dir_path}/eval_samples/instr_cond"
+    # Loop each line in eval_primers_pathlist_file_path
+    while read eval_sample_midi_path; do
+        echo "Primer file: $eval_sample_midi_path"
+        python3 generate_with_model.py -p $eval_sample_midi_path -l 0 --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-txt \
+        "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/$(basename $eval_sample_midi_path .mid)"
+    done < $eval_primers_pathlist_file_path
+fi
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/instr-cond" | tee -a $log_path
 python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
@@ -70,14 +82,20 @@ test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_pat
 
 ### Evaluate model prime continuation
 
-echo "Generating $eval_sample_number prime-continuation samples" | tee -a $log_path
-mkdir "${model_dir_path}/eval_samples/primer_cont"
-# Loop each line in eval_primers_pathlist_file_path
-while read eval_sample_midi_path; do
-    echo "Primer file: $eval_sample_midi_path"
-    python3 generate_with_model.py -p $eval_sample_midi_path -l $primer_length --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-txt \
-    "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/$(basename $eval_sample_midi_path .mid)"
-done < $eval_primers_pathlist_file_path
+has_midis=""
+ls "${model_dir_path}/eval_samples/primer_cont/*.mid" > /dev/null 2>&1 && has_midis="true"
+if [ -d "${model_dir_path}/eval_samples/primer_cont" ] && [ -n "$has_midis" ]; then
+    echo "${model_dir_path}/eval_samples/primer_cont already has midi files."
+else
+    echo "Generating $eval_sample_number prime-continuation samples" | tee -a $log_path
+    mkdir "${model_dir_path}/eval_samples/primer_cont"
+    # Loop each line in eval_primers_pathlist_file_path
+    while read eval_sample_midi_path; do
+        echo "Primer file: $eval_sample_midi_path"
+        python3 generate_with_model.py -p $eval_sample_midi_path -l $primer_length --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-txt \
+        "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/$(basename $eval_sample_midi_path .mid)"
+    done < $eval_primers_pathlist_file_path
+fi
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/primer_cont" | tee -a $log_path
 python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
