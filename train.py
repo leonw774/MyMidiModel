@@ -283,6 +283,8 @@ def main():
         args.use_parallel = False
 
     gradient_accumulation_steps = int(args.train.batch_size / (args.max_pieces_per_gpu * parallel_devices_count))
+    if gradient_accumulation_steps > 1:
+        args.train.batch_size = args.max_pieces_per_gpu * parallel_devices_count
     if gradient_accumulation_steps == 0:
         gradient_accumulation_steps = 1
 
