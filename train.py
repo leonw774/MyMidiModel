@@ -1,4 +1,5 @@
 from argparse import ArgumentParser, Namespace
+from contextlib import nullcontext
 import glob
 import logging
 import os
@@ -280,16 +281,17 @@ def main():
     parallel_devices_count = len(os.getenv('CUDA_VISIBLE_DEVICES').split(',')) if args.use_parallel else 1
     if args.use_parallel and parallel_devices_count == 1:
         args.use_parallel = False
-    accelerator = accelerate.Accelerator() if args.use_parallel else None
-    is_main_process = accelerator.is_main_process if args.use_parallel else True
+
     gradient_accumulation_steps = int(args.train.batch_size / (args.max_pieces_per_gpu * parallel_devices_count))
-    if gradient_accumulation_steps > 1:
-        args.train.batch_size = args.max_pieces_per_gpu * parallel_devices_count
-    elif gradient_accumulation_steps == 0:
+    if gradient_accumulation_steps == 0:
         gradient_accumulation_steps = 1
 
-    # https://stackoverflow.com/questions/75701437/why-do-we-multiply-learning-rate-by-gradient-accumulation-steps-in-pytorch
-    args.train.lr_peak *= gradient_accumulation_steps
+    if args.use_parallel:
+        accelerator = accelerate.Accelerator(gradient_accumulation_steps=gradient_accumulation_steps)
+        is_main_process = accelerator.is_main_process
+    else:
+        accelerator = None
+        is_main_process = True
 
     # root logger
     if args.log_file_path != '':
@@ -489,7 +491,7 @@ def main():
         for _ in tqdm(range(args.train.validation_interval), disable=not is_main_process):
             if is_main_process:
                 train_loss_list.append([0. for _ in train_output_attr_name])
-            for _ in range(gradient_accumulation_steps):
+            with accelerator.accumulate(model) if args.use_parallel else nullcontext():
                 try:
                     batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
                 except StopIteration:
@@ -537,20 +539,20 @@ def main():
                     accelerator.backward(loss)
                 else:
                     loss.backward()
-                # print('loss + back propagate use time:', time() - start_backward_time)
-                # backward_time += time() - start_backward_time
-            # end for range(gradient_accumulation_steps)
 
-            if args.train.grad_clip_norm > 0:
-                if args.use_parallel:
-                    if accelerator.sync_gradients:
-                        accelerator.clip_grad_norm_(model.parameters(), args.train.grad_clip_norm)
-                else:
-                    clip_grad_norm_(model.parameters(), args.train.grad_clip_norm)
+                if args.train.grad_clip_norm > 0:
+                    if args.use_parallel:
+                        if accelerator.sync_gradients:
+                            accelerator.clip_grad_norm_(model.parameters(), args.train.grad_clip_norm)
+                    else:
+                        clip_grad_norm_(model.parameters(), args.train.grad_clip_norm)
 
-            optimizer.step()
-            scheduler.step()
-            optimizer.zero_grad()
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
+            # print('loss + back propagate use time:', time() - start_backward_time)
+            # backward_time += time() - start_backward_time
+            # end with accelerator.accumulate
         # print('Forward time', forward_time, 'Backward time', backward_time)
 
         if is_main_process:
