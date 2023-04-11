@@ -277,6 +277,7 @@ def main():
     if args.use_parallel and parallel_devices_count == 1:
         args.use_parallel = False
 
+    # effective batch size = gradient_accumulation_steps * batch_size * device_count
     gradient_accumulation_steps = int(args.train.batch_size / (args.max_pieces_per_gpu * parallel_devices_count))
     if gradient_accumulation_steps > 1:
         args.train.batch_size = args.max_pieces_per_gpu
