@@ -405,14 +405,14 @@ def main():
     train_dataloader = DataLoader(
         dataset=train_dataset,
         num_workers=args.dataloader_worker_number,
-        batch_size=args.train.batch_size // parallel_devices_count,
+        batch_size=args.train.batch_size,
         shuffle=False, # no need to shuffle because random_split did
         collate_fn=collate_mididataset
     )
     valid_dataloader = DataLoader(
         dataset=valid_dataset,
         num_workers=args.dataloader_worker_number,
-        batch_size=args.train.batch_size // parallel_devices_count,
+        batch_size=args.train.batch_size,
         shuffle=False,
         collate_fn=collate_mididataset
     )
