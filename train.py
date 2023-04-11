@@ -104,7 +104,7 @@ def parse_args():
         default=8
     )
     train_parser.add_argument(
-        '--max-steps',
+        '--max-updates',
         type=int
     )
     train_parser.add_argument(
@@ -114,10 +114,6 @@ def parse_args():
     train_parser.add_argument(
         '--generate-sample-interval',
         type=int
-    )
-    train_parser.add_argument(
-        '--validation-steps',
-        type=int,
     )
     train_parser.add_argument(
         "--grad-clip-norm",
@@ -132,11 +128,11 @@ def parse_args():
         type=float
     )
     train_parser.add_argument(
-        '--lr-warmup-steps',
+        '--lr-warmup-updates',
         type=int
     )
     train_parser.add_argument(
-        '--lr-decay-end-steps',
+        '--lr-decay-end-updates',
         type=int
     )
     train_parser.add_argument(
@@ -227,7 +223,7 @@ def lr_warmup_and_linear_decay(step_num: int, warmup_steps: int, decay_end_ratio
 
 
 def log_losses(
-        cur_step: int,
+        cur_num_updates: int,
         train_loss_list: List[List[float]],
         valid_loss_list: List[List[float]],
         loss_file_path: str):
@@ -241,13 +237,13 @@ def log_losses(
         ', '.join([f'{l:.3f}' for l in avg_valid_losses]), sum_avg_valid_losses
     )
     if loss_file_path:
-        valid_steps = len(train_loss_list)
+        valid_len = len(train_loss_list)
         with open(loss_file_path, 'a', encoding='utf8') as loss_file:
             for i, train_head_losses in enumerate(train_loss_list):
-                step = cur_step - valid_steps + i + 1
-                if step != cur_step:
+                idx = cur_num_updates - valid_len + i + 1
+                if idx != cur_num_updates:
                     loss_file.write(
-                        f'{step},'
+                        f'{idx},'
                         + ','.join([f'{l:.3f}' for l in train_head_losses]) + ',' # train head losses
                         + f'{sum(train_head_losses):.6f},' # train loss (sum)
                         # NO valid head losses and sum
@@ -255,7 +251,7 @@ def log_losses(
                     )
                 else:
                     loss_file.write(
-                        f'{step},'
+                        f'{idx},'
                         + ','.join([f'{l:.3f}' for l in train_head_losses]) + ',' # train head losses
                         + f'{sum(train_head_losses):.6f},' # train loss (sum)
                         + ','.join([f'{l:.3f}' for l in avg_valid_losses]) + ',' # avg valid head losses
@@ -289,7 +285,10 @@ def main():
         gradient_accumulation_steps = 1
 
     if args.use_parallel:
-        accelerator = accelerate.Accelerator(gradient_accumulation_steps=gradient_accumulation_steps)
+        accelerator = accelerate.Accelerator(
+            gradient_accumulation_steps=gradient_accumulation_steps,
+            step_scheduler_with_optimizer=True
+        )
         is_main_process = accelerator.is_main_process
     else:
         accelerator = None
@@ -457,9 +456,9 @@ def main():
         optimizer,
         lr_lambda=lambda step: lr_warmup_and_linear_decay(
             step,
-            args.train.lr_warmup_steps,
+            args.train.lr_warmup_updates,
             args.train.lr_decay_end_ratio,
-            args.train.lr_decay_end_steps
+            args.train.lr_decay_end_updates
         )
     )
 
@@ -482,17 +481,15 @@ def main():
     early_stop_counter = 0
 
     start_time = time()
-    for start_step in range(0, args.train.max_steps, args.train.validation_interval):
+    for start_num_updates in range(0, args.train.max_updates, args.train.validation_interval):
         if is_main_process:
-            logging.info('Training: %d/%d', start_step, args.train.max_steps)
+            logging.info('Training: %d/%d', start_num_updates, args.train.max_updates)
         model.train()
         train_loss_list = []
         train_loss_list: List[List[float]]
         # forward_time = 0
         # backward_time = 0
-        for _ in tqdm(range(args.train.validation_interval), disable=not is_main_process):
-            if is_main_process:
-                train_loss_list.append([0. for _ in train_output_attr_name])
+        for step in tqdm(range(args.train.validation_interval*gradient_accumulation_steps), disable=not is_main_process):
             with accelerator.accumulate(model) if args.use_parallel else nullcontext():
                 try:
                     batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
@@ -508,7 +505,6 @@ def main():
                     batch_target_seqs = batch_target_seqs.to(args.use_device)
                 # start_forward_time = time()
                 prediction = model(batch_input_seqs)
-                # assert all(not torch.isnan(h).any() for h in prediction), [torch.isnan(h).nonzero() for h in prediction]
                 # forward_time += time() - start_forward_time
 
                 # start_backward_time = time()
@@ -528,14 +524,14 @@ def main():
                 # assert all(not torch.isnan(head_l).any() for head_l in head_losses)
 
                 if is_main_process:
+                    if (step+1) % gradient_accumulation_steps == 0: # still need to manually control
+                        train_loss_list.append([0. for _ in train_output_attr_name])
                     # note that this only record the loss calculated on main process
                     train_loss_list[-1] = [
                         accu_l + head_l.item() / gradient_accumulation_steps
-                        for head_l, accu_l in zip(head_losses, train_loss_list[-1])
+                        for accu_l, head_l in zip(train_loss_list[-1], head_losses)
                     ]
                     # print(train_loss_list[-1])
-
-                loss = loss / gradient_accumulation_steps
 
                 if args.use_parallel:
                     accelerator.backward(loss)
@@ -562,13 +558,7 @@ def main():
         model.eval()
         valid_loss_list = []
         with torch.no_grad():
-            for _ in tqdm(range(min(args.train.validation_steps, len(valid_dataloader))), disable=not is_main_process):
-                try:
-                    batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
-                except StopIteration:
-                    valid_dataloader_iter = iter(valid_dataloader)
-                    batch_seqs, batch_mps_sep_indices = next(valid_dataloader_iter)
-
+            for batch_seqs, batch_mps_sep_indices in tqdm(valid_dataloader_iter, disable=not is_main_process):
                 batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
                 batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
                 if not args.use_parallel:
@@ -594,8 +584,8 @@ def main():
                 gathered_head_losses = torch.mean(torch.stack(gathered_head_losses), dim=1)
                 valid_loss_list.append([head_l.item() for head_l in gathered_head_losses])
 
-        cur_step = start_step + args.train.validation_interval
-        ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_step}.pt')
+        cur_num_updates = start_num_updates + args.train.validation_interval
+        ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_num_updates}.pt')
         unwrapped_model = None
         if args.use_parallel:
             accelerator.wait_for_everyone()
@@ -622,9 +612,9 @@ def main():
         if is_main_process:
             logging.info('Time: %d, Learning rate: %.6f', time()-start_time, scheduler.get_last_lr()[0])
             assert train_loss_list
-            log_losses(cur_step, train_loss_list, valid_loss_list, loss_file_path)
+            log_losses(cur_num_updates, train_loss_list, valid_loss_list, loss_file_path)
 
-            if cur_step % args.train.generate_sample_interval == 0:
+            if cur_num_updates % args.train.generate_sample_interval == 0:
                 print('Generating conditional and unconditional sample for checkpoint')
                 uncond_gen_text_list = generate_sample(
                     unwrapped_model if args.use_parallel else model,
@@ -632,11 +622,11 @@ def main():
                     nucleus_sampling_threshold=args.nucleus_sampling_threshold
                 )
                 uncond_gen_piece = ' '.join(uncond_gen_text_list)
-                with open(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
+                with open(os.path.join(ckpt_dir_path, f'{cur_num_updates}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
                     uncond_file.write(uncond_gen_piece)
                 try:
                     midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
-                    midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_uncond.mid'))
+                    midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_num_updates}_uncond.mid'))
                 except Exception:
                     print('Error when dumping uncond gen MidiFile object')
                     print(format_exc())
@@ -648,11 +638,11 @@ def main():
                     nucleus_sampling_threshold=args.nucleus_sampling_threshold
                 )
                 cond_gen_piece = ' '.join(cond_gen_text_list)
-                with open(os.path.join(ckpt_dir_path, f'{cur_step}_cond.txt'), 'w+', encoding='utf8') as cond_file:
+                with open(os.path.join(ckpt_dir_path, f'{cur_num_updates}_cond.txt'), 'w+', encoding='utf8') as cond_file:
                     cond_file.write(cond_gen_piece)
                 try:
                     midiobj = piece_to_midi(cond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
-                    midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_step}_cond.mid'))
+                    midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_num_updates}_cond.mid'))
                 except Exception:
                     print('Error when dumping cond gen MidiFile object')
                     print(format_exc())
