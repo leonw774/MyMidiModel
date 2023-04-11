@@ -558,7 +558,7 @@ def main():
         model.eval()
         valid_loss_list = []
         with torch.no_grad():
-            for batch_seqs, batch_mps_sep_indices in tqdm(valid_dataloader_iter, disable=not is_main_process):
+            for batch_seqs, batch_mps_sep_indices in tqdm(valid_dataloader, disable=not is_main_process):
                 batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
                 batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
                 if not args.use_parallel:
