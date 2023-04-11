@@ -190,7 +190,7 @@ if [ "$USE_PARALLEL" == true ]; then
         $USE_PARALLEL == false
     else
         accelerate config default
-        launch_command="accelerate launch --multi_gpu --num_processes $num_CUDA_VISIBLE_DEVICE --num_machine 1"
+        launch_command="accelerate launch --multi_gpu --num_processes $num_CUDA_VISIBLE_DEVICE --num_machines 1"
         train_other_args="$train_other_args --use-parallel"
     fi
 else

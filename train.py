@@ -285,10 +285,7 @@ def main():
         gradient_accumulation_steps = 1
 
     if args.use_parallel:
-        accelerator = accelerate.Accelerator(
-            gradient_accumulation_steps=gradient_accumulation_steps,
-            step_scheduler_with_optimizer=True
-        )
+        accelerator = accelerate.Accelerator(gradient_accumulation_steps=gradient_accumulation_steps)
         is_main_process = accelerator.is_main_process
     else:
         accelerator = None
@@ -328,8 +325,8 @@ def main():
         logging.info(data_args_str)
         logging.info(model_args_str)
         logging.info(train_args_str)
-        logging.info(args_str)
         logging.info('gradient_accumulation_steps:%d', gradient_accumulation_steps)
+        logging.info(args_str)
 
     ######## Prepare loss.csv
 

@@ -34,7 +34,6 @@ EARLY_STOP=10
 
 # device
 USE_DEVICE='cuda'
-# use accelerate by Huggingface
 USE_PARALLEL=true
 MAX_PIECE_PER_GPU=16
 export CUDA_VISIBLE_DEVICES=0,1,2,3
