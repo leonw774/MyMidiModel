@@ -465,8 +465,8 @@ def main():
     ######## Move model to devices
 
     if args.use_parallel:
-        model, optimizer, train_dataloader, valid_dataloader = accelerator.prepare(
-            model, optimizer, train_dataloader, valid_dataloader
+        model, optimizer, scheduler, train_dataloader, valid_dataloader = accelerator.prepare(
+            model, optimizer, scheduler, train_dataloader, valid_dataloader
         )
     else:
         model = model.to(args.use_device)
