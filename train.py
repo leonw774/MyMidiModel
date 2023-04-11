@@ -285,7 +285,12 @@ def main():
         gradient_accumulation_steps = 1
 
     if args.use_parallel:
-        accelerator = accelerate.Accelerator(gradient_accumulation_steps=gradient_accumulation_steps)
+        accelerator = accelerate.Accelerator(
+            # `split_batches=True indicate that the batch size will always stay the same
+            # no matter how many number of GPUs you run your script on
+            split_batches=True, 
+            gradient_accumulation_steps=gradient_accumulation_steps
+        )
         is_main_process = accelerator.is_main_process
     else:
         accelerator = None

@@ -139,7 +139,7 @@ test $? -ne 0 && { echo "text_to_array.py failed. pipeline.sh exit." | tee -a $l
 
 # test if NO_TRAIN is a set variables
 if [ -n "${NO_TRAIN+x}" ]; then
-    echo "Not training" | tee -a $log_path
+    echo "No training" | tee -a $log_path
     echo "pipeline.sh exit."
     exit 0
 fi
@@ -209,6 +209,13 @@ $launch_command train.py \
 test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
 ######## EVALUATION ########
+
+# test if NO_EVAL is a set variables
+if [ -n "${NO_TRAIN+x}" ]; then
+    echo "No evaluation" | tee -a $log_path
+    echo "pipeline.sh exit."
+    exit 0
+fi
 
 ./evaluated_model.sh $MIDI_DIR_PATH $EVAL_SAMPLE_NUMBER $PROCESS_WORKERS $PRIMER_LENGTH $log_path $model_dir_path $NUCLEUS_THRESHOLD $SEED
 test $? -eq 0 && echo "All done. pipeline.sh exit." | tee -a $log_path
