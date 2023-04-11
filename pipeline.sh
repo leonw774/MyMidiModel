@@ -199,11 +199,11 @@ fi
 $launch_command train.py \
     --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation-range $PITCH_AUGMENTATION_RANGE --measure-sample-step-ratio $MEASURE_SAMPLE_STEP_RATIO \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
-    --batch-size $BATCH_SIZE --max-updates $MAX_STEPS --grad-clip-norm $GRAD_CLIP_NORM --split-ratio $SPLIT_RATIO \
+    --batch-size $BATCH_SIZE --max-updates $MAX_UPDATES --grad-clip-norm $GRAD_CLIP_NORM --split-ratio $SPLIT_RATIO \
     --validation-interval $VALIDATION_INTERVAL --early-stop $EARLY_STOP \
     --generate-sample-interval $GEN_SAMPLE_INTERVAL --nucleus-sampling-threshold $NUCLEUS_THRESHOLD \
-    --lr-peak $LEARNING_RATE_PEAK --lr-warmup-updates $LEARNING_RATE_WARMUP_STEPS \
-    --lr-decay-end-updates $LEARNING_RATE_DECAY_END_STEPS --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
+    --lr-peak $LEARNING_RATE_PEAK --lr-warmup-updates $LEARNING_RATE_WARMUP_UPDATES \
+    --lr-decay-end-updates $LEARNING_RATE_DECAY_END_UPDATES --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
     --use-device $USE_DEVICE --primer-measure-length $PRIMER_LENGTH --log $log_path $train_other_args $corpus_dir_path $model_dir_path
 
 test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
