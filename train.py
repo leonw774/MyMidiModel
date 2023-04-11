@@ -279,17 +279,12 @@ def main():
 
     gradient_accumulation_steps = int(args.train.batch_size / (args.max_pieces_per_gpu * parallel_devices_count))
     if gradient_accumulation_steps > 1:
-        args.train.batch_size = args.max_pieces_per_gpu * parallel_devices_count
+        args.train.batch_size = args.max_pieces_per_gpu
     if gradient_accumulation_steps == 0:
         gradient_accumulation_steps = 1
 
     if args.use_parallel:
-        accelerator = accelerate.Accelerator(
-            # `split_batches=True indicate that the batch size will always stay the same
-            # no matter how many number of GPUs you run your script on
-            split_batches=True,
-            gradient_accumulation_steps=gradient_accumulation_steps
-        )
+        accelerator = accelerate.Accelerator()
         is_main_process = accelerator.is_main_process
     else:
         accelerator = None
