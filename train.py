@@ -1,5 +1,4 @@
 from argparse import ArgumentParser, Namespace
-from contextlib import nullcontext
 import glob
 import logging
 import os
@@ -288,7 +287,7 @@ def main():
         accelerator = accelerate.Accelerator(
             # `split_batches=True indicate that the batch size will always stay the same
             # no matter how many number of GPUs you run your script on
-            split_batches=True, 
+            split_batches=True,
             gradient_accumulation_steps=gradient_accumulation_steps
         )
         is_main_process = accelerator.is_main_process
@@ -489,12 +488,13 @@ def main():
         # forward_time = 0
         # backward_time = 0
         training_tqdm = tqdm(
-            range(args.train.validation_interval*gradient_accumulation_steps),
+            range(args.train.validation_interval),
             disable=not is_main_process,
             desc=f'Training:{start_num_updates}~{start_num_updates+args.train.validation_interval}'
         )
-        for step in training_tqdm:
-            with accelerator.accumulate(model) if args.use_parallel else nullcontext():
+        for updates in training_tqdm:
+            train_loss_list.append([0. for _ in train_output_attr_name])
+            for _ in range(gradient_accumulation_steps):
                 try:
                     batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
                 except StopIteration:
@@ -527,9 +527,9 @@ def main():
                     # print('compute_losses use time:', time() - start_backward_time)
                 # assert all(not torch.isnan(head_l).any() for head_l in head_losses)
 
+                loss /= gradient_accumulation_steps
+
                 if is_main_process:
-                    if step % gradient_accumulation_steps == 0: # still need to manually control
-                        train_loss_list.append([0. for _ in train_output_attr_name])
                     # note that this only record the loss calculated on main process
                     train_loss_list[-1] = [
                         accu_l + head_l.item() / gradient_accumulation_steps
@@ -549,12 +549,12 @@ def main():
                     else:
                         clip_grad_norm_(model.parameters(), args.train.grad_clip_norm)
 
-                optimizer.step()
-                scheduler.step()
-                optimizer.zero_grad()
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad()
             # print('loss + back propagate use time:', time() - start_backward_time)
             # backward_time += time() - start_backward_time
-            # end with accelerator.accumulate
+            # end update
         # print('Forward time', forward_time, 'Backward time', backward_time)
 
         model.eval()
@@ -591,13 +591,12 @@ def main():
 
         if is_main_process:
             logging.info(
-                'Progress: %d/%d, Time: %d, Learning rate: %.6f',
+                'Progress: %d/%d, Time: %d, Learning rate: %.4e',
                 cur_num_updates,
                 args.train.max_updates,
                 time()-start_time,
                 scheduler.get_last_lr()[0]
             )
-            assert train_loss_list
             log_losses(cur_num_updates, train_loss_list, valid_loss_list, loss_file_path)
 
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_num_updates}.pt')
