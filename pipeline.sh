@@ -211,7 +211,7 @@ test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a $log_path 
 ######## EVALUATION ########
 
 # test if NO_EVAL is a set variables
-if [ -n "${NO_TRAIN+x}" ]; then
+if [ -n "${NO_EVAL+x}" ]; then
     echo "No evaluation" | tee -a $log_path
     echo "pipeline.sh exit."
     exit 0
