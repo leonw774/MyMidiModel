@@ -524,7 +524,7 @@ def main():
                 # assert all(not torch.isnan(head_l).any() for head_l in head_losses)
 
                 if is_main_process:
-                    if (step+1) % gradient_accumulation_steps == 0: # still need to manually control
+                    if step % gradient_accumulation_steps == 0: # still need to manually control
                         train_loss_list.append([0. for _ in train_output_attr_name])
                     # note that this only record the loss calculated on main process
                     train_loss_list[-1] = [
