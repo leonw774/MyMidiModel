@@ -240,7 +240,7 @@ def log_losses(
         valid_len = len(train_loss_list)
         with open(loss_file_path, 'a', encoding='utf8') as loss_file:
             for i, train_head_losses in enumerate(train_loss_list):
-                idx = cur_num_updates - valid_len + i + 1
+                idx = cur_num_updates - valid_len + i + 1 # count from 1
                 if idx != cur_num_updates:
                     loss_file.write(
                         f'{idx},'
@@ -482,14 +482,16 @@ def main():
 
     start_time = time()
     for start_num_updates in range(0, args.train.max_updates, args.train.validation_interval):
-        if is_main_process:
-            logging.info('Training: %d/%d', start_num_updates, args.train.max_updates)
         model.train()
-        train_loss_list = []
-        train_loss_list: List[List[float]]
+        train_loss_list: List[List[float]] = []
         # forward_time = 0
         # backward_time = 0
-        for step in tqdm(range(args.train.validation_interval*gradient_accumulation_steps), disable=not is_main_process):
+        training_tqdm = tqdm(
+            range(args.train.validation_interval*gradient_accumulation_steps),
+            disable=not is_main_process,
+            desc=f'Training:{start_num_updates}~{start_num_updates+args.train.validation_interval}'
+        )
+        for step in training_tqdm:
             with accelerator.accumulate(model) if args.use_parallel else nullcontext():
                 try:
                     batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
@@ -553,12 +555,10 @@ def main():
             # end with accelerator.accumulate
         # print('Forward time', forward_time, 'Backward time', backward_time)
 
-        if is_main_process:
-            print('Validation')
         model.eval()
         valid_loss_list = []
         with torch.no_grad():
-            for batch_seqs, batch_mps_sep_indices in tqdm(valid_dataloader, disable=not is_main_process):
+            for batch_seqs, batch_mps_sep_indices in tqdm(valid_dataloader, disable=not is_main_process, desc='Validation'):
                 batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
                 batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
                 if not args.use_parallel:
@@ -584,7 +584,20 @@ def main():
                 gathered_head_losses = torch.mean(torch.stack(gathered_head_losses), dim=1)
                 valid_loss_list.append([head_l.item() for head_l in gathered_head_losses])
 
+
         cur_num_updates = start_num_updates + args.train.validation_interval
+
+        if is_main_process:
+            logging.info(
+                'Progress: %d/%d, Time: %d, Learning rate: %.6f',
+                cur_num_updates,
+                args.train.max_updates,
+                time()-start_time,
+                scheduler.get_last_lr()[0]
+            )
+            assert train_loss_list
+            log_losses(cur_num_updates, train_loss_list, valid_loss_list, loss_file_path)
+
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_num_updates}.pt')
         unwrapped_model = None
         if args.use_parallel:
@@ -610,10 +623,6 @@ def main():
                     logging.info('New best model.')
 
         if is_main_process:
-            logging.info('Time: %d, Learning rate: %.6f', time()-start_time, scheduler.get_last_lr()[0])
-            assert train_loss_list
-            log_losses(cur_num_updates, train_loss_list, valid_loss_list, loss_file_path)
-
             if cur_num_updates % args.train.generate_sample_interval == 0:
                 print('Generating conditional and unconditional sample for checkpoint')
                 uncond_gen_text_list = generate_sample(
