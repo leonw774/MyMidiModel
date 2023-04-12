@@ -169,19 +169,27 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
 
 def midi_to_features(
         midi: MidiFile,
+        midi_to_piece_paras: Union[dict, None] = None,
         primer_measure_length: int = 0,
         max_pairs_number: int = int(1e6),
         max_token_number: int = int(1e4)) -> Dict[str, float]:
-    nth = midi.ticks_per_beat * 4
+
+    if midi_to_piece_paras is None:
+        nth = midi.ticks_per_beat * 4
+        midi_to_piece_paras = {
+            'nth': nth,
+            'max_track_number': len(midi.instruments),
+            'max_duration': nth,
+            'velocity_step': 1,
+            'use_cont_note': True,
+            'tempo_quantization': (1, 512, 1),
+            'use_merge_drums': False
+        }
+    else:
+        nth = midi_to_piece_paras['nth']
     temp_piece = midi_to_piece(
-        midi,
-        nth=nth,
-        max_track_number=len(midi.instruments),
-        max_duration=nth,
-        velocity_step=1,
-        use_cont_note=True,
-        tempo_quantization=(1,4096,1),
-        use_merge_drums=False
+        midi=midi,
+        **midi_to_piece_paras
     )
     return piece_to_features(temp_piece, nth, primer_measure_length, max_pairs_number, max_token_number)
 
