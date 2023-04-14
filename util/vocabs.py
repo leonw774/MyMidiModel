@@ -1,4 +1,5 @@
 import re
+from tqdm import tqdm
 
 from . import tokens
 from .tokens import (
@@ -132,7 +133,7 @@ def build_vocabs(
     max_mps_number = 0
     corpus_measure_time_sigs = set()
     token_count_per_piece = []
-    for piece in corpus_reader:
+    for piece in tqdm(corpus_reader):
         measure_number = piece.count(measure_substr)
         max_measure_number = max(max_measure_number, measure_number)
 
