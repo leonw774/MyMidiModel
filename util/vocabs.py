@@ -176,7 +176,7 @@ def build_vocabs(
         f'Duration vocab size: {len(duration_vocab)}\n'\
         f'Velocity vocab size: {len(velocity_vocab)} ({velocity_vocab})\n'\
         f'Track number vocab size: {paras["max_track_number"]}\n'\
-        f'(Estimated) Max MPS number: {max_measure_length}\n'
+        f'Max MPS number: {max_mps_number}\n'
         f'Max measure number: {max_measure_number}'
     )
     # print(f'Vocabulary build time: {time()-start_time}')
