@@ -191,7 +191,7 @@ def build_vocabs(
         velocities=velocity_vocab,
         track_numbers=track_number_vocab,
         instruments=instrument_vocab,
-        max_mps_numbers=max_measure_length,
+        max_mps_numbers=max_mps_number,
         max_measure_number=max_measure_number,
         tempos=tempo_vocab,
         time_signatures=time_sig_vocab
