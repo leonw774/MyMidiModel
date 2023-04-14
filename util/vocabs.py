@@ -138,11 +138,10 @@ def build_vocabs(
         max_measure_number = max(max_measure_number, measure_number)
 
         all_measure_start_index = [m.start() for m in re.finditer(measure_substr, piece)] + [len(piece)]
-        piece_max_measure_number = max([
-            1 + 2 * piece[start:end].count(position_substr) + piece[start:end].count(tempo_substr)
-            for start, end in zip(all_measure_start_index[:-1], all_measure_start_index[1:])
-        ])
-        max_mps_number = max(max_mps_number, piece_max_measure_number)
+        for start, end in zip(all_measure_start_index[:-1], all_measure_start_index[1:]):
+            if end - start > max_mps_number:
+                mps_number = 1 + 2 * piece[start:end].count(position_substr) + piece[start:end].count(tempo_substr)
+                max_mps_number = max(max_mps_number, mps_number)
 
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
@@ -162,7 +161,7 @@ def build_vocabs(
     velocity_vocab = pad_token + list(map(int2b36str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
     track_number_vocab = pad_token + list(map(int2b36str, range(paras['max_track_number'])))
     instrument_vocab = pad_token + list(map(int2b36str, range(129)))
-    # mps number and measure number are just increasing integer that generated dynamically in corpus.text_to_array, no vocab needed
+    # mps number and measure number are just increasing integer that generated dynamically in corpus.text_to_array
     tempo_vocab = pad_token + event_tempo
     time_sig_vocab = pad_token + event_measure_time_sig
 
