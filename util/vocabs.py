@@ -1,3 +1,5 @@
+import re
+
 from . import tokens
 from .tokens import (
     int2b36str,
@@ -35,14 +37,14 @@ class Vocabs:
     velocities: AttrVocab
     track_numbers: AttrVocab
     instruments: AttrVocab
-    positions: AttrVocab
+    max_mps_numbers: int
     max_measure_number: int
     tempos: AttrVocab
     time_signatures: AttrVocab
 
     def __init__(self, paras: dict, bpe_shapes_list: list, padding_token: str,
             events, pitchs, durations, velocities, track_numbers, instruments,
-            positions, max_measure_number, tempos, time_signatures) -> None:
+            max_mps_numbers, max_measure_number, tempos, time_signatures) -> None:
         self.paras = paras
         self.bpe_shapes_list = bpe_shapes_list
         self.padding_token = padding_token
@@ -52,7 +54,7 @@ class Vocabs:
         self.velocities = Vocabs.AttrVocab(velocities)
         self.track_numbers = Vocabs.AttrVocab(track_numbers)
         self.instruments = Vocabs.AttrVocab(instruments)
-        self.positions = Vocabs.AttrVocab(positions)
+        self.max_mps_numbers = max_mps_numbers
         self.max_measure_number = max_measure_number
         self.tempos = Vocabs.AttrVocab(tempos)
         self.time_signatures = Vocabs.AttrVocab(time_signatures)
@@ -62,7 +64,7 @@ class Vocabs:
         return cls(
             d['paras'], d['bpe_shapes_list'], d['padding_token'],
             d['events'], d['pitchs'], d['durations'], d['velocities'], d['track_numbers'],
-            d['instruments'], d['positions'], d['max_measure_number'], d['tempos'], d['time_signatures']
+            d['instruments'], d['max_mps_numbers'], d['max_measure_number'], d['tempos'], d['time_signatures']
         )
 
     def to_dict(self) -> dict:
@@ -76,7 +78,7 @@ class Vocabs:
             'velocities': vars(self.velocities),
             'track_numbers': vars(self.track_numbers),
             'instruments': vars(self.instruments),
-            'positions': vars(self.positions),
+            'max_mps_numbers': self.max_mps_numbers,
             'max_measure_number': self.max_measure_number,
             'tempos': vars(self.tempos),
             'time_signatures': vars(self.time_signatures),
@@ -123,17 +125,29 @@ def build_vocabs(
         f'{tokens.MEASURE_EVENTS_CHAR}{int2b36str(n)}/{int2b36str(d)}' for n, d in supported_time_signatures
     ]
 
+    measure_substr = ' '+tokens.MEASURE_EVENTS_CHAR
+    position_substr = ' '+tokens.POSITION_EVENTS_CHAR
+    tempo_substr = ' '+tokens.TEMPO_EVENTS_CHAR
     max_measure_number = 0
-    existed_measure_time_sigs = set()
+    max_mps_number = 0
+    corpus_measure_time_sigs = set()
     token_count_per_piece = []
     for piece in corpus_reader:
-        m = piece.count(' '+tokens.MEASURE_EVENTS_CHAR)
-        max_measure_number = max(max_measure_number, m)
+        measure_number = piece.count(measure_substr)
+        max_measure_number = max(max_measure_number, measure_number)
+
+        all_measure_start_index = [m.start() for m in re.finditer(measure_substr, piece)] + [len(piece)]
+        piece_max_measure_number = max([
+            1 + 2 * piece[start:end].count(position_substr) + piece[start:end].count(tempo_substr)
+            for start, end in zip(all_measure_start_index[:-1], all_measure_start_index[1:])
+        ])
+        max_mps_number = max(max_mps_number, piece_max_measure_number)
+
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
-        existed_measure_time_sigs.update({text for text in text_list if text[0] == tokens.MEASURE_EVENTS_CHAR})
+        corpus_measure_time_sigs.update({text for text in text_list if text[0] == tokens.MEASURE_EVENTS_CHAR})
     # should we remove time signatures that dont appears in target corpus?
-    # event_measure_time_sig = [t for t in event_measure_time_sig if t in existed_measure_time_sigs]
+    # event_measure_time_sig = [t for t in event_measure_time_sig if t in corpus_measure_time_sigs]
 
     # padding token HAVE TO be at first
     event_vocab = (
@@ -147,21 +161,21 @@ def build_vocabs(
     velocity_vocab = pad_token + list(map(int2b36str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
     track_number_vocab = pad_token + list(map(int2b36str, range(paras['max_track_number'])))
     instrument_vocab = pad_token + list(map(int2b36str, range(129)))
-    position_vocab = pad_token + list(map(int2b36str, range(largest_possible_position)))
-    # measure number are just increasing integer that generated dynamically in corpus.text_to_array, no vocab needed
+    # mps number and measure number are just increasing integer that generated dynamically in corpus.text_to_array, no vocab needed
     tempo_vocab = pad_token + event_tempo
     time_sig_vocab = pad_token + event_measure_time_sig
 
     summary_string = (
         f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
         f'Event vocab size: {len(event_vocab)}\n'\
-        f'- Measure-time signature: {len(event_measure_time_sig)} (Existed in corpus: {len(existed_measure_time_sigs)})\n'\
-        f'- Position: {len(position_vocab)}\n'\
+        f'- Measure-time signature: {len(event_measure_time_sig)} (Existed in corpus: {len(corpus_measure_time_sigs)})\n'\
+        f'- Position: {len(event_position)}\n'\
         f'- Tempo: {len(event_tempo)} ({event_tempo})\n'\
         f'- Shape: {len(event_multi_note_shapes)}\n'\
         f'Duration vocab size: {len(duration_vocab)}\n'\
         f'Velocity vocab size: {len(velocity_vocab)} ({velocity_vocab})\n'\
         f'Track number vocab size: {paras["max_track_number"]}\n'\
+        f'(Estimated) Max MPS number: {max_measure_length}\n'
         f'Max measure number: {max_measure_number}'
     )
     # print(f'Vocabulary build time: {time()-start_time}')
@@ -177,7 +191,7 @@ def build_vocabs(
         velocities=velocity_vocab,
         track_numbers=track_number_vocab,
         instruments=instrument_vocab,
-        positions=position_vocab,
+        max_mps_numbers=max_measure_length,
         max_measure_number=max_measure_number,
         tempos=tempo_vocab,
         time_signatures=time_sig_vocab

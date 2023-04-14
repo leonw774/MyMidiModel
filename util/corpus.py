@@ -55,14 +55,14 @@ ATTR_NAME_INDEX = {
     'vel': 3, 'velocities': 3,
     'trn': 4, 'track_numbers': 4,
     'ins': 5, 'instruments': 5, # context
-    'pos': 6, 'positions': 6, # positional
+    'mps': 6, 'mps_numbers': 6, # positional
     'mea': 7, 'measure_numbers': 7, # positional
     'tmp': 8, 'tempos': 8, # context
     'tis': 9, 'time_signatures': 9 # context
 }
 
 COMPLETE_ATTR_NAME = [
-    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'positions', 'measure_numbers',
+    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'mps_numbers', 'measure_numbers',
     'tempos', 'time_signatures'
 ]
 
@@ -81,7 +81,13 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         Serialize pieces into numpy array for the model input.
 
         Each token is processed into an 10-dimensional vector:
-            event, pitch, duration, velocity, track_number, instrument, position, measure_number, tempo, time signature
+            event, pitch, duration, velocity, track_number, instrument, mps_number, measure_number, tempo, time signature
+
+        Explanation of maximal permutable subsequence (MPS):
+            M = Measure, P = Position, N = Multi-note
+            consider sequence: M  P  N  N  N  P  N  N  P  N  M  P  N  N
+                        index: 0  1  2  3  4  5  6  7  8  9  10 11 12 13
+            its mps number is: 1  2  3  3  3  4  5  5  6  7  8  9  10 10
 
         If a token doesn't have an attribute, fill it with the index of PAD (which should be zero).
         If a token has an attrbute, but it is not in the vocabs, error would be raised
@@ -94,8 +100,8 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         x = np.full((len(text_list), len(COMPLETE_ATTR_NAME)), fill_value=padding, dtype=np.uint16)
         tracks_count = 0
         cur_position_cursor = 0
-        cur_position_id = 0
-        cur_measure_number = 0 # measure_number starts at 1, 0 is padding
+        cur_mps_number = 0
+        cur_measure_number = 0 # mps-nubmer and measure_number starts at 1, 0 is padding
         cur_tempo_id = padding
         cur_time_sig_id = padding
     elif isinstance(input_memory, dict):
@@ -104,7 +110,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         x[:last_array_len] = input_memory['last_array']
         tracks_count = input_memory['tracks_count']
         cur_position_cursor = input_memory['cur_position_cursor']
-        cur_position_id = input_memory['cur_position_id']
+        cur_mps_number = input_memory['cur_mps_number']
         cur_measure_number = input_memory['cur_measure_number']
         cur_tempo_id = input_memory['cur_tempo_id']
         cur_time_sig_id = input_memory['cur_time_sig_id']
@@ -129,19 +135,19 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             x[i][ATTR_NAME_INDEX['ins']] = vocabs.instruments.text2id[instrument]
 
         elif typename == tokens.MEASURE_EVENTS_CHAR:
-            cur_position_id = vocabs.positions.text2id['0']
             cur_time_sig_id = vocabs.time_signatures.text2id[text]
+            cur_mps_number = 1
             cur_measure_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
-            x[i][ATTR_NAME_INDEX['pos']] = cur_position_id
+            x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
             x[i][ATTR_NAME_INDEX['mea']] = cur_measure_number
-            # x[i][TOKEN_ATTR_INDEX['tmp']] = padding
             x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
 
         elif typename == tokens.TEMPO_EVENTS_CHAR:
             event_text, *attr = text = text.split(':')
+            cur_mps_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
-            x[i][ATTR_NAME_INDEX['pos']] = cur_position_id
+            x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
             x[i][ATTR_NAME_INDEX['mea']] = cur_measure_number
             x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
             x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
@@ -151,10 +157,10 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             x[cur_position_cursor][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
 
         elif typename == tokens.POSITION_EVENTS_CHAR:
-            cur_position_id = vocabs.positions.text2id[text[1:]]
+            cur_mps_number += 1
             cur_position_cursor = i
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
-            x[i][ATTR_NAME_INDEX['pos']] = cur_position_id
+            x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
             x[i][ATTR_NAME_INDEX['mea']] = cur_measure_number
             x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
             x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
@@ -168,7 +174,9 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             x[i][ATTR_NAME_INDEX['trn']] = vocabs.track_numbers.text2id[attr[3]]
             assert b36str2int(attr[3]) < tracks_count, 'Invalid track number'
             x[i][ATTR_NAME_INDEX['ins']] = x[b36str2int(attr[3])+1, ATTR_NAME_INDEX['ins']]
-            x[i][ATTR_NAME_INDEX['pos']] = cur_position_id
+            if x[i-1][ATTR_NAME_INDEX['pit']] == 0: # if last token is position
+                cur_mps_number += 1
+            x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
             x[i][ATTR_NAME_INDEX['mea']] = cur_measure_number
             x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
             x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
@@ -180,7 +188,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
                 'last_array': x,
                 'tracks_count': tracks_count,
                 'cur_position_cursor': cur_position_cursor,
-                'cur_position_id': cur_position_id,
+                'cur_mps_number': cur_mps_number,
                 'cur_measure_number': cur_measure_number,
                 'cur_tempo_id': cur_tempo_id,
                 'cur_time_sig_id': cur_time_sig_id,
@@ -248,25 +256,21 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
     return text_list
 
 
-def get_input_array_format_string(input_array: np.ndarray, mps_sep_indices, vocabs: Vocabs):
+def get_input_array_format_string(input_array: np.ndarray, vocabs: Vocabs):
     array_text_byteio = io.BytesIO()
     np.savetxt(array_text_byteio, input_array, fmt='%d')
     array_savetxt_list = array_text_byteio.getvalue().decode().split('\n')
     reconstructed_text_list = array_to_text_list(input_array, vocabs=vocabs)
     longest_text_length = max(map(len, reconstructed_text_list))
     reconstructed_text_list = [text.ljust(longest_text_length) for text in reconstructed_text_list]
-    if mps_sep_indices is None:
-        mps_sep_indices = []
-    debug_str = ' evt  pit  dur  vel  trn  ins  pos  mea  tmp  tis  reconstructed_text\n'
+    debug_str = ' evt  pit  dur  vel  trn  ins  mps  mea  tmp  tis  reconstructed_text\n'
     debug_str += (
         '\n'.join([
             ' '.join([f'{s:>4}' for s in a.split()])
-            + f'  {z}' + (' MPS_SEP' if i in mps_sep_indices else '')
+            + f'  {z}'
             for i, (a, z) in enumerate(zip(array_savetxt_list, reconstructed_text_list))
         ])
     )
-    if isinstance(mps_sep_indices, np.ndarray):
-        debug_str += '\nmps_sep_indices: ' + str(mps_sep_indices)
     return debug_str
 
 

@@ -249,6 +249,7 @@ def main():
                 while True:
                     i = input()
                     if i == 'y':
+                        print('Removing...')
                         if os.path.exists(to_corpus_file_path(args.output_dir_path)):
                             os.remove(to_corpus_file_path(args.output_dir_path))
                         if os.path.exists(to_paras_file_path(args.output_dir_path)):

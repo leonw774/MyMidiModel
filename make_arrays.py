@@ -8,7 +8,7 @@ import shutil
 from time import strftime, time
 from traceback import format_exc
 from typing import Dict
-from zipfile import ZipFile, ZIP_STORED, ZIP_DEFLATED
+from zipfile import ZipFile, ZIP_DEFLATED
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -24,6 +24,7 @@ from util.corpus import (
     to_vocabs_file_path,
     to_arrays_file_path,
     get_corpus_paras,
+    ATTR_NAME_INDEX,
     text_list_to_array,
     get_input_array_format_string,
 )
@@ -132,9 +133,10 @@ def main():
         assert len(corpus_reader) > 0, f'empty corpus: {args.corpus_dir_path}'
 
         vocabs, summary_string = build_vocabs(corpus_reader, corpus_paras, bpe_shapes_list)
+        logging.info(summary_string)
+
         with open(vocab_path, 'w+', encoding='utf8') as vocabs_file:
             json.dump(vocabs.to_dict(), vocabs_file)
-        logging.info(summary_string)
 
         start_time = time()
         logging.info('Begin make npys')
@@ -193,7 +195,7 @@ def main():
             original_text_list = [text.ljust(longest_text_length) for text in original_text_list]
 
             array_data = text_list_to_array(piece_0.split(), vocabs)
-            debug_str = get_input_array_format_string(array_data, None, vocabs)
+            debug_str = get_input_array_format_string(array_data, vocabs)
             debug_str_list = debug_str.splitlines()
 
             merged_lines = [

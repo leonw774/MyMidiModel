@@ -62,7 +62,7 @@ class MidiDataset(Dataset):
         npz_zipinfo_list = zipfile.ZipFile(npz_path).infolist()
         array_memory_size = sum([zinfo.file_size for zinfo in npz_zipinfo_list])
         if verbose:
-            print('available_memory_size:', available_memory_size, 'array_memory_size:', array_memory_size)
+            print('available memory size:', available_memory_size, 'arrays memory size:', array_memory_size)
         if array_memory_size >= available_memory_size - 4e9: # keep 4G for other things
             # load from disk every time indexing
             if verbose:
@@ -107,17 +107,6 @@ class MidiDataset(Dataset):
                 self._tempo_ids.add(index)
             elif text[0] == tokens.TRACK_EVENTS_CHAR:
                 self._track_ids.add(index)
-        if permute_mps:
-            self._mps_separators = set([
-                self._pad_id,
-                self._bos_id,
-                self._sep_id,
-                self._eos_id,
-            ])
-            self._mps_separators.update(self._track_ids)
-            self._mps_separators.update(self._measure_ids)
-            self._mps_separators.update(self._position_ids)
-            self._mps_separators = np.sort(np.array(list(self._mps_separators)))
         # numpy.isin can work on set, but turn it into sorted 1d array helps search speed
         self._note_ids = np.sort(np.array(self._note_ids))
         self._position_ids = np.sort(np.array(self._position_ids))
@@ -133,7 +122,7 @@ class MidiDataset(Dataset):
         self._virtual_piece_start_index = [[0] for _ in range(self.number_of_pieces)]
 
         self._file_mps_sep_indices = [[] for _ in range(self.number_of_pieces)]
-        
+
         self._augmentable_pitches = [np.empty((0,), dtype=np.bool8) for _ in range(self.number_of_pieces)]
         self._pitch_augmentation_factor = self.pitch_augmentation_range * 2 + 1 # length of (-pa, ..., -1, 0, 1, ..., pa)
 
@@ -168,26 +157,19 @@ class MidiDataset(Dataset):
                             start_vp_num += 1
 
             if permute_mps:
-                # find all seperater's index in body
-                # the result array is sorted in increaing order
-                mps_sep_indices = np.flatnonzero(
-                    np.isin(self.pieces[filename][:, ATTR_NAME_INDEX['evt']], self._mps_separators)
-                )
-                for i in range(mps_sep_indices.shape[0]):
-                    self._file_mps_sep_indices[filenum].append(mps_sep_indices[i])
-                    # M = Measure, P = Position, N = Multi-note
-                    # consider this sequence: M  P  N  N  N  P  N  N  P  N  M  P  N  N
-                    #                  index: 0  1  2  3  4  5  6  7  8  9  10 11 12 13
-                    # the mps are like this:  X  X  1  1  1  X  2  2  X  3  X  X  4  4
-                    # indices of separator:  [0, 1,          5,       8,    10,11]
-                    # X means it is separator, number represents different mps
-                    # if see separator as mps of length 1, we get mps like this:
-                    #                         1  2  3  3  3  4  5  5  6  7  8  9  10 10
-                    # then just store the mps by their beginning index:
-                    #                        [0, 1, 2,       5, 6,    8, 9, 10,11,12]
-                    if i + 1 < mps_sep_indices.shape[0]:
-                        if mps_sep_indices[i+1] != mps_sep_indices[i] + 1:
-                            self._file_mps_sep_indices[filenum].append(mps_sep_indices[i] + 1)
+                # consider sequence: M  P  N  N  N  P  N  N  P  N  M  P  N  N
+                #             index: 0  1  2  3  4  5  6  7  8  9  10 11 12 13
+                # mps numbers are:   1  2  3  3  3  4  5  5  6  7  8  9  10 10
+                # we want the beginning indices of all mps:
+                #                   [0, 1, 2,       5, 6,    8, 9, 10,11,12]
+                mps_numbers = self.pieces[filename][:, ATTR_NAME_INDEX['mps']]
+                # just find where the number increases
+                body_mps_sep_indices = np.where(mps_numbers[:-1] < mps_numbers[1:])[0]
+                mps_sep_indices = np.concatenate([
+                    # np.arange(j + 1), # the head # actually don't need this because it is handled in __getitem__
+                    body_mps_sep_indices,
+                    np.array([self.pieces[filename].shape[0]]) # the EOS
+                ])
 
             if self.pitch_augmentation_range != 0:
                 is_multinote_token = (self.pieces[filename][:, ATTR_NAME_INDEX['pit']]) != 0
@@ -295,13 +277,12 @@ class MidiDataset(Dataset):
                     body_section[:, ATTR_NAME_INDEX['dur']], # sort by this last
                     body_section[:, ATTR_NAME_INDEX['pit']],
                     body_section[:, ATTR_NAME_INDEX['trn']],
-                    body_section[:, ATTR_NAME_INDEX['pos']],
+                    body_section[:, ATTR_NAME_INDEX['mps']],
                     body_section[:, ATTR_NAME_INDEX['mea']], # sort by this first
                 ))
                 sampled_array[body_start_index:body_end_index] = body_section[order]
 
         mps_sep_indices_list = []
-        mps_sep_indices = None
         if self.permute_mps:
             mps_tokens_ranges = []
             mps_sep_indices_list_head = [
@@ -313,13 +294,10 @@ class MidiDataset(Dataset):
                 if start_index <= i < end_index
             ]
             mps_sep_indices_list = mps_sep_indices_list_head + mps_sep_indices_list_body
-            # technically, the BOS is the mps separator
-            # so the first number in mps_sep_indices_list already is 0
-            # but we just add them to be safe
-            mps_sep_indices_and_two_ends = [0] + mps_sep_indices_list + [sampled_array.shape[0]]
-            for i in range(len(mps_sep_indices_and_two_ends)-1):
-                start = mps_sep_indices_and_two_ends[i]
-                end = mps_sep_indices_and_two_ends[i+1]
+            mps_sep_indices_and_end = mps_sep_indices_list + [sampled_array.shape[0]]
+            for i in range(len(mps_sep_indices_and_end)-1):
+                start = mps_sep_indices_and_end[i]
+                end = mps_sep_indices_and_end[i+1]
                 if end - start >= 2:
                     mps_tokens_ranges.append((start, end))
 
@@ -328,46 +306,36 @@ class MidiDataset(Dataset):
                 p = np.random.permutation(end-start) + start
                 sampled_array[start:end] = sampled_array[p]
 
-            # a numpy array of sequences sep indices would also be returned if self.use_permutable_subseq_loss
-            if self.use_permutable_subseq_loss:
-                mps_sep_indices = np.array(
-                    mps_sep_indices_list,
-                    dtype=np.int16
-                )
-
         # checking for bad numbers
-        for fname, fidx in ATTR_NAME_INDEX.items():
-            if len(fname) > 3: # not abbr
+        for attr_name, fidx in ATTR_NAME_INDEX.items():
+            if len(attr_name) > 3: # not abbr
                 assert np.min(sampled_array[:, fidx]) >= 0,\
-                    (f'number in {fname} is below zero\n'
+                    (f'number in {attr_name} is below zero\n'
                     f'{get_input_array_format_string(sampled_array, None, self.vocabs)}')
-                if fname == 'measure_numbers':
-                    assert np.max(sampled_array[:, fidx]) < self.max_seq_length,\
-                        (f'number in {fname} larger than vocab size\n'
+                if attr_name == 'measure_numbers':
+                    assert np.max(sampled_array[:, fidx]) < self.vocabs.max_measure_number,\
+                        (f'number in {attr_name} larger than vocab size\n'
+                        f'{get_input_array_format_string(sampled_array, None, self.vocabs)}')
+                elif attr_name == 'mps_numbers':
+                    assert np.max(sampled_array[:, fidx]) < self.vocabs.max_mps_numbers,\
+                        (f'number in {attr_name} larger than vocab size\n'
                         f'{get_input_array_format_string(sampled_array, None, self.vocabs)}')
                 else:
-                    assert np.max(sampled_array[:, fidx]) < getattr(self.vocabs, fname).size,\
-                        (f'number in {fname} larger than vocab size\n'
+                    assert np.max(sampled_array[:, fidx]) < getattr(self.vocabs, attr_name).size,\
+                        (f'number in {attr_name} larger than vocab size\n'
                         f'{get_input_array_format_string(sampled_array, None, self.vocabs)}')
 
-        return from_numpy(sampled_array), mps_sep_indices
+        return from_numpy(sampled_array)
 
 
     def __len__(self):
         return self._max_index
 
 
-def collate_mididataset(data: List[Tuple[Tensor, Union[np.ndarray, None]]]) -> Tuple[Tensor, List]:
+def collate_mididataset(seq_list: List[Tensor]) -> Tensor:
     """
-        for batched sequences: stack them on batch-first to becom 3-d array and pad them
-        for others, become 1-d object numpy array if not None
+        stack batched sequences with batch-first to becom 3-d array and pad them
     """
-    # print('\n'.join(map(str, [d for d in data])))
-    seqs, mps_sep_indices = zip(*data)
-    batched_seqs = pad_sequence(seqs, batch_first=True, padding_value=0)
-    # mps_sep_indices could be None or numpy object array of tuples
-    if mps_sep_indices[0] is None:
-        batched_mps_sep_indices = []
-    else:
-        batched_mps_sep_indices = list(mps_sep_indices)
-    return batched_seqs, batched_mps_sep_indices
+    # print('\n'.join(map(str, seq_list)))
+    batched_seqs = pad_sequence(seq_list, batch_first=True, padding_value=0)
+    return batched_seqs

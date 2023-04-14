@@ -615,24 +615,22 @@ def generate_sample(
 def compute_permutable_subseq_losses(
         pred_logits: List[Tensor],
         target_labels: Tensor,
-        batched_mps_indices: List) -> Tuple[Tensor, List[Tensor]]:
+        batched_mps_numbers: Tensor) -> Tuple[Tensor, List[Tensor]]:
     """
         pred_logits is a list
         - length: out_attr_num
         - elements are tenors with shape: (batch_size, seq_size, attr_vocabs_size)
         target_labels has shape: (batch_size, seq_size, out_attr_num)
-        mps_indices is a numpy object array of numpy int16 arrays in varying lengths
         return a list of losses of each head
     """
 
-    # because the target is prediction shifted left by 1 index
-    # the first (0th) prediction in a mps can have (mps_size-1) possible labels
-    # the last (mps_size-th) prediction in a mps can have (next_mps_size) possible labels
-    # when we we are finding permutation of target, all index need to be subtracted by 1
-    # so that their corrresponding target is the beginning of mps
+    # find mps separators
     batched_mps_indices_as_list = [
-        [m-1 for m in mps_indices] + [target_labels.shape[1]-1]
-        for mps_indices in batched_mps_indices
+        (
+            torch.where(mps_number[:-1] < mps_number[1:])[0].tolist() # find where the number increases
+            + torch.where(mps_number == 0)[0].tolist() # include all index where mps is zero (head and EOS)
+        )
+        for mps_number in batched_mps_numbers
     ]
 
     with torch.no_grad():

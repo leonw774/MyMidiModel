@@ -13,16 +13,14 @@ parser = ArgumentParser()
 parser.add_argument(
     '--max-seq-length',
     type=int,
-    default=48
-)
-parser.add_argument(
-    '--use-permutable-subseq-loss',
-    action='store_true'
+    default=48,
+    help='Default is %(default)s'
 )
 parser.add_argument(
     '--measure-sample-step-ratio',
     type=float,
-    default=0.25
+    default=0.5,
+    help='Default is %(default)s'
 )
 parser.add_argument(
     '--permute-mps',
@@ -35,12 +33,14 @@ parser.add_argument(
 parser.add_argument(
     '--pitch-augmentation-range',
     type=int,
-    default=0
+    default=0,
+    help='Default is %(default)s'
 )
 parser.add_argument(
     '--batch-size',
     type=int,
-    default=4
+    default=4,
+    help='Default is %(default)s'
 )
 parser.add_argument(
     '--output-midi',
@@ -49,13 +49,15 @@ parser.add_argument(
 parser.add_argument(
     '--seed',
     type=int,
-    default=None
+    default=None,
+    help='Default is %(default)s'
 )
 parser.add_argument(
     'corpus_dir_path',
     type=str,
     nargs='?',
-    default='data/corpus/test_midis_nth32_r32_d32_v16_t24_200_16'
+    default='data/corpus/test_midis_nth32_r32_d32_v16_t24_200_16',
+    help='Default is %(default)s'
 )
 args = parser.parse_args()
 if args.seed is not None:
@@ -65,7 +67,6 @@ if args.seed is not None:
 dataset = MidiDataset(
     data_dir_path=args.corpus_dir_path,
     max_seq_length=args.max_seq_length,
-    use_permutable_subseq_loss=args.use_permutable_subseq_loss,
     measure_sample_step_ratio=args.measure_sample_step_ratio,
     permute_mps=args.permute_mps,
     permute_track_number=args.permute_track_number,
@@ -74,7 +75,6 @@ dataset = MidiDataset(
 )
 vocabs = dataset.vocabs
 print('max_seq_length:', dataset.max_seq_length)
-print('use_permutable_subseq_loss:', dataset.use_permutable_subseq_loss)
 print('permute_mps:', dataset.permute_mps)
 print('permute_track_number:', dataset.permute_track_number)
 
@@ -103,12 +103,10 @@ train_dataloader = DataLoader(
     shuffle=False,
     collate_fn=collate_mididataset
 )
-batched_samples, batched_mps_sep_indices = next(iter(train_dataloader))
-if len(batched_mps_sep_indices) == 0:
-    batched_mps_sep_indices = [None] * batched_samples.shape[0]
-for i, (s, e) in enumerate(zip(batched_samples, batched_mps_sep_indices)):
+batched_samples = next(iter(train_dataloader))
+for i, s in enumerate(batched_samples):
     print(f'BATCHED[{i}]')
-    print(get_input_array_format_string(s.numpy(), e, vocabs))
+    print(get_input_array_format_string(s.numpy(), vocabs))
     piece = ' '.join(array_to_text_list(s.numpy(), vocabs))
     print(piece)
     if args.output_midi:

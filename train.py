@@ -19,7 +19,7 @@ from torch.optim import AdamW, lr_scheduler
 import torchinfo
 
 from util.midi import piece_to_midi, get_first_k_measures
-from util.corpus import COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, get_corpus_vocabs, array_to_text_list, text_list_to_array
+from util.corpus import ATTR_NAME_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, get_corpus_vocabs, array_to_text_list, text_list_to_array
 from util.dataset import MidiDataset, collate_mididataset
 from util.model import (
     MyMidiTransformer,
@@ -492,10 +492,10 @@ def main():
             train_loss_list.append([0. for _ in train_output_attr_name])
             for _ in range(gradient_accumulation_steps):
                 try:
-                    batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
+                    batch_seqs = next(train_dataloader_iter)
                 except StopIteration:
                     train_dataloader_iter = iter(train_dataloader)
-                    batch_seqs, batch_mps_sep_indices = next(train_dataloader_iter)
+                    batch_seqs = next(train_dataloader_iter)
 
                 # batch_seqs has shape: (batch_size, seq_size, complete_attr_num)
                 batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
@@ -509,10 +509,11 @@ def main():
 
                 # start_backward_time = time()
                 if args.data.use_permutable_subseq_loss:
+                    batch_mps_number_seq = batch_seqs[:, 1:, ATTR_NAME_INDEX['mps']]
                     loss, head_losses = compute_permutable_subseq_losses(
                         prediction,
                         batch_target_seqs,
-                        batch_mps_sep_indices
+                        batch_mps_number_seq
                     )
                     # print('compute_permutable_subseq_losses use time:', time() - start_backward_time)
                 else:
@@ -556,7 +557,7 @@ def main():
         model.eval()
         valid_loss_list = []
         with torch.no_grad():
-            for batch_seqs, batch_mps_sep_indices in tqdm(valid_dataloader, disable=not is_main_process, desc='Validation'):
+            for batch_seqs in tqdm(valid_dataloader, disable=not is_main_process, desc='Validation'):
                 batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
                 batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
                 if not args.use_parallel:
@@ -565,10 +566,11 @@ def main():
                 prediction = model(batch_input_seqs)
 
                 if args.data.use_permutable_subseq_loss:
+                    batch_mps_number_seq = batch_seqs[:, 1:, ATTR_NAME_INDEX['mps']]
                     loss, head_losses = compute_permutable_subseq_losses(
                         prediction,
                         batch_target_seqs,
-                        batch_mps_sep_indices,
+                        batch_mps_number_seq
                     )
                 else:
                     loss, head_losses = compute_losses(
