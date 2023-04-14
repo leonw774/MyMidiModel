@@ -45,15 +45,17 @@ class CorpusReader:
                 yield self[i]
 
     def __getitem__(self, index: int) -> str:
-        if index >= self.length:
-            raise IndexError(f'line index out of range: {index} > {self.length}')
         if len(self.line_pos) == 0:
             result = ''
             for i, line in enumerate(self): # iter itself to get cache
                 if i == index:
                     result = line
+            if result == '':
+                raise IndexError(f'line index out of range: {index} > {self.length}')
             return result
         else:
+            if index >= self.length:
+                raise IndexError(f'line index out of range: {index} > {self.length}')
             self.file.seek(self.line_pos[index])
             # minus one to remove \n at the end
             result = self.file.read(self.line_pos[index+1]-self.line_pos[index]-1)
