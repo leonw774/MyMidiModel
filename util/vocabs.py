@@ -138,10 +138,11 @@ def build_vocabs(
         max_measure_number = max(max_measure_number, measure_number)
 
         all_measure_start_index = [m.start() for m in re.finditer(measure_substr, piece)] + [len(piece)]
-        for start, end in zip(all_measure_start_index[:-1], all_measure_start_index[1:]):
-            if end - start > max_mps_number:
-                mps_number = 1 + 2 * piece[start:end].count(position_substr) + piece[start:end].count(tempo_substr)
-                max_mps_number = max(max_mps_number, mps_number)
+        piece_max_measure_number = max([
+            1 + 2 * piece[start:end].count(position_substr) + piece[start:end].count(tempo_substr)
+            for start, end in zip(all_measure_start_index[:-1], all_measure_start_index[1:])
+        ])
+        max_mps_number = max(max_mps_number, piece_max_measure_number)
 
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
