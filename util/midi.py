@@ -112,13 +112,13 @@ def quantize_tempo(tempo: int, tempo_quantization: Tuple[int, int, int]) -> int:
     return t
 
 
-NOTE_TIME_LIMIT = 0x1FFFFF # 2^21 - 1
+NOTE_TIME_LIMIT = 0xFFFFF # 2^20 - 1
 # In midi format, time-delta is representated in variable-length bytes
 # the format is 1xxxxxxx 1xxxxxxx ... 0xxxxxxx, the msb of each byte is 1 if it is not the last byte
-# in this format, three bytes can represent up to 2^21 - 1
-# when ticks_per_beat is 48, in tempo of bpm 240, 2^21 - 1 ticks is about 182 minute
-NOTE_DURATION_LIMIT = 0x3FFFF # 2^18 - 1
-# if a note has duration > 22 minute, we think the file is likely corrupted
+# in this format, three bytes can represent up to 2^20 - 1
+# when nth is 32, in tempo of bpm 240, 2^21 - 1 ticks is about 546 minute
+NOTE_DURATION_LIMIT = 0xFFFF # 2^16 - 1
+# if a note has duration > 34 minute, we think the file is likely corrupted
 
 def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_cont_note: bool) -> list:
     """
