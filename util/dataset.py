@@ -317,7 +317,7 @@ class MidiDataset(Dataset):
                         (f'number in {attr_name} larger than vocab size\n'
                         f'{get_input_array_format_string(sampled_array, None, self.vocabs)}')
                 elif attr_name == 'mps_numbers':
-                    assert np.max(sampled_array[:, fidx]) < self.vocabs.max_mps_numbers,\
+                    assert np.max(sampled_array[:, fidx]) < self.vocabs.max_mps_number,\
                         (f'number in {attr_name} larger than vocab size\n'
                         f'{get_input_array_format_string(sampled_array, None, self.vocabs)}')
                 else:
