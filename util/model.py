@@ -53,7 +53,7 @@ class MyMidiTransformer(nn.Module):
 
         assert vocabs.events.text2id[tokens.PADDING_TOKEN_STR] == 0
 
-        self.vocabs = vocabs
+        self.vocabs: Vocabs = vocabs
         self.max_seq_length = max_seq_length
         self.permute_mps = permute_mps
         self.layers_number = layers_number
@@ -84,9 +84,13 @@ class MyMidiTransformer(nn.Module):
                 self.input_attrs_indices.remove(ATTR_NAME_INDEX['time_signatures'])
 
         self.embedding_vocabs_size = [
-            vocabs.max_measure_number
+            self.vocabs.max_measure_number
             if COMPLETE_ATTR_NAME[idx] == 'measure_numbers' else
-            getattr(vocabs, COMPLETE_ATTR_NAME[idx]).size
+            (
+                self.vocabs.max_mps_number
+                if COMPLETE_ATTR_NAME[idx] == 'mps_numbers' else
+                getattr(self.vocabs, COMPLETE_ATTR_NAME[idx]).size
+            )
             for idx in self.input_attrs_indices
         ]
 
@@ -94,7 +98,7 @@ class MyMidiTransformer(nn.Module):
             nn.Embedding(
                 num_embeddings=vsize,
                 embedding_dim=embedding_dim,
-                padding_idx=vocabs.events.text2id[tokens.PADDING_TOKEN_STR]
+                padding_idx=self.vocabs.events.text2id[tokens.PADDING_TOKEN_STR]
                 # [...] the embedding vector of padding_idx will default to all zeros [...]
             )
             for vsize in self.embedding_vocabs_size
@@ -111,7 +115,7 @@ class MyMidiTransformer(nn.Module):
             self.output_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
 
         self.logit_vocabs_size = [
-            getattr(vocabs, OUTPUT_ATTR_NAME[i]).size
+            getattr(self.vocabs, OUTPUT_ATTR_NAME[i]).size
             for i in self.output_attrs_indices
         ]
         self.project_linears = nn.ModuleList([
