@@ -38,14 +38,14 @@ class Vocabs:
     velocities: AttrVocab
     track_numbers: AttrVocab
     instruments: AttrVocab
-    max_mps_numbers: int
+    max_mps_number: int
     max_measure_number: int
     tempos: AttrVocab
     time_signatures: AttrVocab
 
     def __init__(self, paras: dict, bpe_shapes_list: list, padding_token: str,
             events, pitchs, durations, velocities, track_numbers, instruments,
-            max_mps_numbers, max_measure_number, tempos, time_signatures) -> None:
+            max_mps_number, max_measure_number, tempos, time_signatures) -> None:
         self.paras = paras
         self.bpe_shapes_list = bpe_shapes_list
         self.padding_token = padding_token
@@ -55,7 +55,7 @@ class Vocabs:
         self.velocities = Vocabs.AttrVocab(velocities)
         self.track_numbers = Vocabs.AttrVocab(track_numbers)
         self.instruments = Vocabs.AttrVocab(instruments)
-        self.max_mps_numbers = max_mps_numbers
+        self.max_mps_number = max_mps_number
         self.max_measure_number = max_measure_number
         self.tempos = Vocabs.AttrVocab(tempos)
         self.time_signatures = Vocabs.AttrVocab(time_signatures)
@@ -65,7 +65,7 @@ class Vocabs:
         return cls(
             d['paras'], d['bpe_shapes_list'], d['padding_token'],
             d['events'], d['pitchs'], d['durations'], d['velocities'], d['track_numbers'],
-            d['instruments'], d['max_mps_numbers'], d['max_measure_number'], d['tempos'], d['time_signatures']
+            d['instruments'], d['max_mps_number'], d['max_measure_number'], d['tempos'], d['time_signatures']
         )
 
     def to_dict(self) -> dict:
@@ -79,7 +79,7 @@ class Vocabs:
             'velocities': vars(self.velocities),
             'track_numbers': vars(self.track_numbers),
             'instruments': vars(self.instruments),
-            'max_mps_numbers': self.max_mps_numbers,
+            'max_mps_number': self.max_mps_number,
             'max_measure_number': self.max_measure_number,
             'tempos': vars(self.tempos),
             'time_signatures': vars(self.time_signatures),
@@ -192,7 +192,7 @@ def build_vocabs(
         velocities=velocity_vocab,
         track_numbers=track_number_vocab,
         instruments=instrument_vocab,
-        max_mps_numbers=max_mps_number,
+        max_mps_number=max_mps_number,
         max_measure_number=max_measure_number,
         tempos=tempo_vocab,
         time_signatures=time_sig_vocab
