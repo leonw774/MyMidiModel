@@ -207,9 +207,9 @@ def get_time_structure_tokens(
     # print('first, last:', first_note_start, last_note_end)
 
     if len(midi.time_signature_changes) == 0:
-        # default is 4/4 but nah
-        assert False, 'No time signature information'
-        # time_sig_list = [TimeSignature(4, 4, 0)]
+        # default is 4/4
+        time_sig_list = [TimeSignature(4, 4, 0)]
+        # assert False, 'No time signature information'
     else:
         time_sig_list = []
         # remove duplicated time_signatures
@@ -234,8 +234,8 @@ def get_time_structure_tokens(
 
     assert time_sig_list[0].time <= first_note_start, 'Time signature undefined before first note'
     # if the time signature starts after the first note, try 4/4 start at time 0
-    # if time_sig_list[0].time > first_note_start:
-    #     time_sig_list = [(TimeSignature(4, 4, 0))] + time_sig_list
+    if time_sig_list[0].time > first_note_start:
+        time_sig_list = [(TimeSignature(4, 4, 0))] + time_sig_list
 
     measure_token_list = []
     for i, time_sig in enumerate(time_sig_list):
