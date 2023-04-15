@@ -170,6 +170,7 @@ class MidiDataset(Dataset):
                     body_mps_sep_indices,
                     np.array([self.pieces[filename].shape[0]]) # the EOS
                 ])
+                self._file_mps_sep_indices[filenum] = mps_sep_indices
 
             if self.pitch_augmentation_range != 0:
                 is_multinote_token = (self.pieces[filename][:, ATTR_NAME_INDEX['pit']]) != 0
