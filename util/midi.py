@@ -144,7 +144,8 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
         )
         for track_number, track in enumerate(midi.instruments)
         for note in track.notes
-        if note.start < note.end and note.start >= 0 and note.end > 0
+        if note.start < note.end and note.start >= 0 and note.end > 0 and (not track.is_drum or 35 <= note.pitch <= 81)
+        # remove negtives and remove percussion notes not in the Genral MIDI percussion map
     ]
 
     # handle too long duration
