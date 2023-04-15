@@ -470,7 +470,7 @@ def midi_to_piece(
             consecutive_measure_token_count += 1
         elif t[0] == 'N':
             consecutive_measure_token_count = 0
-        if consecutive_measure_token_count >= 64:
+        if consecutive_measure_token_count >= 32:
             raise AssertionError('Very long silence detected, likely corrupted')
 
     return ' '.join(text_list)
