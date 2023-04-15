@@ -242,7 +242,7 @@ def main():
             if args.use_existed:
                 logging.info('Output corpus path: %s already has file.', corpus_file_path)
                 logging.info('Flag --use-existed is set')
-                logging.info('==== midi_to_text.py exited ====')
+                logging.info('==== midi_to_corpus.py exited ====')
                 return 0
             else:
                 logging.info('Output corpus: %s already has files. Remove? (y=remove/n=exit)', corpus_file_path)
@@ -258,7 +258,7 @@ def main():
                             os.remove(to_pathlist_file_path(args.output_dir_path))
                         break
                     if i == 'n':
-                        logging.info('==== midi_to_text.py exited ====')
+                        logging.info('==== midi_to_corpus.py exited ====')
                         return 0
                     print('(y/n):')
         else:
@@ -285,7 +285,7 @@ def main():
 
     if len(file_path_list) == 0:
         logging.info('No file to process')
-        logging.info('==== midi_to_text.py exited ====')
+        logging.info('==== midi_to_corpus.py exited ====')
         return 1
     else:
         logging.info('Find %d files', len(file_path_list))
