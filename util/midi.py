@@ -91,6 +91,7 @@ def tick_to_nth(tick: int, ticks_per_nth: Union[float, int]) -> int:
 
 
 def quantize_to_nth(midi: MidiFile, nth: int):
+    # midi = copy.deepcopy(midi)
     ticks_per_nth = midi.ticks_per_beat / (nth // 4)
     for track in midi.instruments:
         for n in track.notes:
@@ -102,6 +103,7 @@ def quantize_to_nth(midi: MidiFile, nth: int):
         tempo.time = tick_to_nth(tempo.time, ticks_per_nth)
     for time_sig in midi.time_signature_changes:
         time_sig.time = tick_to_nth(time_sig.time, ticks_per_nth)
+    # return midi
 
 
 def quantize_tempo(tempo: int, tempo_quantization: Tuple[int, int, int]) -> int:
@@ -112,13 +114,10 @@ def quantize_tempo(tempo: int, tempo_quantization: Tuple[int, int, int]) -> int:
     return t
 
 
-NOTE_TIME_LIMIT = 0xFFFFF # 2^20 - 1
-# In midi format, time-delta is representated in variable-length bytes
-# the format is 1xxxxxxx 1xxxxxxx ... 0xxxxxxx, the msb of each byte is 1 if it is not the last byte
-# in this format, three bytes can represent up to 2^20 - 1
-# when nth is 32, in tempo of bpm 240, 2^21 - 1 ticks is about 546 minute
-NOTE_DURATION_LIMIT = 0xFFFF # 2^16 - 1
-# if a note has duration > 34 minute, we think the file is likely corrupted
+NOTE_TIME_LIMIT = 0xFFFFF # 2^18 - 1
+# when tick/nth is 32, in tempo of bpm 120, 2^20 - 1 ticks are about 273 minutes / 4.55 hours
+NOTE_DURATION_LIMIT = 0xFFFF # 2^14 - 1
+# if a note may have duration > 17 minutes, we think the file is likely corrupted
 
 def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_cont_note: bool) -> list:
     """

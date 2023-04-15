@@ -12,6 +12,10 @@ class CorpusReader:
         self.length = -1
         self.file = open(self.file_path, 'r', encoding='utf8')
 
+    def prepare():
+        for _ in self:
+            pass
+
     # context manager
     def __enter__(self):
         return self
