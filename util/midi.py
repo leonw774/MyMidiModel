@@ -114,9 +114,9 @@ def quantize_tempo(tempo: int, tempo_quantization: Tuple[int, int, int]) -> int:
     return t
 
 
-NOTE_TIME_LIMIT = 0xFFFFF # 2^18 - 1
+NOTE_TIME_LIMIT = 0x3FFFF # 2^18 - 1
 # when tick/nth is 32, in tempo of bpm 120, 2^20 - 1 ticks are about 273 minutes / 4.55 hours
-NOTE_DURATION_LIMIT = 0xFFFF # 2^14 - 1
+NOTE_DURATION_LIMIT = 0x3FFF # 2^14 - 1
 # if a note may have duration > 17 minutes, we think the file is likely corrupted
 
 def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_cont_note: bool) -> list:
