@@ -577,12 +577,15 @@ def main():
                         prediction,
                         batch_target_seqs,
                     )
-                # need to gather, otherwise each process see different losses
-                gathered_head_losses = accelerator.gather(head_losses)
-                # gathered_head_losses: List[tensor.Tensor]
-                # dim 0 is process dimension, dim 1 ~ last are original dimensions
-                gathered_head_losses = torch.mean(torch.stack(gathered_head_losses), dim=1)
-                valid_loss_list.append([head_l.item() for head_l in gathered_head_losses])
+                if args.use_parallel:
+                    # need to gather, otherwise each process see different losses
+                    gathered_head_losses = accelerator.gather(head_losses)
+                    # gathered_head_losses: List[tensor.Tensor]
+                    # dim 0 is process dimension, dim 1 ~ last are original dimensions
+                    gathered_head_losses = torch.mean(torch.stack(gathered_head_losses), dim=1)
+                    valid_loss_list.append([head_l.item() for head_l in gathered_head_losses])
+                else:
+                    valid_loss_list.append([head_l.item() for head_l in head_losses])
 
 
         cur_num_updates = start_num_updates + args.train.validation_interval
