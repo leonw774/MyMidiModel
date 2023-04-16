@@ -35,10 +35,6 @@ def parse_args():
         type=int
     )
     data_parser.add_argument(
-        '--use-permutable-subseq-loss',
-        action='store_true'
-    )
-    data_parser.add_argument(
         '--measure-sample-step-ratio',
         type=float,
         default=0.25
@@ -137,6 +133,10 @@ def parse_args():
     train_parser.add_argument(
         '--lr-decay-end-ratio',
         type=float
+    )
+    train_parser.add_argument(
+        '--use-permutable-subseq-loss',
+        action='store_true'
     )
     train_parser.add_argument(
         '--early-stop',
@@ -508,7 +508,7 @@ def main():
                 # forward_time += time() - start_forward_time
 
                 # start_backward_time = time()
-                if args.data.use_permutable_subseq_loss:
+                if args.train.use_permutable_subseq_loss:
                     batch_mps_number_seq = batch_seqs[:, 1:, ATTR_NAME_INDEX['mps']]
                     loss, head_losses = compute_permutable_subseq_losses(
                         prediction,
@@ -565,7 +565,7 @@ def main():
                     batch_target_seqs = batch_target_seqs.to(args.use_device)
                 prediction = model(batch_input_seqs)
 
-                if args.data.use_permutable_subseq_loss:
+                if args.train.use_permutable_subseq_loss:
                     batch_mps_number_seq = batch_seqs[:, 1:, ATTR_NAME_INDEX['mps']]
                     loss, head_losses = compute_permutable_subseq_losses(
                         prediction,

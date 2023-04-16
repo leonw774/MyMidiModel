@@ -24,19 +24,22 @@ class MidiDataset(Dataset):
             permute_mps: bool = False,
             permute_track_number: bool = False,
             pitch_augmentation_range: int = 0,
-            use_permutable_subseq_loss: bool = False,
             verbose: bool = False
         ) -> None:
         """
             Parameters:
             - data_dir_path: Expected to have 'data.npz' and 'vocabs.json'
-            - use_permutable_subseq_loss: Whether or not we provide a mps_seperator_indices information at __getitem__
+
             - measure_sample_step_ratio: Will create multiple virtual pieces by sampling overlength pieces.
               The start point of samples will be at the first measure token that has index not smaller than
               max_seq_length * measure_sample_step_ratio * N, where N is positive integer
-            - permute_mps: Whether or not the dataset should permute all the *maximal permutable subsequences*
-              in the sequence before returning in `__getitem__`
-            - permute_track_number: Permute all the track numbers, as data augmentation
+
+            - permute_mps: Whether or not the dataset should permute all the *maximal permutable subsequences* and
+              ignore the ascending track-number rule, before returning in `__getitem__`
+
+            - permute_track_number: Permute all the track numbers relative to the instruments, as data augmentation.
+              This would not break the ascending track-number rule
+
             - pitch_augmentation_range: Add or minus a uniform random on pitch value, as data augmentation
         """
 
@@ -51,9 +54,6 @@ class MidiDataset(Dataset):
         self.permute_track_number = permute_track_number
         assert pitch_augmentation_range >= 0
         self.pitch_augmentation_range = pitch_augmentation_range
-        assert isinstance(use_permutable_subseq_loss, bool)
-        assert not (use_permutable_subseq_loss and not permute_mps)
-        self.use_permutable_subseq_loss = use_permutable_subseq_loss
 
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
         if verbose:
