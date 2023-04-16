@@ -311,20 +311,23 @@ class MidiDataset(Dataset):
         for attr_name, fidx in ATTR_NAME_INDEX.items():
             if len(attr_name) > 3: # not abbr
                 assert np.min(sampled_array[:, fidx]) >= 0,\
-                    (f'number in {attr_name} is below zero\n'
-                    f'{get_input_array_format_string(sampled_array, None, self.vocabs)}')
+                    (f'Number in {attr_name} is below zero\n'
+                     f'{get_input_array_format_string(sampled_array, self.vocabs)}')
                 if attr_name == 'measure_numbers':
-                    assert np.max(sampled_array[:, fidx]) < self.max_seq_length,\
-                        (f'number in {attr_name} larger than vocab size\n'
-                        f'{get_input_array_format_string(sampled_array, None, self.vocabs)}')
+                    assert np.max(sampled_array[:, fidx]) <= self.vocabs.max_measure_number,\
+                        (f'Number in {attr_name} larger than vocab size: '
+                         f'{np.max(sampled_array[:, fidx])} >= {self.vocabs.max_measure_number}\n'
+                         f'{get_input_array_format_string(sampled_array, self.vocabs)}')
                 elif attr_name == 'mps_numbers':
-                    assert np.max(sampled_array[:, fidx]) < self.vocabs.max_mps_number,\
-                        (f'number in {attr_name} larger than vocab size\n'
-                        f'{get_input_array_format_string(sampled_array, None, self.vocabs)}')
+                    assert np.max(sampled_array[:, fidx]) <= self.vocabs.max_mps_number,\
+                        (f'Number in {attr_name} larger than vocab size: '
+                         f'{np.max(sampled_array[:, fidx])} >= {self.vocabs.max_mps_number}\n'
+                         f'{get_input_array_format_string(sampled_array, self.vocabs)}')
                 else:
                     assert np.max(sampled_array[:, fidx]) < getattr(self.vocabs, attr_name).size,\
-                        (f'number in {attr_name} larger than vocab size\n'
-                        f'{get_input_array_format_string(sampled_array, None, self.vocabs)}')
+                        (f'Number in {attr_name} not smaller than vocab size: '
+                         f'{np.max(sampled_array[:, fidx])} >= {getattr(self.vocabs, attr_name).size}\n'
+                         f'{get_input_array_format_string(sampled_array, self.vocabs)}')
 
         return from_numpy(sampled_array)
 
