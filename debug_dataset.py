@@ -83,7 +83,7 @@ valid_len = len(dataset) - train_len
 train_set, val_set = random_split(dataset, [train_len, valid_len])
 print(len(dataset), len(train_set), len(val_set))
 
-# print('TEST RANDOM SPLIT')
+# print('RANDOM SPLIT')
 
 # train_sample, train_mps_sep_indices = train_set[0]
 # train0 = train_sample.numpy()
@@ -95,7 +95,7 @@ print(len(dataset), len(train_set), len(val_set))
 # print('VAL[0]')
 # print(get_input_array_format_string(val0, val_mps_sep_indices, vocabs))
 
-print('TEST DATA CORRECTNESS')
+print('FIRST BATCH OF TRAIN_DATALOADER')
 
 train_dataloader = DataLoader(
     dataset=train_set,

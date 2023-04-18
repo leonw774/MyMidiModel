@@ -83,11 +83,20 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         Each token is processed into an 10-dimensional vector:
             event, pitch, duration, velocity, track_number, instrument, mps_number, measure_number, tempo, time signature
 
-        Explanation of maximal permutable subsequence (MPS):
+        Positional embedding of body:
             M = Measure, P = Position, N = Multi-note
-            consider sequence: M  P  N  N  N  P  N  N  P  N  M  P  N  N
-                        index: 0  1  2  3  4  5  6  7  8  9  10 11 12 13
-            its mps number is: 1  2  3  3  3  4  5  5  6  7  8  9  10 10
+                    sequence: ... M P N N N P N N P N M P N N ...
+              measure number: ... 3 3 3 3 3 3 3 3 3 3 4 4 4 4 ...
+                  mps number: ... 1 2 3 3 3 4 5 5 6 7 1 2 3 3 ...
+                track number: ... 0 0 1 3 5 0 1 2 0 2 0 0 2 3 ...
+
+        Positional embedding of head section:
+            B = Begain-of-sequence, T = Track, S = Separator
+                    sequence: B T T T T T T S M ...
+              measure number: 1 1 1 1 1 1 1 1 2 ...
+                  mps number: 1 2 2 2 2 2 2 3 1 ...
+                track number: 0 1 2 3 4 5 6 0 0 ...
+            Basically, head section is treated as a special measure
 
         If a token doesn't have an attribute, fill it with the index of PAD (which should be zero).
         If a token has an attrbute, but it is not in the vocabs, error would be raised
@@ -101,7 +110,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         tracks_count = 0
         cur_position_cursor = 0
         cur_mps_number = 0
-        cur_measure_number = 0 # mps-nubmer and measure_number starts at 1, 0 is padding
+        cur_measure_number = 0
         cur_tempo_id = padding
         cur_time_sig_id = padding
     elif isinstance(input_memory, dict):
@@ -124,15 +133,27 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         i = h + last_array_len
 
         if text in tokens.SPECIAL_TOKENS_STR:
+            if text == tokens.SEP_TOKEN_STR:
+                cur_mps_number += 1
+            else: # BEGIN_TOKEN_STR or END_TOKEN_STR or PADDING_TOKEN_STR
+                cur_mps_number = 1
+                cur_measure_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
+            x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
+            x[i][ATTR_NAME_INDEX['mea']] = cur_measure_number
+
 
         elif typename == tokens.TRACK_EVENTS_CHAR:
             event_text, track_number = text.split(':')
             instrument = event_text[1:]
             tracks_count += 1
+            if x[i-1][ATTR_NAME_INDEX['trn']] == 0: # if prev is BOS
+                cur_mps_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][ATTR_NAME_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
             x[i][ATTR_NAME_INDEX['ins']] = vocabs.instruments.text2id[instrument]
+            x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
+            x[i][ATTR_NAME_INDEX['mea']] = cur_measure_number
 
         elif typename == tokens.MEASURE_EVENTS_CHAR:
             cur_time_sig_id = vocabs.time_signatures.text2id[text]

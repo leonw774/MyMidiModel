@@ -84,7 +84,7 @@ class MyMidiTransformer(nn.Module):
                 self.input_attrs_indices.remove(ATTR_NAME_INDEX['time_signatures'])
 
         self.embedding_vocabs_size = [
-            self.vocabs.max_measure_number + 1 # plus one because padding
+            self.vocabs.max_measure_number + 1 # plus one for padding
             if COMPLETE_ATTR_NAME[idx] == 'measure_numbers' else
             (
                 self.vocabs.max_mps_number + 1

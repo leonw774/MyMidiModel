@@ -224,8 +224,9 @@ class MidiDataset(Dataset):
         end_with_eos = sampled_array[-1, ATTR_NAME_INDEX['evt']] == self._eos_id
         body_end_index = -1 if end_with_eos else sampled_array.shape[0]
         min_measure_number = np.min(sampled_array[body_start_index:body_end_index, ATTR_NAME_INDEX['mea']])
-        if min_measure_number != 1:
-            sampled_array[body_start_index:body_end_index, ATTR_NAME_INDEX['mea']] -= (min_measure_number - 1)
+        # the first measure has measure number because measure number 1 is head section
+        if min_measure_number != 2:
+            sampled_array[body_start_index:body_end_index, ATTR_NAME_INDEX['mea']] -= (min_measure_number - 2)
         # if there are still measure numbers that bigger than max_seq_length, panic
         # max_measure_number = np.max(sampled_array[body_start_index:body_end_index, TOKEN_ATTR_INDEX['mea']])
         # assert max_measure_number < self.max_seq_length
