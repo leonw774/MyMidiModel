@@ -71,7 +71,8 @@ else
     while read eval_sample_midi_path; do
         echo "Primer file: $eval_sample_midi_path"
         python3 generate_with_model.py -p "$eval_sample_midi_path" -l 0 --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-txt \
-        "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/$(basename '$eval_sample_midi_path' .mid)"
+        primer_name=$(basename "$eval_sample_midi_path" .mid)
+        "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/${primer_name}"
     done < $eval_primers_pathlist_file_path
 fi
 
@@ -93,7 +94,8 @@ else
     while read eval_sample_midi_path; do
         echo "Primer file: $eval_sample_midi_path"
         python3 generate_with_model.py -p "$eval_sample_midi_path" -l $primer_length --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-txt \
-        "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/$(basename '$eval_sample_midi_path' .mid)"
+        primer_name=$(basename "$eval_sample_midi_path" .mid)
+        "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/${primer_name}"
     done < $eval_primers_pathlist_file_path
 fi
 
