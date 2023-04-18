@@ -1,5 +1,4 @@
 #!/bin/bash
-echo "evaluated_model.sh start."
 midi_dir_path=$1
 eval_sample_number=$2
 process_workers=$3
@@ -10,6 +9,7 @@ nucleus_threshold=$7
 # $8 can be unset
 test -n "$8" && seed_option="--seed $8"
 
+echo "evaluated_model.sh start." | tee -a $log_path 
 echo "midi_dir_path=${midi_dir_path}, eval_sample_number=${eval_sample_number}, process_workers=${process_workers}, primer_length=${primer_length}"
 echo "log_path=${log_path}, model_dir_path=${model_dir_path}, nucleus_threshold=${nucleus_threshold}, seed_option=${seed_option}, "
 
@@ -104,4 +104,4 @@ python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-numb
     --primer-measure-length $primer_length --reference-file-path "${eval_primers_dir_path}/eval_features.json" "${model_dir_path}/eval_samples/primer_cont"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
-echo "evaluated_model.sh exit."
+echo "evaluated_model.sh exit." | tee -a $log_path 
