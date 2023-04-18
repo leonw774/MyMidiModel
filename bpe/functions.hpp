@@ -10,7 +10,7 @@ Shape getShapeOfMultiNotePair(
     const std::vector<Shape>& shapeDict
 );
 
-double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton=false);
+double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelocity=false);
 
 std::vector<std::pair<Shape, unsigned int>> shapeScoring(
     const Corpus& corpus,

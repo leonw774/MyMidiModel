@@ -169,7 +169,7 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
 }
 
 
-double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton) {
+double calculateAvgMulpiSize(const Corpus& corpus, bool ingoreVelcocity) { // ingoreVelcocity is default false
     unsigned int max_thread_num = omp_get_max_threads();
     std::vector<uint8_t> multipiSizes[max_thread_num];
     #pragma omp parallel for
@@ -177,7 +177,7 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton) {
         int thread_num = omp_get_thread_num();
         // for each track
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
-            // key: 64 bits: upper 17 unused, 7 for velocity, 8 for duration (time_unit), 32 for onset
+            // key: 64 bits: upper 16 unused, 8 for velocity, 8 for duration (time_unit), 32 for onset
             // value: occurence count
             std::map< uint64_t, uint8_t > thisTrackMulpiSizes;
 
@@ -195,11 +195,13 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreSingleton) {
 
                 uint64_t key = corpus.piecesMN[i][j][k].onset;
                 key |= ((uint64_t) corpus.piecesMN[i][j][k].unit) << 32;
-                key |= ((uint64_t) corpus.piecesMN[i][j][k].vel) << 40;
+                if (!ingoreVelcocity) {
+                    key |= ((uint64_t) corpus.piecesMN[i][j][k].vel) << 40;
+                }
                 thisTrackMulpiSizes[key] += 1;
             }
             for (auto it = thisTrackMulpiSizes.cbegin(); it != thisTrackMulpiSizes.cend(); ++it) {
-                if (it->second > 1 or !ignoreSingleton) {
+                if (it->second > 1) {
                     multipiSizes[thread_num].push_back(it->second);
                 } 
             }
