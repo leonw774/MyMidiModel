@@ -566,7 +566,8 @@ def generate_sample(
 
                 # re-arrange output order to array order
                 array_order_sampled_attrs = [0] * len(ESSENTAIL_ATTR_NAMES)
-                for model_output_index, attr_name in enumerate(model_output_attrs):
+                for attr_name in ESSENTAIL_ATTR_NAMES:
+                    model_output_index = model_output_attrs.index(attr_name)
                     array_order_sampled_attrs[ATTR_NAME_INDEX[attr_name]] = sampled_attrs[model_output_index]
 
                 # print(array_order_sampled_attrs)
