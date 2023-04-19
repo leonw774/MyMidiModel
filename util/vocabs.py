@@ -134,7 +134,7 @@ def build_vocabs(
     corpus_measure_time_sigs = set()
     token_count_per_piece = []
     for piece in tqdm(corpus_reader):
-        measure_number = piece.count(measure_substr) + 1 # +1 to include head section 
+        measure_number = piece.count(measure_substr) + 2 # +2 to include head section and EOS
         max_measure_number = max(max_measure_number, measure_number)
 
         all_measure_start_index = [m.start() for m in re.finditer(measure_substr, piece)] + [len(piece)]

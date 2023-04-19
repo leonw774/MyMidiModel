@@ -223,7 +223,7 @@ class MidiDataset(Dataset):
         # if last token is EOS, body_end_index is length of sample array - 1
         end_with_eos = sampled_array[-1, ATTR_NAME_INDEX['evt']] == self._eos_id
         body_end_index = -1 if end_with_eos else sampled_array.shape[0]
-        min_measure_number = np.min(sampled_array[body_start_index:body_end_index, ATTR_NAME_INDEX['mea']])
+        min_measure_number = np.min(sampled_array[body_start_index:, ATTR_NAME_INDEX['mea']])
         # the first measure has measure number because measure number 1 is head section
         if min_measure_number != 2:
             sampled_array[body_start_index:body_end_index, ATTR_NAME_INDEX['mea']] -= (min_measure_number - 2)
