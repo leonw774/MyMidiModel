@@ -249,47 +249,43 @@ class MidiDataset(Dataset):
                 sampled_body_pitch_col[sampled_augmentable_pitches] += pitch_augment
 
         if self.permute_track_number:
-            # use self._piece_body_start_index to know how many tracks there are in this piece
-            track_count = body_start_index - 2
+            max_track_number = self.vocabs.track_numbers.size - 1
             # add one because there is a padding token at the beginning of the vocab
-            perm_array = np.random.permutation(track_count) + 1
-            # view body's track number col
-            body_trn_column = sampled_array[body_start_index:, ATTR_NAME_INDEX['trn']]
-            body_trn_column_expand = np.asarray([
-                (body_trn_column == i + 1) for i in range(track_count)
+            perm_array = np.random.permutation(self.vocabs.track_numbers.size-1) + 1
+            # view track number col
+            piece_trn_column = sampled_array[:, ATTR_NAME_INDEX['trn']]
+            piece_trn_column_expand = np.asarray([
+                (piece_trn_column == i + 1) for i in range(max_track_number)
             ])
             # permute body's track number
             evt_ins_col_index = [ATTR_NAME_INDEX['evt'], ATTR_NAME_INDEX['ins']]
-            for i in range(track_count):
-                body_trn_column[body_trn_column_expand[i]] = perm_array[i]
-            # permute head's events and instruments with the inverse of the permutation array
-            if track_count > 1:
-                # head_start_index = 1
-                inv_perm_array = np.empty(track_count, dtype=np.int32)
-                inv_perm_array[perm_array-1] = (np.arange(track_count) + 1)
-                track_permuted_evt_ins = np.empty((track_count, 2), dtype=np.int32)
-                track_permuted_evt_ins = self.pieces[str(filenum)][inv_perm_array][:, evt_ins_col_index]
-                sampled_array[1:body_start_index-1, evt_ins_col_index] = track_permuted_evt_ins
-                # index 0 is BOS and index body_start_index-1 is SEP
-
+            for i in range(max_track_number):
+                piece_trn_column[piece_trn_column_expand[i]] = perm_array[i]
+            
+            # DEPRECATED
+            # permute head's track tokens with the inverse of perm array
+            # inv_perm_array = np.empty(max_track_number, dtype=np.int32)
+            # inv_perm_array[perm_array-1] = (np.arange(max_track_number) + 1)
+            # track_permuted_evt_ins = np.empty((max_track_number, 2), dtype=np.int32)
+            # track_permuted_evt_ins = self.pieces[str(filenum)][inv_perm_array][:, evt_ins_col_index]
+            # sampled_array[1:body_start_index-1, evt_ins_col_index] = track_permuted_evt_ins
+            #
             # if not using mps permutation, we want each mps to be sorted increasingly by track number, pitch, then duration
-            if not self.permute_mps:
-                body_section = sampled_array[body_start_index:body_end_index]
-                order = np.lexsort((
-                    body_section[:, ATTR_NAME_INDEX['dur']], # sort by this last
-                    body_section[:, ATTR_NAME_INDEX['pit']],
-                    body_section[:, ATTR_NAME_INDEX['trn']],
-                    body_section[:, ATTR_NAME_INDEX['mps']],
-                    body_section[:, ATTR_NAME_INDEX['mea']], # sort by this first
-                ))
-                sampled_array[body_start_index:body_end_index] = body_section[order]
+            # if not self.permute_mps:
+            #     body_section = sampled_array[body_start_index:body_end_index]
+            #     order = np.lexsort((
+            #         body_section[:, ATTR_NAME_INDEX['dur']], # sort by this last
+            #         body_section[:, ATTR_NAME_INDEX['pit']],
+            #         body_section[:, ATTR_NAME_INDEX['trn']],
+            #         body_section[:, ATTR_NAME_INDEX['mps']],
+            #         body_section[:, ATTR_NAME_INDEX['mea']], # sort by this first
+            #     ))
+            #     sampled_array[body_start_index:body_end_index] = body_section[order]
 
         mps_sep_indices_list = []
         if self.permute_mps:
             mps_tokens_ranges = []
-            mps_sep_indices_list_head = [
-                i for i in range(body_start_index) # because all tokens in head should not be permutable
-            ]
+            mps_sep_indices_list_head = [0, 1, body_start_index - 1] # BOS, first track token and body_start_index-1 is SEP
             mps_sep_indices_list_body = [
                 i - start_index + body_start_index
                 for i in self._file_mps_sep_indices[filenum]
