@@ -257,7 +257,7 @@ class MidiDataset(Dataset):
             piece_trn_column_expand = np.asarray([
                 (piece_trn_column == i + 1) for i in range(max_track_number)
             ])
-            # permute body's track number
+            # permute track number
             for i in range(max_track_number):
                 piece_trn_column[piece_trn_column_expand[i]] = perm_array[i]
 

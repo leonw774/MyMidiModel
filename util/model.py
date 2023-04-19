@@ -350,7 +350,7 @@ def adjust_probs_with_context(
         if context_text_list[-1][0] == tokens.MEASURE_EVENTS_CHAR:
             multinote_and_tempo_indices = multinote_indices.union(tempo_indices)
             for i in range(vocabs.events.size):
-                if i not in multinote_and_tempo_indices:
+                if i in multinote_and_tempo_indices:
                     probs[ATTR_NAME_INDEX['evt']][i] = 0
 
         # this prohibits the position tokens that is "behind" the current position

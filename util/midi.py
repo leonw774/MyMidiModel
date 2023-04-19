@@ -558,8 +558,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
             # track_numbers_list.sort()
             # assert track_numbers_list == list(range(len(track_numbers_list))),\
             #     'Track numbers are not permutation of consecutive integers starting from 1'
-            for track_number in track_program_mapping:
-                program = track_program_mapping[track_number]
+            for track_number, program in track_program_mapping.items():
                 midi.instruments.append(
                     Instrument(program=(program%128), is_drum=(program==128), name=f'Track_{track_number}')
                 )
