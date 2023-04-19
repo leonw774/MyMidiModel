@@ -261,9 +261,7 @@ int main(int argc, char *argv[]) {
     }
     avgMulpi = calculateAvgMulpiSize(corpus);
     std::cout << "End multinote count: " << multinoteCount
-        << ", End average mulpi: " << avgMulpi
-        << ", Multinote reduce rate: " << 1 - (double) multinoteCount / startMultinoteCount
-        << ", Average mulpi reduce rate: " << 1 - avgMulpi / startAvgMulpi << std::endl;
+        << ", End average mulpi: " << avgMulpi;
 
 
     // Write files

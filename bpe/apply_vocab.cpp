@@ -252,9 +252,7 @@ int main(int argc, char *argv[]) {
     }
     avgMulpi = calculateAvgMulpiSize(corpus);
     std::cout << "Ending multinote count: " << multinoteCount
-        << ", Ending average mulpi: " << avgMulpi
-        << ", Multinote reduce rate: " << 1 - (double) multinoteCount / startMultinoteCount
-        << ", Average mulpi reduce rate: " << 1 - avgMulpi / startAvgMulpi << std::endl;
+        << ", Ending average mulpi: " << avgMulpi;
 
     // Write files
     std::ofstream outCorpusFile(outCorpusFilePath, std::ios::out | std::ios::trunc);
