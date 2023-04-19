@@ -531,6 +531,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
         f'No BOS and EOS at start and end, instead: {text_list[0]} and {text_list[-1]}'
 
     cur_time = 0
+    cur_position = -1
     is_head = True
     cur_measure_length = 0
     cur_measure_onset = 0
@@ -564,8 +565,8 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
                 )
 
         elif typename == tokens.MEASURE_EVENTS_CHAR:
-            # if this is the first measure
             assert not is_head
+            cur_position = -1
 
             numer, denom = (b36str2int(x) for x in text[1:].split('/'))
             cur_measure_onset += cur_measure_length
@@ -578,8 +579,8 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
 
         elif typename == tokens.POSITION_EVENTS_CHAR:
             assert not is_head, 'Position token at head'
-            position = b36str2int(text[1:])
-            cur_time = position + cur_measure_onset
+            cur_position = b36str2int(text[1:])
+            cur_time = cur_position + cur_measure_onset
 
         elif typename == tokens.TEMPO_EVENTS_CHAR:
             assert not is_head, 'Tempo token at head'
@@ -587,6 +588,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
 
         elif typename == tokens.NOTE_EVENTS_CHAR:
             assert not is_head, 'Note token at head'
+            assert cur_position > 0
             is_cont = (text[1] == '~')
             if is_cont:
                 note_attrs = tuple(b36str2int(x) for x in text[3:].split(':'))
