@@ -584,11 +584,12 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
 
         elif typename == tokens.TEMPO_EVENTS_CHAR:
             assert not is_head, 'Tempo token at head'
+            assert cur_position >= 0, 'No position before tempo'
             midi.tempo_changes.append(TempoChange(tempo=b36str2int(text[1:]), time=cur_time))
 
         elif typename == tokens.NOTE_EVENTS_CHAR:
             assert not is_head, 'Note token at head'
-            assert cur_position > 0
+            assert cur_position >= 0, 'No position before note'
             is_cont = (text[1] == '~')
             if is_cont:
                 note_attrs = tuple(b36str2int(x) for x in text[3:].split(':'))
@@ -602,6 +603,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
 
         elif typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             assert not is_head, 'Multi-note token at head'
+            assert cur_position >= 0, 'No position before multi-note'
             shape_string, *other_attr = text[1:].split(':')
             relnote_list = []
             for s in shape_string[:-1].split(';'):
