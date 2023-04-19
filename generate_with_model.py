@@ -136,10 +136,10 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
         if gen_text_list == BEGIN_TOKEN_STR + ' ' + END_TOKEN_STR:
             print(f'{output_file_path}: generated empty piece. will not output file.')
         else:
-            if args.output_txt:
+            if args.output_text:
                 with open(f'{output_file_path}.txt', 'w+', encoding='utf8') as f:
                     f.write(' '.join(gen_text_list))
-            if args.output_debug:
+            if args.output_array_text:
                 with open(f'{output_file_path}_array.txt', 'w+', encoding='utf8') as f:
                     f.write(get_input_array_format_string(text_list_to_array(gen_text_list, model.vocabs), model.vocabs))
             midi = piece_to_midi(' '.join(gen_text_list), model.vocabs.paras['nth'])
