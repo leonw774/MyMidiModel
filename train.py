@@ -19,7 +19,7 @@ from torch.optim import AdamW, lr_scheduler
 import torchinfo
 
 from util.midi import piece_to_midi, get_first_k_measures
-from util.corpus import ATTR_NAME_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, get_corpus_vocabs, array_to_text_list, text_list_to_array
+from util.corpus import ATTR_NAME_INDEX, ATTR_NAMES, OUTPUTABLE_ATTR_NAMES, get_corpus_vocabs, array_to_text_list, text_list_to_array
 from util.dataset import MidiDataset, collate_mididataset
 from util.model import (
     MyMidiTransformer,
@@ -336,8 +336,8 @@ def main():
     loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
     with open(loss_file_path, 'w+', encoding='utf8') as loss_file:
         loss_csv_head = 'step,'
-        train_output_attr_name = ['train_' + n for n in OUTPUT_ATTR_NAME]
-        valid_output_attr_name = ['valid_' + n for n in OUTPUT_ATTR_NAME]
+        train_output_attr_name = ['train_' + n for n in OUTPUTABLE_ATTR_NAMES]
+        valid_output_attr_name = ['valid_' + n for n in OUTPUTABLE_ATTR_NAMES]
         if not args.model.output_instruments:
             # remove instruments from output attribute names
             train_output_attr_name = train_output_attr_name[:-1]
@@ -426,7 +426,7 @@ def main():
     if is_main_process:
         logging.info('Embedding size:')
         logging.info('\n'.join([
-            f'{i} - {COMPLETE_ATTR_NAME[idx]} {vsize}'
+            f'{i} - {ATTR_NAMES[idx]} {vsize}'
             for i, (idx, vsize) in enumerate(zip(model.input_attrs_indices, model.embedding_vocabs_size))
         ]))
     to_input_attrs = model.to_input_attrs

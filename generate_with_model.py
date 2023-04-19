@@ -48,7 +48,7 @@ def read_args():
         '--sample-number', '-n',
         type=int,
         default=1,
-        help='How many generated sample will created. Default is %(default)s.'
+        help='How many sample will be generated. Default is %(default)s.'
     )
     parser.add_argument(
         '--output-text', '-o',

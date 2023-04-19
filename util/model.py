@@ -32,7 +32,14 @@ from . import tokens
 from .tokens import b36str2int
 from .midi import piece_to_midi
 from .vocabs import Vocabs
-from .corpus import ATTR_NAME_INDEX, COMPLETE_ATTR_NAME, OUTPUT_ATTR_NAME, array_to_text_list, text_list_to_array
+from .corpus import (
+    ATTR_NAME_INDEX,
+    ATTR_NAMES,
+    ESSENTAIL_ATTR_NAMES,
+    OUTPUTABLE_ATTR_NAMES,
+    array_to_text_list,
+    text_list_to_array
+)
 
 
 class MyMidiTransformer(nn.Module):
@@ -68,28 +75,30 @@ class MyMidiTransformer(nn.Module):
 
         ######## Inputs
 
-        self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in COMPLETE_ATTR_NAME]
+        self.input_attr_names = list(ATTR_NAMES) # make copy
         if input_context:
             if input_instruments:
                 pass
             else:
-                self.input_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
+                self.input_attr_names.remove('instruments')
         else:
             if input_instruments:
-                self.input_attrs_indices.remove(ATTR_NAME_INDEX['tempos'])
-                self.input_attrs_indices.remove(ATTR_NAME_INDEX['time_signatures'])
+                self.input_attr_names.remove('tempos')
+                self.input_attr_names.remove('time_signatures')
             else:
-                self.input_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
-                self.input_attrs_indices.remove(ATTR_NAME_INDEX['tempos'])
-                self.input_attrs_indices.remove(ATTR_NAME_INDEX['time_signatures'])
+                self.input_attr_names.remove('instruments')
+                self.input_attr_names.remove('tempos')
+                self.input_attr_names.remove('time_signatures')
+
+        self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in self.input_attr_names]
 
         self.embedding_vocabs_size = [
             self.vocabs.max_measure_number + 1 # plus one for padding
-            if COMPLETE_ATTR_NAME[idx] == 'measure_numbers' else
+            if ATTR_NAMES[idx] == 'measure_numbers' else
             (
                 self.vocabs.max_mps_number + 1
-                if COMPLETE_ATTR_NAME[idx] == 'mps_numbers' else
-                getattr(self.vocabs, COMPLETE_ATTR_NAME[idx]).size
+                if ATTR_NAMES[idx] == 'mps_numbers' else
+                getattr(self.vocabs, ATTR_NAMES[idx]).size
             )
             for idx in self.input_attrs_indices
         ]
@@ -107,15 +116,17 @@ class MyMidiTransformer(nn.Module):
 
         ######## Outputs
 
+        self.output_attr_names = list(OUTPUTABLE_ATTR_NAMES) # make copy
+        if not output_instruments:
+            self.output_attrs_indices.remove('instruments')
+
         self.output_attrs_indices = [
             ATTR_NAME_INDEX[fname]
-            for fname in OUTPUT_ATTR_NAME
+            for fname in self.output_attr_names
         ]
-        if not output_instruments:
-            self.output_attrs_indices.remove(ATTR_NAME_INDEX['instruments'])
 
         self.logit_vocabs_size = [
-            getattr(self.vocabs, OUTPUT_ATTR_NAME[i]).size
+            getattr(self.vocabs, ATTR_NAMES[i]).size
             for i in self.output_attrs_indices
         ]
         self.project_linears = nn.ModuleList([
@@ -294,14 +305,13 @@ def adjust_probs_with_context(
         probs: List[Tensor],
         context_text_list: List[str],
         vocabs: Vocabs,
-        event_family_indices: Tuple[set],
-        permute_mps: bool = True):
+        event_family_indices: Tuple[set]):
     """
         Set to zero to the probs of the attribute values that would definitily raise exception
         if the next token in context_text_list has them and force the position tokens to be ordered increasingly in time
     """
     assert len(context_text_list) > 0, 'Empty context_text_list'
-    assert len(probs) == len(OUTPUT_ATTR_NAME) or len(probs) == len(OUTPUT_ATTR_NAME) - 1, 'Bad probs'
+    assert len(probs) == len(OUTPUTABLE_ATTR_NAMES) or len(probs) == len(OUTPUTABLE_ATTR_NAMES) - 1, 'Bad probs'
 
     bos_index = vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
     sep_index = vocabs.events.text2id[tokens.SEP_TOKEN_STR]
@@ -322,18 +332,32 @@ def adjust_probs_with_context(
     is_head = context_text_list[-1] == tokens.BEGIN_TOKEN_STR or context_text_list[-1][0] == tokens.TRACK_EVENTS_CHAR
     is_sep = context_text_list[-1] == tokens.SEP_TOKEN_STR
     if is_head:
-        # if the section is head, then only track-instrument and separater allowed
-        for i in range(vocabs.events.size):
-            if i not in track_instrument_indices and (i != sep_index or len(context_text_list) == 1):
-                probs[ATTR_NAME_INDEX['evt']][i] = 0
-        # prevent generating repeating track number
-        used_track_number =  [
-            b36str2int(context_text_list[i].split(':')[1]) + 1 # the id of track number is 0:padding, 1:0, 2:1, ...
-            for i in range(1, len(context_text_list))
-        ]
-        probs[ATTR_NAME_INDEX['trn']][used_track_number] = 0
-        if len(used_track_number) == vocabs.track_numbers.size - 1:
-            probs[ATTR_NAME_INDEX['trn']][0] = 1
+        # if the section is head
+        if len(context_text_list) == 1:
+            # only track-instrument allowed
+            for i in range(vocabs.events.size):
+                if i not in track_instrument_indices:
+                    probs[ATTR_NAME_INDEX['evt']][i] = 0
+        elif 1 < len(context_text_list) < vocabs.track_numbers.size:
+            # only track-instrument and separater allowed
+            for i in range(vocabs.events.size):
+                if i not in track_instrument_indices and i != sep_index:
+                    probs[ATTR_NAME_INDEX['evt']][i] = 0
+            # prevent generating repeating track number
+            used_track_number =  [
+                b36str2int(context_text_list[i].split(':')[1]) + 1 # the id of track number is 0:padding, 1:0, 2:1, ...
+                for i in range(1, len(context_text_list))
+            ]
+            assert all(t < vocabs.track_numbers.size for t in used_track_number), \
+                f'context_text_list: {context_text_list}\nused_track_number: {used_track_number}'
+            probs[ATTR_NAME_INDEX['trn']][used_track_number] = 0
+        else:
+            # only separater allowed
+            probs[ATTR_NAME_INDEX['evt']][:sep_index] = 0
+            probs[ATTR_NAME_INDEX['evt']][sep_index+1:] = 0
+            # track number doesn't matter
+            # probs[ATTR_NAME_INDEX['trn']][list(range(1, len(used_track_number)+1))] = 0
+
 
     elif is_sep:
         # if is separater, then only measure tokens are allowed
@@ -437,7 +461,7 @@ def generate_sample(
         exception_msg = f'start_seq\'s shape have to be (1, seq_length, complete_attr_number), get {start_seq.shape}'
         if len(start_seq.shape) != 3:
             raise AssertionError(exception_msg)
-        elif start_seq.shape[0] != 1 or start_seq.shape[1] < 1 or start_seq.shape[2] != len(COMPLETE_ATTR_NAME):
+        elif start_seq.shape[0] != 1 or start_seq.shape[1] < 1 or start_seq.shape[2] != len(ATTR_NAMES):
             raise AssertionError(exception_msg)
         assert start_seq.dtype == torch.int32
     else:
@@ -500,6 +524,7 @@ def generate_sample(
     # get_sample_time = 0
     # check_format_time = 0
     # print(seq.shape)
+    ins_index_in_output = OUTPUTABLE_ATTR_NAMES.index('instrument')
     with torch.no_grad():
         for _ in tqdm(range(max_gen_step), disable=not show_tqdm):
             # return batched_last_logits because inferencing is True
@@ -510,14 +535,16 @@ def generate_sample(
                 last_logits = [
                     l[0].to('cpu') # to cpu, if was cuda (likely)
                     # l has shape (1, attr_vocab_size)
-                    for l in batched_last_logits
+                    for idx, l in enumerate(batched_last_logits)
+                    if idx != ins_index_in_output or model.output_instruments # ignore instrument output if there is
                 ]
             else:
                 batched_logits = model(input_seq_in_attr_device)
                 last_logits = [
                     l[0, -1].to('cpu')
                     # l has shape (1, seq_length, attr_vocab_size)
-                    for l in batched_logits
+                    for idx, l in enumerate(batched_logits)
+                    if idx != ins_index_in_output or model.output_instruments # ignore instrument output if there is
                 ]
 
             last_probs = [
@@ -530,8 +557,7 @@ def generate_sample(
                     last_probs,
                     text_list,
                     model.vocabs,
-                    event_family_indices,
-                    model.permute_mps
+                    event_family_indices
                 )
             # get_logit_time += time() - bt
             # print('\n'.join([repr(p) for p in last_probs]))

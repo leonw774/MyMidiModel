@@ -61,14 +61,19 @@ ATTR_NAME_INDEX = {
     'tis': 9, 'time_signatures': 9 # context
 }
 
-COMPLETE_ATTR_NAME = [
+ATTR_NAMES = [
     'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'mps_numbers', 'measure_numbers',
     'tempos', 'time_signatures'
 ]
 
-OUTPUT_ATTR_NAME = [
+ESSENTAIL_ATTR_NAMES = [
+    'events', 'pitchs', 'durations', 'velocities', 'track_numbers'
+]
+
+OUTPUTABLE_ATTR_NAMES = [
     'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments'
 ]
+
 
 def piece_to_array(piece: str, vocabs: Vocabs, input_memory: Union[dict, None] = None, output_memory: bool = False) -> np.ndarray:
     return text_list_to_array(piece.split(' '), vocabs, input_memory, output_memory)
@@ -110,7 +115,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
 
     if input_memory is None:
         last_array_len = 0
-        x = np.full((len(text_list), len(COMPLETE_ATTR_NAME)), fill_value=padding, dtype=np.uint16)
+        x = np.full((len(text_list), len(ATTR_NAMES)), fill_value=padding, dtype=np.uint16)
         tracks_count = 0
         cur_position_cursor = 0
         cur_mps_number = 0
@@ -119,7 +124,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         cur_time_sig_id = padding
     elif isinstance(input_memory, dict):
         last_array_len = input_memory['last_array'].shape[0]
-        x = np.full((last_array_len+len(text_list), len(COMPLETE_ATTR_NAME)), fill_value=padding, dtype=np.uint16)
+        x = np.full((last_array_len+len(text_list), len(ATTR_NAMES)), fill_value=padding, dtype=np.uint16)
         x[:last_array_len] = input_memory['last_array']
         tracks_count = input_memory['tracks_count']
         cur_position_cursor = input_memory['cur_position_cursor']
@@ -229,10 +234,10 @@ def array_to_text_list(array, vocabs: Vocabs, is_output=False):
     assert len(array.shape) == 2 and array.shape[0] > 0, f'Bad numpy array shape: {array.shape}'
     if is_output:
         # because it may or may not output instrument
-        assert array.shape[1] in (len(OUTPUT_ATTR_NAME), len(OUTPUT_ATTR_NAME) - 1), \
+        assert array.shape[1] == len(ESSENTAIL_ATTR_NAMES), \
             f'Bad numpy array shape: {array.shape}'
     else:
-        assert array.shape[1] == len(COMPLETE_ATTR_NAME), f'Bad numpy array shape: {array.shape}'
+        assert array.shape[1] == len(ATTR_NAMES), f'Bad numpy array shape: {array.shape}'
 
 
     text_list = []
