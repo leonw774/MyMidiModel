@@ -75,20 +75,20 @@ class MyMidiTransformer(nn.Module):
 
         ######## Inputs
 
-        self.input_attr_names = list(ATTR_NAMES) # make copy
+        input_attr_names = list(ATTR_NAMES) # make copy
         if input_context:
             if input_instruments:
                 pass
             else:
-                self.input_attr_names.remove('instruments')
+                input_attr_names.remove('instruments')
         else:
             if input_instruments:
-                self.input_attr_names.remove('tempos')
-                self.input_attr_names.remove('time_signatures')
+                input_attr_names.remove('tempos')
+                input_attr_names.remove('time_signatures')
             else:
-                self.input_attr_names.remove('instruments')
-                self.input_attr_names.remove('tempos')
-                self.input_attr_names.remove('time_signatures')
+                input_attr_names.remove('instruments')
+                input_attr_names.remove('tempos')
+                input_attr_names.remove('time_signatures')
 
         self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in self.input_attr_names]
 
@@ -116,13 +116,13 @@ class MyMidiTransformer(nn.Module):
 
         ######## Outputs
 
-        self.output_attr_names = list(OUTPUTABLE_ATTR_NAMES) # make copy
+        output_attr_names = list(OUTPUTABLE_ATTR_NAMES) # make copy
         if not output_instruments:
             self.output_attrs_indices.remove('instruments')
 
         self.output_attrs_indices = [
             ATTR_NAME_INDEX[fname]
-            for fname in self.output_attr_names
+            for fname in output_attr_names
         ]
 
         self.logit_vocabs_size = [
@@ -524,7 +524,10 @@ def generate_sample(
     # get_sample_time = 0
     # check_format_time = 0
     # print(seq.shape)
-    ins_index_in_output = OUTPUTABLE_ATTR_NAMES.index('instrument')
+    model_output_attrs = list(OUTPUTABLE_ATTR_NAMES)
+    if not model.output_instruments:
+        model_output_attrs.remove('instruments')
+
     with torch.no_grad():
         for _ in tqdm(range(max_gen_step), disable=not show_tqdm):
             # return batched_last_logits because inferencing is True
@@ -534,17 +537,13 @@ def generate_sample(
                 batched_last_logits, recurrent_memory = model(input_seq_in_attr_device, recurrent_memory)
                 last_logits = [
                     l[0].to('cpu') # to cpu, if was cuda (likely)
-                    # l has shape (1, attr_vocab_size)
-                    for idx, l in enumerate(batched_last_logits)
-                    if idx != ins_index_in_output or model.output_instruments # ignore instrument output if there is
+                    for l in batched_last_logits # l has shape (1, attr_vocab_size)
                 ]
             else:
                 batched_logits = model(input_seq_in_attr_device)
                 last_logits = [
                     l[0, -1].to('cpu')
-                    # l has shape (1, seq_length, attr_vocab_size)
-                    for idx, l in enumerate(batched_logits)
-                    if idx != ins_index_in_output or model.output_instruments # ignore instrument output if there is
+                    for l in batched_logits # l has shape (1, seq_length, attr_vocab_size)
                 ]
 
             last_probs = [
@@ -553,12 +552,7 @@ def generate_sample(
             ]
             if use_prob_adjustment:
                 # prevent many bad format in advance
-                last_probs = adjust_probs_with_context(
-                    last_probs,
-                    text_list,
-                    model.vocabs,
-                    event_family_indices
-                )
+                last_probs = adjust_probs_with_context(last_probs, text_list, model.vocabs, event_family_indices)
             # get_logit_time += time() - bt
             # print('\n'.join([repr(p) for p in last_probs]))
             try_count = 0
@@ -568,10 +562,15 @@ def generate_sample(
                     nucleus_sampling(p, nucleus_sampling_threshold)
                     for p in last_probs
                 ]
-
                 # print(sampled_attrs)
-                try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, out_attr_num)
-                # print([ model.vocabs.to_dict()[OUTPUT_ATTR_NAME[i]]['id2text'][int(f)] for i, f in enumerate(try_token[0]) ])
+
+                # re-arrange output order to array order
+                array_order_sampled_attrs = [0] * len(ESSENTAIL_ATTR_NAMES)
+                for model_output_index, attr_name in enumerate(model_output_attrs):
+                    array_order_sampled_attrs[ATTR_NAME_INDEX[attr_name]] = sampled_attrs[model_output_index]
+
+                # print(array_order_sampled_attrs)
+                try_token = torch.stack(array_order_sampled_attrs, dim=1) # shape = (1, out_attr_num)
                 try_token_text = array_to_text_list(try_token.cpu().numpy(), vocabs=model.vocabs, is_output=True)[0]
                 # print(try_text_list)
                 if try_token_text == tokens.END_TOKEN_STR:
