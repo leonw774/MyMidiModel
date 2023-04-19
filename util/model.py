@@ -326,15 +326,14 @@ def adjust_probs_with_context(
         for i in range(vocabs.events.size):
             if i not in track_instrument_indices and (i != sep_index or len(context_text_list) == 1):
                 probs[ATTR_NAME_INDEX['evt']][i] = 0
-        # the id of track number is 0:padding, 1:0, 2:1, ...
-        # if the context text list is ['BOS', 'RD:0'] the next track number must be 1, and '1' has id of 2
-        # so the length of context text list is the id of the next track number
-        if len(context_text_list) < vocabs.track_numbers.size:
-            probs[ATTR_NAME_INDEX['trn']][0:len(context_text_list)] = 0
-            probs[ATTR_NAME_INDEX['trn']][len(context_text_list)+1:] = 0
-        # but if context_text_list == vocabs.track_numbers.size, the upper limit is reached, only separtor is valid
-        else:
-            probs[ATTR_NAME_INDEX['evt']][list(track_instrument_indices)] = 0
+        # prevent generating repeating track number
+        used_track_number =  [
+            b36str2int(context_text_list[i].split(':')[1]) + 1 # the id of track number is 0:padding, 1:0, 2:1, ...
+            for i in range(1, len(context_text_list))
+        ]
+        probs[ATTR_NAME_INDEX['trn']][used_track_number] = 0
+        if len(used_track_number) == vocabs.track_numbers.size - 1:
+            probs[ATTR_NAME_INDEX['trn']][0] = 1
 
     elif is_sep:
         # if is separater, then only measure tokens are allowed
@@ -372,34 +371,28 @@ def adjust_probs_with_context(
             probs[ATTR_NAME_INDEX['evt']][list(tempo_indices)] = 0
 
         # this prohibits the multi-note token to have the track number smaller than the previous multi-note token
-        if not permute_mps:
-            prev_token_type = context_text_list[-1][0]
-            if prev_token_type == tokens.MULTI_NOTE_EVENTS_CHAR or prev_token_type == tokens.NOTE_EVENTS_CHAR:
-                prev_token_track_number = b36str2int(context_text_list[-1].split(':')[-1])
-                # prohibits track number from '0' to 'prev_token_track_number - 1'
-                # id of track number '0' is 1
-                # id of track number 'prev_token_track_number - 1' is prev_token_track_number
-                probs[ATTR_NAME_INDEX['trn']][1:prev_token_track_number+1] = 0
+        # if not permute_mps:
+        #     prev_token_type = context_text_list[-1][0]
+        #     if prev_token_type == tokens.MULTI_NOTE_EVENTS_CHAR or prev_token_type == tokens.NOTE_EVENTS_CHAR:
+        #         prev_token_track_number = b36str2int(context_text_list[-1].split(':')[-1])
+        #         # prohibits track number from '0' to 'prev_token_track_number - 1'
+        #         # id of track number '0' is 1
+        #         # id of track number 'prev_token_track_number - 1' is prev_token_track_number
+        #         probs[ATTR_NAME_INDEX['trn']][1:prev_token_track_number+1] = 0
 
-
-    # adjust track attribute logit
-    if not (is_head or is_sep):
-        # if the section is body, then only allow the defined track
+        # only allow the defined track number
         sep_index_in_text_list = context_text_list.index(tokens.SEP_TOKEN_STR)
         try:
-            max_track_number = max([
-                b36str2int(t.split(':')[1])
+            used_track_number = [
+                b36str2int(t.split(':')[1]) + 1
                 for t in context_text_list[1:sep_index_in_text_list]
                 if t[0] == tokens.TRACK_EVENTS_CHAR
-            ])
+            ]
         except Exception as e:
             print(context_text_list[1:sep_index_in_text_list])
             raise e
-        # start from max_track_number+1+1
-        # first +1 is because index 0 is padding
-        # second +1 is because we want indices that greater than max_track_number+1
-        for i in range(max_track_number+1+1, vocabs.track_numbers.size):
-            probs[ATTR_NAME_INDEX['trn']][i] = 0
+        unused_track_number = list(set(range(vocabs.track_numbers.size)).difference(used_track_number))
+        probs[ATTR_NAME_INDEX['trn']][unused_track_number] = 0
 
     # re-normalized it
     normed_probs = [p / p.sum() for p in probs]

@@ -11,7 +11,7 @@ from miditoolkit import MidiFile
 from util.tokens import BEGIN_TOKEN_STR, END_TOKEN_STR
 from util.midi import midi_to_piece, piece_to_midi, get_first_k_measures, get_first_k_nths
 from util.corpus_reader import CorpusReader
-from util.corpus import text_list_to_array, to_corpus_file_path, to_paras_file_path, dump_corpus_paras
+from util.corpus import text_list_to_array, to_corpus_file_path, to_paras_file_path, dump_corpus_paras, get_input_array_format_string
 from util.model import MyMidiTransformer, generate_sample
 
 def read_args():
@@ -55,7 +55,11 @@ def read_args():
         action='store_true'
     )
     parser.add_argument(
-        '--max-generation-step', '--step',
+        '--output-debug', '-d',
+        action='store_true'
+    )
+    parser.add_argument(
+        '--max-generation-step', '--step', '-s',
         type=int,
         default=-1,
         help='The maximum TOKENS in each sample would be generated. Default is models max sequence length.'
@@ -135,6 +139,9 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
             if args.output_txt:
                 with open(f'{output_file_path}.txt', 'w+', encoding='utf8') as f:
                     f.write(' '.join(gen_text_list))
+            if args.output_debug:
+                with open(f'{output_file_path}_debug.txt', 'w+', encoding='utf8') as f:
+                    f.write(get_input_array_format_string(text_list_to_array(gen_text_list), model.vocabs))
             midi = piece_to_midi(' '.join(gen_text_list), model.vocabs.paras['nth'])
             midi.dump(f'{output_file_path}.mid')
     except Exception:

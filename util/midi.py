@@ -543,20 +543,22 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
             assert is_head, 'Track token at body'
             instrument, track_number = (b36str2int(x) for x in text[1:].split(':'))
             assert track_number not in track_program_mapping, 'Repeated track number'
+            # DEPRECATED
             # assertion below restrict track list to just: 1, ..., n
-            assert track_number == len(track_program_mapping), 'Track number not increasing by one'
+            # assert track_number == len(track_program_mapping), 'Track number not increasing by one'
             track_program_mapping[track_number] = instrument
 
         elif typename == tokens.SEP_TOKEN_STR[0]:
             assert is_head, 'Seperator token in body'
             is_head = False
             assert len(track_program_mapping) > 0, 'No track in head'
-            track_numbers_list = list(track_program_mapping.keys())
-            track_numbers_list.sort()
+            # DEPRECATED
             # track number must at least be a permutation of 1, ..., n
-            assert track_numbers_list == list(range(len(track_numbers_list))),\
-                'Track numbers are not permutation of consecutive integers starting from 1'
-            for track_number in track_numbers_list:
+            # track_numbers_list = list(track_program_mapping.keys())
+            # track_numbers_list.sort()
+            # assert track_numbers_list == list(range(len(track_numbers_list))),\
+            #     'Track numbers are not permutation of consecutive integers starting from 1'
+            for track_number in track_program_mapping:
                 program = track_program_mapping[track_number]
                 midi.instruments.append(
                     Instrument(program=(program%128), is_drum=(program==128), name=f'Track_{track_number}')

@@ -258,10 +258,9 @@ class MidiDataset(Dataset):
                 (piece_trn_column == i + 1) for i in range(max_track_number)
             ])
             # permute body's track number
-            evt_ins_col_index = [ATTR_NAME_INDEX['evt'], ATTR_NAME_INDEX['ins']]
             for i in range(max_track_number):
                 piece_trn_column[piece_trn_column_expand[i]] = perm_array[i]
-            
+
             # DEPRECATED
             # permute head's track tokens with the inverse of perm array
             # inv_perm_array = np.empty(max_track_number, dtype=np.int32)
