@@ -19,7 +19,7 @@ from torch.optim import AdamW, lr_scheduler
 import torchinfo
 
 from util.midi import piece_to_midi, get_first_k_measures
-from util.corpus import ATTR_NAME_INDEX, ATTR_NAMES, OUTPUTABLE_ATTR_NAMES, get_corpus_vocabs, array_to_text_list, text_list_to_array
+from util.corpus import ATTR_NAME_INDEX, ALL_ATTR_NAMES, OUTPUTABLE_ATTR_NAMES, get_corpus_vocabs, array_to_text_list, text_list_to_array
 from util.dataset import MidiDataset, collate_mididataset
 from util.model import (
     MyMidiTransformer,
@@ -426,7 +426,7 @@ def main():
     if is_main_process:
         logging.info('Embedding size:')
         logging.info('\n'.join([
-            f'{i} - {ATTR_NAMES[idx]} {vsize}'
+            f'{i} - {ALL_ATTR_NAMES[idx]} {vsize}'
             for i, (idx, vsize) in enumerate(zip(model.input_attrs_indices, model.embedding_vocabs_size))
         ]))
     to_input_attrs = model.to_input_attrs

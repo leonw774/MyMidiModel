@@ -34,7 +34,7 @@ from .midi import piece_to_midi
 from .vocabs import Vocabs
 from .corpus import (
     ATTR_NAME_INDEX,
-    ATTR_NAMES,
+    ALL_ATTR_NAMES,
     ESSENTAIL_ATTR_NAMES,
     OUTPUTABLE_ATTR_NAMES,
     array_to_text_list,
@@ -75,7 +75,7 @@ class MyMidiTransformer(nn.Module):
 
         ######## Inputs
 
-        input_attr_names = list(ATTR_NAMES) # make copy
+        input_attr_names = list(ALL_ATTR_NAMES) # make copy
         if input_context:
             if input_instruments:
                 pass
@@ -94,11 +94,11 @@ class MyMidiTransformer(nn.Module):
 
         self.embedding_vocabs_size = [
             self.vocabs.max_measure_number + 1 # plus one for padding
-            if ATTR_NAMES[idx] == 'measure_numbers' else
+            if ALL_ATTR_NAMES[idx] == 'measure_numbers' else
             (
                 self.vocabs.max_mps_number + 1
-                if ATTR_NAMES[idx] == 'mps_numbers' else
-                getattr(self.vocabs, ATTR_NAMES[idx]).size
+                if ALL_ATTR_NAMES[idx] == 'mps_numbers' else
+                getattr(self.vocabs, ALL_ATTR_NAMES[idx]).size
             )
             for idx in self.input_attrs_indices
         ]
@@ -126,7 +126,7 @@ class MyMidiTransformer(nn.Module):
         ]
 
         self.logit_vocabs_size = [
-            getattr(self.vocabs, ATTR_NAMES[i]).size
+            getattr(self.vocabs, ALL_ATTR_NAMES[i]).size
             for i in self.output_attrs_indices
         ]
         self.project_linears = nn.ModuleList([
@@ -192,11 +192,11 @@ class MyMidiTransformer(nn.Module):
             module.weight.data.fill_(1.0)
 
     def to_input_attrs(self, batch_input_seqs: Tensor) -> Tensor:
-        # expect batch_input_seqs has shape: (batch_size, seq_size, complete_attr_num)
+        # expect batch_input_seqs has shape: (batch_size, seq_size, all_attr_num)
         return batch_input_seqs[..., self.input_attrs_indices]
 
     def to_output_attrs(self, batch_input_seqs: Tensor) -> Tensor:
-        # expect batch_input_seqs has shape: (batch_size, seq_size, complete_attr_num)
+        # expect batch_input_seqs has shape: (batch_size, seq_size, all_attr_num)
         return batch_input_seqs[..., self.output_attrs_indices]
 
     def forward(self, x, memory=None):
@@ -452,16 +452,16 @@ def generate_sample(
         show_tqdm: bool = False,
         ignore_pending_note_error: bool = True) -> list:
     """
-        Expect start_seq to be Tensor with shape: (1, seq_size, complete_attr_number) or None
+        Expect start_seq to be Tensor with shape: (1, seq_size, all_attr_number) or None
         If start_seq is None, will use `text_list_to_array([BEGIN_TOKEN_STR])` as start_seq
         ignore_pending_note_error is default to be True, otherwise model cannot generate continuing note
         return the text list of the generated piece
     """
     if start_seq is not None:
-        exception_msg = f'start_seq\'s shape have to be (1, seq_length, complete_attr_number), get {start_seq.shape}'
+        exception_msg = f'start_seq\'s shape have to be (1, seq_length, all_attr_number), get {start_seq.shape}'
         if len(start_seq.shape) != 3:
             raise AssertionError(exception_msg)
-        elif start_seq.shape[0] != 1 or start_seq.shape[1] < 1 or start_seq.shape[2] != len(ATTR_NAMES):
+        elif start_seq.shape[0] != 1 or start_seq.shape[1] < 1 or start_seq.shape[2] != len(ALL_ATTR_NAMES):
             raise AssertionError(exception_msg)
         assert start_seq.dtype == torch.int32
     else:
@@ -500,7 +500,7 @@ def generate_sample(
             tempo_indices
         )
 
-    text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs, is_output=False)
+    text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs)
     # is_head = (tokens.SEP_TOKEN_STR not in text_list)
 
     input_seq = start_seq
@@ -520,20 +520,15 @@ def generate_sample(
         for i in range(1, primer_length):
             _, recurrent_memory = model(model.to_input_attrs(input_seq[:, :i]).to(model_device), recurrent_memory)
 
-    # get_logit_time = 0
-    # get_sample_time = 0
-    # check_format_time = 0
-    # print(seq.shape)
     model_output_attrs = list(OUTPUTABLE_ATTR_NAMES)
     if not model.output_instruments:
         model_output_attrs.remove('instruments')
 
     with torch.no_grad():
         for _ in tqdm(range(max_gen_step), disable=not show_tqdm):
-            # return batched_last_logits because inferencing is True
-            # bt = time()
             input_seq_in_attr_device = model.to_input_attrs(input_seq).to(model_device)
             if model.use_linear_attn:
+                # return batched_last_logits because inferencing is True
                 batched_last_logits, recurrent_memory = model(input_seq_in_attr_device, recurrent_memory)
                 last_logits = [
                     l[0].to('cpu') # to cpu, if was cuda (likely)
@@ -546,40 +541,36 @@ def generate_sample(
                     for l in batched_logits # l has shape (1, seq_length, attr_vocab_size)
                 ]
 
-            last_probs = [
+            # re-arrange output order to array order
+            array_order_logits = [0] * len(ESSENTAIL_ATTR_NAMES)
+            for attr_name in ESSENTAIL_ATTR_NAMES:
+                model_output_index = model_output_attrs.index(attr_name)
+                array_order_logits[ATTR_NAME_INDEX[attr_name]] = last_logits[model_output_index]
+
+            probs = [
                 F.softmax(l / temperature, dim=0)
-                for l in last_logits # l has shape (attr_vocab_size,)
+                for l in array_order_logits # l has shape (attr_vocab_size,)
             ]
             if use_prob_adjustment:
                 # prevent many bad format in advance
-                last_probs = adjust_probs_with_context(last_probs, text_list, model.vocabs, event_family_indices)
-            # get_logit_time += time() - bt
-            # print('\n'.join([repr(p) for p in last_probs]))
+                probs = adjust_probs_with_context(probs, text_list, model.vocabs, event_family_indices)
+            # print('\n'.join([repr(p) for p in probs]))
+
             try_count = 0
             while try_count < try_count_limit:
-                # bt = time()
                 sampled_attrs = [
                     nucleus_sampling(p, nucleus_sampling_threshold)
-                    for p in last_probs
+                    for p in probs
                 ]
                 # print(sampled_attrs)
-
-                # re-arrange output order to array order
-                array_order_sampled_attrs = [0] * len(ESSENTAIL_ATTR_NAMES)
-                for attr_name in ESSENTAIL_ATTR_NAMES:
-                    model_output_index = model_output_attrs.index(attr_name)
-                    array_order_sampled_attrs[ATTR_NAME_INDEX[attr_name]] = sampled_attrs[model_output_index]
-
-                # print(array_order_sampled_attrs)
-                try_token = torch.stack(array_order_sampled_attrs, dim=1) # shape = (1, out_attr_num)
-                try_token_text = array_to_text_list(try_token.cpu().numpy(), vocabs=model.vocabs, is_output=True)[0]
+                try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, out_attr_num)
+                try_token_text = array_to_text_list(try_token.cpu().numpy(), vocabs=model.vocabs)[0]
                 # print(try_text_list)
                 if try_token_text == tokens.END_TOKEN_STR:
                     text_list = text_list + [try_token_text]
                     # if sampled EOS, then dont check. just end
                     break
-                # get_sample_time = time() - bt
-                # bt = time()
+
                 try:
                     try_text_list = text_list + [try_token_text]
                     # format checking
@@ -590,43 +581,36 @@ def generate_sample(
                             nth=model.vocabs.paras['nth'],
                             ignore_pending_note_error=ignore_pending_note_error
                         )
-                    # compute complete attribute array and second format checking
+                    # compute full attribute array and second format checking
                     try_text_list_array, try_array_to_text_list_memory = text_list_to_array(
                         [try_token_text],
                         vocabs=model.vocabs,
                         input_memory=array_to_text_list_memory,
                         output_memory=True
                     )
-                    try_text_list_tensor = torch.from_numpy(
-                        try_text_list_array.astype('int32')
-                    ).unsqueeze(0).int() # shape = (1, 1, complete_attr_num)
-                    # check_format_time += time() - bt
+                    try_text_list_tensor = torch.from_numpy(try_text_list_array.astype('int32')).unsqueeze(0).int()
+                    # shape = (1, 1, all_attr_num)
                 except (AssertionError, ValueError) as e:
                     if print_exception:
                         print(repr(e))
                     try_count += 1
-                    # check_format_time += time() - bt
                     continue # keep sampling until no error
-                # no error
-                input_seq = try_text_list_tensor
-                array_to_text_list_memory = try_array_to_text_list_memory
-                text_list = try_text_list
-                break
-            # end while try
-            # print(text_list)
+            # end while sample and try
+
             if try_count == try_count_limit:
                 if print_exception:
                     print('Exceeded try count limit:', try_count_limit)
                 break
 
-            if text_list[-1] == tokens.END_TOKEN_STR:
+            if try_text_list == tokens.END_TOKEN_STR:
                 end_with_end_token = True
                 break
+
+            text_list = try_text_list
+            array_to_text_list_memory = try_array_to_text_list_memory
+            input_seq = try_text_list_tensor
         # end for each step
     # end with torch.no_grad
-    # print('get_logit_time', get_logit_time)
-    # print('get_sample_time', get_sample_time)
-    # print('check_format_time', check_format_time)
 
     if not end_with_end_token:
         text_list.append(tokens.END_TOKEN_STR)
