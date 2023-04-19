@@ -141,7 +141,7 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
                     f.write(' '.join(gen_text_list))
             if args.output_debug:
                 with open(f'{output_file_path}_debug.txt', 'w+', encoding='utf8') as f:
-                    f.write(get_input_array_format_string(text_list_to_array(gen_text_list), model.vocabs))
+                    f.write(get_input_array_format_string(text_list_to_array(gen_text_list, model.vocabs), model.vocabs))
             midi = piece_to_midi(' '.join(gen_text_list), model.vocabs.paras['nth'])
             midi.dump(f'{output_file_path}.mid')
     except Exception:
