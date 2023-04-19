@@ -142,12 +142,11 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
             x[i][ATTR_NAME_INDEX['mea']] = cur_measure_number
 
-
         elif typename == tokens.TRACK_EVENTS_CHAR:
             event_text, track_number = text.split(':')
             instrument = event_text[1:]
             tracks_count += 1
-            if x[i-1][ATTR_NAME_INDEX['trn']] == 0: # if prev is BOS
+            if x[i-1][ATTR_NAME_INDEX['trn']] == 0: # if prev token is BOS
                 cur_mps_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][ATTR_NAME_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
@@ -195,7 +194,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             x[i][ATTR_NAME_INDEX['trn']] = vocabs.track_numbers.text2id[attr[3]]
             assert b36str2int(attr[3]) < tracks_count, 'Invalid track number'
             x[i][ATTR_NAME_INDEX['ins']] = x[b36str2int(attr[3])+1, ATTR_NAME_INDEX['ins']]
-            if x[i-1][ATTR_NAME_INDEX['pit']] == 0: # if last token is position
+            if x[i-1][ATTR_NAME_INDEX['pit']] == 0: # if prev token is position
                 cur_mps_number += 1
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
             x[i][ATTR_NAME_INDEX['mea']] = cur_measure_number
