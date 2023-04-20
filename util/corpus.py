@@ -116,7 +116,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
     if input_memory is None:
         last_array_len = 0
         x = np.full((len(text_list), len(ALL_ATTR_NAMES)), fill_value=padding, dtype=np.uint16)
-        defined_tracks_numbers = []
+        tracks_number_instrument_mapping = dict()
         cur_position_cursor = 0
         cur_mps_number = 0
         cur_measure_number = 0
@@ -126,7 +126,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         last_array_len = input_memory['last_array'].shape[0]
         x = np.full((last_array_len+len(text_list), len(ALL_ATTR_NAMES)), fill_value=padding, dtype=np.uint16)
         x[:last_array_len] = input_memory['last_array']
-        defined_tracks_numbers = input_memory['defined_tracks_numbers']
+        tracks_number_instrument_mapping = input_memory['tracks_number_instrument_mapping']
         cur_position_cursor = input_memory['cur_position_cursor']
         cur_mps_number = input_memory['cur_mps_number']
         cur_measure_number = input_memory['cur_measure_number']
@@ -154,7 +154,8 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         elif typename == tokens.TRACK_EVENTS_CHAR:
             event_text, track_number = text.split(':')
             instrument = event_text[1:]
-            defined_tracks_numbers.append(track_number)
+            assert track_number not in tracks_number_instrument_mapping, 'Repeating track number in head'
+            tracks_number_instrument_mapping[track_number] = vocabs.instruments.text2id[instrument]
             if x[i-1][ATTR_NAME_INDEX['trn']] == 0: # if prev token is BOS
                 cur_mps_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
@@ -201,8 +202,8 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             x[i][ATTR_NAME_INDEX['dur']] = vocabs.durations.text2id[attr[1]]
             x[i][ATTR_NAME_INDEX['vel']] = vocabs.velocities.text2id[attr[2]]
             x[i][ATTR_NAME_INDEX['trn']] = vocabs.track_numbers.text2id[attr[3]]
-            assert b36str2int(attr[3]) in defined_tracks_numbers, 'Invalid track number'
-            x[i][ATTR_NAME_INDEX['ins']] = x[b36str2int(attr[3])+1, ATTR_NAME_INDEX['ins']]
+            assert attr[3] in tracks_number_instrument_mapping, 'Invalid track number'
+            x[i][ATTR_NAME_INDEX['ins']] = tracks_number_instrument_mapping[attr[3]]
             if x[i-1][ATTR_NAME_INDEX['pit']] == 0: # if prev token is position
                 cur_mps_number += 1
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
@@ -215,7 +216,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
     if output_memory:
         return x, {
                 'last_array': x,
-                'defined_tracks_numbers': defined_tracks_numbers,
+                'tracks_number_instrument_mapping': tracks_number_instrument_mapping,
                 'cur_position_cursor': cur_position_cursor,
                 'cur_mps_number': cur_mps_number,
                 'cur_measure_number': cur_measure_number,
