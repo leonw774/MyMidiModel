@@ -40,11 +40,11 @@ def adjust_probs_with_context(
     if is_head: # if the section is head and not sep
         if len(context_text_list) == 1:
             # only track-instrument allowed
-            not_track_indices = list(set(range(vocabs.events.size)).difference(track_indices))
+            not_track_indices = [idx for idx in range(vocabs.events.size) if idx not in track_indices]
             probs[ATTR_NAME_INDEX['evt']][not_track_indices] = 0
         elif 1 < len(context_text_list) < vocabs.track_numbers.size:
             # only track-instrument and separater allowed
-            not_track_or_sep_indices = list(set(range(vocabs.events.size)).difference(track_indices))
+            not_track_or_sep_indices = [idx for idx in range(vocabs.events.size) if idx not in track_indices]
             not_track_or_sep_indices.remove(sep_index)
             probs[ATTR_NAME_INDEX['evt']][not_track_or_sep_indices] = 0
             # prevent generating repeating track number
@@ -103,15 +103,15 @@ def adjust_probs_with_context(
         # only allow the defined track number
         try:
             sep_index_in_text_list = context_text_list.index(tokens.SEP_TOKEN_STR)
-            used_track_number_indices = [
+            used_track_number_indices = {
                 b36str2int(t.split(':')[1]) + 1
                 for t in context_text_list[1:sep_index_in_text_list]
                 if t[0] == tokens.TRACK_EVENTS_CHAR
-            ]
+            }
         except Exception as e:
             print(context_text_list)
             raise e
-        unused_track_number_indices = list(set(range(vocabs.track_numbers.size)).difference(used_track_number_indices))
+        unused_track_number_indices = [idx for idx in range(vocabs.track_numbers.size) if idx not in used_track_number_indices]
         probs[ATTR_NAME_INDEX['trn']][unused_track_number_indices] = 0
 
     # re-normalized probs
