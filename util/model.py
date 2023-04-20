@@ -79,7 +79,7 @@ class MyMidiTransformer(nn.Module):
                 input_attr_names.remove('tempos')
                 input_attr_names.remove('time_signatures')
 
-        self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in self.input_attr_names]
+        self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in input_attr_names]
 
         self.embedding_vocabs_size = [
             self.vocabs.max_measure_number + 1 # plus one for padding
