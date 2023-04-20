@@ -201,7 +201,7 @@ $launch_command train.py \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
     --batch-size $BATCH_SIZE --max-updates $MAX_UPDATES --grad-clip-norm $GRAD_CLIP_NORM --split-ratio $SPLIT_RATIO \
     --validation-interval $VALIDATION_INTERVAL --early-stop $EARLY_STOP \
-    --generate-sample-interval $GEN_SAMPLE_INTERVAL --nucleus-sampling-threshold $NUCLEUS_THRESHOLD \
+    --generate-interval $GENERATE_INTERVAL --nucleus-sampling-threshold $NUCLEUS_THRESHOLD \
     --lr-peak $LEARNING_RATE_PEAK --lr-warmup-updates $LEARNING_RATE_WARMUP_UPDATES \
     --lr-decay-end-updates $LEARNING_RATE_DECAY_END_UPDATES --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
     --use-device $USE_DEVICE --primer-measure-length $PRIMER_LENGTH --log $log_path $train_other_args $corpus_dir_path $model_dir_path

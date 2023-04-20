@@ -104,7 +104,7 @@ def parse_args():
         type=int,
     )
     train_parser.add_argument(
-        '--generate-sample-interval',
+        '--generate-interval',
         type=int
     )
     train_parser.add_argument(
@@ -622,7 +622,7 @@ def main():
                     logging.info('New best model.')
 
         if is_main_process:
-            if cur_num_updates % args.train.generate_piece_interval == 0:
+            if cur_num_updates % args.train.generate_interval == 0:
                 print('Generating conditional and unconditional sample for checkpoint')
                 uncond_gen_text_list = generate_piece(
                     unwrapped_model if args.use_parallel else model,
