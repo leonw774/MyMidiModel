@@ -12,6 +12,7 @@ from .corpus import (ATTR_NAME_INDEX, ALL_ATTR_NAMES, ESSENTAIL_ATTR_NAMES, OUTP
                      array_to_text_list, text_list_to_array)
 from .model import MyMidiTransformer
 
+
 def adjust_probs_with_context(
         probs: List[torch.Tensor],
         context_text_list: List[str],
@@ -101,15 +102,15 @@ def adjust_probs_with_context(
             probs[ATTR_NAME_INDEX['evt']][list(tempo_indices)] = 0
 
         # only allow the defined track number
-        sep_index_in_text_list = context_text_list.index(tokens.SEP_TOKEN_STR)
         try:
+            sep_index_in_text_list = context_text_list.index(tokens.SEP_TOKEN_STR)
             used_track_number = [
                 b36str2int(t.split(':')[1]) + 1
                 for t in context_text_list[1:sep_index_in_text_list]
                 if t[0] == tokens.TRACK_EVENTS_CHAR
             ]
         except Exception as e:
-            print(context_text_list[1:sep_index_in_text_list])
+            print(context_text_list)
             raise e
         unused_track_number = list(set(range(vocabs.track_numbers.size)).difference(used_track_number))
         probs[ATTR_NAME_INDEX['trn']][unused_track_number] = 0
@@ -181,9 +182,9 @@ def generate_piece(
                 event_family_indices[1].add(i)
             elif t[0] == tokens.MEASURE_EVENTS_CHAR:
                 event_family_indices[2].add(i)
-            elif t[0] == tokens.TEMPO_EVENTS_CHAR:
-                event_family_indices[3].add(i)
             elif t[0] == tokens.TRACK_EVENTS_CHAR:
+                event_family_indices[3].add(i)
+            elif t[0] == tokens.TEMPO_EVENTS_CHAR:
                 event_family_indices[4].add(i)
 
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs)
@@ -276,6 +277,9 @@ def generate_piece(
                     try_count += 1
                     continue # keep sampling until no error
 
+                text_list = try_text_list
+                array_memory = try_array_memory
+                input_seq = try_tensor
                 break
             # end while sample and try
 
@@ -287,10 +291,7 @@ def generate_piece(
             if try_text_list == tokens.END_TOKEN_STR:
                 end_with_end_token = True
                 break
-
-            text_list = try_text_list
-            array_memory = try_array_memory
-            input_seq = try_tensor
+            
         # end for each step
     # end with torch.no_grad
 
