@@ -538,6 +538,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
     cur_time_signature = None
     pending_cont_notes = dict()
     track_program_mapping = dict()
+    track_midi_index_mapping = dict()
     for text in text_list[1:-1]:
         typename = text[0]
         if typename == tokens.TRACK_EVENTS_CHAR:
@@ -559,7 +560,8 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
             # track_numbers_list.sort()
             # assert track_numbers_list == list(range(len(track_numbers_list))),\
             #     'Track numbers are not permutation of consecutive integers starting from 1'
-            for track_number, program in track_program_mapping.items():
+            for midi_track_index, (track_number, program) in enumerate(track_program_mapping.items()):
+                track_midi_index_mapping[track_number] = midi_track_index
                 midi.instruments.append(
                     Instrument(program=(program%128), is_drum=(program==128), name=f'Track_{track_number}')
                 )
@@ -599,7 +601,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
             assert note_attrs[3] in track_program_mapping, 'Note not in used track'
             n = handle_note_continuation(is_cont, note_attrs, cur_time, pending_cont_notes)
             if n is not None:
-                midi.instruments[note_attrs[3]].notes.append(n)
+                midi.instruments[track_midi_index_mapping[note_attrs[3]]].notes.append(n)
 
         elif typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             assert not is_head, 'Multi-note token at head'
@@ -624,7 +626,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
                 onset_time = cur_time + rel_onset * stretch_factor
                 n = handle_note_continuation(is_cont, note_attrs, onset_time, pending_cont_notes)
                 if n is not None:
-                    midi.instruments[track_number].notes.append(n)
+                    midi.instruments[track_midi_index_mapping[track_number]].notes.append(n)
         else:
             raise ValueError(f'Bad token string: {text}')
 
