@@ -281,7 +281,7 @@ def array_to_text_list(array, vocabs: Vocabs):
     return text_list
 
 
-def get_input_array_format_string(input_array: np.ndarray, vocabs: Vocabs):
+def get_full_array_string(input_array: np.ndarray, vocabs: Vocabs):
     array_text_byteio = io.BytesIO()
     np.savetxt(array_text_byteio, input_array, fmt='%d')
     array_savetxt_list = array_text_byteio.getvalue().decode().split('\n')

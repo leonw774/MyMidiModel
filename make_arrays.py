@@ -26,7 +26,7 @@ from util.corpus import (
     get_corpus_paras,
     ATTR_NAME_INDEX,
     text_list_to_array,
-    get_input_array_format_string,
+    get_full_array_string,
 )
 
 
@@ -195,7 +195,7 @@ def main():
             original_text_list = [text.ljust(longest_text_length) for text in original_text_list]
 
             array_data = text_list_to_array(piece_0.split(), vocabs)
-            debug_str = get_input_array_format_string(array_data, vocabs)
+            debug_str = get_full_array_string(array_data, vocabs)
             debug_str_list = debug_str.splitlines()
 
             merged_lines = [

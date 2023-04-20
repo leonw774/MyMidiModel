@@ -19,14 +19,11 @@ from torch.optim import AdamW, lr_scheduler
 import torchinfo
 
 from util.midi import piece_to_midi, get_first_k_measures
-from util.corpus import ATTR_NAME_INDEX, ALL_ATTR_NAMES, OUTPUTABLE_ATTR_NAMES, get_corpus_vocabs, array_to_text_list, text_list_to_array
+from util.corpus import (ATTR_NAME_INDEX, ALL_ATTR_NAMES, OUTPUTABLE_ATTR_NAMES,
+                         get_corpus_vocabs, array_to_text_list, text_list_to_array)
 from util.dataset import MidiDataset, collate_mididataset
-from util.model import (
-    MyMidiTransformer,
-    generate_sample,
-    compute_losses,
-    compute_permutable_subseq_losses
-)
+from util.model import MyMidiTransformer, compute_losses, compute_permutable_subseq_losses
+from util.generation import generate_piece
 
 def parse_args():
     data_parser = ArgumentParser()
@@ -625,9 +622,9 @@ def main():
                     logging.info('New best model.')
 
         if is_main_process:
-            if cur_num_updates % args.train.generate_sample_interval == 0:
+            if cur_num_updates % args.train.generate_piece_interval == 0:
                 print('Generating conditional and unconditional sample for checkpoint')
-                uncond_gen_text_list = generate_sample(
+                uncond_gen_text_list = generate_piece(
                     unwrapped_model if args.use_parallel else model,
                     steps=args.data.max_seq_length,
                     nucleus_sampling_threshold=args.nucleus_sampling_threshold
@@ -642,7 +639,7 @@ def main():
                     print('Error when dumping uncond gen MidiFile object')
                     print(format_exc())
 
-                cond_gen_text_list = generate_sample(
+                cond_gen_text_list = generate_piece(
                     unwrapped_model if args.use_parallel else model,
                     steps=args.data.max_seq_length,
                     start_seq=cond_primer_array,

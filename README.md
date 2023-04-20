@@ -70,17 +70,20 @@ They should compile to:
 - `corpus.py`
   - Define corpus directory structure and the array form of the representation.
   - The piece-to-array and array-to-piece functions.
+- `corpus_reader.py`
+  - Define corpus reader class
 - `dataset.py`
   - Define `MidiDataset` class and the collate function.
 - `evaluation.py`
   - The functions for features computation and preparing data for features computation.
   - The piece-to-feature and midi-to-feature functions.
+- `generation.py`
+  - The functions for generating using model
 - `midi.py`
   - The midi-to-piece and piece-to-midi functions.
 - `model.py`
   - Define `MyMidiTransformer` class, inherit from `torch.nn.Module`
   - The loss functions for the model
-  - The function for generating using model
 - `token.py`
   - Define representation tokens and their "main form" (text representation)
   - Some hard-coded configurations in midi preprocessing

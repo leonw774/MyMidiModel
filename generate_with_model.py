@@ -11,8 +11,9 @@ from miditoolkit import MidiFile
 from util.tokens import BEGIN_TOKEN_STR, END_TOKEN_STR
 from util.midi import midi_to_piece, piece_to_midi, get_first_k_measures, get_first_k_nths
 from util.corpus_reader import CorpusReader
-from util.corpus import text_list_to_array, to_corpus_file_path, to_paras_file_path, dump_corpus_paras, get_input_array_format_string
-from util.model import MyMidiTransformer, generate_sample
+from util.corpus import text_list_to_array, to_corpus_file_path, to_paras_file_path, dump_corpus_paras, get_full_array_string
+from util.model import MyMidiTransformer
+from util.generation import generate_piece
 
 def read_args():
     parser = ArgumentParser()
@@ -122,7 +123,7 @@ def read_args():
 
 def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_file_path: str):
     try:
-        gen_text_list = generate_sample(
+        gen_text_list = generate_piece(
             model,
             steps=args.max_generation_step,
             start_seq=primer_seq,
@@ -141,7 +142,7 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
                     f.write(' '.join(gen_text_list))
             if args.output_array_text:
                 with open(f'{output_file_path}_array.txt', 'w+', encoding='utf8') as f:
-                    f.write(get_input_array_format_string(text_list_to_array(gen_text_list, model.vocabs), model.vocabs))
+                    f.write(get_full_array_string(text_list_to_array(gen_text_list, model.vocabs), model.vocabs))
             midi = piece_to_midi(' '.join(gen_text_list), model.vocabs.paras['nth'])
             midi.dump(f'{output_file_path}.mid')
     except Exception:

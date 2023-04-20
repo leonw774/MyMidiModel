@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import random_split, DataLoader
 
 from util.midi import piece_to_midi
-from util.corpus import get_input_array_format_string, array_to_text_list
+from util.corpus import get_full_array_string, array_to_text_list
 from util.dataset import MidiDataset, collate_mididataset
 # from util.model import MidiTransformerDecoder
 
@@ -106,7 +106,7 @@ train_dataloader = DataLoader(
 batched_samples = next(iter(train_dataloader))
 for i, s in enumerate(batched_samples):
     print(f'BATCHED[{i}]')
-    print(get_input_array_format_string(s.numpy(), vocabs))
+    print(get_full_array_string(s.numpy(), vocabs))
     piece = ' '.join(array_to_text_list(s.numpy(), vocabs))
     print(piece)
     if args.output_midi:

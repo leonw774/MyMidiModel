@@ -12,7 +12,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
 from . import tokens
-from .corpus import get_corpus_vocabs, ATTR_NAME_INDEX, get_input_array_format_string
+from .corpus import get_corpus_vocabs, ATTR_NAME_INDEX, get_full_array_string
 
 class MidiDataset(Dataset):
 
@@ -261,28 +261,9 @@ class MidiDataset(Dataset):
             for i in range(max_track_number):
                 piece_trn_column[piece_trn_column_expand[i]] = perm_array[i]
 
-            # DEPRECATED
-            # permute head's track tokens with the inverse of perm array
-            # inv_perm_array = np.empty(max_track_number, dtype=np.int32)
-            # inv_perm_array[perm_array-1] = (np.arange(max_track_number) + 1)
-            # track_permuted_evt_ins = np.empty((max_track_number, 2), dtype=np.int32)
-            # track_permuted_evt_ins = self.pieces[str(filenum)][inv_perm_array][:, evt_ins_col_index]
-            # sampled_array[1:body_start_index-1, evt_ins_col_index] = track_permuted_evt_ins
-            #
-            # if not using mps permutation, we want each mps to be sorted increasingly by track number, pitch, then duration
-            # if not self.permute_mps:
-            #     body_section = sampled_array[body_start_index:body_end_index]
-            #     order = np.lexsort((
-            #         body_section[:, ATTR_NAME_INDEX['dur']], # sort by this last
-            #         body_section[:, ATTR_NAME_INDEX['pit']],
-            #         body_section[:, ATTR_NAME_INDEX['trn']],
-            #         body_section[:, ATTR_NAME_INDEX['mps']],
-            #         body_section[:, ATTR_NAME_INDEX['mea']], # sort by this first
-            #     ))
-            #     sampled_array[body_start_index:body_end_index] = body_section[order]
 
-        mps_sep_indices_list = []
         if self.permute_mps:
+            mps_sep_indices_list = []
             mps_tokens_ranges = []
             mps_sep_indices_list_head = [0, 1, body_start_index - 1] # BOS, first track token and body_start_index-1 is SEP
             mps_sep_indices_list_body = [
@@ -308,22 +289,22 @@ class MidiDataset(Dataset):
             if len(attr_name) > 3: # not abbr
                 assert np.min(sampled_array[:, fidx]) >= 0,\
                     (f'Number in {attr_name} is below zero\n'
-                     f'{get_input_array_format_string(sampled_array, self.vocabs)}')
+                     f'{get_full_array_string(sampled_array, self.vocabs)}')
                 if attr_name == 'measure_numbers':
                     assert np.max(sampled_array[:, fidx]) <= self.vocabs.max_measure_number,\
                         (f'Number in {attr_name} larger than vocab size: '
                          f'{np.max(sampled_array[:, fidx])} >= {self.vocabs.max_measure_number}\n'
-                         f'{get_input_array_format_string(sampled_array, self.vocabs)}')
+                         f'{get_full_array_string(sampled_array, self.vocabs)}')
                 elif attr_name == 'mps_numbers':
                     assert np.max(sampled_array[:, fidx]) <= self.vocabs.max_mps_number,\
                         (f'Number in {attr_name} larger than vocab size: '
                          f'{np.max(sampled_array[:, fidx])} >= {self.vocabs.max_mps_number}\n'
-                         f'{get_input_array_format_string(sampled_array, self.vocabs)}')
+                         f'{get_full_array_string(sampled_array, self.vocabs)}')
                 else:
                     assert np.max(sampled_array[:, fidx]) < getattr(self.vocabs, attr_name).size,\
                         (f'Number in {attr_name} not smaller than vocab size: '
                          f'{np.max(sampled_array[:, fidx])} >= {getattr(self.vocabs, attr_name).size}\n'
-                         f'{get_input_array_format_string(sampled_array, self.vocabs)}')
+                         f'{get_full_array_string(sampled_array, self.vocabs)}')
 
         return from_numpy(sampled_array)
 
