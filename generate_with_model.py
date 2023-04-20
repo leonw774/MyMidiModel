@@ -174,29 +174,31 @@ def main():
     primer_seq = None
     if args.primer is not None:
         primer_text_list = []
-        if args.primer.endswith('.mid') or args.primer.endswith('.midi'):
+
+        if not os.path.exists(args.primer):
+            raise FileNotFoundError()
+
+        if os.path.isfile(args.primer):
             primer_piece = midi_to_piece(MidiFile(args.primer), **model.vocabs.paras)
 
             if len(model.vocabs.bpe_shapes_list) > 0 and args.primer_length > 0:
                 # model use BPE, then apply it
                 with tempfile.TemporaryDirectory() as tmp_in_corpus_dir_path:
+                    # make tmp corpus
                     with open(to_corpus_file_path(tmp_in_corpus_dir_path), 'w+', encoding='utf8') as tmp_corpus_file:
                         tmp_corpus_file.write(primer_piece + '\n')
                     with open(to_paras_file_path(tmp_in_corpus_dir_path), 'w+', encoding='utf8') as tmp_paras_file:
                         tmp_paras_file.write(dump_corpus_paras(model.vocabs.paras))
+                    # make tmp shape_vocab
                     tmp_shape_vocab_file_path = os.path.join(tmp_in_corpus_dir_path, 'shape_vocab')
                     with open(tmp_shape_vocab_file_path, 'w+', encoding='utf8') as shape_vocab_file:
                         shape_vocab_file.write('\n'.join(model.vocabs.bpe_shapes_list) + '\n')
-
-                    # make sure the current working directory is currect
+                    # make sure the current working directory is correct
                     assert os.path.abspath(os.getcwd()) == os.path.dirname(os.path.abspath(__file__))
-
                     # make sure the program is there and new
                     subprocess.run(['make', '-C', './bpe'], check=True, stdout=subprocess.DEVNULL)
-
                     with tempfile.TemporaryDirectory() as tmp_out_corpus_dir_path:
                         tmp_out_corpus_file_path = to_corpus_file_path(tmp_out_corpus_dir_path)
-
                         # ./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath
                         apply_args = [
                             './bpe/apply_vocab',
@@ -207,7 +209,6 @@ def main():
                             tmp_shape_vocab_file_path
                         ]
                         subprocess.run(apply_args, check=True, stdout=subprocess.DEVNULL)
-
                         # get content from output
                         with open(to_corpus_file_path(tmp_out_corpus_dir_path), 'r', encoding='utf8') as tmp_out_corpus:
                             merged_piece = tmp_out_corpus.readline() # get first piece
@@ -215,7 +216,7 @@ def main():
             else:
                 primer_text_list = primer_piece.split(' ')
 
-        else:
+        else: # os.path.isdir(args.primer):
             # we expect the corpus file has same midi parameters as the model
             try:
                 with CorpusReader(args.primer) as corpus_reader:
