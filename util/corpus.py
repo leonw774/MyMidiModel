@@ -154,7 +154,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         elif typename == tokens.TRACK_EVENTS_CHAR:
             event_text, track_number = text.split(':')
             instrument = event_text[1:]
-            tracks_count += 1
+            defined_tracks_numbers.append(track_number)
             if x[i-1][ATTR_NAME_INDEX['trn']] == 0: # if prev token is BOS
                 cur_mps_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
