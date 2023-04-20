@@ -84,7 +84,7 @@ def read_args():
     parser.add_argument(
         '--try-count-limit',
         type=int,
-        default=1000,
+        default=100,
         help='The model may fail to generate next token that satisfy the rule.\
             The generation ends when its trying times pass this limit.\
             Default is %(default)s.'

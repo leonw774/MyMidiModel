@@ -275,6 +275,8 @@ def generate_piece(
                         print(repr(e))
                     try_count += 1
                     continue # keep sampling until no error
+
+                break
             # end while sample and try
 
             if try_count == try_count_limit:
