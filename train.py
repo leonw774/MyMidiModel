@@ -386,7 +386,7 @@ def main():
             break
         except Exception:
             continue
-    if cond_primer_array.shape[1] > args.data.max_seq_length:
+    if cond_primer_array.shape[0] > args.data.max_seq_length:
         cond_primer_array = cond_primer_array[:args.data.max_seq_length]
     cond_primer_array = torch.from_numpy(np.expand_dims(cond_primer_array, axis=0))
     if is_main_process:
