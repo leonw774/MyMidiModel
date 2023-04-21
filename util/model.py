@@ -82,13 +82,9 @@ class MyMidiTransformer(nn.Module):
         self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in input_attr_names]
 
         self.embedding_vocabs_size = [
-            self.vocabs.max_measure_number + 1 # plus one for padding
-            if ALL_ATTR_NAMES[idx] == 'measure_numbers' else
-            (
-                self.vocabs.max_mps_number + 1
-                if ALL_ATTR_NAMES[idx] == 'mps_numbers' else
-                getattr(self.vocabs, ALL_ATTR_NAMES[idx]).size
-            )
+            min(self.max_seq_length, self.vocabs.max_mps_number) + 1 # plus one for padding
+            if ALL_ATTR_NAMES[idx] == 'mps_numbers' else
+            getattr(self.vocabs, ALL_ATTR_NAMES[idx]).size
             for idx in self.input_attrs_indices
         ]
 

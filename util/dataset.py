@@ -91,25 +91,11 @@ class MidiDataset(Dataset):
         self._eos_id = self.vocabs.events.text2id[tokens.END_TOKEN_STR]
         # the pad id should be the same across all vocabs (aka zero)
         self._pad_id = self.vocabs.events.text2id[self.vocabs.padding_token]
-        self._track_ids = set()
-        self._tempo_ids = set()
         self._measure_ids = list()
-        self._position_ids = list()
-        self._note_ids = list()
         for text, index in self.vocabs.events.text2id.items():
-            if text[0] == tokens.NOTE_EVENTS_CHAR or text[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
-                self._note_ids.append(index)
-            elif text[0] == tokens.POSITION_EVENTS_CHAR:
-                self._position_ids.append(index)
-            elif text[0] == tokens.MEASURE_EVENTS_CHAR:
+            if text[0] == tokens.MEASURE_EVENTS_CHAR:
                 self._measure_ids.append(index)
-            elif text[0] == tokens.TEMPO_EVENTS_CHAR:
-                self._tempo_ids.add(index)
-            elif text[0] == tokens.TRACK_EVENTS_CHAR:
-                self._track_ids.add(index)
         # numpy.isin can work on set, but turn it into sorted 1d array helps search speed
-        self._note_ids = np.sort(np.array(self._note_ids))
-        self._position_ids = np.sort(np.array(self._position_ids))
         self._measure_ids = np.sort(np.array(self._measure_ids))
 
         # preprocessing
@@ -159,7 +145,7 @@ class MidiDataset(Dataset):
             if permute_mps:
                 # consider sequence: M  P  N  N  N  P  N  N  P  N  M  P  N  N
                 #             index: 0  1  2  3  4  5  6  7  8  9  10 11 12 13
-                # mps numbers are:   1  2  3  3  3  4  5  5  6  7  8  9  10 10
+                #   mps numbers are: 1  2  3  3  3  4  5  5  6  7  8  9  10 10
                 # we want the beginning indices of all mps:
                 #                   [0, 1, 2,       5, 6,    8, 9, 10,11,12]
                 mps_numbers = self.pieces[filename][:, ATTR_NAME_INDEX['mps']]
@@ -219,17 +205,13 @@ class MidiDataset(Dataset):
         sampled_array = np.concatenate([head_array, body_array], axis=0)
         sampled_array = sampled_array.astype(np.int32) # was int16 to save space but torch ask for int
 
-        # to make sure measure number is smaller than max_seq_length
-        # if last token is EOS, body_end_index is length of sample array - 1
-        end_with_eos = sampled_array[-1, ATTR_NAME_INDEX['evt']] == self._eos_id
-        body_end_index = -1 if end_with_eos else sampled_array.shape[0]
-        min_measure_number = np.min(sampled_array[body_start_index:, ATTR_NAME_INDEX['mea']])
-        # the first measure has measure number because measure number 1 is head section
-        if min_measure_number != 2:
-            sampled_array[body_start_index:body_end_index, ATTR_NAME_INDEX['mea']] -= (min_measure_number - 2)
-        # if there are still measure numbers that bigger than max_seq_length, panic
-        # max_measure_number = np.max(sampled_array[body_start_index:body_end_index, TOKEN_ATTR_INDEX['mea']])
-        # assert max_measure_number < self.max_seq_length
+        # to make sure mps number is smaller than max_mps_number
+        # end_with_eos = sampled_array[-1, ATTR_NAME_INDEX['evt']] == self._eos_id
+        # body_end_index = -1 if end_with_eos else sampled_array.shape[0]
+        min_mps_number = np.min(sampled_array[body_start_index:, ATTR_NAME_INDEX['mps']])
+        # magic number 4 because the first measure must have mps number 3
+        if min_mps_number != 4:
+            sampled_array[body_start_index:, ATTR_NAME_INDEX['mps']] -= (min_mps_number - 4)
 
         # pitch augmentation
         # pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
@@ -287,21 +269,16 @@ class MidiDataset(Dataset):
         # checking for bad numbers
         for attr_name, fidx in ATTR_NAME_INDEX.items():
             if len(attr_name) > 3: # not abbr
-                assert np.min(sampled_array[:, fidx]) >= 0,\
+                assert np.min(sampled_array[:, fidx]) >= 0, \
                     (f'Number in {attr_name} is below zero\n'
                      f'{get_full_array_string(sampled_array, self.vocabs)}')
-                if attr_name == 'measure_numbers':
-                    assert np.max(sampled_array[:, fidx]) <= self.vocabs.max_measure_number,\
+                if attr_name == 'mps_numbers':
+                    assert np.max(sampled_array[:, fidx]) <= min(self.max_seq_length, self.vocabs.max_mps_number), \
                         (f'Number in {attr_name} larger than vocab size: '
-                         f'{np.max(sampled_array[:, fidx])} >= {self.vocabs.max_measure_number}\n'
-                         f'{get_full_array_string(sampled_array, self.vocabs)}')
-                elif attr_name == 'mps_numbers':
-                    assert np.max(sampled_array[:, fidx]) <= self.vocabs.max_mps_number,\
-                        (f'Number in {attr_name} larger than vocab size: '
-                         f'{np.max(sampled_array[:, fidx])} >= {self.vocabs.max_mps_number}\n'
+                         f'{np.max(sampled_array[:, fidx])} >= {min(self.max_seq_length, self.vocabs.max_mps_number)}\n'
                          f'{get_full_array_string(sampled_array, self.vocabs)}')
                 else:
-                    assert np.max(sampled_array[:, fidx]) < getattr(self.vocabs, attr_name).size,\
+                    assert np.max(sampled_array[:, fidx]) < getattr(self.vocabs, attr_name).size, \
                         (f'Number in {attr_name} not smaller than vocab size: '
                          f'{np.max(sampled_array[:, fidx])} >= {getattr(self.vocabs, attr_name).size}\n'
                          f'{get_full_array_string(sampled_array, self.vocabs)}')
