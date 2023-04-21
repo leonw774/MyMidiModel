@@ -295,7 +295,7 @@ def get_time_structure_tokens(
         "Last note did not ends in last measure"
 
     tempo_token_list = []
-    tempo_list = [] # (tempo, time)
+    tempo_list = [] # TempoChange(tempo, time)
     if len(midi.tempo_changes) == 0:
         tempo_list = [TempoChange(120, 0)]
     else:
@@ -319,10 +319,14 @@ def get_time_structure_tokens(
             prev_tempo = cur_tempo
             prev_time = cur_time
     assert len(tempo_list) > 0, 'No tempo information retrieved'
+    tempo_list.sort(key=lambda t: t.time) # sometime it is not sorted, dunno why
 
     # same weird issue as time signature, but tempo can appear in any place so this is all we can do
     if tempo_list[0].time == 1 and measure_token_list[0].onset == 0:
         tempo_list[0].time = 0
+    # assert tempo_list[0].time == measure_token_list[0].onset, 'Tempo not start at time 0'
+    if tempo_list[0].time > measure_token_list[0].onset:
+        tempo_list = [TempoChange(120, 0)] + tempo_list
 
     tempo_token_list = [
         TempoToken(
@@ -335,7 +339,7 @@ def get_time_structure_tokens(
     # print('\n'.join(map(str, measure_token_list)))
     # print('\n'.join(map(str, tempo_token_list)))
     # measure_token_list.sort() # dont have to sort
-    tempo_token_list.sort() # sometime it is not sorted, dunno why
+    tempo_token_list.sort() # just to be sure
     return  measure_token_list, tempo_token_list
 
 
