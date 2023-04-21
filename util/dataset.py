@@ -30,7 +30,7 @@ class MidiDataset(Dataset):
             Parameters:
             - data_dir_path: Expected to have 'data.npz' and 'vocabs.json'
 
-            - measure_sample_step_ratio: Will create multiple virtual pieces by sampling overlength pieces.
+            - measure_sample_step_ratio: If > 0, will create multiple virtual pieces by sampling overlength pieces.
               The start point of samples will be at the first measure token that has index not smaller than
               max_seq_length * measure_sample_step_ratio * N, where N is positive integer
 

@@ -18,6 +18,7 @@ def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -
     except:
         print(f'exception in piece_to_midi of {a_corpus_dir} piece #{piece_index}')
         print(format_exc())
+        # print('Piece:', a_piece)
         return False
 
     try:
@@ -25,6 +26,7 @@ def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -
     except:
         print(f'exception in piece_to_midi of {b_corpus_dir} piece #{piece_index}')
         print(format_exc())
+        # print('Piece:', b_piece)
         return False
 
     if any(
