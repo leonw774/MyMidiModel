@@ -19,15 +19,8 @@ import util.tokens as tokens
 from util.tokens import b36str2int
 from util.vocabs import build_vocabs
 from util.corpus_reader import CorpusReader
-from util.corpus import (
-    to_shape_vocab_file_path,
-    to_vocabs_file_path,
-    to_arrays_file_path,
-    get_corpus_paras,
-    ATTR_NAME_INDEX,
-    text_list_to_array,
-    get_full_array_string,
-)
+from util.corpus import (to_shape_vocab_file_path, to_vocabs_file_path, to_arrays_file_path, get_corpus_paras,
+                         text_list_to_array, get_full_array_string)
 
 
 def mp_handler(args_dict):
