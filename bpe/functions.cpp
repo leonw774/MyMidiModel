@@ -201,9 +201,7 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ingoreVelcocity) { // in
                 thisTrackMulpiSizes[key] += 1;
             }
             for (auto it = thisTrackMulpiSizes.cbegin(); it != thisTrackMulpiSizes.cend(); ++it) {
-                if (it->second > 1) {
-                    multipiSizes[thread_num].push_back(it->second);
-                } 
+                multipiSizes[thread_num].push_back(it->second);
             }
         }
     }
