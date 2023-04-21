@@ -31,7 +31,7 @@ else
     test -d $eval_primers_dir_path && rm -r $eval_primers_dir_path
     mkdir $eval_primers_dir_path
     while read eval_sample_midi_path; do
-        cp $eval_sample_midi_path $eval_primers_dir_path
+        cp "$eval_sample_midi_path" "$eval_primers_dir_path"
     done < $eval_primers_pathlist_file_path
     echo "Getting evaluation features without first $primer_length measures of $midi_dir_path" | tee -a $log_path 
     python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
