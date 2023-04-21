@@ -29,7 +29,7 @@ else
     test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
     # Copy sampled files into eval_primers_dir_path
     test -d $eval_primers_dir_path && rm -r $eval_primers_dir_path
-    mkdir $eval_primers_dir_path
+    mkdir "$eval_primers_dir_path"
     while read eval_sample_midi_path; do
         cp "$eval_sample_midi_path" "$eval_primers_dir_path"
     done < $eval_primers_pathlist_file_path
@@ -49,7 +49,7 @@ if [ -d "${model_dir_path}/eval_samples/uncond" ] && [ -n "$has_midis" ]; then
 else
     echo "Generating $eval_sample_number unconditional samples" | tee -a $log_path 
     mkdir "${model_dir_path}/eval_samples/uncond"
-    python3 generate_with_model.py --sample-number $eval_sample_number --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-txt \
+    python3 generate_with_model.py --sample-number $eval_sample_number --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-text \
         "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/uncond/uncond"
 fi
 
@@ -71,7 +71,7 @@ else
     while read eval_sample_midi_path; do
         echo "Primer file: $eval_sample_midi_path"
         primer_name=$(basename "$eval_sample_midi_path" .mid)
-        python3 generate_with_model.py -p "$eval_sample_midi_path" -l 0 --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-txt \
+        python3 generate_with_model.py -p "$eval_sample_midi_path" -l 0 --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-text \
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/${primer_name}"
     done < $eval_primers_pathlist_file_path
 fi
@@ -94,7 +94,7 @@ else
     while read eval_sample_midi_path; do
         echo "Primer file: $eval_sample_midi_path"
         primer_name=$(basename "$eval_sample_midi_path" .mid)
-        python3 generate_with_model.py -p "$eval_sample_midi_path" -l $primer_length --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-txt \
+        python3 generate_with_model.py -p "$eval_sample_midi_path" -l $primer_length --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-text \
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/${primer_name}"
     done < $eval_primers_pathlist_file_path
 fi
