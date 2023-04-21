@@ -65,7 +65,8 @@ int main(int argc, char *argv[]) {
         << "bpeIter: " << bpeIter << '\n'
         << "mergeCondition: " << mergeCondition << '\n'
         << "samplingRate: " << samplingRate << '\n'
-        << "minScoreLimit: " << minScoreLimit << std::endl;
+        << "minScoreLimit: " << minScoreLimit << '\n'
+        << "workersNum" << workersNum << std::endl;
 
     // open files
     std::string inCorpusFilePath = inCorpusDirPath + "/corpus";

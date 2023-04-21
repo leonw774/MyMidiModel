@@ -3,6 +3,7 @@
 #include <string>
 #include <algorithm>
 #include <unistd.h>
+#include "omp.h"
 
 int main(int argc, char *argv[]) {
     // read and validate args
@@ -10,6 +11,7 @@ int main(int argc, char *argv[]) {
     bool clearLine = false;
     bool doLog = false;
     int nonOptStartIndex = 1;
+    std::string cmdLineUsage = "./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath [workersNum]";
     while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
         switch (cmd_opt) {
@@ -23,25 +25,34 @@ int main(int argc, char *argv[]) {
                 if (isprint(optopt)) {
                     std::cout << "Bad argument: " << argv[optopt] << "\n";
                 }
-                std::cout << "./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
+                std::cout << cmdLineUsage<< std::endl;
                 return 1;
             default:
-                std::cout << "./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
+                std::cout << cmdLineUsage << std::endl;
                 exit(1);
         }
     }
     if (argc - nonOptStartIndex != 3) {
         std::cout << "Bad number of non-optional arguments: " << argc - nonOptStartIndex << " != 3\n";
-        std::cout << "./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath" << std::endl;
+        for (int i = 0; i < argc; ++i) {
+            std::cout << argv[i] << " ";
+        }
+        std::cout << cmdLineUsage << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[nonOptStartIndex]);
     std::string outCorpusFilePath(argv[nonOptStartIndex+1]);
     std::string vocabFilePath(argv[nonOptStartIndex+2]);
+    int workersNum = -1; // -1 means use default
+    if (argc - nonOptStartIndex == 4) {
+        workersNum = atoi(argv[nonOptStartIndex+3]);
+        omp_set_num_threads(workersNum);
+    }
 
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
         << "outCorpusFilePath: " << outCorpusFilePath << '\n'
-        << "vocabFilePath: " << vocabFilePath << std::endl;
+        << "vocabFilePath: " << vocabFilePath << '\n'
+        << "workersNum" << workersNum << std::endl;
 
     // open files
     std::string inCorpusFilePath = inCorpusDirPath + "/corpus";
