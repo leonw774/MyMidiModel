@@ -77,10 +77,15 @@ def adjust_probs_with_context(
         if context_text_list[-1][0] == tokens.MEASURE_EVENTS_CHAR:
             multinote_and_tempo_indices = multinote_indices.union(tempo_indices)
             probs[ATTR_NAME_INDEX['evt']][list(multinote_and_tempo_indices)] = 0
+        
+        # if the last token in context_text_list is position
+        # then the next token's event can not be measure
+        elif context_text_list[-1][0] == tokens.POSITION_EVENTS_CHAR:
+            probs[ATTR_NAME_INDEX['evt']][list(position_indices)] = 0
 
         # if the last token in context_text_list is note or multinote
         # the next token's event can not be tempo
-        if context_text_list[-1][0] in (tokens.NOTE_EVENTS_CHAR, tokens.MULTI_NOTE_EVENTS_CHAR):
+        elif context_text_list[-1][0] in (tokens.NOTE_EVENTS_CHAR, tokens.MULTI_NOTE_EVENTS_CHAR):
             probs[ATTR_NAME_INDEX['evt']][list(tempo_indices)] = 0
 
         # this prohibits the position tokens that is "behind" the current position
