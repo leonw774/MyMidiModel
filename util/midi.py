@@ -233,7 +233,7 @@ def get_time_structure_tokens(
     assert len(time_sig_list) > 0, 'No time signature information retrieved'
     # print(time_sig_list)
 
-    assert time_sig_list[0].time <= first_note_start, 'Time signature undefined before first note'
+    # assert time_sig_list[0].time <= first_note_start, 'Time signature undefined before first note'
     # if the time signature starts after the first note, try 4/4 start at time 0
     if time_sig_list[0].time > first_note_start:
         time_sig_list = [(TimeSignature(4, 4, 0))] + time_sig_list
@@ -325,8 +325,9 @@ def get_time_structure_tokens(
     if tempo_list[0].time == 1 and measure_token_list[0].onset == 0:
         tempo_list[0].time = 0
     # assert tempo_list[0].time == measure_token_list[0].onset, 'Tempo not start at time 0'
+    # if the tempo change starts after the first measure, use the default 120 at first measure 
     if tempo_list[0].time > measure_token_list[0].onset:
-        tempo_list = [TempoChange(120, 0)] + tempo_list
+        tempo_list = [TempoChange(120, measure_token_list[0].onset)] + tempo_list
 
     tempo_token_list = [
         TempoToken(
