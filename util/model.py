@@ -64,20 +64,20 @@ class MyMidiTransformer(nn.Module):
 
         ######## Inputs
 
-        input_attr_names = list(ALL_ATTR_NAMES) # make copy
+        self.input_attr_names = list(ALL_ATTR_NAMES) # make copy
         if input_context:
             if input_instruments:
                 pass
             else:
-                input_attr_names.remove('instruments')
+                self.input_attr_names.remove('instruments')
         else:
             if input_instruments:
-                input_attr_names.remove('tempos')
-                input_attr_names.remove('time_signatures')
+                self.input_attr_names.remove('tempos')
+                self.input_attr_names.remove('time_signatures')
             else:
-                input_attr_names.remove('instruments')
-                input_attr_names.remove('tempos')
-                input_attr_names.remove('time_signatures')
+                self.input_attr_names.remove('instruments')
+                self.input_attr_names.remove('tempos')
+                self.input_attr_names.remove('time_signatures')
 
         self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in input_attr_names]
 
@@ -101,13 +101,13 @@ class MyMidiTransformer(nn.Module):
 
         ######## Outputs
 
-        output_attr_names = list(OUTPUTABLE_ATTR_NAMES) # make copy
+        self.output_attr_names = list(OUTPUTABLE_ATTR_NAMES) # make copy
         if not output_instruments:
             self.output_attrs_indices.remove('instruments')
 
         self.output_attrs_indices = [
             ATTR_NAME_INDEX[fname]
-            for fname in output_attr_names
+            for fname in self.output_attr_names
         ]
 
         self.logit_vocabs_size = [

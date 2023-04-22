@@ -200,14 +200,10 @@ def generate_piece(
     recurrent_memory = None
     _, array_memory = text_list_to_array(text_list, model.vocabs, input_memory=None, output_memory=True)
 
-    # build memory for primer first if use linear transformer
+    # build memory for primer if use linear transformer
     if model.use_linear_attn:
         for i in range(1, primer_length):
             _, recurrent_memory = model(model.to_input_attrs(input_seq[:, :i]).to(model_device), recurrent_memory)
-
-    model_output_attrs = list(OUTPUTABLE_ATTR_NAMES)
-    if not model.output_instruments:
-        model_output_attrs.remove('instruments')
 
     with torch.no_grad():
         for _ in tqdm(range(max_gen_step), disable=not show_tqdm):
@@ -229,7 +225,7 @@ def generate_piece(
             # re-arrange output order to array order
             array_order_logits = [0] * len(ESSENTAIL_ATTR_NAMES)
             for attr_name in ESSENTAIL_ATTR_NAMES:
-                model_output_index = model_output_attrs.index(attr_name)
+                model_output_index = model.output_attr_names.index(attr_name)
                 array_order_logits[ATTR_NAME_INDEX[attr_name]] = last_logits[model_output_index]
 
             probs = [

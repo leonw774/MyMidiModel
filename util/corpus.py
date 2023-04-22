@@ -56,13 +56,12 @@ ATTR_NAME_INDEX = {
     'trn': 4, 'track_numbers': 4,
     'ins': 5, 'instruments': 5, # context
     'mps': 6, 'mps_numbers': 6, # positional
-    # 'mea': 7, 'measure_numbers': 7, # positional
-    'tmp': 7, 'tempos': 7, # context
-    'tis': 8, 'time_signatures': 8 # context
+    'tis': 7, 'time_signatures': 7 # context
+    # 'tmp': 8, 'tempos': 8, # context
 }
 
 ALL_ATTR_NAMES = [
-    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'mps_numbers', 'tempos', 'time_signatures'
+    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'mps_numbers', 'time_signatures'
 ]
 
 ESSENTAIL_ATTR_NAMES = [
@@ -116,7 +115,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         track_program_mapping = dict()
         cur_position_cursor = 0
         cur_mps_number = 0
-        cur_tempo_id = padding
+        # cur_tempo_id = padding
         cur_time_sig_id = padding
     elif isinstance(input_memory, dict):
         last_array_len = input_memory['last_array'].shape[0]
@@ -125,7 +124,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         track_program_mapping = input_memory['track_program_mapping']
         cur_position_cursor = input_memory['cur_position_cursor']
         cur_mps_number = input_memory['cur_mps_number']
-        cur_tempo_id = input_memory['cur_tempo_id']
+        # cur_tempo_id = input_memory['cur_tempo_id']
         cur_time_sig_id = input_memory['cur_time_sig_id']
     else:
         raise ValueError('input_memory is not None nor a dictionary')
@@ -158,15 +157,13 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             cur_mps_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
-            # x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
 
         elif typename == tokens.TEMPO_EVENTS_CHAR:
             event_text, *attr = text = text.split(':')
-            cur_tempo_id = vocabs.tempos.text2id[event_text]
+            # cur_tempo_id = vocabs.tempos.text2id[event_text]
             cur_mps_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
-            # x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
             x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
             # because tempo come after position and the position token was assigned to previous tempo's id
             x[cur_position_cursor][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
@@ -176,8 +173,8 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             cur_position_cursor = i
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
-            x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
             x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
+            # x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
 
         elif typename == tokens.NOTE_EVENTS_CHAR or typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             event_text, *attr = text.split(':')
@@ -191,8 +188,8 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
                 cur_mps_number += 1
             x[i][ATTR_NAME_INDEX['ins']] = track_program_mapping[attr[3]]
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
-            x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
             x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
+            # x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
 
         else:
             raise ValueError('unknown typename')
@@ -202,8 +199,8 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
                 'track_program_mapping': track_program_mapping,
                 'cur_position_cursor': cur_position_cursor,
                 'cur_mps_number': cur_mps_number,
-                'cur_tempo_id': cur_tempo_id,
                 'cur_time_sig_id': cur_time_sig_id,
+                # 'cur_tempo_id': cur_tempo_id,
             }
     else:
         return x
