@@ -166,7 +166,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
             x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
             # because tempo come after position and the position token was assigned to previous tempo's id
-            x[cur_position_cursor][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
+            # x[cur_position_cursor][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
 
         elif typename == tokens.POSITION_EVENTS_CHAR:
             cur_mps_number += 1
