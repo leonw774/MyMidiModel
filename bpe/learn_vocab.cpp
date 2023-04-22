@@ -218,7 +218,7 @@ int main(int argc, char *argv[]) {
                             // the first relnote in the new shape is correspond to the first relnote in left multinote's original shape
                             uint8_t newUnit = shapeDict[corpus.piecesMN[i][j][k].shapeIndex][0].relDur * corpus.piecesMN[i][j][k].unit / maxScoreShape[0].relDur;
                             // unit cannot be greater than max_duration
-                            if (newUnit > maxDur) break;
+                            if (newUnit > maxDur) continue;
                             corpus.piecesMN[i][j][k].unit = newUnit;
                             corpus.piecesMN[i][j][k].shapeIndex = newShapeIndex;
 
