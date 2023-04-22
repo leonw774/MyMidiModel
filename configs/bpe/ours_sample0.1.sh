@@ -1,9 +1,0 @@
-#!/bin/bash
-# bpe parameters
-BPE_ITER=128
-MERGE_CONDITION="ours"
-MIN_SCORE_LIMIT=1
-SAMPLE_RATE=0.1
-BPE_CLEARLINE="-clearLine"
-BPE_DOLOG="-log"
-BPE_WORKER=32
