@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
         << "mergeCondition: " << mergeCondition << '\n'
         << "samplingRate: " << samplingRate << '\n'
         << "minScoreLimit: " << minScoreLimit << '\n'
-        << "workersNum" << workersNum << std::endl;
+        << "workersNum: " << workersNum << std::endl;
 
     // open files
     std::string inCorpusFilePath = inCorpusDirPath + "/corpus";

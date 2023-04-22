@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
         << "outCorpusFilePath: " << outCorpusFilePath << '\n'
         << "vocabFilePath: " << vocabFilePath << '\n'
-        << "workersNum" << workersNum << std::endl;
+        << "workersNum: " << workersNum << std::endl;
 
     // open files
     std::string inCorpusFilePath = inCorpusDirPath + "/corpus";
