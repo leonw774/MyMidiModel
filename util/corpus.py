@@ -268,8 +268,11 @@ def get_full_array_string(input_array: np.ndarray, vocabs: Vocabs):
     reconstructed_text_list = array_to_text_list(input_array, vocabs=vocabs)
     longest_text_length = max(map(len, reconstructed_text_list))
     reconstructed_text_list = [text.ljust(longest_text_length) for text in reconstructed_text_list]
-    debug_str = ' evt  pit  dur  vel  trn  ins  mps  tmp  tis  reconstructed_text\n'
-    debug_str += (
+    three_letter_names = [attr_name for attr_name in ATTR_NAME_INDEX if len(attr_name) == 3]
+    ordered_three_letter_names = sorted(three_letter_names, key=ATTR_NAME_INDEX.get)
+    debug_str_head = ' '.join([f'{attr_name:>4}' for attr_name in ordered_three_letter_names])
+    debug_str_head += '  reconstructed_text\n'
+    debug_str = debug_str_head + (
         '\n'.join([
             ' '.join([f'{s:>4}' for s in a.split()])
             + f'  {z}'
