@@ -297,7 +297,7 @@ def get_time_structure_tokens(
     tempo_token_list = []
     tempo_list = [] # TempoChange(tempo, time)
     if len(midi.tempo_changes) == 0:
-        tempo_list = [TempoChange(120, 0)]
+        tempo_list = [TempoChange(120, measure_token_list[0].onset)]
     else:
         # remove duplicated time and tempos
         prev_time = None
@@ -325,7 +325,7 @@ def get_time_structure_tokens(
     if tempo_list[0].time == 1 and measure_token_list[0].onset == 0:
         tempo_list[0].time = 0
     # assert tempo_list[0].time == measure_token_list[0].onset, 'Tempo not start at time 0'
-    # if the tempo change starts after the first measure, use the default 120 at first measure 
+    # if the tempo change starts after the first measure, use the default 120 at first measure
     if tempo_list[0].time > measure_token_list[0].onset:
         tempo_list = [TempoChange(120, measure_token_list[0].onset)] + tempo_list
 
