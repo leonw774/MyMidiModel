@@ -8,12 +8,11 @@ model_dir_path=$6
 nucleus_threshold=$7
 # $8 can be unset
 test -n "$8" && seed_option="--seed $8"
+test -z "$midi_dir_path" && echo "./evaluation.sh midi_dir_path eval_sample_number process_workers primer_length log_path model_dir_path nucleus_threshold" && exit 0
 
 echo "evaluated_model.sh start." | tee -a $log_path 
 echo "midi_dir_path=${midi_dir_path}, eval_sample_number=${eval_sample_number}, process_workers=${process_workers}, primer_length=${primer_length}"
 echo "log_path=${log_path}, model_dir_path=${model_dir_path}, nucleus_threshold=${nucleus_threshold}, seed_option=${seed_option}, "
-
-test -z "$midi_dir_path" && echo "./evaluation.sh midi_dir_path eval_sample_number process_workers primer_length log_path model_dir_path nucleus_threshold" && exit 0
 
 eval_feature_file_path="${midi_dir_path}/eval_features.json"
 eval_pathlist_file_path="${midi_dir_path}/eval_pathlist.txt"
@@ -33,11 +32,9 @@ else
     # Copy sampled files into eval_primers_dir_path
     test -d $eval_primers_dir_path && rm -r $eval_primers_dir_path
     mkdir "$eval_primers_dir_path"
-    ls "$midi_dir_path"
     while read eval_sample_midi_path; do
         cp "$eval_sample_midi_path" "$eval_primers_dir_path"
     done < $eval_pathlist_file_path
-    ls "$eval_primers_dir_path"
     echo "Getting evaluation features without first $primer_length measures of $midi_dir_path" | tee -a $log_path 
     python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
         --primer-measure-length $primer_length $eval_primers_dir_path
