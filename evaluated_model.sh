@@ -15,12 +15,15 @@ echo "log_path=${log_path}, model_dir_path=${model_dir_path}, nucleus_threshold=
 
 test -z "$midi_dir_path" && echo "./evaluation.sh midi_dir_path eval_sample_number process_workers primer_length log_path model_dir_path nucleus_threshold" && exit 0
 
-eval_primers_dir_path="${midi_dir_path}/eval_primers_${eval_sample_number}"
-eval_primers_pathlist_file_path="${midi_dir_path}/eval_pathlist.txt"
+eval_feature_file_path="${midi_dir_path}/eval_features.json"
+eval_pathlist_file_path="${midi_dir_path}/eval_pathlist.txt"
+eval_primers_feature_file_path="${midi_dir_path}/eval_features_primer${primer_length}.json"
+
+eval_primers_dir_path="${midi_dir_path}/primers${primer_length}"
 
 # Get features of dataset if no result file
 
-if [ -f "${midi_dir_path}/eval_features.json" ] && [ -f "$eval_primers_pathlist_file_path" ] && [ -d "$eval_primers_dir_path" ]; then
+if [ -f "$eval_feature_file_path" ] && [ -f "$eval_pathlist_file_path" ] && [ -f "$eval_primers_feature_file_path" ]; then
     echo "Midi dataset $midi_dir_path already has feature stats file." | tee -a $log_path 
 else
     echo "Getting evaluation features of $midi_dir_path" | tee -a $log_path 
@@ -30,12 +33,18 @@ else
     # Copy sampled files into eval_primers_dir_path
     test -d $eval_primers_dir_path && rm -r $eval_primers_dir_path
     mkdir "$eval_primers_dir_path"
+    ls "$midi_dir_path"
     while read eval_sample_midi_path; do
         cp "$eval_sample_midi_path" "$eval_primers_dir_path"
-    done < $eval_primers_pathlist_file_path
+    done < $eval_pathlist_file_path
+    ls "$eval_primers_dir_path"
     echo "Getting evaluation features without first $primer_length measures of $midi_dir_path" | tee -a $log_path 
     python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
         --primer-measure-length $primer_length $eval_primers_dir_path
+    # move eval_features.json back to midi dir root
+    mv "${eval_primers_dir_path}/eval_features.json" "$eval_primers_feature_file_path"
+    # delete eval_primers_dir_path
+    rm -r "$eval_primers_dir_path"
 fi
 
 test -z "$model_dir_path" && exit 0 
@@ -55,7 +64,7 @@ fi
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/uncond" | tee -a $log_path 
 python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
-    --reference-file-path "${midi_dir_path}/eval_features.json" "${model_dir_path}/eval_samples/uncond"
+    --reference-file-path "$eval_feature_file_path" "${model_dir_path}/eval_samples/uncond"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
 ### Evaluate model instrument-conditiond generation
@@ -67,18 +76,18 @@ if [ -d "${model_dir_path}/eval_samples/instr_cond" ] && [ -n "$has_midis"  ]; t
 else
     echo "Generating $eval_sample_number instrument-conditioned samples" | tee -a $log_path
     mkdir "${model_dir_path}/eval_samples/instr_cond"
-    # Loop each line in eval_primers_pathlist_file_path
+    # Loop each line in eval_pathlist_file_path
     while read eval_sample_midi_path; do
         echo "Primer file: $eval_sample_midi_path"
         primer_name=$(basename "$eval_sample_midi_path" .mid)
         python3 generate_with_model.py -p "$eval_sample_midi_path" -l 0 --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-text \
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/${primer_name}"
-    done < $eval_primers_pathlist_file_path
+    done < $eval_pathlist_file_path
 fi
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/instr-cond" | tee -a $log_path
 python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
-    --reference-file-path "${midi_dir_path}/eval_features.json" "${model_dir_path}/eval_samples/instr_cond"
+    --reference-file-path "$eval_feature_file_path" "${model_dir_path}/eval_samples/instr_cond"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
 ### Evaluate model prime continuation
@@ -90,18 +99,18 @@ if [ -d "${model_dir_path}/eval_samples/primer_cont" ] && [ -n "$has_midis" ]; t
 else
     echo "Generating $eval_sample_number prime-continuation samples" | tee -a $log_path
     mkdir "${model_dir_path}/eval_samples/primer_cont"
-    # Loop each line in eval_primers_pathlist_file_path
+    # Loop each line in eval_pathlist_file_path
     while read eval_sample_midi_path; do
         echo "Primer file: $eval_sample_midi_path"
         primer_name=$(basename "$eval_sample_midi_path" .mid)
         python3 generate_with_model.py -p "$eval_sample_midi_path" -l $primer_length --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-text \
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/${primer_name}"
-    done < $eval_primers_pathlist_file_path
+    done < $eval_pathlist_file_path
 fi
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/primer_cont" | tee -a $log_path
 python3 get_eval_features_of_midis.py $seed_option --log $log_path --sample-number $eval_sample_number --workers $process_workers \
-    --primer-measure-length $primer_length --reference-file-path "${eval_primers_dir_path}/eval_features.json" "${model_dir_path}/eval_samples/primer_cont"
+    --primer-measure-length $primer_length --reference-file-path "$eval_primers_feature_file_path" "${model_dir_path}/eval_samples/primer_cont"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 
 echo "evaluated_model.sh exit." | tee -a $log_path 
