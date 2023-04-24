@@ -72,14 +72,12 @@ class MyMidiTransformer(nn.Module):
                 self.input_attr_names.remove('instruments')
         else:
             if input_instruments:
-                self.input_attr_names.remove('tempos')
                 self.input_attr_names.remove('time_signatures')
             else:
                 self.input_attr_names.remove('instruments')
-                self.input_attr_names.remove('tempos')
                 self.input_attr_names.remove('time_signatures')
 
-        self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in input_attr_names]
+        self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in self.input_attr_names]
 
         self.embedding_vocabs_size = [
             min(self.max_seq_length, self.vocabs.max_mps_number) + 1 # plus one for padding
