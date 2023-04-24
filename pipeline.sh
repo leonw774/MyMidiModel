@@ -217,5 +217,6 @@ if [ -n "${NO_EVAL+x}" ]; then
     exit 0
 fi
 
-./evaluated_model.sh $MIDI_DIR_PATH $EVAL_SAMPLE_NUMBER $PROCESS_WORKERS $PRIMER_LENGTH $log_path $model_dir_path $NUCLEUS_THRESHOLD $SEED
+./evaluate_model.sh "$MIDI_DIR_PATH" "$EVAL_SAMPLE_NUMBER" "$EVAL_MIDI_TO_PIECE_PARAS" "$PROCESS_WORKERS" "$PRIMER_LENGTH" "$log_path" \
+    "$model_dir_path" "$NUCLEUS_THRESHOLD" "$SEED"
 test $? -eq 0 && echo "All done. pipeline.sh exit." | tee -a $log_path

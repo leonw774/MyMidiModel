@@ -17,6 +17,7 @@ import numpy as np
 from pandas import Series
 from tqdm import tqdm
 
+from util.corpus import get_corpus_paras
 from util.evaluations import (
     EVAL_SCALAR_FEATURE_NAMES,
     EVAL_DISTRIBUTION_FEATURE_NAMES,
@@ -30,15 +31,21 @@ from util.evaluations import (
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
-        '--log',
-        dest='log_file_path',
-        type=str,
-        default='',
-    )
-    parser.add_argument(
         '--sample-number',
         type=int,
         default=100
+    )
+    parser.add_argument(
+        '--midi-to-piece-paras',
+        type=str,
+        default='',
+        help='The path of midi_to_piece parameters file (the YAML file).\
+            Default is empty string and `util.evaluations.EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT` will be used.'
+    )
+    parser.add_argument(
+        '--workers',
+        type=int,
+        default=min(cpu_count(), 4)
     )
     parser.add_argument(
         '--primer-measure-length',
@@ -46,13 +53,14 @@ def parse_args():
         default=0,
         metavar='k',
         help='If this option is not set, the features are computed from the whole piece.\
-            If this option is set to %(metavar)s, which should be a positive integer, \
+            If this option is set to %(metavar)s, which should be a positive integer,\
             the features are computed from the number %(metavar)s+1 to the last measure of the piece.'
     )
     parser.add_argument(
-        '--workers',
-        type=int,
-        default=min(cpu_count(), 4)
+        '--log',
+        dest='log_file_path',
+        type=str,
+        default='',
     )
     parser.add_argument(
         '--output-sampled-file-paths',
@@ -136,6 +144,11 @@ def main():
     if dataset_size < args.sample_number:
         logging.info('Dataset size (%d) is smaller than given sample number (%d)', dataset_size, args.sample_number)
         args.sample_number = dataset_size
+
+    if args.midi_to_piece_paras != '':
+        assert os.path.isfile(args.midi_to_piece_paras), f'{args.midi_to_piece_paras} doesn\'t exist or is not a file'
+        paras_dict = get_corpus_paras(args.midi_to_piece_paras) 
+
     args.workers = min(args.workers, dataset_size)
 
     eval_features_per_piece: List[ Dict[str, float] ] = []
@@ -154,6 +167,7 @@ def main():
         eval_args_dict_list = [
             {
                 'midi_file_path': file_path_list[idx],
+                'midi_to_piece_paras': paras_dict,
                 'primer_measure_length': args.primer_measure_length,
                 'max_pairs_number': args.max_pairs_number
             }
