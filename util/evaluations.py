@@ -175,7 +175,7 @@ def midi_to_features(
         max_token_number: int = int(1e4)) -> Dict[str, float]:
 
     if midi_to_piece_paras is None:
-        nth = midi.ticks_per_beat * 4
+        nth = min(midi.ticks_per_beat, 48) * 4
         midi_to_piece_paras = {
             'nth': nth,
             'max_track_number': len(midi.instruments),
