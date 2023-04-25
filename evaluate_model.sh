@@ -19,9 +19,9 @@ test -n "$midi_to_piece_paras" && midi_to_piece_paras_option="--midi-ro-piece-pa
 # seed can be unset
 test -n "$9" && seed_option="--seed $9"
 
-echo "evaluated_model.sh start." | tee -a $log_path 
-echo "midi_dir_path=${midi_dir_path}, eval_sample_number=${eval_sample_number}, midi_to_piece_paras=${midi_to_piece_paras}, process_workers=${process_workers}"
-echo "primer_length=${primer_length}, log_path=${log_path}, model_dir_path=${model_dir_path}, nucleus_threshold=${nucleus_threshold}, seed_option=${seed_option}"
+echo "evaluated_model.sh start." | tee -a $log_path
+echo "midi_dir_path=${midi_dir_path}, eval_sample_number=${eval_sample_number}, midi_to_piece_paras=${midi_to_piece_paras}, process_workers=${process_workers}" | tee -a $log_path
+echo "primer_length=${primer_length}, log_path=${log_path}, model_dir_path=${model_dir_path}, nucleus_threshold=${nucleus_threshold}, seed_option=${seed_option}" | tee -a $log_path
 
 eval_feature_file_path="${midi_dir_path}/eval_features.json"
 eval_pathlist_file_path="${midi_dir_path}/eval_pathlist.txt"
