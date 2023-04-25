@@ -17,7 +17,7 @@ fi
 test -n "$midi_to_piece_paras" && midi_to_piece_paras_option="--midi-ro-piece-paras ${midi_to_piece_paras}"
 
 # seed can be unset
-test -n "$9" && seed_option="--seed $8"
+test -n "$9" && seed_option="--seed $9"
 
 echo "evaluated_model.sh start." | tee -a $log_path 
 echo "midi_dir_path=${midi_dir_path}, eval_sample_number=${eval_sample_number}, midi_to_piece_paras=${midi_to_piece_paras}, process_workers=${process_workers}"
