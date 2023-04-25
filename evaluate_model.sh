@@ -7,16 +7,17 @@ primer_length=$5
 log_path=$6
 model_dir_path=$7
 nucleus_threshold=$8
+seed=$9
 if [ -z "$midi_dir_path" ]; then
     echo "./evaluate_model.sh midi_dir_path eval_sample_number midi_to_piece_paras process_workers primer_length log_path model_dir_path nucleus_threshold seed"
     exit 0
 fi
 
-# $3 can be empty string
+# midi_to_piece_paras can be empty string
 test -n "$midi_to_piece_paras" && midi_to_piece_paras_option="--midi-ro-piece-paras ${midi_to_piece_paras}"
 
-# $8 can be unset
-test -n "$8" && seed_option="--seed $8"
+# seed can be unset
+test -n "$9" && seed_option="--seed $8"
 
 echo "evaluated_model.sh start." | tee -a $log_path 
 echo "midi_dir_path=${midi_dir_path}, eval_sample_number=${eval_sample_number}, midi_to_piece_paras=${midi_to_piece_paras}, process_workers=${process_workers}"
