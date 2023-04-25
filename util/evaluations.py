@@ -187,6 +187,12 @@ def midi_to_features(
 
     if midi_to_piece_paras is None:
         midi_to_piece_paras = EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT
+    else:
+        assert isinstance(midi_to_piece_paras, dict)
+        if len(midi_to_piece_paras) == 0:
+            midi_to_piece_paras = EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT
+        else:
+            assert all(k in midi_to_piece_paras for k in EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT)
     nth = midi_to_piece_paras['nth']
     temp_piece = midi_to_piece(
         midi=midi,

@@ -147,7 +147,9 @@ def main():
 
     if args.midi_to_piece_paras != '':
         assert os.path.isfile(args.midi_to_piece_paras), f'{args.midi_to_piece_paras} doesn\'t exist or is not a file'
-        paras_dict = get_corpus_paras(args.midi_to_piece_paras) 
+        paras_dict = get_corpus_paras(args.midi_to_piece_paras)
+    else:
+        paras_dict = None
 
     args.workers = min(args.workers, dataset_size)
 
