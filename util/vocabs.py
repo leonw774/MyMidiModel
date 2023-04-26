@@ -38,13 +38,14 @@ class Vocabs:
     velocities: AttrVocab
     track_numbers: AttrVocab
     instruments: AttrVocab
-    max_mps_number: int
+    max_measure_number: int
+    max_position_number: int
     tempos: AttrVocab
     time_signatures: AttrVocab
 
     def __init__(self, paras: dict, bpe_shapes_list: list, padding_token: str,
             events, pitchs, durations, velocities, track_numbers, instruments,
-            max_mps_number, tempos, time_signatures) -> None:
+            max_position_number, max_measure_number, tempos, time_signatures) -> None:
         self.paras = paras
         self.bpe_shapes_list = bpe_shapes_list
         self.padding_token = padding_token
@@ -54,7 +55,8 @@ class Vocabs:
         self.velocities = Vocabs.AttrVocab(velocities)
         self.track_numbers = Vocabs.AttrVocab(track_numbers)
         self.instruments = Vocabs.AttrVocab(instruments)
-        self.max_mps_number = max_mps_number
+        self.max_position_number = max_position_number
+        self.max_measure_number = max_measure_number
         self.tempos = Vocabs.AttrVocab(tempos)
         self.time_signatures = Vocabs.AttrVocab(time_signatures)
 
@@ -63,7 +65,7 @@ class Vocabs:
         return cls(
             d['paras'], d['bpe_shapes_list'], d['padding_token'],
             d['events'], d['pitchs'], d['durations'], d['velocities'], d['track_numbers'],
-            d['instruments'], d['max_mps_number'], d['tempos'], d['time_signatures']
+            d['instruments'], d['max_position_number'], d['max_measure_number'], d['tempos'], d['time_signatures']
         )
 
     def to_dict(self) -> dict:
@@ -77,7 +79,8 @@ class Vocabs:
             'velocities': vars(self.velocities),
             'track_numbers': vars(self.track_numbers),
             'instruments': vars(self.instruments),
-            'max_mps_number': self.max_mps_number,
+            'max_position_number': self.max_position_number,
+            'max_measure_number': self.max_measure_number,
             'tempos': vars(self.tempos),
             'time_signatures': vars(self.time_signatures),
         }
@@ -123,18 +126,15 @@ def build_vocabs(
         f'{tokens.MEASURE_EVENTS_CHAR}{int2b36str(n)}/{int2b36str(d)}' for n, d in supported_time_signatures
     ]
 
+    max_position_number = tokens.get_largest_possible_position(paras['nth']) * 2 + 1
+
     measure_substr = ' '+tokens.MEASURE_EVENTS_CHAR
-    position_substr = ' '+tokens.POSITION_EVENTS_CHAR
-    tempo_substr = ' '+tokens.TEMPO_EVENTS_CHAR
-    max_mps_number = 0
+    max_measure_number = 0
     corpus_measure_time_sigs = set()
     token_count_per_piece = []
     for piece in tqdm(corpus_reader):
-        measure_number = piece.count(measure_substr)
-        position_number = piece.count(position_substr)
-        tempo_number = piece.count(tempo_substr)
-        piece_max_mps_number = 2 * measure_number + 2 * position_number + tempo_number + 4 # +4 because head (3) and eos (1)
-        max_mps_number = max(max_mps_number, piece_max_mps_number)
+        measure_number = 2 * (piece.count(measure_substr) - 1) + 4 # refer to the comment of corpus.text_to_array
+        max_measure_number = max(max_measure_number, measure_number)
 
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
@@ -154,7 +154,7 @@ def build_vocabs(
     velocity_vocab = pad_token + list(map(int2b36str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
     track_number_vocab = pad_token + list(map(int2b36str, range(paras['max_track_number'])))
     instrument_vocab = pad_token + list(map(int2b36str, range(129)))
-    # mps number and measure number are just increasing integer that generated dynamically in corpus.text_to_array
+    # position number and measure number are generated dynamically in corpus.text_to_array
     tempo_vocab = pad_token + event_tempo
     time_sig_vocab = pad_token + event_measure_time_sig
 
@@ -168,7 +168,8 @@ def build_vocabs(
         f'Duration vocab size: {len(duration_vocab)}\n'\
         f'Velocity vocab size: {len(velocity_vocab)} ({velocity_vocab})\n'\
         f'Track number vocab size: {paras["max_track_number"]}\n'\
-        f'Max MPS number: {max_mps_number}'
+        f'Max Position number: {max_position_number}'
+        f'Max Measure number: {max_measure_number}'
     )
     # print(f'Vocabulary build time: {time()-start_time}')
 
@@ -183,7 +184,8 @@ def build_vocabs(
         velocities=velocity_vocab,
         track_numbers=track_number_vocab,
         instruments=instrument_vocab,
-        max_mps_number=max_mps_number,
+        max_position_number=max_position_number,
+        max_measure_number=max_measure_number,
         tempos=tempo_vocab,
         time_signatures=time_sig_vocab
     )
