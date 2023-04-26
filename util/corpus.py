@@ -86,7 +86,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         Each token is processed into an 8-dimensional vector:
             event, pitch, duration, velocity, track_number, instrument, mps_number, time signature #, tempo
 
-        Positional embedding of body:
+        Positional embedding of body section:
         ```
             M = Measure, P = Position, N = Multi-note
                   sequence: ... M P N N N P N N P N M P N  N ...
@@ -100,8 +100,8 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
                   sequence: B T T T T T T S M ...
                 mps number: 1 2 2 2 2 2 2 3 4 ...
               track number: 0 1 2 3 4 5 6 0 0 ...
-            Basically, head section is treated as a special measure
         ```
+        Basically, head section is treated as a special measure
 
         If a token doesn't have an attribute, fill it with the index of PAD (which should be zero).
         If a token has an attrbute, but it is not in the vocabs, error would be raised
@@ -113,7 +113,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         last_array_len = 0
         x = np.full((len(text_list), len(ALL_ATTR_NAMES)), fill_value=padding, dtype=np.uint16)
         track_program_mapping = dict()
-        cur_position_cursor = 0
+        # cur_position_cursor = 0
         cur_mps_number = 0
         # cur_tempo_id = padding
         cur_time_sig_id = padding
@@ -122,7 +122,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         x = np.full((last_array_len+len(text_list), len(ALL_ATTR_NAMES)), fill_value=padding, dtype=np.uint16)
         x[:last_array_len] = input_memory['last_array']
         track_program_mapping = input_memory['track_program_mapping']
-        cur_position_cursor = input_memory['cur_position_cursor']
+        # cur_position_cursor = input_memory['cur_position_cursor']
         cur_mps_number = input_memory['cur_mps_number']
         # cur_tempo_id = input_memory['cur_tempo_id']
         cur_time_sig_id = input_memory['cur_time_sig_id']
@@ -170,7 +170,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
 
         elif typename == tokens.POSITION_EVENTS_CHAR:
             cur_mps_number += 1
-            cur_position_cursor = i
+            # cur_position_cursor = i
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
             x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id

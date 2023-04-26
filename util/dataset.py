@@ -209,7 +209,7 @@ class MidiDataset(Dataset):
         # end_with_eos = sampled_array[-1, ATTR_NAME_INDEX['evt']] == self._eos_id
         # body_end_index = -1 if end_with_eos else sampled_array.shape[0]
         min_mps_number = np.min(sampled_array[body_start_index:, ATTR_NAME_INDEX['mps']])
-        # magic number 4 because the first measure must have mps number 3
+        # magic number 4 because the first measure must have mps number 4
         if min_mps_number != 4:
             sampled_array[body_start_index:, ATTR_NAME_INDEX['mps']] -= (min_mps_number - 4)
 
