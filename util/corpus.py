@@ -84,7 +84,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         Serialize pieces into numpy array for the model input.
 
         Each token is processed into an 8-dimensional vector:
-            event, pitch, duration, velocity, track_number, instrument, mps_number, time signature #, tempo
+            event, pitch, duration, velocity, track_number, instrument, mps_number, time signature
 
         Positional embedding of body section:
         ```
