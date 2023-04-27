@@ -197,7 +197,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         return x, {
                 'last_array': x,
                 'track_program_mapping': track_program_mapping,
-                'cur_position_cursor': cur_position_cursor,
+                # 'cur_position_cursor': cur_position_cursor,
                 'cur_mps_number': cur_mps_number,
                 'cur_time_sig_id': cur_time_sig_id,
                 # 'cur_tempo_id': cur_tempo_id,
