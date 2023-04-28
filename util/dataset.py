@@ -61,12 +61,10 @@ class MidiDataset(Dataset):
         available_memory_size = psutil.virtual_memory().available
         npz_zipinfo_list = zipfile.ZipFile(npz_path).infolist()
         array_memory_size = sum([zinfo.file_size for zinfo in npz_zipinfo_list])
-        if verbose:
-            print('available memory size:', available_memory_size, 'arrays memory size:', array_memory_size)
         if array_memory_size >= available_memory_size - 4e9: # keep 4G for other things
-            # load from disk every time indexing
             if verbose:
                 print('Memory size not enough, using NPZ mmap.')
+                print('available memory size:', available_memory_size, 'arrays memory size:', array_memory_size)
             self.pieces = np.load(npz_path)
         else:
             # load into memory to be faster
@@ -75,7 +73,7 @@ class MidiDataset(Dataset):
             npz_file = np.load(npz_path)
             self.pieces = {
                 str(filenum): npz_file[str(filenum)]
-                for filenum in tqdm(range(len(npz_file)), disable=not verbose)
+                for filenum in tqdm(range(len(npz_file)), disable=not verbose, ncols=0)
             }
         self.number_of_pieces = len(self.pieces)
 
@@ -113,7 +111,7 @@ class MidiDataset(Dataset):
         self._pitch_augmentation_factor = self.pitch_augmentation_range * 2 + 1 # length of (-pa, ..., -1, 0, 1, ..., pa)
 
         cur_index = -1 # <-- !!! because the first element we add should become index 0
-        for filenum in tqdm(range(self.number_of_pieces), disable=not verbose):
+        for filenum in tqdm(range(self.number_of_pieces), disable=not verbose, ncols=0):
             filename = str(filenum)
 
             cur_piece_lengths = int(self.pieces[filename].shape[0])

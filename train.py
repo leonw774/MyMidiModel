@@ -485,7 +485,8 @@ def main():
         training_tqdm = tqdm(
             range(args.train.validation_interval),
             disable=not is_main_process,
-            desc=f'Training:{start_num_updates}~{start_num_updates+args.train.validation_interval}'
+            desc=f'Training:{start_num_updates}~{start_num_updates+args.train.validation_interval}',
+            ncols=100
         )
         for updates in training_tqdm:
             train_loss_list.append([0. for _ in train_output_attr_name])
@@ -556,7 +557,7 @@ def main():
         model.eval()
         valid_loss_list = []
         with torch.no_grad():
-            for batch_seqs in tqdm(valid_dataloader, disable=not is_main_process, desc='Validation'):
+            for batch_seqs in tqdm(valid_dataloader, disable=not is_main_process, desc='Validation', ncols=100):
                 batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
                 batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
                 if not args.use_parallel:
