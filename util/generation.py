@@ -128,6 +128,7 @@ def adjust_probs_with_context(
 
 
 def nucleus_sampling(probs, threshold):
+    assert 0 < threshold <= 1.0
     if threshold == 1.0:
         return torch.multinomial(probs, 1)
     sorted_probs, sorted_indices = torch.sort(probs, dim=-1, descending=True)
