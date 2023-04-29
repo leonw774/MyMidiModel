@@ -237,7 +237,6 @@ def main():
                 raise ValueError(f'primer_text_list has less than primer_length={args.primer_length} tokens.')
             primer_text_list = primer_text_list[:args.primer_length]
 
-
         # turn primer text list into array
         primer_seq = text_list_to_array(primer_text_list, vocabs=model.vocabs)
         primer_seq = np.expand_dims(primer_seq, axis=0).astype(np.int32)

@@ -151,7 +151,7 @@ def generate_piece(
         nucleus_sampling_threshold: float = 1.0,
         print_exception: bool = False,
         show_tqdm: bool = False,
-        ignore_pending_note_error: bool = True) -> list:
+        ignore_pending_note_error: bool = True) -> List[str]:
     """
         Expect start_seq to be Tensor with shape: (1, seq_size, all_attr_number) or None
         If start_seq is None, will use `text_list_to_array([BEGIN_TOKEN_STR])` as start_seq
@@ -196,6 +196,9 @@ def generate_piece(
     input_seq = start_seq
     primer_length = input_seq.shape[1]
     max_gen_step = min(model.max_seq_length, steps+primer_length) - primer_length
+    if max_gen_step <= 0:
+        print('generate_piece: start_seq is longer than model\'s max_seq_length')
+        return text_list
     end_with_end_token = False
     recurrent_memory = None
     _, array_memory = text_list_to_array(text_list, model.vocabs, input_memory=None, output_memory=True)
