@@ -92,7 +92,6 @@ def read_args():
     parser.add_argument(
         '--use-device',
         type=str,
-        choices=['cpu', 'cuda'],
         default='cuda',
         help='What device the model would be on.'
     )

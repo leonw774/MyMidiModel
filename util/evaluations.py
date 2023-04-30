@@ -169,11 +169,11 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
 
 EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT = {
     'nth': 48 * 4, # 48 is default ticks-per-beat
-    'max_track_number': 128,
+    'max_track_number': 256,
     'max_duration': 48 * 4,
     'velocity_step': 1,
     'use_cont_note': True,
-    'tempo_quantization': (1, 256, 1),
+    'tempo_quantization': (1, 512, 1), # like, shostakovich string quartet 8 mvt 2 uses 480 quarter notes per minute
     'use_merge_drums': False
 }
 
