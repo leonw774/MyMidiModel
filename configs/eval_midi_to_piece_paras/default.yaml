@@ -1,9 +1,9 @@
 max_duration: 192
-max_track_number: 128
+max_track_number: 255
 nth: 192
 tempo_quantization:
 - 1
-- 256
+- 512
 - 1
 use_cont_note: true
 use_merge_drums: false

@@ -169,7 +169,7 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
 
 EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT = {
     'nth': 48 * 4, # 48 is default ticks-per-beat
-    'max_track_number': 256,
+    'max_track_number': 255, # limit of the multi-note bpe program
     'max_duration': 48 * 4,
     'velocity_step': 1,
     'use_cont_note': True,
