@@ -101,7 +101,7 @@ class MyMidiTransformer(nn.Module):
 
         self.output_attr_names = list(OUTPUTABLE_ATTR_NAMES) # make copy
         if not output_instruments:
-            self.output_attrs_indices.remove('instruments')
+            self.output_attr_names.remove('instruments')
 
         self.output_attrs_indices = [
             ATTR_NAME_INDEX[fname]
