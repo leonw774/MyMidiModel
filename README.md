@@ -78,15 +78,15 @@ They should compile to:
   - The functions for features computation and preparing data for features computation.
   - The piece-to-feature and midi-to-feature functions.
 - `generation.py`
-  - The functions for generating using model
+  - The functions for generating using model.
 - `midi.py`
   - The midi-to-piece and piece-to-midi functions.
 - `model.py`
   - Define `MyMidiTransformer` class, inherit from `torch.nn.Module`
-  - The loss functions for the model
+  - The loss functions for the model.
 - `token.py`
   - Define representation tokens and their "main form" (text representation)
-  - Some hard-coded configurations in midi preprocessing
+  - Some hard-coded configurations in midi preprocessing.
 - `vocabs.py`
   - Define `Vocabs` class that record the vocabulary set, vocabulary building configurations and midi preprocessing parameters.
   - The build-vocabulary function.

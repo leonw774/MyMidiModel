@@ -62,10 +62,13 @@ ls "${model_dir_path}/eval_samples/uncond/"*.mid > /dev/null 2>&1 && has_midis="
 if [ -d "${model_dir_path}/eval_samples/uncond" ] && [ -n "$has_midis" ]; then
     echo "${model_dir_path}/eval_samples/uncond already has midi files."
 else
-    echo "Generating $eval_sample_number unconditional samples" | tee -a $log_path 
+    echo "Generating $eval_sample_number unconditional samples" | tee -a $log_path
+    start_time=$SECONDS
     mkdir "${model_dir_path}/eval_samples/uncond"
     python3 generate_with_model.py --sample-number $eval_sample_number --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-text \
         "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/uncond/uncond"
+    duration=$(( $SECONDS - start_time ))
+    echo "Finished. Used time: ${duration} seconds"
 fi
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/uncond" | tee -a $log_path 
@@ -82,6 +85,7 @@ if [ -d "${model_dir_path}/eval_samples/instr_cond" ] && [ -n "$has_midis"  ]; t
 else
     echo "Generating $eval_sample_number instrument-conditioned samples" | tee -a $log_path
     mkdir "${model_dir_path}/eval_samples/instr_cond"
+    start_time=$SECONDS
     # Loop each line in eval_pathlist_file_path
     while read eval_sample_midi_path; do
         echo "Primer file: $eval_sample_midi_path"
@@ -89,6 +93,8 @@ else
         python3 generate_with_model.py -p "$eval_sample_midi_path" -l 0 --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-text \
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/${primer_name}"
     done < $eval_pathlist_file_path
+    duration=$(( $SECONDS - start_time ))
+    echo "Finished. Used time: ${duration} seconds"
 fi
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/instr-cond" | tee -a $log_path
@@ -105,6 +111,7 @@ if [ -d "${model_dir_path}/eval_samples/primer_cont" ] && [ -n "$has_midis" ]; t
 else
     echo "Generating $eval_sample_number prime-continuation samples" | tee -a $log_path
     mkdir "${model_dir_path}/eval_samples/primer_cont"
+    start_time=$SECONDS
     # Loop each line in eval_pathlist_file_path
     while read eval_sample_midi_path; do
         echo "Primer file: $eval_sample_midi_path"
@@ -112,6 +119,8 @@ else
         python3 generate_with_model.py -p "$eval_sample_midi_path" -l $primer_length --nucleus-sampling-threshold $nucleus_threshold --no-tqdm --output-text \
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/${primer_name}"
     done < $eval_pathlist_file_path
+    duration=$(( $SECONDS - start_time ))
+    echo "Finished. Used time: ${duration} seconds"
 fi
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/primer_cont" | tee -a $log_path
