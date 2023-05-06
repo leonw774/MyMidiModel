@@ -357,8 +357,9 @@ void writeOutputCorpusFile(
 ) {
     int trackCurIdx[maxTrackNum];
     bool trackEnd[maxTrackNum];
-    int tsCurIdx;
+    int tsCurIdx; // ts = time structures (measure and tempo)
     bool tsEnd;
+    int endedTrackCount;
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
         outCorpusFile << BEGIN_TOKEN_STR << " ";
 
@@ -374,13 +375,15 @@ void writeOutputCorpusFile(
         unsigned int curPieceTrackNum = corpus.piecesMN[i].size();
         memset(trackCurIdx, 0, sizeof(trackCurIdx));
         memset(trackEnd, 0, sizeof(trackEnd));
-        tsCurIdx = tsEnd = 0;
-        // weird but sometimes there is a track with no notes
-        // should have eliminated them in midi_to_text
+        tsEnd = false;
+        tsCurIdx = endedTrackCount = 0;
+        // something gone wrong if there is a track with no notes
+        // should have eliminated them in pre-processing
+        // but just keep it here for safety
         for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
             trackEnd[j] = (corpus.piecesMN[i][j].size() == 0);
         }
-        while (1) {
+        while ((endedTrackCount < curPieceTrackNum) || !tsEnd) {
             // find what token to put
             int minTrackOnset = INT32_MAX;
             int minTrackIdx = 0;
@@ -392,7 +395,7 @@ void writeOutputCorpusFile(
                     minTrackIdx = j;
                 }
             }
-            // if ts's onset == mn's onset, ts first
+            // if ts's onset <= mn's onset, ts first
             if (!tsEnd && corpus.piecesTS[i][tsCurIdx].onset <= minTrackOnset) {
                 // std::cout << "TS " << i << "," << tsCurIdx << ", onset=" << corpus.piecesTS[i][tsCurIdx].onset << std::endl;
                 if (corpus.piecesTS[i][tsCurIdx].getT()) {
@@ -442,11 +445,11 @@ void writeOutputCorpusFile(
                 }
             }
 
-            int isAllEnd = 0;
-            for (int j = 0; j < curPieceTrackNum; ++j) isAllEnd += trackEnd[j];
-            isAllEnd += tsEnd;
-            if (isAllEnd == curPieceTrackNum + 1) {
-                break;
+            endedTrackCount = 0;
+            for (int j = 0; j < curPieceTrackNum; ++j) {
+                if (trackEnd[j]) {
+                    endedTrackCount++;
+                }
             }
         }
 
