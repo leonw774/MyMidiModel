@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
     bool clearLine = false;
     bool doLog = false;
     int nonOptStartIndex = 1;
-    std::string cmdLineUsage = "./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath bpeIter mergeCondition samplingRate minScoreLimit [workersNum]";
+    std::string cmdLineUsage = "./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath iterNum mergeCondition samplingRate minScoreLimit [workersNum]";
     while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
         switch (cmd_opt) {
@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     }
     std::string inCorpusDirPath(argv[nonOptStartIndex]);
     std::string outCorpusDirPath(argv[nonOptStartIndex+1]);
-    int bpeIter = atoi(argv[nonOptStartIndex+2]);
+    int iterNum = atoi(argv[nonOptStartIndex+2]);
     std::string mergeCondition(argv[nonOptStartIndex+3]);
     double samplingRate = atof(argv[nonOptStartIndex+4]);
     double minScoreLimit = atof(argv[nonOptStartIndex+5]);
@@ -52,8 +52,8 @@ int main(int argc, char *argv[]) {
         omp_set_num_threads(workersNum);
     }
     
-    if (bpeIter <= 0 || MultiNote::shapeIndexLimit < bpeIter) {
-        std::cout << "Error: bpeIter <= 0 or > 2045: " << bpeIter << std::endl;
+    if (iterNum <= 0 || MultiNote::shapeIndexLimit < iterNum) {
+        std::cout << "Error: iterNum <= 0 or > 2045: " << iterNum << std::endl;
         return 1;
     }
     if (mergeCondition != "ours" && mergeCondition != "mulpi") {
@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
     }
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
         << "outCorpusDirPath: " << outCorpusDirPath << '\n'
-        << "bpeIter: " << bpeIter << '\n'
+        << "iterNum: " << iterNum << '\n'
         << "mergeCondition: " << mergeCondition << '\n'
         << "samplingRate: " << samplingRate << '\n'
         << "minScoreLimit: " << minScoreLimit << '\n'
@@ -147,7 +147,7 @@ int main(int argc, char *argv[]) {
         std::cout << "Iter, Avg neighbor number, Found shapes count, Shape, Score, "
                 << "Multinote count, Iteration time, Find best shape time, Merge time" << std::endl;
     }
-    for (int iterCount = 0; iterCount < bpeIter; ++iterCount) {
+    for (int iterCount = 0; iterCount < iterNum; ++iterCount) {
         iterStartTimePoint = std::chrono::system_clock::now();
         if (doLog && clearLine && iterCount != 0) {
             std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line

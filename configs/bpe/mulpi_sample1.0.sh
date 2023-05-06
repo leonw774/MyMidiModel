@@ -1,6 +1,6 @@
 #!/bin/bash
 # bpe parameters
-BPE_ITER=128
+BPE_ITER_NUM=128
 MERGE_CONDITION="mulpi"
 MIN_SCORE_LIMIT=1
 SAMPLE_RATE=1.0
