@@ -1,7 +1,7 @@
 #!/bin/bash
 midi_dir_path=$1
 eval_sample_number=$2
-midi_to_piece_paras=$3
+midi_to_piece_paras_file=$3
 process_workers=$4
 primer_length=$5
 log_path=$6
@@ -9,18 +9,18 @@ model_dir_path=$7
 nucleus_threshold=$8
 seed=$9
 if [ -z "$midi_dir_path" ]; then
-    echo "./evaluate_model.sh midi_dir_path eval_sample_number midi_to_piece_paras process_workers primer_length log_path model_dir_path nucleus_threshold seed"
+    echo "./evaluate_model.sh midi_dir_path eval_sample_number midi_to_piece_paras_file process_workers primer_length log_path model_dir_path nucleus_threshold seed"
     exit 0
 fi
 
-# midi_to_piece_paras can be empty string
-test -n "$midi_to_piece_paras" && midi_to_piece_paras_option="--midi-ro-piece-paras ${midi_to_piece_paras}"
+# midi_to_piece_paras_file can be empty string
+test -n "$midi_to_piece_paras_file" && midi_to_piece_paras_option="--midi-ro-piece-paras ${midi_to_piece_paras_file}"
 
 # seed can be unset
 test -n "$9" && seed_option="--seed $9"
 
 echo "evaluated_model.sh start." | tee -a $log_path
-echo "midi_dir_path=${midi_dir_path}, eval_sample_number=${eval_sample_number}, midi_to_piece_paras=${midi_to_piece_paras}, process_workers=${process_workers}" | tee -a $log_path
+echo "midi_dir_path=${midi_dir_path}, eval_sample_number=${eval_sample_number}, midi_to_piece_paras_file=${midi_to_piece_paras_file}, process_workers=${process_workers}" | tee -a $log_path
 echo "primer_length=${primer_length}, log_path=${log_path}, model_dir_path=${model_dir_path}, nucleus_threshold=${nucleus_threshold}, seed_option=${seed_option}" | tee -a $log_path
 
 eval_feature_file_path="${midi_dir_path}/eval_features.json"
