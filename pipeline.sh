@@ -46,7 +46,7 @@ corpus_dir_path="data/corpus/${DATA_NAME}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_
 
 do_midi_to_corpus=true
 do_bpe=false
-if [ $BPE_ITER_NUM -ne 0 ]; then
+if [ -n "${BPE_ITER_NUM+x}" ] && [ $BPE_ITER_NUM -ne 0 ]; then
     do_bpe=true
     bpe_corpus_dir_path="${corpus_dir_path}_bpe${BPE_ITER_NUM}_${MERGE_CONDITION}_${SAMPLE_RATE}"
     if [ -d $bpe_corpus_dir_path ] && [ -f "${bpe_corpus_dir_path}/corpus" ] && [ -f "${bpe_corpus_dir_path}/shape_vocab" ]; then
@@ -126,7 +126,7 @@ if [ "$do_bpe" == true ]; then
     test $verify_exit_code -ne 0 && { echo "Corpus equality verification failed. pipeline.sh exit." | tee -a $log_path ; } && exit 1
 fi
 
-if [ $BPE_ITER_NUM -ne 0 ]; then
+if [ -n "${BPE_ITER_NUM+x}" ] && [ $BPE_ITER_NUM -ne 0 ]; then
     # replace corpus_dir_path to bpe_corpus_dir_path
     corpus_dir_path=$bpe_corpus_dir_path
     BPE_OPTION="--bpe"

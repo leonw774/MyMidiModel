@@ -90,7 +90,8 @@ class MyMidiTransformer(nn.Module):
             nn.Embedding(
                 num_embeddings=vsize,
                 embedding_dim=embedding_dim,
-                padding_idx=self.vocabs.events.text2id[tokens.PADDING_TOKEN_STR]
+                # padding_idx=self.vocabs.events.text2id[tokens.PADDING_TOKEN_STR]
+                padding_idx=0 # should be zero
                 # [...] the embedding vector of padding_idx will default to all zeros [...]
             )
             for vsize in self.embedding_vocabs_size
@@ -163,6 +164,10 @@ class MyMidiTransformer(nn.Module):
                 num_layers=layers_number
             )
         self.apply(self._init_weights)
+        # set padding vectors to zeros because the _init_weights set it to something else
+        with torch.no_grad():
+            for emb_layer in self.embeddings:
+                emb_layer.weight[0] = torch.zeros(size=(embedding_dim,))
 
     # copied from SymphonyNet
     def _init_weights(self, module):
@@ -187,9 +192,11 @@ class MyMidiTransformer(nn.Module):
         if self.use_linear_attn and self.inferencing:
             # The recurrent model only need to receive the last element with size of (batch_size, embed_size)
             x = x[:, -1:] # become (batch_size, 1, embed_size)
-        emb_sum = sum(
-            emb(x[..., i]) for i, emb in enumerate(self.embeddings)
-        )
+        embs = [emb(x[..., i]) for i, emb in enumerate(self.embeddings)]
+        # for i, emb in enumerate(embs):
+        #     mask = x[..., i].ne(0).float()[..., None].to(x.device)
+        #     assert (emb == emb*mask).all(), f'{i}\n{x}\n{emb}\n{mask}\n{emb*mask}'
+        emb_sum = sum(embs)
         emb_sum_dropout = self.embedding_dropout(emb_sum)
         if self.use_linear_attn:
             if self.inferencing:
