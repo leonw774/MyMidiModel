@@ -1,4 +1,4 @@
 #!/bin/bash
 # bpe parameters
-BPE_ITER=0
+BPE_ITER_NUM=0
 
