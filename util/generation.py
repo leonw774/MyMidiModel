@@ -198,7 +198,9 @@ def generate_piece(
     primer_length = input_seq.shape[1]
     max_gen_step = min(model.max_seq_length, steps+primer_length) - primer_length
     if max_gen_step <= 0:
-        print('generate_piece: start_seq is longer than model\'s max_seq_length')
+        print('generate_piece: start_seq is longer than model\'s max_seq_length. No generation is performed.')
+        if text_list[-1] != tokens.END_TOKEN_STR:
+            text_list.append(tokens.END_TOKEN_STR)
         return text_list
     end_with_end_token = False
     recurrent_memory = None

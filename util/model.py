@@ -167,7 +167,7 @@ class MyMidiTransformer(nn.Module):
         # set padding vectors to zeros because the _init_weights set it to something else
         with torch.no_grad():
             for emb_layer in self.embeddings:
-                emb_layer.weight[0] = torch.zeros(size=(embedding_dim,))
+                emb_layer.weight.data[0].zero_()
 
     # copied from SymphonyNet
     def _init_weights(self, module):
