@@ -106,6 +106,11 @@ def read_args():
         help='No tqdm progress bar when generating samples.'
     )
     parser.add_argument(
+        '--seed',
+        type=int,
+        default=None
+    )
+    parser.add_argument(
         'model_file_path',
         type=str
     )
@@ -151,6 +156,9 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
 
 def main():
     args = read_args()
+    if args.seed is not None:
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
 
     # device
     if not args.use_device.startswith('cuda') and args.use_device != 'cpu':
