@@ -102,7 +102,7 @@ class MidiDataset(Dataset):
 
         # the default zeros will be replaced by body start index
         self._piece_body_start_index = [0] * self.number_of_pieces
-        virtual_piece_step = max_seq_length * measure_sample_step_ratio
+        virtual_piece_step = max(1, int(max_seq_length * measure_sample_step_ratio))
         self._virtual_piece_start_index = [[0] for _ in range(self.number_of_pieces)]
 
         self._file_mps_sep_indices = [[] for _ in range(self.number_of_pieces)]
