@@ -108,10 +108,10 @@ def parse_args():
         type=int
     )
     train_parser.add_argument(
-        "--grad-clip-norm",
+        "--max-grad-norm",
         type=float,
         default=0.0,
-        help='Set the max_norm of nn.util.clip_grad_norm_(). \
+        help='The max_norm of nn.util.clip_grad_norm_(). \
             If this value is zero, gradient clipping will not be used. \
             Default is %(desult)s.'
     )
@@ -539,12 +539,12 @@ def main():
                 else:
                     loss.backward()
 
-                if args.train.grad_clip_norm > 0:
+                if args.train.max_grad_norm > 0:
                     if args.use_parallel:
                         if accelerator.sync_gradients:
-                            accelerator.clip_grad_norm_(model.parameters(), args.train.grad_clip_norm)
+                            accelerator.clip_grad_norm_(model.parameters(), args.train.max_grad_norm)
                     else:
-                        clip_grad_norm_(model.parameters(), args.train.grad_clip_norm)
+                        clip_grad_norm_(model.parameters(), args.train.max_grad_norm)
 
             optimizer.step()
             scheduler.step()

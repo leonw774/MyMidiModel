@@ -199,7 +199,7 @@ fi
 $launch_command train.py \
     --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation-range $PITCH_AUGMENTATION_RANGE --measure-sample-step-ratio $MEASURE_SAMPLE_STEP_RATIO \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
-    --batch-size $BATCH_SIZE --max-updates $MAX_UPDATES --grad-clip-norm $GRAD_CLIP_NORM --split-ratio $SPLIT_RATIO \
+    --batch-size $BATCH_SIZE --max-updates $MAX_UPDATES --max-grad-norm $MAX_GRAD_NORM --split-ratio $SPLIT_RATIO \
     --validation-interval $VALIDATION_INTERVAL --early-stop $EARLY_STOP \
     --generate-interval $GENERATE_INTERVAL --nucleus-sampling-threshold $NUCLEUS_THRESHOLD \
     --lr-peak $LEARNING_RATE_PEAK --lr-warmup-updates $LEARNING_RATE_WARMUP_UPDATES \

@@ -33,7 +33,8 @@ def parse_args():
     parser.add_argument(
         '--sample-number',
         type=int,
-        default=100
+        default=None,
+        help='The number of random selected sample to be use to evaluate. If unset, all the files would be used.'
     )
     parser.add_argument(
         '--midi-to-piece-paras',
@@ -141,7 +142,10 @@ def main():
 
     dataset_size = len(file_path_list)
     assert dataset_size > 0, f'No midi files found in {args.midi_dir_path}'
-    if dataset_size < args.sample_number:
+    if args.sample_number is None:
+        logging.info('Using all (%d) midis in the dataset', dataset_size)
+        args.sample_number = dataset_size
+    elif dataset_size < args.sample_number:
         logging.info('Dataset size (%d) is smaller than given sample number (%d)', dataset_size, args.sample_number)
         args.sample_number = dataset_size
 

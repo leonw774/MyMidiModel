@@ -149,7 +149,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             track_program_mapping[track_number] = vocabs.instruments.text2id[instrument]
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][ATTR_NAME_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
-            x[i][ATTR_NAME_INDEX['ins']] = vocabs.instruments.text2id[instrument]
+            # x[i][ATTR_NAME_INDEX['ins']] = vocabs.instruments.text2id[instrument]
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
 
         elif typename == tokens.MEASURE_EVENTS_CHAR:
