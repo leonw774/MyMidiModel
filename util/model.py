@@ -276,18 +276,23 @@ def compute_losses(
             # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
             target=target_labels[..., k], # (batch_size, seq_size)
             ignore_index=0, # padding is index 0
-            reduction='sum'
-            # some attributes have more non-padding occurence than others
-            # we reflect this by them having different "weight" of loss by using 'sum'
+            reduction='none' # return tensor size (batch_size, seq_size)
         )
         for k, logits in enumerate(pred_logits)
     ]
+    # average losses by number of labels
+    # number_of_labels = target_labels.numel()
+    # head_losses = [head_l.sum() / number_of_labels for head_l in head_losses]
+    # loss = sum(head_losses)
 
-    # "normalize" the losses by number of non-padding targets
-    number_of_nonpadding = torch.count_nonzero(target_labels)
-    head_losses = [head_l / number_of_nonpadding for head_l in head_losses]
-    loss = sum(head_losses)
-
+    # average losses by number of non-padding labels by each sequence
+    number_of_nonpadding_each_token = torch.count_nonzero(target_labels, dim=2) # (batch_size, seq_size)
+    number_of_nonpadding_each_seq = number_of_nonpadding_each_token.sum(dim=1) # (batch_size,)
+    loss = torch.stack(head_losses, dim=2) # (batch_size, seq_size, out_attr_number)
+    loss = loss.sum(dim=2).sum(dim=1) # (batch_size,)
+    loss = torch.div(loss, number_of_nonpadding_each_seq) # element-wise division, average of sequences
+    loss = loss.mean() # average of batches
+    head_losses = [(head_l.sum() / (head_l != 0.0).sum()).item() for head_l in head_losses]
     return loss, head_losses
 
 

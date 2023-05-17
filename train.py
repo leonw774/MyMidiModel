@@ -220,22 +220,24 @@ def lr_warmup_and_linear_decay(step_num: int, warmup_steps: int, decay_end_ratio
 
 def log_losses(
         cur_num_updates: int,
-        train_loss_list: List[List[float]],
-        valid_loss_list: List[List[float]],
+        train_loss_list: List[float],
+        train_head_losses_list: List[List[float]],
+        valid_loss_list: List[float],
+        valid_head_losses_list: List[List[float]],
         loss_file_path: str):
-    avg_train_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*train_loss_list) ]
-    avg_valid_losses = [ sum(head_loss_tuple) / len(head_loss_tuple) for head_loss_tuple in zip(*valid_loss_list) ]
-    sum_avg_train_losses = sum(avg_train_losses)
-    sum_avg_valid_losses = sum(avg_valid_losses)
+    avg_train_head_losses = [ sum(head_losses) / len(head_losses) for head_losses in zip(*train_head_losses_list) ]
+    avg_valid_head_losses = [ sum(head_losses) / len(head_losses) for head_losses in zip(*valid_head_losses_list) ]
+    avg_train_loss = sum(train_loss_list) / len(train_loss_list)
+    avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
     logging.info(
         'Avg. train head losses: %s Avg. train loss: %.6f \nAvg. valid head losses: %s Avg. valid loss: %.6f',
-        ', '.join([f'{l:.3f}' for l in avg_train_losses]), sum_avg_train_losses,
-        ', '.join([f'{l:.3f}' for l in avg_valid_losses]), sum_avg_valid_losses
+        ', '.join([f'{l:.3f}' for l in avg_train_head_losses]), avg_train_loss,
+        ', '.join([f'{l:.3f}' for l in avg_valid_head_losses]), avg_valid_loss
     )
     if loss_file_path:
-        valid_len = len(train_loss_list)
+        valid_len = len(train_head_losses_list)
         with open(loss_file_path, 'a', encoding='utf8') as loss_file:
-            for i, train_head_losses in enumerate(train_loss_list):
+            for i, train_head_losses in enumerate(train_head_losses_list):
                 idx = cur_num_updates - valid_len + i + 1 # count from 1
                 if idx != cur_num_updates:
                     loss_file.write(
@@ -250,8 +252,8 @@ def log_losses(
                         f'{idx},'
                         + ','.join([f'{l:.3f}' for l in train_head_losses]) + ',' # train head losses
                         + f'{sum(train_head_losses):.6f},' # train loss (sum)
-                        + ','.join([f'{l:.3f}' for l in avg_valid_losses]) + ',' # avg valid head losses
-                        + f'{sum_avg_valid_losses:.6f}' # avg valid loss (sum)
+                        + ','.join([f'{l:.3f}' for l in avg_valid_head_losses]) + ',' # avg valid head losses
+                        + f'{avg_valid_loss:.6f}' # avg valid loss (sum)
                         + '\n'
                     )
 
@@ -479,7 +481,8 @@ def main():
     start_time = time()
     for start_num_updates in range(0, args.train.max_updates, args.train.validation_interval):
         model.train()
-        train_loss_list: List[List[float]] = []
+        train_loss_list: List[float] = []
+        train_head_losses_list: List[List[float]] = []
         # forward_time = 0
         # backward_time = 0
         training_tqdm = tqdm(
@@ -489,7 +492,8 @@ def main():
             ncols=100
         )
         for updates in training_tqdm:
-            train_loss_list.append([0. for _ in train_output_attr_name])
+            train_loss_list.append(0.0)
+            train_head_losses_list.append([0.0 for _ in train_output_attr_name])
             for _ in range(gradient_accumulation_steps):
                 try:
                     batch_seqs = next(train_dataloader_iter)
@@ -528,11 +532,12 @@ def main():
 
                 if is_main_process:
                     # note that this only record the loss calculated on main process
-                    train_loss_list[-1] = [
+                    train_loss_list[-1] += loss.item()
+                    train_head_losses_list[-1] = [
                         accu_l + head_l.item() / gradient_accumulation_steps
-                        for accu_l, head_l in zip(train_loss_list[-1], head_losses)
+                        for accu_l, head_l in zip(train_head_losses_list[-1], head_losses)
                     ]
-                    # print(train_loss_list[-1])
+                    # print(train_head_losses_list[-1])
 
                 if args.use_parallel:
                     accelerator.backward(loss)
@@ -555,7 +560,8 @@ def main():
         # print('Forward time', forward_time, 'Backward time', backward_time)
 
         model.eval()
-        valid_loss_list = []
+        valid_loss_list: List[float] = []
+        valid_head_losses_list: List[List[float]] = []
         with torch.no_grad():
             for batch_seqs in tqdm(valid_dataloader, disable=not is_main_process, desc='Validation', ncols=100):
                 batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
@@ -579,13 +585,17 @@ def main():
                     )
                 if args.use_parallel:
                     # need to gather, otherwise each process see different losses
+                    gathered_loss = accelerator.gather(loss)
                     gathered_head_losses = accelerator.gather(head_losses)
                     # gathered_head_losses: List[tensor.Tensor]
                     # dim 0 is process dimension, dim 1 ~ last are original dimensions
+                    gathered_loss = torch.mean(torch.stack(gathered_loss))
                     gathered_head_losses = torch.mean(torch.stack(gathered_head_losses), dim=1)
-                    valid_loss_list.append([head_l.item() for head_l in gathered_head_losses])
+                    valid_loss_list.append(gathered_loss.item())
+                    valid_head_losses_list.append([head_l.item() for head_l in gathered_head_losses])
                 else:
-                    valid_loss_list.append([head_l.item() for head_l in head_losses])
+                    valid_loss_list.append(loss.item())
+                    valid_head_losses_list.append([head_l.item() for head_l in head_losses])
 
 
         cur_num_updates = start_num_updates + args.train.validation_interval
@@ -598,7 +608,14 @@ def main():
                 time()-start_time,
                 scheduler.get_last_lr()[0]
             )
-            log_losses(cur_num_updates, train_loss_list, valid_loss_list, loss_file_path)
+            log_losses(
+                cur_num_updates,
+                train_loss_list,
+                train_head_losses_list,
+                valid_loss_list,
+                valid_head_losses_list,
+                loss_file_path
+            )
 
         ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_num_updates}.pt')
         unwrapped_model = None
@@ -610,7 +627,7 @@ def main():
             torch.save(model, ckpt_model_file_path)
 
         if args.train.early_stop > 0:
-            avg_valid_loss = sum([sum(valid_head_losses) for valid_head_losses in valid_loss_list]) / len(valid_loss_list)
+            avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
             if avg_valid_loss >= min_avg_valid_loss:
                 early_stop_counter += 1
                 if early_stop_counter >= args.train.early_stop:

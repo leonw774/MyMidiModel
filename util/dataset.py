@@ -20,7 +20,7 @@ class MidiDataset(Dataset):
             self,
             data_dir_path: str,
             max_seq_length: int,
-            measure_sample_step_ratio: float = 0.25,
+            measure_sample_step_ratio: float = -1,
             permute_mps: bool = False,
             permute_track_number: bool = False,
             pitch_augmentation_range: int = 0,
@@ -32,15 +32,16 @@ class MidiDataset(Dataset):
 
             - measure_sample_step_ratio: If > 0, will create multiple virtual pieces by sampling overlength pieces.
               The start point of samples will be at the first measure token that has index not smaller than
-              max_seq_length * measure_sample_step_ratio * N, where N is positive integer
+              max_seq_length * measure_sample_step_ratio * N, where N is positive integer. Default is -1.
 
             - permute_mps: Whether or not the dataset should permute all the *maximal permutable subsequences* and
-              ignore the ascending track-number rule, before returning in `__getitem__`
+              ignore the ascending track-number rule, before returning in `__getitem__`. Default is False.
 
             - permute_track_number: Permute all the track numbers relative to the instruments, as data augmentation.
-              This would not break the ascending track-number rule
+              This would not break the ascending track-number rule. Default is False.
 
-            - pitch_augmentation_range: Add or minus a uniform random on pitch value, as data augmentation
+            - pitch_augmentation_range: If set to P, will add a random value from -P to +P on all pitch values
+              as data augmentation. Default is False.
         """
 
         self.vocabs = get_corpus_vocabs(data_dir_path)
