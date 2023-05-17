@@ -292,7 +292,7 @@ def compute_losses(
     loss = loss.sum(dim=2).sum(dim=1) # (batch_size,)
     loss = torch.div(loss, number_of_nonpadding_each_seq) # element-wise division, average of sequences
     loss = loss.mean() # average of batches
-    head_losses = [(head_l.sum() / (head_l != 0.0).sum()).item() for head_l in head_losses]
+    head_losses = [head_l.sum() / (head_l != 0.0).sum() for head_l in head_losses]
     return loss, head_losses
 
 
