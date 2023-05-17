@@ -5,7 +5,7 @@ import os
 import shutil
 from time import strftime, time
 from traceback import format_exc
-from typing import List
+from typing import List, Union
 
 import accelerate
 import numpy as np
@@ -283,6 +283,7 @@ def main():
     if gradient_accumulation_steps == 0:
         gradient_accumulation_steps = 1
 
+    accelerator: Union[accelerate.Accelerator , None]
     if args.use_parallel:
         accelerator = accelerate.Accelerator()
         is_main_process = accelerator.is_main_process
@@ -528,7 +529,7 @@ def main():
                     # print('compute_losses use time:', time() - start_backward_time)
                 # assert all(not torch.isnan(head_l).any() for head_l in head_losses)
 
-                loss /= gradient_accumulation_steps
+                loss = loss / gradient_accumulation_steps
 
                 if is_main_process:
                     # note that this only record the loss calculated on main process
@@ -544,12 +545,12 @@ def main():
                 else:
                     loss.backward()
 
-                if args.train.max_grad_norm > 0:
-                    if args.use_parallel:
-                        if accelerator.sync_gradients:
-                            accelerator.clip_grad_norm_(model.parameters(), args.train.max_grad_norm)
-                    else:
-                        clip_grad_norm_(model.parameters(), args.train.max_grad_norm)
+            if args.train.max_grad_norm > 0:
+                if args.use_parallel:
+                    if accelerator.sync_gradients:
+                        accelerator.clip_grad_norm_(model.parameters(), args.train.max_grad_norm)
+                else:
+                    clip_grad_norm_(model.parameters(), args.train.max_grad_norm)
 
             optimizer.step()
             scheduler.step()

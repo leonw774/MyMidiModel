@@ -277,6 +277,7 @@ def compute_losses(
             target=target_labels[..., k], # (batch_size, seq_size)
             ignore_index=0, # padding is index 0
             reduction='none' # return tensor size (batch_size, seq_size)
+            # ignored index are 0.0
         )
         for k, logits in enumerate(pred_logits)
     ]
