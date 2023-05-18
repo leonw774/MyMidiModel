@@ -42,10 +42,10 @@ int b36strtoi(const char* s) {
     int r = 0;
     for (unsigned int i = (isNeg ? 1 : 0); i < l; ++i) {
         if ('0' <= s[i] && s[i] <= '9') {
-            r = (r << 5) + (r << 2) + s[i] - '0'; // r * 36 --> r = (r * 32 + r * 4)
+            r = (r * 36) + s[i] - '0';
         }
         else if ('A' <= s[i] && s[i] <= 'Z') {
-            r = (r << 5) + (r << 2) + s[i] - 'A' + 10;
+            r = (r * 36) + s[i] - 'A' + 10;
         }
     }
     return (isNeg ? -r : r);
