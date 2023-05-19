@@ -590,7 +590,7 @@ def main():
                     gathered_head_losses = accelerator.gather(head_losses)
                     # gathered_head_losses: List[tensor.Tensor]
                     # dim 0 is process dimension, dim 1 ~ last are original dimensions
-                    gathered_loss = torch.mean(torch.stack(gathered_loss))
+                    gathered_loss = torch.mean(gathered_loss)
                     gathered_head_losses = torch.mean(torch.stack(gathered_head_losses), dim=1)
                     valid_loss_list.append(gathered_loss.item())
                     valid_head_losses_list.append([head_l.item() for head_l in gathered_head_losses])
