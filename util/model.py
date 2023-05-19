@@ -259,18 +259,23 @@ class MyMidiTransformer(nn.Module):
 
 def compute_losses(
         pred_logits: List[Tensor],
-        target_labels: Tensor) -> Tuple[Tensor, List[Tensor]]:
+        target_labels: Tensor,
+        nonpadding_dim: str = 'attribute') -> Tuple[Tensor, List[Tensor]]:
     """
-        pred_logits is a list
-        - length: out_attr_number
-        - elements are tenors with shape: (batch_size, seq_size, attr_vocab_size)
-        target_labels has shape: (batch_size, seq_size, out_attr_number)
+        - pred_logits is a list:
+          - length: out_attr_number
+          - elements are tenors with shape: (batch_size, seq_size, attr_vocab_size)
+
+        - target_labels has shape: (batch_size, seq_size, out_attr_number)
+
+        - nonpadding_dim decide how to reduce the loss vector. Can be 'token', 'sequence', 'attribute', or 'none'
+
         return a list of losses of each head
     """
     # basically treat seq_size as one of the K dimensions and K = 1
     # target_labels have to be long int
     target_labels = target_labels.long()
-    head_losses = [
+    no_reduce_head_losses_list = [
         F.cross_entropy(
             input=logits.transpose(1, 2),
             # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
@@ -281,19 +286,39 @@ def compute_losses(
         )
         for k, logits in enumerate(pred_logits)
     ]
-    # average losses by number of labels
-    # number_of_labels = target_labels.numel()
-    # head_losses = [head_l.sum() / number_of_labels for head_l in head_losses]
-    # loss = sum(head_losses)
+    no_reduce_losses = torch.stack(no_reduce_head_losses_list, dim=2)
+    head_losses = [
+        no_reduce_head_losses.sum() / (no_reduce_head_losses != 0.0).sum()
+        for no_reduce_head_losses in no_reduce_head_losses_list
+    ]
 
-    # average losses by number of non-padding labels by each sequence
-    number_of_nonpadding_each_token = torch.count_nonzero(target_labels, dim=2) # (batch_size, seq_size)
-    number_of_nonpadding_each_seq = number_of_nonpadding_each_token.sum(dim=1) # (batch_size,)
-    loss = torch.stack(head_losses, dim=2) # (batch_size, seq_size, out_attr_number)
-    loss = loss.sum(dim=2).sum(dim=1) # (batch_size,)
-    loss = torch.div(loss, number_of_nonpadding_each_seq) # element-wise division, average of sequences
-    loss = loss.mean() # average of batches
-    head_losses = [head_l.sum() / (head_l != 0.0).sum() for head_l in head_losses]
+    if nonpadding_dim == 'token':
+        # average token losses by number of non-padding labels then average them again for each sequence
+        num_nonpadding_per_token = torch.count_nonzero(target_labels, dim=2) # (batch_size, seq_size)
+        # (batch_size, seq_size, out_attr_number) <- [(batch_size, seq_size) ... (batch_size, seq_size)]
+        loss = no_reduce_losses.sum(dim=2) # (batch_size, seq_size) <- (batch_size, seq_size, out_attr_number)
+        loss = torch.div(loss, num_nonpadding_per_token) # element-wise division, average of tokens
+        loss = loss.mean() # () <- (batch_size, seq_size)
+
+
+    elif nonpadding_dim == 'sequence':
+        # average sequence losses by number of non-padding labels
+        num_nonpadding_per_seq = torch.count_nonzero(target_labels, dim=2).sum(dim=1) # (batch_size,)
+        # (batch_size, seq_size, out_attr_number) <- [(batch_size, seq_size) ... (batch_size, seq_size)]
+        loss = no_reduce_losses.sum(dim=0).sum(dim=1) # (batch_size,)
+        loss = torch.div(loss, num_nonpadding_per_seq) # element-wise division, average of sequences
+        loss = loss.mean()
+
+    elif nonpadding_dim == 'attribute':
+        loss = torch.stack(head_losses).mean()
+
+    elif nonpadding_dim == 'none':
+        # average all loss with number of all attributes
+        loss = no_reduce_losses.mean()
+
+    else:
+        raise ValueError('nonpadding_level in compute_losses can only be \'token\', \'sequence\', \'attribute\', or \'none\'.')
+
     return loss, head_losses
 
 
