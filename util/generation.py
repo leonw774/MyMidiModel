@@ -235,7 +235,7 @@ def generate_piece(
                 array_order_logits[ATTR_NAME_INDEX[attr_name]] = last_logits[model_output_index]
 
             probs = [
-                F.softmax(l / temperature, dim=0)
+                F.softmax(l / softmax_temperature, dim=0)
                 for l in array_order_logits # l has shape (attr_vocab_size,)
             ]
             if use_prob_adjustment:
