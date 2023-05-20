@@ -268,7 +268,8 @@ def compute_losses(
 
         - target_labels has shape: (batch_size, seq_size, out_attr_number)
 
-        - nonpadding_dim decide how to reduce the loss vector. Can be 'token', 'sequence', 'attribute', or 'none'
+        - nonpadding_dim decide how to reduce the loss vector. Can be 'token', 'sequence', 'attribute', or 'none'.
+          Default is 'none'.
 
         return a list of losses of each head
     """

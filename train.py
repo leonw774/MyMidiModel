@@ -180,6 +180,12 @@ def parse_args():
         default='',
     )
     global_parser.add_argument(
+        '--softmax-temperature',
+        type=float,
+        default=1.0,
+        help='The temperature of softmax function. Default is %(default)s.'
+    )
+    global_parser.add_argument(
         '--nucleus-sampling-threshold', '--nu',
         type=float,
         default=1.0,
@@ -320,14 +326,6 @@ def main():
 
     ckpt_dir_path = os.path.join(args.model_dir_path, 'ckpt')
     if is_main_process:
-        logging.info(strftime('==== train.py start at %Y%m%d-%H%M%S ===='))
-        if not os.path.isdir(args.model_dir_path):
-            logging.info('Invalid model dir path: %s', args.model_dir_path)
-            return 1
-        if not os.path.isdir(ckpt_dir_path):
-            logging.info('Invalid model ckpt dir path: %s', ckpt_dir_path)
-            return 1
-
         data_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.data).items()])
         model_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.model).items()])
         train_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.train).items()])
@@ -337,6 +335,14 @@ def main():
         logging.info(train_args_str)
         logging.info('gradient_accumulation_steps:%d', gradient_accumulation_steps)
         logging.info(args_str)
+
+        logging.info(strftime('==== train.py start at %Y%m%d-%H%M%S ===='))
+        if not os.path.isdir(args.model_dir_path):
+            logging.info('Invalid model dir path: %s', args.model_dir_path)
+            return 1
+        if not os.path.isdir(ckpt_dir_path):
+            logging.info('Invalid model ckpt dir path: %s', ckpt_dir_path)
+            return 1
 
     ######## Prepare loss.csv
 
