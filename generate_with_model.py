@@ -66,7 +66,7 @@ def read_args():
         help='The maximum TOKENS in each sample would be generated. Default is models max sequence length.'
     )
     parser.add_argument(
-        '--temperature', '-t',
+        '--softmax-temperature', '-t',
         type=float,
         default=1.0,
         help='Control the temperature of softmax before multinomial sampling. Default is %(default)s.'
@@ -131,7 +131,7 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
             model,
             steps=args.max_generation_step,
             start_seq=primer_seq,
-            temperature=args.temperature,
+            temperature=args.softmax_temperature,
             try_count_limit=args.try_count_limit,
             use_prob_adjustment=(not args.no_prob_adjustment),
             nucleus_sampling_threshold=args.nucleus_sampling_threshold,

@@ -59,12 +59,16 @@ def parse_args():
 def main():
     args = parse_args()
     args_dict = vars(args)
+    # push
     for k, v in args_dict.items():
         os.environ[k] = str(v)
     subprocess.run(
         ['./evaluate_model.sh'],
         check=True
     )
+    # pop
+    for k, v in args_dict.items():
+        os.environ[k] = ""
 
 if __name__ == '__main__':
     exit_code = main()

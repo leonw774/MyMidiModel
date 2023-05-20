@@ -146,7 +146,7 @@ def generate_piece(
         model: MyMidiTransformer,
         steps: int,
         start_seq: Union[torch.Tensor, None] = None,
-        temperature: float = 1.0,
+        softmax_temperature: float = 1.0,
         try_count_limit: int = 1000,
         use_prob_adjustment: bool = True,
         nucleus_sampling_threshold: float = 1.0,
