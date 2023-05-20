@@ -223,7 +223,7 @@ def main():
     ]))
     # for fast copy-paste
     logging.info('\t'.join([
-        f'{eval_features_stats[fname]["mean"]:.6}' for fname in EVAL_SCALAR_FEATURE_NAMES
+        f'{eval_features_stats[fname]["mean"]}' for fname in EVAL_SCALAR_FEATURE_NAMES
     ]))
 
     for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
@@ -286,7 +286,7 @@ def main():
 
             # for fast copy-paste
             logging.info('\t'.join([
-                f'{fname}{suffix}: {eval_features_stats[fname+suffix]}'
+                f'{eval_features_stats[fname+suffix]}'
                 for suffix in ('_KLD', '_OA', '_HI')
                 for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
             ]))
