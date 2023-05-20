@@ -260,7 +260,7 @@ class MyMidiTransformer(nn.Module):
 def compute_losses(
         pred_logits: List[Tensor],
         target_labels: Tensor,
-        nonpadding_dim: str = 'all') -> Tuple[Tensor, List[Tensor]]:
+        nonpadding_dim: str = 'none') -> Tuple[Tensor, List[Tensor]]:
     """
         - pred_logits is a list:
           - length: out_attr_number
