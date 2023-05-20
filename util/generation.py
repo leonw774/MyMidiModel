@@ -146,10 +146,10 @@ def generate_piece(
         model: MyMidiTransformer,
         steps: int,
         start_seq: Union[torch.Tensor, None] = None,
-        softmax_temperature: float = 1.0,
+        softmax_temperature: Union[List[float], None] = None,
         try_count_limit: int = 1000,
         use_prob_adjustment: bool = True,
-        nucleus_sampling_threshold: float = 1.0,
+        nucleus_sampling_threshold:  Union[List[float], None] = None,
         print_exception: bool = False,
         show_tqdm: bool = False,
         ignore_pending_note_error: bool = True) -> List[str]:
@@ -191,6 +191,22 @@ def generate_piece(
                 event_family_indices[3].add(i)
             elif t[0] == tokens.TEMPO_EVENTS_CHAR:
                 event_family_indices[4].add(i)
+
+    if softmax_temperature is None:
+        softmax_temperature = [1.0] * len(model.output_attrs_indices)
+    elif isinstance(softmax_temperature, list):
+        if len(softmax_temperature) == 1:
+            softmax_temperature = softmax_temperature * len(model.output_attrs_indices)
+        elif softmax_temperature != len(model.output_attrs_indices):
+            raise ValueError('length of softmax_temperature can either be one or out_attr_num')
+
+    if nucleus_sampling_threshold is None:
+        nucleus_sampling_threshold = [1.0] * len(model.output_attrs_indices)
+    elif isinstance(nucleus_sampling_threshold, list):
+        if len(nucleus_sampling_threshold) == 1:
+            nucleus_sampling_threshold = nucleus_sampling_threshold * len(model.output_attrs_indices)
+        elif nucleus_sampling_threshold != len(model.output_attrs_indices):
+            raise ValueError('length of nucleus_sampling_threshold can either be one or out_attr_num')
 
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs)
 
@@ -235,8 +251,8 @@ def generate_piece(
                 array_order_logits[ATTR_NAME_INDEX[attr_name]] = last_logits[model_output_index]
 
             probs = [
-                F.softmax(l / softmax_temperature, dim=0)
-                for l in array_order_logits # l has shape (attr_vocab_size,)
+                F.softmax(l / t, dim=0)
+                for l, t in zip(array_order_logits, softmax_temperature) # l has shape (attr_vocab_size,)
             ]
             if use_prob_adjustment:
                 # prevent many bad format in advance
@@ -246,8 +262,8 @@ def generate_piece(
             try_count = 0
             while try_count < try_count_limit:
                 sampled_attrs = [
-                    nucleus_sampling(p, nucleus_sampling_threshold)
-                    for p in probs
+                    nucleus_sampling(prob, threshold)
+                    for prob, threshold in zip(probs, nucleus_sampling_threshold)
                 ]
                 # print(sampled_attrs)
                 try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, out_attr_num)

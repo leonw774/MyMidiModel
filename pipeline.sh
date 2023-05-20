@@ -201,7 +201,6 @@ $launch_command train.py \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
     --batch-size $BATCH_SIZE --max-updates $MAX_UPDATES --max-grad-norm $MAX_GRAD_NORM --split-ratio $SPLIT_RATIO \
     --validation-interval $VALIDATION_INTERVAL --early-stop $EARLY_STOP --loss-nonpadding-dim $LOSS_NONPAD_DIM \
-    --generate-interval $GENERATE_INTERVAL --softmax-temperature $SOFTMAX_TEMPERATURE --nucleus-sampling-threshold $NUCLEUS_THRESHOLD \
     --lr-peak $LEARNING_RATE_PEAK --lr-warmup-updates $LEARNING_RATE_WARMUP_UPDATES \
     --lr-decay-end-updates $LEARNING_RATE_DECAY_END_UPDATES --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
     --use-device $USE_DEVICE --primer-measure-length $PRIMER_LENGTH --log "$log_path" $train_other_args "$corpus_dir_path" "$model_dir_path"
@@ -219,6 +218,6 @@ fi
 
 python3 evaluate_model_wrapper.py \
     --model-dir-path "$model_dir_path" --num-workers $PROCESS_WORKERS --midi-to-piece-paras "$EVAL_MIDI_TO_PIECE_PARAS_FILE" \
-    --log-path "$log_path" --softmax-temperature $SOFTMAX_TEMPERATURE --nucleus-sampling-threshold $NUCLEUS_THRESHOLD \
+    --log-path "$log_path" --softmax-temperature $SOFTMAX_TEMPERATURE --nucleus-sampling-threshold $NUCLEUS_THRESHOLD -- \
     "$MIDI_DIR_PATH" $EVAL_SAMPLE_NUMBER $PRIMER_LENGTH
 test $? -eq 0 && echo "All done. pipeline.sh exit." | tee -a "$log_path"

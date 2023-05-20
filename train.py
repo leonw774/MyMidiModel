@@ -107,11 +107,6 @@ def parse_args():
         required=True
     )
     train_parser.add_argument(
-        '--generate-interval',
-        type=int,
-        default=0,
-    )
-    train_parser.add_argument(
         "--max-grad-norm",
         type=float,
         default=0.0,
@@ -178,18 +173,6 @@ def parse_args():
         dest='log_file_path',
         type=str,
         default='',
-    )
-    global_parser.add_argument(
-        '--softmax-temperature',
-        type=float,
-        default=1.0,
-        help='The temperature of softmax function. Default is %(default)s.'
-    )
-    global_parser.add_argument(
-        '--nucleus-sampling-threshold', '--nu',
-        type=float,
-        default=1.0,
-        help='The probability threshold nuclues sampling. Default is %(default)s.'
     )
     global_parser.add_argument(
         '--primer-measure-length',
@@ -660,40 +643,6 @@ def main():
                 if is_main_process:
                     shutil.copyfile(ckpt_model_file_path, os.path.join(args.model_dir_path, 'best_model.pt'))
                     logging.info('New best model.')
-
-        if is_main_process:
-            if args.train.generate_interval != 0 and cur_num_updates % args.train.generate_interval == 0:
-                print('Generating conditional and unconditional sample for checkpoint')
-                uncond_gen_text_list = generate_piece(
-                    unwrapped_model if args.use_parallel else model,
-                    steps=args.data.max_seq_length,
-                    nucleus_sampling_threshold=args.nucleus_sampling_threshold
-                )
-                uncond_gen_piece = ' '.join(uncond_gen_text_list)
-                with open(os.path.join(ckpt_dir_path, f'{cur_num_updates}_uncond.txt'), 'w+', encoding='utf8') as uncond_file:
-                    uncond_file.write(uncond_gen_piece)
-                try:
-                    midiobj = piece_to_midi(uncond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
-                    midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_num_updates}_uncond.mid'))
-                except Exception:
-                    print('Error when dumping uncond gen MidiFile object')
-                    print(format_exc())
-
-                cond_gen_text_list = generate_piece(
-                    unwrapped_model if args.use_parallel else model,
-                    steps=args.data.max_seq_length,
-                    start_seq=cond_primer_array,
-                    nucleus_sampling_threshold=args.nucleus_sampling_threshold
-                )
-                cond_gen_piece = ' '.join(cond_gen_text_list)
-                with open(os.path.join(ckpt_dir_path, f'{cur_num_updates}_cond.txt'), 'w+', encoding='utf8') as cond_file:
-                    cond_file.write(cond_gen_piece)
-                try:
-                    midiobj = piece_to_midi(cond_gen_piece, vocabs.paras['nth'], ignore_pending_note_error=True)
-                    midiobj.dump(os.path.join(ckpt_dir_path, f'{cur_num_updates}_cond.mid'))
-                except Exception:
-                    print('Error when dumping cond gen MidiFile object')
-                    print(format_exc())
 
     ######## Training end
 

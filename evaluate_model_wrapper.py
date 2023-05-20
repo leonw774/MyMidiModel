@@ -30,12 +30,14 @@ def parse_args():
     parser.add_argument(
         '--softmax-temperature',
         type=float,
-        default=1.0
+        nargs='+',
+        default=[1.0]
     )
     parser.add_argument(
         '--nucleus-sampling-threshold',
         type=float,
-        default=1.0
+        nargs='+',
+        default=[1.0]
     )
 
     # required
@@ -61,14 +63,14 @@ def main():
     args_dict = vars(args)
     # push
     for k, v in args_dict.items():
-        os.environ[k] = str(v)
+        if isinstance(v, list):
+            os.environ[k] = ' '.join(map(str, v))
+        else:
+            os.environ[k] = str(v)
     subprocess.run(
         ['./evaluate_model.sh'],
         check=True
     )
-    # pop
-    for k, v in args_dict.items():
-        os.environ[k] = ""
 
 if __name__ == '__main__':
     exit_code = main()

@@ -66,20 +66,22 @@ def read_args():
         help='The maximum TOKENS in each sample would be generated. Default is models max sequence length.'
     )
     parser.add_argument(
-        '--softmax-temperature', '-t',
-        type=float,
-        default=1.0,
-        help='Control the temperature of softmax before multinomial sampling. Default is %(default)s.'
-    )
-    parser.add_argument(
         '--no-prob-adjustment',
         action='store_true'
     )
     parser.add_argument(
+        '--softmax-temperature', '-t',
+        type=float,
+        nargs='+',
+        default=[1.0],
+        help='Control the temperature of softmax before multinomial sampling. Default is %(default)s.'
+    )
+    parser.add_argument(
         '--nucleus-sampling-threshold', '--nu',
         type=float,
-        default=1.0,
-        help='The probability threshold nuclues sampling. Default is %(default)s.'
+        nargs='+',
+        default=[1.0],
+        help='The probability threshold of nucleus sampling. Default is %(default)s.'
     )
     parser.add_argument(
         '--try-count-limit',

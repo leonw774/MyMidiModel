@@ -66,7 +66,7 @@ else
     start_time=$SECONDS
     mkdir "${model_dir_path}/eval_samples/uncond"
     python3 generate_with_model.py $seed_option --sample-number $sample_number --no-tqdm --output-text \
-        --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold \
+        --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
         "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/uncond/uncond"
     duration=$(( $SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds"
@@ -92,7 +92,7 @@ else
         echo "Primer file: $eval_sample_midi_path"
         primer_name=$(basename "$eval_sample_midi_path" .mid)
         python3 generate_with_model.py $seed_option -p "$eval_sample_midi_path" -l 0 --no-tqdm --output-text \
-            --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold \
+            --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/${primer_name}"
     done < $eval_pathlist_file_path
     duration=$(( $SECONDS - start_time ))
@@ -119,7 +119,7 @@ else
         echo "Primer file: $eval_sample_midi_path"
         primer_name=$(basename "$eval_sample_midi_path" .mid)
         python3 generate_with_model.py $seed_option -p "$eval_sample_midi_path" -l $primer_measure_length --no-tqdm --output-text \
-            --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold \
+            --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/${primer_name}"
     done < $eval_pathlist_file_path
     duration=$(( $SECONDS - start_time ))
