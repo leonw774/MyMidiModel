@@ -13,11 +13,11 @@ fi
 # optionals: set default and make option string
 test -z "$log_path" && log_path=/dev/null
 test -z "$num_workers" && num_workers=1
+test -z "$softmax_temperature" && softmax_temperature=1.0
+test -z "$nucleus_sampling_threshold" && nucleus_sampling_threshold=1.0
 
 test -n "$seed" && seed_option="--seed $seed"
 test -n "$midi_to_piece_paras" && midi_to_piece_paras_option="--midi-to-piece-paras ${midi_to_piece_paras}"
-test -n "$softmax_temperature" && softmax_temperature=1.0
-test -n "$nucleus_sampling_threshold" && nucleus_sampling_threshold=1.0
 
 echo "evaluated_model.sh start." | tee -a $log_path
 echo "midi_dir_path=${midi_dir_path} sample_number=${sample_number} primer_measure_length=${primer_measure_length}" | tee -a $log_path
