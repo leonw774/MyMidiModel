@@ -14,25 +14,25 @@ from .model import MyMidiTransformer
 
 
 def adjust_probs_with_context(
-        probs: List[torch.Tensor],
+        probs_list: List[torch.Tensor],
         context_text_list: List[str],
         vocabs: Vocabs,
         event_family_indices: Tuple[set]):
     """
-        Set to zero to the probs of the attribute values that would definitily raise exception
+        Set to zero to the prob of the attribute values that would definitily raise exception
         if the next token in context_text_list has them and force the position tokens to be ordered increasingly in time
     """
     assert len(context_text_list) > 0, 'Empty context_text_list'
-    assert len(probs) == len(OUTPUTABLE_ATTR_NAMES) or len(probs) == len(OUTPUTABLE_ATTR_NAMES) - 1, 'Bad probs'
+    assert len(probs_list) == len(OUTPUTABLE_ATTR_NAMES) or len(probs_list) == len(OUTPUTABLE_ATTR_NAMES) - 1, 'Bad probs_list'
 
     bos_index = vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
     sep_index = vocabs.events.text2id[tokens.SEP_TOKEN_STR]
     multinote_indices, position_indices, measure_indices, track_indices, tempo_indices = event_family_indices
 
     # BOS token is redundent, will not be used in generation
-    probs[ATTR_NAME_INDEX['evt']][bos_index] = 0
+    probs_list[ATTR_NAME_INDEX['evt']][bos_index] = 0
     # predict PAD is not allowed in generation time
-    for attr_probs in probs:
+    for attr_probs in probs_list:
         attr_probs[0] = 0
 
     is_head = context_text_list[-1] == tokens.BEGIN_TOKEN_STR or context_text_list[-1][0] == tokens.TRACK_EVENTS_CHAR
@@ -41,12 +41,12 @@ def adjust_probs_with_context(
         if len(context_text_list) == 1:
             # only track-instrument allowed
             not_track_indices = [idx for idx in range(vocabs.events.size) if idx not in track_indices]
-            probs[ATTR_NAME_INDEX['evt']][not_track_indices] = 0
+            probs_list[ATTR_NAME_INDEX['evt']][not_track_indices] = 0
         elif 1 < len(context_text_list) < vocabs.track_numbers.size:
             # only track-instrument and separater allowed
             not_track_or_sep_indices = [idx for idx in range(vocabs.events.size) if idx not in track_indices]
             not_track_or_sep_indices.remove(sep_index)
-            probs[ATTR_NAME_INDEX['evt']][not_track_or_sep_indices] = 0
+            probs_list[ATTR_NAME_INDEX['evt']][not_track_or_sep_indices] = 0
             # prevent generating repeating track number
             used_track_number =  [
                 b36str2int(context_text_list[i].split(':')[1]) + 1 # the id of track number is 0:padding, 1:0, 2:1, ...
@@ -54,39 +54,39 @@ def adjust_probs_with_context(
             ]
             assert all(t < vocabs.track_numbers.size for t in used_track_number), \
                 f'context_text_list: {context_text_list}\nused_track_number: {used_track_number}'
-            probs[ATTR_NAME_INDEX['trn']][used_track_number] = 0
+            probs_list[ATTR_NAME_INDEX['trn']][used_track_number] = 0
         else:
             # only separater allowed
-            probs[ATTR_NAME_INDEX['evt']][:sep_index] = 0
-            probs[ATTR_NAME_INDEX['evt']][sep_index+1:] = 0
+            probs_list[ATTR_NAME_INDEX['evt']][:sep_index] = 0
+            probs_list[ATTR_NAME_INDEX['evt']][sep_index+1:] = 0
             # track number doesn't matter
-            # probs[ATTR_NAME_INDEX['trn']][list(range(1, len(used_track_number)+1))] = 0
+            # probs_list[ATTR_NAME_INDEX['trn']][list(range(1, len(used_track_number)+1))] = 0
 
     elif is_sep: # if is separater, then only measure tokens are allowed
         for i in range(vocabs.events.size):
             if i not in measure_indices:
-                probs[ATTR_NAME_INDEX['evt']][i] = 0
+                probs_list[ATTR_NAME_INDEX['evt']][i] = 0
 
     else: # if the section is body
         # the next token's event can not be track-instrument or sep
-        probs[ATTR_NAME_INDEX['evt']][list(track_indices)] = 0
-        probs[ATTR_NAME_INDEX['evt']][sep_index] = 0
+        probs_list[ATTR_NAME_INDEX['evt']][list(track_indices)] = 0
+        probs_list[ATTR_NAME_INDEX['evt']][sep_index] = 0
 
         # if the last token in context_text_list is measure
         # then the next token's event can not be multi-note or tempo
         if context_text_list[-1][0] == tokens.MEASURE_EVENTS_CHAR:
             multinote_and_tempo_indices = multinote_indices.union(tempo_indices)
-            probs[ATTR_NAME_INDEX['evt']][list(multinote_and_tempo_indices)] = 0
+            probs_list[ATTR_NAME_INDEX['evt']][list(multinote_and_tempo_indices)] = 0
 
         # if the last token in context_text_list is position
         # then the next token's event can not be measure
         elif context_text_list[-1][0] == tokens.POSITION_EVENTS_CHAR:
-            probs[ATTR_NAME_INDEX['evt']][list(position_indices)] = 0
+            probs_list[ATTR_NAME_INDEX['evt']][list(position_indices)] = 0
 
         # if the last token in context_text_list is note or multinote
         # the next token's event can not be tempo
         elif context_text_list[-1][0] in (tokens.NOTE_EVENTS_CHAR, tokens.MULTI_NOTE_EVENTS_CHAR):
-            probs[ATTR_NAME_INDEX['evt']][list(tempo_indices)] = 0
+            probs_list[ATTR_NAME_INDEX['evt']][list(tempo_indices)] = 0
 
         # this prohibits the position tokens that is "behind" the current position
         k = len(context_text_list) - 1
@@ -96,14 +96,14 @@ def adjust_probs_with_context(
             cur_position = b36str2int(context_text_list[k][1:])
             for i in position_indices:
                 if b36str2int(vocabs.events.id2text[i][1:]) <= cur_position:
-                    probs[ATTR_NAME_INDEX['evt']][i] = 0
+                    probs_list[ATTR_NAME_INDEX['evt']][i] = 0
 
         # this prohibit the tempo tokens if there is already a tempo token in the current position
         k = len(context_text_list) - 1
         while context_text_list[k][0] not in (tokens.POSITION_EVENTS_CHAR, tokens.TEMPO_EVENTS_CHAR) and k > 0:
             k -= 1
         if context_text_list[k][0] == tokens.TEMPO_EVENTS_CHAR:
-            probs[ATTR_NAME_INDEX['evt']][list(tempo_indices)] = 0
+            probs_list[ATTR_NAME_INDEX['evt']][list(tempo_indices)] = 0
 
         # only allow the defined track number
         try:
@@ -117,14 +117,14 @@ def adjust_probs_with_context(
             print(context_text_list)
             raise e
         unused_track_number_indices = [idx for idx in range(vocabs.track_numbers.size) if idx not in used_track_number_indices]
-        probs[ATTR_NAME_INDEX['trn']][unused_track_number_indices] = 0
+        probs_list[ATTR_NAME_INDEX['trn']][unused_track_number_indices] = 0
 
     # re-normalized probs
-    normed_probs = [p / p.sum() for p in probs]
+    normed_probs_list = [p / p.sum() for p in probs_list]
     # if in some attribute all events are fill with zero, something is wrong
-    assert not any([torch.isnan(p).any() for p in normed_probs]), \
-        f'Text List: {context_text_list}\nAdjusted: {probs}\nRe-normalized: {normed_probs}'
-    return normed_probs
+    assert not any([torch.isnan(p).any() for p in normed_probs_list]), \
+        f'Text List: {context_text_list}\nAdjusted: {probs_list}\nRe-normalized: {normed_probs_list}'
+    return normed_probs_list
 
 
 def nucleus_sampling(probs, threshold):
@@ -133,8 +133,8 @@ def nucleus_sampling(probs, threshold):
         return torch.multinomial(probs, 1)
     sorted_probs, sorted_indices = torch.sort(probs, dim=-1, descending=True)
     cumsum_probs = torch.cumsum(sorted_probs, dim=-1)
-    nucleus_number = sum(cumsum_probs < threshold) + 1
-    if nucleus_number == 1:
+    nucleus_number = sum(cumsum_probs < threshold)
+    if nucleus_number == 0:
         return torch.unsqueeze(sorted_indices[0], dim=0) # returned dimension have to be 1
     nucleus_probs = sorted_probs[:nucleus_number]
     sampled_nuclei = torch.multinomial(nucleus_probs, 1)
@@ -198,7 +198,7 @@ def generate_piece(
         if len(softmax_temperature) == 1:
             softmax_temperature = softmax_temperature * len(model.output_attrs_indices)
         elif len(softmax_temperature) != len(model.output_attrs_indices):
-            raise ValueError('length of softmax_temperature can either be one or out_attr_num. Get ' + str(softmax_temperature))
+            raise ValueError('length of softmax_temperature can only be 1 or out_attr_num. Get ' + str(softmax_temperature))
 
     if nucleus_sampling_threshold is None:
         nucleus_sampling_threshold = [1.0] * len(model.output_attrs_indices)
@@ -206,7 +206,7 @@ def generate_piece(
         if len(nucleus_sampling_threshold) == 1:
             nucleus_sampling_threshold = nucleus_sampling_threshold * len(model.output_attrs_indices)
         elif len(nucleus_sampling_threshold) != len(model.output_attrs_indices):
-            raise ValueError('length of nucleus_sampling_threshold can either be one or out_attr_num. Get ' + str(nucleus_sampling_threshold))
+            raise ValueError('length of nucleus_sampling_threshold can only be 1 or out_attr_num. Get ' + str(nucleus_sampling_threshold))
 
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs)
 
@@ -250,20 +250,20 @@ def generate_piece(
                 model_output_index = model.output_attr_names.index(attr_name)
                 array_order_logits[ATTR_NAME_INDEX[attr_name]] = last_logits[model_output_index]
 
-            probs = [
+            probs_list = [
                 F.softmax(l / t, dim=0)
                 for l, t in zip(array_order_logits, softmax_temperature) # l has shape (attr_vocab_size,)
             ]
             if use_prob_adjustment:
                 # prevent many bad format in advance
-                probs = adjust_probs_with_context(probs, text_list, model.vocabs, event_family_indices)
+                probs_list = adjust_probs_with_context(probs_list, text_list, model.vocabs, event_family_indices)
             # print('\n'.join([repr(p) for p in probs]))
 
             try_count = 0
             while try_count < try_count_limit:
                 sampled_attrs = [
                     nucleus_sampling(prob, threshold)
-                    for prob, threshold in zip(probs, nucleus_sampling_threshold)
+                    for probs, threshold in zip(probs_list, nucleus_sampling_threshold)
                 ]
                 # print(sampled_attrs)
                 try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, out_attr_num)
