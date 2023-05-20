@@ -262,7 +262,7 @@ def generate_piece(
             try_count = 0
             while try_count < try_count_limit:
                 sampled_attrs = [
-                    nucleus_sampling(prob, threshold)
+                    nucleus_sampling(probs, threshold)
                     for probs, threshold in zip(probs_list, nucleus_sampling_threshold)
                 ]
                 # print(sampled_attrs)
