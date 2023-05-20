@@ -20,7 +20,7 @@ class MidiDataset(Dataset):
             self,
             data_dir_path: str,
             max_seq_length: int,
-            measure_sample_step_ratio: float = -1,
+            measure_sample_step_ratio: float = 0,
             permute_mps: bool = False,
             permute_track_number: bool = False,
             pitch_augmentation_range: int = 0,

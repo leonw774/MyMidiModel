@@ -12,6 +12,7 @@ import numpy as np
 
 from tqdm import tqdm
 import torch
+from torch.nn.functional import pad
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.data import random_split, DataLoader
 from torch.optim import AdamW, lr_scheduler
@@ -97,15 +98,18 @@ def parse_args():
     )
     train_parser.add_argument(
         '--max-updates',
-        type=int
+        type=int,
+        required=True
     )
     train_parser.add_argument(
         '--validation-interval',
         type=int,
+        required=True
     )
     train_parser.add_argument(
         '--generate-interval',
-        type=int
+        type=int,
+        default=0,
     )
     train_parser.add_argument(
         "--max-grad-norm",
@@ -476,6 +480,7 @@ def main():
         logging.info('Begin training')
     train_dataloader_iter = iter(train_dataloader)
     valid_dataloader_iter = iter(valid_dataloader)
+    pad1bottom = (0, 0, 0, 1)
     min_avg_valid_loss = float('inf')
     early_stop_counter = 0
 
@@ -503,8 +508,9 @@ def main():
                     batch_seqs = next(train_dataloader_iter)
 
                 # batch_seqs has shape: (batch_size, seq_size, complete_attr_num)
-                batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
+                batch_input_seqs = to_input_attrs(batch_seqs)
                 batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
+                batch_target_seqs = pad(batch_target_seqs, pad1bottom, 'constant', 0) # pad one from back on token dim
                 if not args.use_parallel:
                     batch_input_seqs = batch_input_seqs.to(args.use_device)
                     batch_target_seqs = batch_target_seqs.to(args.use_device)
@@ -643,7 +649,7 @@ def main():
                     logging.info('New best model.')
 
         if is_main_process:
-            if cur_num_updates % args.train.generate_interval == 0:
+            if args.train.generate_interval != 0 and cur_num_updates % args.train.generate_interval == 0:
                 print('Generating conditional and unconditional sample for checkpoint')
                 uncond_gen_text_list = generate_piece(
                     unwrapped_model if args.use_parallel else model,
