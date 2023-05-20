@@ -268,7 +268,7 @@ def compute_losses(
 
         - target_labels has shape: (batch_size, seq_size, out_attr_number)
 
-        - nonpadding_dim decide how to reduce the loss vector. Can be 'all', 'sequence', 'attribute', or 'none'.
+        - nonpadding_dim decide how to reduce the loss vector. Can be 'all', 'attribute', or 'none'.
           Default is 'all'.
 
         return a list of losses of each head
@@ -299,16 +299,9 @@ def compute_losses(
         num_nonpadding = torch.count_nonzero(target_labels) # ()
         loss = no_reduce_losses.sum() / num_nonpadding
 
-    elif nonpadding_dim == 'sequence':
-        # average each sequence losses by number of its non-padding labels
-        num_nonpadding_per_seq = torch.count_nonzero(target_labels, dim=2).sum(dim=1) # (batch_size,)
-        loss = no_reduce_losses.sum(dim=0).sum(dim=1) # (batch_size,)
-        loss = torch.div(loss, num_nonpadding_per_seq) # element-wise division, average of sequences
-        loss = loss.mean()
-
     elif nonpadding_dim == 'attribute':
         # average each attribute losses by number of its non-padding labels
-        # basically treat the output as out_attr_number sequences
+        # like out_attr_number sequences with ignore paddings
         nonpadding_head_losses = [
             no_reduce_head_losses.sum() / torch.count_nonzero(no_reduce_head_losses)
             for no_reduce_head_losses in no_reduce_head_losses_list
@@ -316,10 +309,11 @@ def compute_losses(
         loss = torch.stack(nonpadding_head_losses).mean()
 
     elif nonpadding_dim == 'none':
-        loss = no_reduce_losses.mean()
+        # still need to ignore the padding tokens at the end
+        loss = no_reduce_losses.sum() / torch.count_nonzero(target_labels[..., 0]) / target_labels.size(2)
 
     else:
-        raise ValueError('nonpadding_level in compute_losses can only be \'all\', \'sequence\', \'attribute\', or \'none\'.')
+        raise ValueError('nonpadding_level in compute_losses can only be \'all\', \'attribute\', or \'none\'.')
 
     return loss, head_losses
 
