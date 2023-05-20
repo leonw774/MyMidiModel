@@ -300,14 +300,15 @@ def compute_losses(
         loss = no_reduce_losses.sum() / num_nonpadding
 
     elif nonpadding_dim == 'sequence':
-        # average sequence losses by number of its non-padding labels
+        # average each sequence losses by number of its non-padding labels
         num_nonpadding_per_seq = torch.count_nonzero(target_labels, dim=2).sum(dim=1) # (batch_size,)
         loss = no_reduce_losses.sum(dim=0).sum(dim=1) # (batch_size,)
         loss = torch.div(loss, num_nonpadding_per_seq) # element-wise division, average of sequences
         loss = loss.mean()
 
     elif nonpadding_dim == 'attribute':
-        # average attribute losses by number of non-padding labels
+        # average each attribute losses by number of its non-padding labels
+        # basically treat the output as out_attr_number sequences
         nonpadding_head_losses = [
             no_reduce_head_losses.sum() / torch.count_nonzero(no_reduce_head_losses)
             for no_reduce_head_losses in no_reduce_head_losses_list
@@ -315,7 +316,6 @@ def compute_losses(
         loss = torch.stack(nonpadding_head_losses).mean()
 
     elif nonpadding_dim == 'none':
-        # average all loss with number of all attributes
         loss = no_reduce_losses.mean()
 
     else:
