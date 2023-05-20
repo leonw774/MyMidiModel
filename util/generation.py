@@ -197,16 +197,16 @@ def generate_piece(
     elif isinstance(softmax_temperature, list):
         if len(softmax_temperature) == 1:
             softmax_temperature = softmax_temperature * len(model.output_attrs_indices)
-        elif softmax_temperature != len(model.output_attrs_indices):
-            raise ValueError('length of softmax_temperature can either be one or out_attr_num')
+        elif len(softmax_temperature) != len(model.output_attrs_indices):
+            raise ValueError('length of softmax_temperature can either be one or out_attr_num. Get ' + str(softmax_temperature))
 
     if nucleus_sampling_threshold is None:
         nucleus_sampling_threshold = [1.0] * len(model.output_attrs_indices)
     elif isinstance(nucleus_sampling_threshold, list):
         if len(nucleus_sampling_threshold) == 1:
             nucleus_sampling_threshold = nucleus_sampling_threshold * len(model.output_attrs_indices)
-        elif nucleus_sampling_threshold != len(model.output_attrs_indices):
-            raise ValueError('length of nucleus_sampling_threshold can either be one or out_attr_num')
+        elif len(nucleus_sampling_threshold) != len(model.output_attrs_indices):
+            raise ValueError('length of nucleus_sampling_threshold can either be one or out_attr_num. Get ' + str(nucleus_sampling_threshold))
 
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs)
 
