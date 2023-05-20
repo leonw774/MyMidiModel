@@ -221,6 +221,10 @@ def main():
         f'{fname}: {eval_features_stats[fname]["mean"]} ± {eval_features_stats[fname]["std"]}'
         for fname in EVAL_SCALAR_FEATURE_NAMES
     ]))
+    # for fast copy-paste
+    logging.info('\t'.join([
+        f'{eval_features_stats[fname]["mean"]:.6}' for fname in EVAL_SCALAR_FEATURE_NAMES
+    ]))
 
     for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
         eval_features_stats[fname] = dict(sum(
@@ -277,6 +281,13 @@ def main():
                 )
             logging.info('\n'.join([
                 f'{fname}_HI: {eval_features_stats[fname+"_HI"]}'
+                for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
+            ]))
+
+            # for fast copy-paste
+            logging.info('\t'.join([
+                f'{fname}{suffix}: {eval_features_stats[fname+suffix]}'
+                for suffix in ('_KLD', '_OA', '_HI')
                 for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
             ]))
 
