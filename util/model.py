@@ -260,7 +260,7 @@ class MyMidiTransformer(nn.Module):
 def compute_losses(
         pred_logits: List[Tensor],
         target_labels: Tensor,
-        nonpadding_dim: str = 'attribute') -> Tuple[Tensor, List[Tensor]]:
+        nonpadding_dim: str = 'none') -> Tuple[Tensor, List[Tensor]]:
     """
         - pred_logits is a list:
           - length: out_attr_number
@@ -288,7 +288,7 @@ def compute_losses(
     ]
     no_reduce_losses = torch.stack(no_reduce_head_losses_list, dim=2)
     head_losses = [
-        no_reduce_head_losses.sum() / (no_reduce_head_losses != 0.0).sum()
+        no_reduce_head_losses.mean()
         for no_reduce_head_losses in no_reduce_head_losses_list
     ]
 
@@ -310,7 +310,12 @@ def compute_losses(
         loss = loss.mean()
 
     elif nonpadding_dim == 'attribute':
-        loss = torch.stack(head_losses).mean()
+        # average attribute losses by number of non-padding labels
+        nonpadding_head_losses = [
+            no_reduce_head_losses.sum() / torch.count_nonzero(no_reduce_head_losses)
+            for no_reduce_head_losses in no_reduce_head_losses_list
+        ]
+        loss = torch.stack(nonpadding_head_losses).mean()
 
     elif nonpadding_dim == 'none':
         # average all loss with number of all attributes

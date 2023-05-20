@@ -120,6 +120,12 @@ def parse_args():
             Default is %(desult)s.'
     )
     train_parser.add_argument(
+        '--loss-nonpadding-dim',
+        type=str,
+        choices=['token', 'sequence', 'attribute', 'none'],
+        default='none'
+    )
+    train_parser.add_argument(
         '--lr-peak',
         type=float
     )
@@ -524,13 +530,14 @@ def main():
                     loss, head_losses = compute_permutable_subseq_losses(
                         prediction,
                         batch_target_seqs,
-                        batch_mps_number_seq
+                        batch_mps_number_seq,
                     )
                     # print('compute_permutable_subseq_losses use time:', time() - start_backward_time)
                 else:
                     loss, head_losses = compute_losses(
                         prediction,
-                        batch_target_seqs
+                        batch_target_seqs,
+                        args.train.loss_nonpadding_dim
                     )
                     # print('compute_losses use time:', time() - start_backward_time)
                 # assert all(not torch.isnan(head_l).any() for head_l in head_losses)
