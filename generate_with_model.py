@@ -131,7 +131,7 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
             model,
             steps=args.max_generation_step,
             start_seq=primer_seq,
-            temperature=args.softmax_temperature,
+            softmax_temperature=args.softmax_temperature,
             try_count_limit=args.try_count_limit,
             use_prob_adjustment=(not args.no_prob_adjustment),
             nucleus_sampling_threshold=args.nucleus_sampling_threshold,
