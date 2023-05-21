@@ -196,7 +196,7 @@ def main():
             eval_features_per_piece += eval_features
 
     logging.info(
-        'Done. Sampling %d midi files from %s takes %.3f seconds',
+        'Done. Sampling %d midi files from %s takes %.3f seconds.',
         args.sample_number,
         args.midi_dir_path,
         time() - start_time
@@ -210,6 +210,7 @@ def main():
         for fname in EVAL_SCALAR_FEATURE_NAMES
     }
 
+    # process scalar features
     eval_features_stats = dict()
     for fname in EVAL_SCALAR_FEATURE_NAMES:
         fname_description = dict(Series(aggr_scalar_eval_features[fname], dtype='float64').dropna().describe())
@@ -217,15 +218,7 @@ def main():
         eval_features_stats[fname] = {
             k: float(v) for k, v in fname_description.items()
         }
-    logging.info('\n'.join([
-        f'{fname}: {eval_features_stats[fname]["mean"]} ± {eval_features_stats[fname]["std"]}'
-        for fname in EVAL_SCALAR_FEATURE_NAMES
-    ]))
-    # for fast copy-paste
-    logging.info('\t'.join([
-        f'{eval_features_stats[fname]["mean"]}' for fname in EVAL_SCALAR_FEATURE_NAMES
-    ]))
-
+    # process distribution features
     for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
         eval_features_stats[fname] = dict(sum(
             [Counter(features[fname]) for features in eval_features_per_piece],
@@ -233,6 +226,21 @@ def main():
         ))
         # cast the keys into strings!!! because the reference distribution is read from json, and their keys are strings
         eval_features_stats[fname] = {str(k): v for k, v in eval_features_stats[fname].items()}
+
+    logging.info(
+        '%d notes involved in evaluation.',
+        sum(eval_features_stats['pitch_histogram'].values())
+    )
+    # logging.info('\n'.join([
+    #     f'{fname}: {eval_features_stats[fname]["mean"]} ± {eval_features_stats[fname]["std"]}'
+    #     for fname in EVAL_SCALAR_FEATURE_NAMES
+    # ]))
+    logging.info('\t'.join([
+        f'{fname}' for fname in EVAL_SCALAR_FEATURE_NAMES
+    ]))
+    logging.info('\t'.join([
+        f'{eval_features_stats[fname]["mean"]}' for fname in EVAL_SCALAR_FEATURE_NAMES
+    ]))
 
     if args.reference_file_path != '':
         if os.path.isfile(args.reference_file_path):
@@ -256,10 +264,6 @@ def main():
                     reference_eval_features_stats[fname],
                     ignore_pred_zero=True
                 )
-            logging.info('\n'.join([
-                f'{fname}_KLD: {eval_features_stats[fname+"_KLD"]}'
-                for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
-            ]))
 
             # Overlapping area of estimated gaussian distribution
             for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
@@ -268,10 +272,6 @@ def main():
                     {float(Fraction(k)): v for k, v in eval_features_stats[fname].items()},
                     {float(Fraction(k)): v for k, v in reference_eval_features_stats[fname].items()}
                 )
-            logging.info('\n'.join([
-                f'{fname}_OA: {eval_features_stats[fname+"_OA"]}'
-                for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
-            ]))
 
             # (Normalized) Histogram intersection
             for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
@@ -279,12 +279,13 @@ def main():
                     eval_features_stats[fname],
                     reference_eval_features_stats[fname]
                 )
-            logging.info('\n'.join([
-                f'{fname}_HI: {eval_features_stats[fname+"_HI"]}'
+
+            logging.info('\t'.join([
+                f'{fname}{suffix}'
+                for suffix in ('_KLD', '_OA', '_HI')
                 for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
             ]))
 
-            # for fast copy-paste
             logging.info('\t'.join([
                 f'{eval_features_stats[fname+suffix]}'
                 for suffix in ('_KLD', '_OA', '_HI')
