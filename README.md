@@ -116,9 +116,12 @@ Pythons scripts
 
 Shell scripts
 
+- `evaluate_model_wrapper.py`
+  - Use python's `argparse` module to make using `evaluate_model.sh` easier.
 - `evaluate_model.sh`
-   1. Get evaluation features of the training dataset with the randomly sampled midi files using `get_eval_features_of_midis.py`
-   2. Get evaluation features of the unconditional, instrument-informed, and prime continution generation result of the model using the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`
+   1. Arguments are passed as environment variables
+   2. Get evaluation features of the training dataset with the randomly sampled midi files using `get_eval_features_of_midis.py`
+   3. Get evaluation features of the unconditional, instrument-informed, and prime continution generation result of the model using the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`
 - `experiment_apply_learned_shapes_to_other.sh`
 - `experiment_bpe_parameters.sh`
 - `experiment_full_model_and_ablation.sh`
