@@ -69,7 +69,7 @@ else
         --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
         "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/uncond/uncond"
     duration=$(( $SECONDS - start_time ))
-    echo "Finished. Used time: ${duration} seconds"
+    echo "Finished. Used time: ${duration} seconds" | tee -a $log_path
 fi
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/uncond" | tee -a $log_path 
@@ -96,7 +96,7 @@ else
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/${primer_name}"
     done < $eval_pathlist_file_path
     duration=$(( $SECONDS - start_time ))
-    echo "Finished. Used time: ${duration} seconds"
+    echo "Finished. Used time: ${duration} seconds" | tee -a $log_path
 fi
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/instr-cond" | tee -a $log_path
@@ -123,7 +123,7 @@ else
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/${primer_name}"
     done < $eval_pathlist_file_path
     duration=$(( $SECONDS - start_time ))
-    echo "Finished. Used time: ${duration} seconds"
+    echo "Finished. Used time: ${duration} seconds" | tee -a $log_path
 fi
 
 echo "Get evaluation features of ${model_dir_path}/eval_samples/primer_cont" | tee -a $log_path
