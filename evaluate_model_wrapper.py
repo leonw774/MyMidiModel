@@ -39,6 +39,11 @@ def parse_args():
         nargs='+',
         default=[1.0]
     )
+    parser.add_argument(
+        '--seed',
+        type=int,
+        default=''
+    )
 
     # required
     parser.add_argument(
