@@ -123,6 +123,18 @@ def parse_args():
     return Namespace(**args)
 
 
+def detect_long_silence(piece):
+    consecutive_measure_token_count = 0
+    for t in piece.split(' '):
+        if t[0] == 'M':
+            consecutive_measure_token_count += 1
+        elif t[0] == 'N':
+            consecutive_measure_token_count = 0
+        if consecutive_measure_token_count >= 32:
+            raise AssertionError('Very long silence detected, likely corrupted')
+    return None
+
+
 def handler(args_dict: dict):
     n = args_dict.pop('n', 0)
     midi_file_path  = args_dict.pop('midi_file_path', '')
@@ -134,6 +146,7 @@ def handler(args_dict: dict):
 
     try:
         piece = midi_to_piece(**args_dict)
+        detect_long_silence(piece)
         piece_bytes = piece.encode()
         # return compressed text because memory issue
         return zlib.compress(piece_bytes)
