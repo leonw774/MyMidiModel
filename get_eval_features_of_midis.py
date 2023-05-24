@@ -197,11 +197,13 @@ def main():
 
     logging.info(
         'Done. Sampling %d midi files from %s takes %.3f seconds.',
-        args.sample_number,
+        len(eval_features_per_piece),
         args.midi_dir_path,
         time() - start_time
     )
 
+    eval_features_stats = dict()
+    # process scalar features
     aggr_scalar_eval_features = {
         fname: [
             fs[fname]
@@ -209,9 +211,6 @@ def main():
         ]
         for fname in EVAL_SCALAR_FEATURE_NAMES
     }
-
-    # process scalar features
-    eval_features_stats = dict()
     for fname in EVAL_SCALAR_FEATURE_NAMES:
         fname_description = dict(Series(aggr_scalar_eval_features[fname], dtype='float64').dropna().describe())
         fname_description: Dict[str, np.float64]
@@ -226,15 +225,18 @@ def main():
         ))
         # cast the keys into strings!!! because the reference distribution is read from json, and their keys are strings
         eval_features_stats[fname] = {str(k): v for k, v in eval_features_stats[fname].items()}
-
+    # process other
+    eval_features_stats['notes_number_per_piece'] = [
+        sum(features['pitch_histogram'].values())
+        for features in eval_features_per_piece
+    ]
     logging.info(
-        '%d notes involved in evaluation.',
-        sum(eval_features_stats['pitch_histogram'].values())
+        '%d notes involved in evaluation. Avg. note number per piece: %f ± %f',
+        np.sum(eval_features_stats['notes_number_per_piece']),
+        np.mean(eval_features_stats['notes_number_per_piece']),
+        np.std(eval_features_stats['notes_number_per_piece'])
     )
-    # logging.info('\n'.join([
-    #     f'{fname}: {eval_features_stats[fname]["mean"]} ± {eval_features_stats[fname]["std"]}'
-    #     for fname in EVAL_SCALAR_FEATURE_NAMES
-    # ]))
+
     logging.info('\t'.join([
         f'{fname}' for fname in EVAL_SCALAR_FEATURE_NAMES
     ]))
