@@ -117,8 +117,8 @@ def parse_args():
     train_parser.add_argument(
         '--loss-nonpadding-dim',
         type=str,
-        choices=['token', 'sequence', 'attribute', 'none'],
-        default='none'
+        choices=['all', 'attribute', 'none'],
+        default='all'
     )
     train_parser.add_argument(
         '--lr-peak',
