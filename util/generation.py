@@ -44,23 +44,24 @@ def adjust_probs_with_context(
             probs_list[ATTR_NAME_INDEX['evt']][not_track_indices] = 0
         elif 1 < len(context_text_list) < vocabs.track_numbers.size:
             # only track-instrument and separater allowed
-            not_track_or_sep_indices = [idx for idx in range(vocabs.events.size) if idx not in track_indices]
-            not_track_or_sep_indices.remove(sep_index)
+            not_track_or_sep_indices = [
+                idx
+                for idx in range(vocabs.events.size)
+                if idx not in track_indices and idx != sep_index
+            ]
             probs_list[ATTR_NAME_INDEX['evt']][not_track_or_sep_indices] = 0
             # prevent generating repeating track number
             used_track_number =  [
                 b36str2int(context_text_list[i].split(':')[1]) + 1 # the id of track number is 0:padding, 1:0, 2:1, ...
                 for i in range(1, len(context_text_list))
             ]
-            assert all(t < vocabs.track_numbers.size for t in used_track_number), \
-                f'context_text_list: {context_text_list}\nused_track_number: {used_track_number}'
+            # assert all(t < vocabs.track_numbers.size for t in used_track_number), \
+            #     f'context_text_list: {context_text_list}\nused_track_number: {used_track_number}'
             probs_list[ATTR_NAME_INDEX['trn']][used_track_number] = 0
         else:
             # only separater allowed
             probs_list[ATTR_NAME_INDEX['evt']][:sep_index] = 0
             probs_list[ATTR_NAME_INDEX['evt']][sep_index+1:] = 0
-            # track number doesn't matter
-            # probs_list[ATTR_NAME_INDEX['trn']][list(range(1, len(used_track_number)+1))] = 0
 
     elif is_sep: # if is separater, then only measure tokens are allowed
         for i in range(vocabs.events.size):
@@ -127,13 +128,13 @@ def adjust_probs_with_context(
     return normed_probs_list
 
 
-def nucleus_sampling(probs, threshold):
+def nucleus_sampling(probs: torch.Tensor, threshold: float):
     assert 0 < threshold <= 1.0
     if threshold == 1.0:
         return torch.multinomial(probs, 1)
     sorted_probs, sorted_indices = torch.sort(probs, dim=-1, descending=True)
     cumsum_probs = torch.cumsum(sorted_probs, dim=-1)
-    nucleus_number = sum(cumsum_probs < threshold)
+    nucleus_number = torch.sum(cumsum_probs < threshold)
     if nucleus_number == 0:
         return torch.unsqueeze(sorted_indices[0], dim=0) # returned dimension have to be 1
     nucleus_probs = sorted_probs[:nucleus_number]
