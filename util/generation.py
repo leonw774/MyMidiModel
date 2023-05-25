@@ -52,7 +52,7 @@ def adjust_probs_with_context(
             probs_list[ATTR_NAME_INDEX['evt']][not_track_or_sep_indices] = 0
             # prevent generating repeating track number
             used_track_number =  [
-                b36str2int(context_text_list[i].split(':')[1]) + 1 # the id of track number is 0:padding, 1:0, 2:1, ...
+                b36str2int(context_text_list[i].split(':')[1]) + 1 # the id:value of track number is 0:padding, 1:0, 2:1, ...
                 for i in range(1, len(context_text_list))
             ]
             # assert all(t < vocabs.track_numbers.size for t in used_track_number), \

@@ -1,3 +1,4 @@
+from functools import reduce
 from typing import List, Tuple
 
 import torch
@@ -196,7 +197,8 @@ class MyMidiTransformer(nn.Module):
         # for i, emb in enumerate(embs):
         #     mask = x[..., i].ne(0).float()[..., None].to(x.device)
         #     assert (emb == emb*mask).all(), f'{i}\n{x}\n{emb}\n{mask}\n{emb*mask}'
-        emb_sum = sum(embs)
+        # emb_sum = sum(embs)
+        emb_sum = reduce(torch.add, embs) # cool trick
         emb_sum_dropout = self.embedding_dropout(emb_sum)
         if self.use_linear_attn:
             if self.inferencing:
