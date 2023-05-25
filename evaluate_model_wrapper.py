@@ -42,7 +42,9 @@ def parse_args():
     parser.add_argument(
         '--seed',
         type=int,
-        default=''
+        nargs='?',
+        default='',
+        const=''
     )
 
     # required

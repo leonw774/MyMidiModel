@@ -13,6 +13,7 @@ from typing import List, Dict
 import random
 
 from miditoolkit import MidiFile
+from mido import MidiFile as mido_MidiFile
 import numpy as np
 from pandas import Series
 from tqdm import tqdm
@@ -159,17 +160,18 @@ def main():
 
     args.workers = min(args.workers, dataset_size)
 
-    eval_features_per_piece: List[ Dict[str, float] ] = []
+    sampled_midis_eval_features: List[ Dict[str, float] ] = []
     sample_able_indices = set(range(dataset_size))
-    sampled_midi_file_paths = list()
+    sampled_midi_file_paths = []
+    sampled_midi_length = []
 
     start_time = time()
-    while len(eval_features_per_piece) < args.sample_number and len(sample_able_indices) > 0:
+    while len(sampled_midis_eval_features) < args.sample_number and len(sample_able_indices) > 0:
         if args.sample_number >= len(sample_able_indices):
             random_indices = list(sample_able_indices)
             sample_able_indices.clear()
         else:
-            random_indices = random.sample(list(sample_able_indices), args.sample_number - len(eval_features_per_piece))
+            random_indices = random.sample(list(sample_able_indices), args.sample_number - len(sampled_midis_eval_features))
             sample_able_indices.difference_update(random_indices)
 
         eval_args_dict_list = [
@@ -186,18 +188,23 @@ def main():
                 p.imap(midi_to_features_wrapper, eval_args_dict_list),
                 total=len(random_indices)
             ))
-            sampled_midi_file_paths.extend([
-                file_path_list[idx]
-                for n, idx in enumerate(random_indices)
-                if eval_features[n] is not None
-            ])
-            eval_features = [f for f in eval_features if f is not None]
-            print(f'Processed {len(eval_features)} uncorrupted files out of {len(random_indices)} random indices')
-            eval_features_per_piece += eval_features
+        uncorrupt_midi_file_paths = [
+            file_path_list[idx]
+            for n, idx in enumerate(random_indices)
+            if eval_features[n] is not None
+        ]
+        eval_features = [f for f in eval_features if f is not None]
+        sampled_midis_eval_features += eval_features
+        sampled_midi_file_paths += uncorrupt_midi_file_paths
+        sampled_midi_length += [
+            mido_MidiFile(midi_path).length
+            for midi_path in uncorrupt_midi_file_paths
+        ]
+        print(f'Processed {len(eval_features)} uncorrupted files out of {len(random_indices)} random indices')
 
     logging.info(
         'Done. Sampling %d midi files from %s takes %.3f seconds.',
-        len(eval_features_per_piece),
+        len(sampled_midis_eval_features),
         args.midi_dir_path,
         time() - start_time
     )
@@ -207,7 +214,7 @@ def main():
     aggr_scalar_eval_features = {
         fname: [
             fs[fname]
-            for fs in eval_features_per_piece
+            for fs in sampled_midis_eval_features
         ]
         for fname in EVAL_SCALAR_FEATURE_NAMES
     }
@@ -220,7 +227,7 @@ def main():
     # process distribution features
     for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
         eval_features_stats[fname] = dict(sum(
-            [Counter(features[fname]) for features in eval_features_per_piece],
+            [Counter(features[fname]) for features in sampled_midis_eval_features],
             Counter() # starting value of empty counter
         ))
         # cast the keys into strings!!! because the reference distribution is read from json, and their keys are strings
@@ -228,13 +235,13 @@ def main():
     # process other
     eval_features_stats['notes_number_per_piece'] = [
         sum(features['pitch_histogram'].values())
-        for features in eval_features_per_piece
+        for features in sampled_midis_eval_features
     ]
     logging.info(
-        '%d notes involved in evaluation. Avg. note number per piece: %f ± %f',
+        '%d notes involved in evaluation. Avg. #note per piece: %f. Avg. midi playback time per piece: %f.',
         np.sum(eval_features_stats['notes_number_per_piece']),
         np.mean(eval_features_stats['notes_number_per_piece']),
-        np.std(eval_features_stats['notes_number_per_piece'])
+        np.mean(sampled_midi_length)
     )
 
     logging.info('\t'.join([
