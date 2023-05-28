@@ -50,7 +50,7 @@ else
     # move eval_features.json back to midi dir root
     mv "${eval_primers_dir_path}/eval_features.json" "$eval_primers_feature_file_path"
     # delete eval_primers_dir_path
-    rm -r "$eval_primers_dir_path"
+    # rm -r "$eval_primers_dir_path"
 fi
 
 test -z "$model_dir_path" && exit 0 

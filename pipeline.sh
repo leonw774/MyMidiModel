@@ -220,4 +220,9 @@ python3 evaluate_model_wrapper.py \
     --model-dir-path "$model_dir_path" --num-workers $PROCESS_WORKERS --midi-to-piece-paras "$EVAL_MIDI_TO_PIECE_PARAS_FILE" \
     --log-path "$log_path" --softmax-temperature $SOFTMAX_TEMPERATURE --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --seed $SEED -- \
     "$MIDI_DIR_PATH" $EVAL_SAMPLE_NUMBER $PRIMER_LENGTH
-test $? -eq 0 && echo "All done. pipeline.sh exit." | tee -a "$log_path"
+
+if [$? -ne 0 ]; then
+    echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
+    exit 1
+else
+    echo "All done. pipeline.sh exit." | tee -a "$log_path"
