@@ -151,7 +151,7 @@ def build_vocabs(
     pad_token = [tokens.PADDING_TOKEN_STR]
     pitch_vocab = pad_token + list(map(int2b36str, range(128)))
     duration_vocab = pad_token + list(map(int2b36str, range(1, paras['max_duration']+1))) # add 1 because range end is exclusive
-    velocity_vocab = pad_token + list(map(int2b36str, range(paras['velocity_step']//2, 128, paras['velocity_step'])))
+    velocity_vocab = pad_token + list(map(int2b36str, range(paras['velocity_step'], 128+1, paras['velocity_step'])))
     track_number_vocab = pad_token + list(map(int2b36str, range(paras['max_track_number'])))
     instrument_vocab = pad_token + list(map(int2b36str, range(129)))
     # mps number and measure number are just increasing integer that generated dynamically in corpus.text_to_array
