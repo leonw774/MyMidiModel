@@ -118,7 +118,9 @@ def quantize_velocity(velocty: int, velocity_step: int) -> int:
     # snap
     v = round(velocty / velocity_step) * velocity_step
     # clamp
-    v = min(128, max(velocity_step, v))
+    min_v = velocity_step
+    max_v = int(127 / velocity_step) * velocity_step # use int() to round down
+    v = min(max_v, max(min_v, v))
     return v
 
 

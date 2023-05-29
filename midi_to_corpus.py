@@ -132,7 +132,6 @@ def detect_long_silence(piece):
             consecutive_measure_token_count = 0
         if consecutive_measure_token_count >= 32:
             raise AssertionError('Very long silence detected, likely corrupted')
-    return None
 
 
 def handler(args_dict: dict):
@@ -141,7 +140,7 @@ def handler(args_dict: dict):
     try:
         args_dict['midi'] = MidiFile(midi_file_path)
     except Exception as e:
-        logging.debug('%d pid: %d file path: %s\n', n, os.getpid(), midi_file_path, format_exc())
+        # logging.debug('%d pid: %d file path: %s\n', n, os.getpid(), midi_file_path, format_exc())
         return 'RuntimeError(\'miditoolkit failed to parse the file\')'
 
     try:
@@ -153,7 +152,7 @@ def handler(args_dict: dict):
     except KeyboardInterrupt as e:
         raise e
     except Exception as e:
-        logging.debug('%d pid: %d file path: %s\n%s', n, os.getpid(), midi_file_path, format_exc())
+        # logging.debug('%d pid: %d file path: %s\n%s', n, os.getpid(), midi_file_path, format_exc())
         # if not (repr(e).startswith('Assert') or repr(e).startswith('Runtime')):
         #     print(f'{n} pid: {os.getpid()} file path: {args_dict["midi_file_path"]}')
         #     print(format_exc())
