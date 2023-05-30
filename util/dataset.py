@@ -32,7 +32,7 @@ class MidiDataset(Dataset):
 
             - virtaul_piece_step_ratio: If > 0, will create multiple virtual pieces by splitting overlength pieces.
               The start point of samples will be at the first measure token that has index just greater than
-              max_seq_length * virtaul_piece_step_ratio * N, where N is positive integer. Default is -1.
+              max_seq_length * virtaul_piece_step_ratio * N, where N is positive integer. Default is 0.
 
             - permute_mps: Whether or not the dataset should permute all the maximal permutable subsequences
               before returning in `__getitem__`. Default is False.
