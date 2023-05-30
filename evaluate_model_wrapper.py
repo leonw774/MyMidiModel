@@ -78,6 +78,7 @@ def main():
         ['./evaluate_model.sh'],
         check=True
     )
+    return 0
 
 if __name__ == '__main__':
     exit_code = main()

@@ -1,5 +1,6 @@
 from typing import List, Tuple, Union
 
+import numpy as np
 import torch
 from torch.nn import functional as F
 from tqdm import tqdm
@@ -11,6 +12,23 @@ from .vocabs import Vocabs
 from .corpus import (ATTR_NAME_INDEX, ALL_ATTR_NAMES, ESSENTAIL_ATTR_NAMES, OUTPUTABLE_ATTR_NAMES,
                      array_to_text_list, text_list_to_array)
 from .model import MyMidiTransformer
+
+
+# the same code from `dataset.py`
+def permute_track_number(array: np.ndarray, track_number_size: int) -> np.ndarray:
+    max_track_number = track_number_size - 1
+    # add one because there is a padding token at the beginning of the vocab
+    perm = np.random.permutation(track_number_size-1) + 1
+    # view track number col
+    new_array = array.copy()
+    piece_trn_column = new_array[:, ATTR_NAME_INDEX['trn']]
+    piece_trn_column_expand = np.asarray([
+        (piece_trn_column == i + 1) for i in range(max_track_number)
+    ])
+    # permute track number
+    for i in range(max_track_number):
+        piece_trn_column[piece_trn_column_expand[i]] = perm[i]
+    return new_array
 
 
 def adjust_probs_with_context(

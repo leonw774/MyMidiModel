@@ -69,6 +69,10 @@ def parse_args():
         type=int
     )
     model_parser.add_argument(
+        '--not-use-mps-number',
+        action='store_true',
+    )
+    model_parser.add_argument(
         '--input-context',
         action='store_true',
     )
@@ -422,6 +426,7 @@ def main():
         vocabs=vocabs,
         max_seq_length=args.data.max_seq_length,
         permute_mps=args.data.permute_mps,
+        permute_track_number=args.data.permute_track_number,
         **vars(args.model)
     )
     if is_main_process:

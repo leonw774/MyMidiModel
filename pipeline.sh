@@ -84,14 +84,14 @@ if [ "$do_midi_to_corpus" == true ]; then
     python3 midi_to_corpus.py --nth $NTH --max-track-number $MAX_TRACK_NUMBER --max-duration $MAX_DURATION --velocity-step $VELOCITY_STEP \
         --tempo-quantization $TEMPO_MIN $TEMPO_MAX $TEMPO_STEP --position-method $POSITION_METHOD $midi_to_corpus_other_args $use_existed \
         --log "$log_path" -w $PROCESS_WORKERS -r -o "$corpus_dir_path" "$MIDI_DIR_PATH"
-    test $? -ne 0 && { echo "midi_to_text.py failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+    test "$?" -ne 0 && { echo "midi_to_text.py failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
 fi
 
 if [ "$do_bpe" == true ]; then
     echo "Start learn bpe vocab" | tee -a "$log_path"
     # compile
     make -C ./bpe
-    test $? -ne 0 && { echo "Compile error. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+    test "$?" -ne 0 && { echo "Compile error. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
 
     # create new dir 
     if [ -d "$bpe_corpus_dir_path" ]; then
@@ -133,7 +133,7 @@ if [ -n "${BPE_ITER_NUM+x}" ] && [ $BPE_ITER_NUM -ne 0 ]; then
 fi
 
 python3 make_arrays.py --debug $BPE_OPTION --mp-worker-number $PROCESS_WORKERS --log "$log_path" "$corpus_dir_path" $use_existed
-test $? -ne 0 && { echo "text_to_array.py failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+test "$?" -ne 0 && { echo "text_to_array.py failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
 
 ######## TRAIN MODEL ########
 
@@ -158,25 +158,26 @@ train_other_args=""
 if [ "$USE_PERMUTABLE_SUBSEQ_LOSS" == true ]; then
     python3 -c "import torch;import mps_loss" 2>&1 | grep ModuleNotFoundError
     # if module not exist, install
-    if [ $? -eq 0 ]; then
+    if [ "$?" -eq 0 ]; then
         cd util/pytorch/mps_loss
         python3 setup.py install
         cd ../../..
         # check if success
         python3 -c "import torch;import mps_loss" 2>&1 | grep ModuleNotFoundError
-        test $? -eq 0 && { echo "mps_loss extension setup failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+        test "$?" -eq 0 && { echo "mps_loss extension setup failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
     fi
     train_other_args="$train_other_args --use-permutable-subseq-loss"
 fi
 test "$PERMUTE_MPS" == true            && train_other_args="$train_other_args --permute-mps"
 test "$PERMUTE_TRACK_NUMBER" == true   && train_other_args="$train_other_args --permute-track-number"
 test "$USE_LINEAR_ATTENTION" == true   && train_other_args="$train_other_args --use-linear-attn"
+test "$NOT_USE_MPS_NUMBER" == true     && train_other_args="$train_other_args --not-use-mps-number"
 test "$INPUT_CONTEXT" == true          && train_other_args="$train_other_args --input-context"
 test "$INPUT_INSTRUMENTS" == true      && train_other_args="$train_other_args --input-instruments"
 test "$OUTPUT_INSTRUMENTS" == true     && train_other_args="$train_other_args --output-instruments"
 test -n "$MAX_PIECE_PER_GPU"           && train_other_args="$train_other_args --max-pieces-per-gpu $MAX_PIECE_PER_GPU"
 test -n "$SEED"                        && train_other_args="$train_other_args --seed $SEED"
-test -n "$train_other_args" && { echo "Appended $train_other_args to train.py's argument" | tee -a "$log_path" ; }
+test -n "$train_other_args" && { echo "Appended '$train_other_args' to train.py's argument" | tee -a "$log_path" ; }
 
 if [ "$USE_PARALLEL" == true ]; then
     num_CUDA_VISIBLE_DEVICE=$(echo $CUDA_VISIBLE_DEVICES | tr -cd , | wc -c ;)
@@ -205,7 +206,7 @@ $launch_command train.py \
     --lr-decay-end-updates $LEARNING_RATE_DECAY_END_UPDATES --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
     --use-device $USE_DEVICE --primer-measure-length $PRIMER_LENGTH --log "$log_path" $train_other_args "$corpus_dir_path" "$model_dir_path"
 
-test $? -ne 0 && { echo "training failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+test "$?" -ne 0 && { echo "Training failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
 
 ######## EVALUATION ########
 
@@ -221,8 +222,5 @@ python3 evaluate_model_wrapper.py \
     --log-path "$log_path" --softmax-temperature $SOFTMAX_TEMPERATURE --nucleus-sampling-threshold $NUCLEUS_THRESHOLD --seed $SEED -- \
     "$MIDI_DIR_PATH" $EVAL_SAMPLE_NUMBER $PRIMER_LENGTH
 
-if [$? -ne 0 ]; then
-    echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
-    exit 1
-else
-    echo "All done. pipeline.sh exit." | tee -a "$log_path"
+test "$?" -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+echo "All done. pipeline.sh exit." | tee -a "$log_path"

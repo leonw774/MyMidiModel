@@ -38,9 +38,11 @@ class MyMidiTransformer(nn.Module):
             use_linear_attn: bool,
             max_seq_length: int,
             permute_mps: bool,
+            permute_track_number: bool,
             layers_number: int,
             attn_heads_number: int,
             embedding_dim: int,
+            not_use_mps_number: bool,
             input_context: bool,
             input_instruments: bool,
             output_instruments: bool,
@@ -53,9 +55,13 @@ class MyMidiTransformer(nn.Module):
         self.vocabs: Vocabs = vocabs
         self.max_seq_length = max_seq_length
         self.permute_mps = permute_mps
+        self.permute_track_number = permute_track_number
+
         self.layers_number = layers_number
         self.attn_heads_number = attn_heads_number
         self.embedding_dim = embedding_dim
+
+        self.not_use_mps_number = not_use_mps_number
         self.input_context = input_context
         self.input_instruments = input_instruments
         self.output_instruments = output_instruments
@@ -66,6 +72,8 @@ class MyMidiTransformer(nn.Module):
         ######## Inputs
 
         self.input_attr_names = list(ALL_ATTR_NAMES) # make copy
+        if not_use_mps_number:
+            self.input_attr_names.remove('mps_numbers')
         if input_context:
             if input_instruments:
                 pass
@@ -87,7 +95,7 @@ class MyMidiTransformer(nn.Module):
             for idx in self.input_attrs_indices
         ]
 
-        self.embeddings = nn.ModuleList([
+        self.embedding_layers = nn.ModuleList([
             nn.Embedding(
                 num_embeddings=vsize,
                 embedding_dim=embedding_dim,
@@ -97,6 +105,13 @@ class MyMidiTransformer(nn.Module):
             )
             for vsize in self.embedding_vocabs_size
         ])
+        if not_use_mps_number:
+            self.positional_embedding_layer = nn.Embedding(
+                num_embeddings=self.max_seq_length,
+                embedding_dim=embedding_dim
+            )
+        else:
+            self.positional_embedding_layer = None
         self.embedding_dropout = nn.Dropout(embedding_dropout_rate)
 
         ######## Outputs
@@ -167,7 +182,7 @@ class MyMidiTransformer(nn.Module):
         self.apply(self._init_weights)
         # set padding vectors to zeros because the _init_weights set it to something else
         with torch.no_grad():
-            for emb_layer in self.embeddings:
+            for emb_layer in self.embedding_layers:
                 emb_layer.weight.data[0].zero_()
 
     # copied from SymphonyNet
@@ -193,12 +208,18 @@ class MyMidiTransformer(nn.Module):
         if self.use_linear_attn and self.inferencing:
             # The recurrent model only need to receive the last element with size of (batch_size, embed_size)
             x = x[:, -1:] # become (batch_size, 1, embed_size)
-        embs = [emb(x[..., i]) for i, emb in enumerate(self.embeddings)]
+        embs = [emb(x[..., i]) for i, emb in enumerate(self.embedding_layers)]
         # for i, emb in enumerate(embs):
         #     mask = x[..., i].ne(0).float()[..., None].to(x.device)
         #     assert (emb == emb*mask).all(), f'{i}\n{x}\n{emb}\n{mask}\n{emb*mask}'
         # emb_sum = sum(embs)
         emb_sum = reduce(torch.add, embs) # cool trick
+        if self.not_use_mps_number:
+            potision_number = torch.arange(x.size(1)).repeat((x.size(0), 1))
+            # potision_number has shape (batch_size, seq_size)
+            pos_emb = self.positional_embedding_layer(potision_number)
+            emb_sum = emb_sum + pos_emb
+
         emb_sum_dropout = self.embedding_dropout(emb_sum)
         if self.use_linear_attn:
             if self.inferencing:

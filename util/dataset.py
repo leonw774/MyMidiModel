@@ -232,7 +232,7 @@ class MidiDataset(Dataset):
         if self.permute_track_number:
             max_track_number = self.vocabs.track_numbers.size - 1
             # add one because there is a padding token at the beginning of the vocab
-            perm_array = np.random.permutation(self.vocabs.track_numbers.size-1) + 1
+            perm = np.random.permutation(self.vocabs.track_numbers.size-1) + 1
             # view track number col
             piece_trn_column = sampled_array[:, ATTR_NAME_INDEX['trn']]
             piece_trn_column_expand = np.asarray([
@@ -240,7 +240,7 @@ class MidiDataset(Dataset):
             ])
             # permute track number
             for i in range(max_track_number):
-                piece_trn_column[piece_trn_column_expand[i]] = perm_array[i]
+                piece_trn_column[piece_trn_column_expand[i]] = perm[i]
 
 
         if self.permute_mps:

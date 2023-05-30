@@ -13,7 +13,7 @@ from util.midi import midi_to_piece, piece_to_midi, get_first_k_measures, get_fi
 from util.corpus_reader import CorpusReader
 from util.corpus import text_list_to_array, to_corpus_file_path, to_paras_file_path, dump_corpus_paras, get_full_array_string
 from util.model import MyMidiTransformer
-from util.generation import generate_piece
+from util.generation import generate_piece, permute_track_number
 
 def read_args():
     parser = ArgumentParser()
@@ -248,6 +248,8 @@ def main():
 
         # turn primer text list into array
         primer_seq = text_list_to_array(primer_text_list, vocabs=model.vocabs)
+        if model.permute_track_number:
+            primer_seq = permute_track_number(primer_seq, model.vocabs.track_numbers.size)
         primer_seq = np.expand_dims(primer_seq, axis=0).astype(np.int32)
         primer_seq = torch.from_numpy(primer_seq)
 
