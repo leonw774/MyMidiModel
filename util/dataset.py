@@ -20,7 +20,7 @@ class MidiDataset(Dataset):
             self,
             data_dir_path: str,
             max_seq_length: int,
-            measure_sample_step_ratio: float = 0,
+            virtaul_piece_step_ratio: float = 0,
             permute_mps: bool = False,
             permute_track_number: bool = False,
             pitch_augmentation_range: int = 0,
@@ -30,25 +30,25 @@ class MidiDataset(Dataset):
             Parameters:
             - data_dir_path: Expected to have 'data.npz' and 'vocabs.json'
 
-            - measure_sample_step_ratio: If > 0, will create multiple virtual pieces by sampling overlength pieces.
-              The start point of samples will be at the first measure token that has index not smaller than
-              max_seq_length * measure_sample_step_ratio * N, where N is positive integer. Default is -1.
+            - virtaul_piece_step_ratio: If > 0, will create multiple virtual pieces by splitting overlength pieces.
+              The start point of samples will be at the first measure token that has index just greater than
+              max_seq_length * virtaul_piece_step_ratio * N, where N is positive integer. Default is -1.
 
-            - permute_mps: Whether or not the dataset should permute all the *maximal permutable subsequences* and
-              ignore the ascending track-number rule, before returning in `__getitem__`. Default is False.
+            - permute_mps: Whether or not the dataset should permute all the maximal permutable subsequences
+              before returning in `__getitem__`. Default is False.
 
             - permute_track_number: Permute all the track numbers relative to the instruments, as data augmentation.
-              This would not break the ascending track-number rule. Default is False.
+              Default is False.
 
             - pitch_augmentation_range: If set to P, will add a random value from -P to +P on all pitch values
-              as data augmentation. Default is False.
+              as data augmentation. Default is 0.
         """
 
         self.vocabs = get_corpus_vocabs(data_dir_path)
         assert max_seq_length >= 0
         self.max_seq_length = max_seq_length
-        assert 0 <= measure_sample_step_ratio <= 1
-        self.measure_sample_step_ratio = measure_sample_step_ratio
+        assert 0 <= virtaul_piece_step_ratio <= 1
+        self.virtaul_piece_step_ratio = virtaul_piece_step_ratio
         assert isinstance(permute_mps, bool)
         self.permute_mps = permute_mps
         assert isinstance(permute_track_number, bool)
@@ -103,7 +103,7 @@ class MidiDataset(Dataset):
 
         # the default zeros will be replaced by body start index
         self._piece_body_start_index = [0] * self.number_of_pieces
-        virtual_piece_step = max(1, int(max_seq_length * measure_sample_step_ratio))
+        virtual_piece_step = max(1, int(max_seq_length * virtaul_piece_step_ratio))
         self._virtual_piece_start_index = [[0] for _ in range(self.number_of_pieces)]
 
         self._file_mps_sep_indices = [[] for _ in range(self.number_of_pieces)]
@@ -125,7 +125,7 @@ class MidiDataset(Dataset):
             self._virtual_piece_start_index[filenum][0] = j + 1
 
             # create virtual pieces from overlength pieces
-            if measure_sample_step_ratio > 0:
+            if virtaul_piece_step_ratio > 0:
                 if self.pieces[filename].shape[0] > max_seq_length:
                     measure_indices = list(
                         np.flatnonzero(

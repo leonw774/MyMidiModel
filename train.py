@@ -33,7 +33,7 @@ def parse_args():
         type=int
     )
     data_parser.add_argument(
-        '--measure-sample-step-ratio',
+        '--virtaul-piece-step-ratio',
         type=float,
         default=0.25
     )
