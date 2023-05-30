@@ -77,7 +77,7 @@ std::string itob36str(int x);
 
 std::string shape2str(const Shape& s);
 
-unsigned int findMaxRelOffset(const Shape& s);
+unsigned int getMaxRelOffset(const Shape& s);
 
 std::vector<Shape> getDefaultShapeDict();
 
@@ -88,7 +88,7 @@ struct MultiNote {
     uint32_t onset;
     static const uint32_t onsetLimit = 0xffffffff;
     // shapeIndex:  Use 16 bits. The index of shape in the shapeDict.
-    //              0: DEFAULT_SHAPE_END, 1: DEFAULT_SHAPE_CONT
+    //              0: DEFAULT_SHAPE_REGULAR, 1: DEFAULT_SHAPE_CONT
     //              This mean iterNum cannot be greater than 0xffff - 2 = 65534
     uint16_t shapeIndex;
     static const uint16_t shapeIndexLimit = 0xffff - 2;

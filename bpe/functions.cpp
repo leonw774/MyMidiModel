@@ -81,7 +81,7 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // printTrack(corpus.piecesMN[i][j], shapeDict, k, 1);
                 unsigned int onsetTime = corpus.piecesMN[i][j][k].onset;
-                unsigned int maxRelOffset = findMaxRelOffset(shapeDict[corpus.piecesMN[i][j][k].shapeIndex]);
+                unsigned int maxRelOffset = getMaxRelOffset(shapeDict[corpus.piecesMN[i][j][k].shapeIndex]);
                 unsigned int offsetTime = corpus.piecesMN[i][j][k].onset + maxRelOffset * corpus.piecesMN[i][j][k].unit;
                 unsigned int immdFollowOnset = -1;
                 int n = 1;

@@ -12,8 +12,8 @@ RelNote::RelNote(uint8_t c, uint8_t o, uint8_t p, uint8_t d) {
     relDur = d;
 }
 
+// sort on onset first, and then pitch, finally duration.
 bool RelNote::operator < (const RelNote& rhs) const {
-    // sort on onset first, and then pitch, finally duration.
     if (getRelOnset() == rhs.getRelOnset()) {
         if (relPitch == rhs.relPitch) {
             if (relDur == rhs.relDur) {
@@ -81,12 +81,12 @@ std::string shape2str(const Shape& s) {
 
 std::vector<Shape> getDefaultShapeDict() {
     return {
-        {RelNote(0, 0, 0, 1)}, // DEFAULT_SHAPE_END
+        {RelNote(0, 0, 0, 1)}, // DEFAULT_SHAPE_REGULAR
         {RelNote(1, 0, 0, 1)}  // DEFAULT_SHAPE_CONT
     };
-} 
+}
 
-unsigned int findMaxRelOffset(const Shape& s) {
+unsigned int getMaxRelOffset(const Shape& s) {
     unsigned int maxRelOffset = s[0].getRelOnset() + s[0].relDur;
     for (int i = 1; i < s.size(); ++i) {
         if (maxRelOffset < s[i].getRelOnset() + s[i].relDur) {
