@@ -1,7 +1,7 @@
 import bisect
 import os
 import sys
-from typing import List, Tuple, Union
+from typing import List
 import zipfile
 
 import numpy as np
@@ -139,7 +139,7 @@ class MidiDataset(Dataset):
                             break
                         if m_idx > virtual_piece_step * start_vp_num:
                             self._virtual_piece_start_index[filenum].append(m_idx)
-                            start_vp_num += 1
+                            start_vp_num += ((virtual_piece_step * start_vp_num) - m_idx) // start_vp_num
 
             if permute_mps:
                 # consider sequence: M  P  N  N  N  P  N  N  P  N  M  P  N  N
