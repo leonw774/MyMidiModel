@@ -173,6 +173,8 @@ class MyMidiTransformer(nn.Module):
             layer = nn.TransformerEncoderLayer(
                 d_model=embedding_dim,
                 nhead=attn_heads_number,
+                dim_feedforward=4*embedding_dim,
+                dropout=0.1,
                 batch_first=True
             )
             self.transformer_decoder = nn.TransformerEncoder(

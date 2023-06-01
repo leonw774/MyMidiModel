@@ -1,4 +1,5 @@
 import bisect
+import math
 import os
 import sys
 from typing import List
@@ -139,7 +140,7 @@ class MidiDataset(Dataset):
                             break
                         if m_idx > virtual_piece_step * start_vp_num:
                             self._virtual_piece_start_index[filenum].append(m_idx)
-                            start_vp_num += ((virtual_piece_step * start_vp_num) - m_idx) // start_vp_num
+                            start_vp_num += math.ceil(((virtual_piece_step * start_vp_num) - m_idx) / start_vp_num)
 
             if permute_mps:
                 # consider sequence: M  P  N  N  N  P  N  N  P  N  M  P  N  N
