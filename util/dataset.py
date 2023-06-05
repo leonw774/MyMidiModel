@@ -61,8 +61,8 @@ class MidiDataset(Dataset):
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
         all_pathlist = [p.strip() for p in open(os.path.join(data_dir_path, 'pathlist'), 'r', encoding='utf8').readlines()]
         if test_pathlist != '':
-            if os.path.exists(test_pathlist):
-                test_pathlist = [p.strip() for p in open(test_pathlist, 'r', encoding='utf8').readlines()]
+            assert os.path.exists(test_pathlist):
+            test_pathlist = [p.strip() for p in open(test_pathlist, 'r', encoding='utf8').readlines()]
         if verbose:
             print('Reading', npz_path)
         available_memory_size = psutil.virtual_memory().available
