@@ -2,10 +2,10 @@
 
 # experiment on applying vocabulary from corpus A to corpus B
 base_path="data/corpus/experiment_apply_learned_bpe_on_other"
-lmd_orig_path="data/corpus/lmd_full_nth32_r32_d32_v16_t24_200_16"
-lmd_bpe_path="data/corpus/lmd_full_nth32_r32_d32_v16_t24_200_16_bpe128_ours_1.0"
-snd_orig_path="data/corpus/snd_nth32_r32_d32_v16_t24_200_16"
-snd_bpe_path="data/corpus/snd_nth32_r32_d32_v16_t24_200_16_bpe128_ours_1.0"
+lmd_orig_path="data/corpus/lmd_full_nth32_r40_d32_v16_t24_200_16"
+lmd_bpe_path="data/corpus/lmd_full_nth32_r40_d32_v16_t24_200_16_bpe128_ours_1.0"
+snd_orig_path="data/corpus/snd_nth32_r40_d32_v16_t24_200_16"
+snd_bpe_path="data/corpus/snd_nth32_r40_d32_v16_t24_200_16_bpe128_ours_1.0"
 rm -r $base_path
 mkdir $base_path
 mkdir "${base_path}/corpus"
