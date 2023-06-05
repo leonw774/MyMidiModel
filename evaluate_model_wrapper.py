@@ -53,7 +53,7 @@ def parse_args():
         type=str,
     )
     parser.add_argument(
-        'sample_number',
+        'test_pathlist',
         type=int
     )
     parser.add_argument(

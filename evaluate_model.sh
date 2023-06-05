@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # check required variables
-if [ -z "$midi_dir_path" ] || [ -z "$test_pathlist_file_path" ] || [ -z "$primer_measure_length" ] ; then
+if [ -z "$midi_dir_path" ] || [ -z "$test_pathlist" ] || [ -z "$primer_measure_length" ] ; then
     echo "var1=value1 var2=value2 [...] varN=valueN ./evaluate_model.sh"
     echo "Required variables:"
-    echo -e "\tmidi_dir_path test_pathlist_file_path primer_measure_length"
+    echo -e "\tmidi_dir_path test_pathlist primer_measure_length"
     echo "Optional variables:"
     echo -e "\tmodel_dir_path num_workers log_path midi_to_piece_paras softmax_temperature nucleus_sampling_threshold seed"
     exit 1
@@ -19,10 +19,10 @@ test -z "$nucleus_sampling_threshold" && nucleus_sampling_threshold=1.0
 test -n "$seed" && seed_option="--seed $seed"
 test -n "$midi_to_piece_paras" && midi_to_piece_paras_option="--midi-to-piece-paras ${midi_to_piece_paras}"
 
-sample_number=$(wc -l < $test_pathlist_file_path)
+sample_number=$(wc -l < $test_pathlist)
 
 echo "evaluated_model.sh start." | tee -a "$log_path"
-echo "midi_dir_path=${midi_dir_path} test_pathlist_file_path=${test_pathlist_file_path} primer_measure_length=${primer_measure_length} sample_number=${sample_number}" | tee -a "$log_path"
+echo "midi_dir_path=${midi_dir_path} test_pathlist=${test_pathlist} primer_measure_length=${primer_measure_length} sample_number=${sample_number}" | tee -a "$log_path"
 echo "model_dir_path=${model_dir_path} midi_to_piece_paras_option=${midi_to_piece_paras_option} seed_option=${seed_option}" | tee -a "$log_path"
 echo "num_workers=${num_workers} log_path=${log_path} softmax_temperature=${softmax_temperature} nucleus_sampling_threshold=${nucleus_sampling_threshold}" | tee -a "$log_path"
 
@@ -40,7 +40,7 @@ else
     mkdir "$primers_dir_path"
     while read test_midi_path; do
         cp "$midi_dir_path/$test_midi_path" "$primers_dir_path"
-    done < $test_pathlist_file_path
+    done < $test_pathlist
 
     echo "Getting evaluation features of $midi_dir_path" | tee -a "$log_path" 
     python3 get_eval_features_of_midis.py $seed_option $midi_to_piece_paras_option --log $log_path --sample-number $sample_number \
@@ -91,14 +91,14 @@ else
     echo "Generating $sample_number instrument-conditioned samples" | tee -a "$log_path"
     mkdir "${model_dir_path}/eval_samples/instr_cond"
     start_time=$SECONDS
-    # Loop each line in test_pathlist_file_path
+    # Loop each line in test_pathlist
     while read eval_sample_midi_path; do
         echo "Primer file: $eval_sample_midi_path"
         primer_name=$(basename "$eval_sample_midi_path" .mid)
         python3 generate_with_model.py $seed_option -p "$eval_sample_midi_path" -l 0 --no-tqdm \
             --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/${primer_name}"
-    done < $test_pathlist_file_path
+    done < $test_pathlist
     duration=$(( $SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
 fi
@@ -118,14 +118,14 @@ else
     echo "Generating $sample_number prime-continuation samples" | tee -a "$log_path"
     mkdir "${model_dir_path}/eval_samples/primer_cont"
     start_time=$SECONDS
-    # Loop each line in test_pathlist_file_path
+    # Loop each line in test_pathlist
     while read eval_sample_midi_path; do
         echo "Primer file: $eval_sample_midi_path"
         primer_name=$(basename "$eval_sample_midi_path" .mid)
         python3 generate_with_model.py $seed_option -p "$eval_sample_midi_path" -l $primer_measure_length --no-tqdm \
             --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/${primer_name}"
-    done < $test_pathlist_file_path
+    done < $test_pathlist
     duration=$(( $SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
 fi
