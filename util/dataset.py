@@ -70,18 +70,21 @@ class MidiDataset(Dataset):
         array_memory_size = sum([zinfo.file_size for zinfo in npz_zipinfo_list])
         if array_memory_size >= available_memory_size - 4e9: # keep 4G for other things
             if verbose:
-                print('Memory size not enough, using NPZ mmap.')
-                print('available memory size:', available_memory_size, 'arrays memory size:', array_memory_size)
-            self.pieces = np.load(npz_path)
+                print('Memory size not enough. Panic')
+                raise OSError('Memory size not enough. Panic')
         else:
             # load into memory to be faster
             if verbose:
                 print('Loading arrays to memory')
             npz_file = np.load(npz_path)
+            self.non_test_filenums = [
+                filenum
+                for filenum, midi_filepath in enumerate(all_pathlist)
+                if not any(midi_filepath.endswith(test_path) for test_path in test_pathlist)
+            ]
             self.pieces = {
                 str(filenum): npz_file[str(filenum)]
-                for filenum, midi_filepath in tqdm(enumerate(all_pathlist), disable=not verbose, ncols=0)
-                if not any(midi_filepath.endswith(test_path) for test_path in test_pathlist)
+                for filenum in tqdm(self.non_test_filenums, disable=not verbose, ncols=0)
             }
         self.number_of_pieces = len(self.pieces)
 
@@ -119,17 +122,17 @@ class MidiDataset(Dataset):
         self._pitch_augmentation_factor = self.pitch_augmentation_range * 2 + 1 # length of (-pa, ..., -1, 0, 1, ..., pa)
 
         cur_index = -1 # <-- !!! because the first element we add should become index 0
-        for filenum in tqdm(range(self.number_of_pieces), disable=not verbose, ncols=0):
+        for idx, filenum in tqdm(enumerate(self.non_test_filenums), disable=not verbose, ncols=0):
             filename = str(filenum)
 
             cur_piece_lengths = int(self.pieces[filename].shape[0])
-            self._piece_lengths[filenum] = cur_piece_lengths
+            self._piece_lengths[idx] = cur_piece_lengths
 
             j = 2 # because first token is BOS and second must be track as we excluded all empty midis
-            while self.pieces[str(filenum)][j][ATTR_NAME_INDEX['evt']] != self._sep_id:
+            while self.pieces[filename][j][ATTR_NAME_INDEX['evt']] != self._sep_id:
                 j += 1
-            self._piece_body_start_index[filenum] = j + 1
-            self._virtual_piece_start_index[filenum][0] = j + 1
+            self._piece_body_start_index[idx] = j + 1
+            self._virtual_piece_start_index[idx][0] = j + 1
 
             # create virtual pieces from overlength pieces
             if virtaul_piece_step_ratio > 0:
@@ -145,7 +148,7 @@ class MidiDataset(Dataset):
                         if m_idx > cur_piece_lengths - virtual_piece_step:
                             break
                         if m_idx > virtual_piece_step * vp_step_num:
-                            self._virtual_piece_start_index[filenum].append(m_idx)
+                            self._virtual_piece_start_index[idx].append(m_idx)
                             vp_step_num += math.ceil((m_idx - (virtual_piece_step * vp_step_num)) / vp_step_num)
 
             if permute_mps:
@@ -162,7 +165,7 @@ class MidiDataset(Dataset):
                     body_mps_sep_indices,
                     np.array([self.pieces[filename].shape[0]]) # the EOS
                 ])
-                self._file_mps_sep_indices[filenum] = mps_sep_indices
+                self._file_mps_sep_indices[idx] = mps_sep_indices
 
             if self.pitch_augmentation_range != 0:
                 is_multinote_token = (self.pieces[filename][:, ATTR_NAME_INDEX['pit']]) != 0
@@ -170,10 +173,10 @@ class MidiDataset(Dataset):
                 # but different percussion sound
                 # assume instrument vocabulary is 0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
                 not_percussion_notes = (self.pieces[filename][:, ATTR_NAME_INDEX['ins']]) != 129
-                self._augmentable_pitches[filenum] = np.logical_and(is_multinote_token, not_percussion_notes)
+                self._augmentable_pitches[idx] = np.logical_and(is_multinote_token, not_percussion_notes)
 
-            cur_index += len(self._virtual_piece_start_index[filenum]) * self._pitch_augmentation_factor
-            self._filenum_indices[filenum] = cur_index
+            cur_index += len(self._virtual_piece_start_index[idx]) * self._pitch_augmentation_factor
+            self._filenum_indices[idx] = cur_index
         self._max_index = cur_index
 
         if verbose:
