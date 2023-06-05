@@ -239,7 +239,7 @@ class MyMidiTransformer(nn.Module):
                 )
         else:
             # in pytorch's official implementation, True is masked, False is keep
-            causal_mask = self.causal_mask[:x.shape[1], :x.shape[1]].to(x.device)
+            causal_mask = self.causal_mask[:x.size(1), :x.size(1)].to(x.device)
             length_mask = x[..., 0].eq(0).to(x.device)
             transformer_output = self.transformer_decoder(
                 emb_sum_dropout,
