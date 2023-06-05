@@ -61,7 +61,7 @@ class MidiDataset(Dataset):
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
         all_pathlist = [p.strip() for p in open(os.path.join(data_dir_path, 'pathlist'), 'r', encoding='utf8').readlines()]
         if test_pathlist != '':
-            assert os.path.exists(test_pathlist):
+            assert os.path.exists(test_pathlist)
             test_pathlist = [p.strip() for p in open(test_pathlist, 'r', encoding='utf8').readlines()]
         if verbose:
             print('Reading', npz_path)
