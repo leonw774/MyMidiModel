@@ -20,6 +20,7 @@ class MidiDataset(Dataset):
     def __init__(
             self,
             data_dir_path: str,
+            test_pathlist: str,
             max_seq_length: int,
             virtaul_piece_step_ratio: float = 0,
             permute_mps: bool = False,
@@ -29,7 +30,7 @@ class MidiDataset(Dataset):
         ) -> None:
         """
             Parameters:
-            - data_dir_path: Expected to have 'data.npz' and 'vocabs.json'
+            - data_dir_path: Expected to have 'arrays.npz', 'pathlist' and 'vocabs.json'
 
             - virtaul_piece_step_ratio: If > 0, will create multiple virtual pieces by splitting overlength pieces.
               The start point of samples will be at the first measure token that has index just greater than
@@ -58,6 +59,10 @@ class MidiDataset(Dataset):
         self.pitch_augmentation_range = pitch_augmentation_range
 
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
+        all_pathlist = [p.strip() for p in open(os.path.join(data_dir_path, 'pathlist'), 'r', encoding='utf8').readlines()]
+        if test_pathlist != '':
+            if os.path.exists(test_pathlist):
+                test_pathlist = [p.strip() for p in open(test_pathlist, 'r', encoding='utf8').readlines()]
         if verbose:
             print('Reading', npz_path)
         available_memory_size = psutil.virtual_memory().available
@@ -75,7 +80,8 @@ class MidiDataset(Dataset):
             npz_file = np.load(npz_path)
             self.pieces = {
                 str(filenum): npz_file[str(filenum)]
-                for filenum in tqdm(range(len(npz_file)), disable=not verbose, ncols=0)
+                for filenum, midi_filepath in tqdm(enumerate(all_pathlist), disable=not verbose, ncols=0)
+                if not any(midi_filepath.endswith(test_path) for test_path in test_pathlist)
             }
         self.number_of_pieces = len(self.pieces)
 
@@ -133,14 +139,14 @@ class MidiDataset(Dataset):
                             np.isin(self.pieces[filename][:, ATTR_NAME_INDEX['evt']], self._measure_ids)
                         )
                     )
-                    start_vp_num = 1
+                    vp_step_num = 1
                     for m_idx in measure_indices:
                         # the virtual piece can not be shorter than virtual_piece_step
                         if m_idx > cur_piece_lengths - virtual_piece_step:
                             break
-                        if m_idx > virtual_piece_step * start_vp_num:
+                        if m_idx > virtual_piece_step * vp_step_num:
                             self._virtual_piece_start_index[filenum].append(m_idx)
-                            start_vp_num += math.ceil(((virtual_piece_step * start_vp_num) - m_idx) / start_vp_num)
+                            vp_step_num += math.ceil((m_idx - (virtual_piece_step * vp_step_num)) / vp_step_num)
 
             if permute_mps:
                 # consider sequence: M  P  N  N  N  P  N  N  P  N  M  P  N  N

@@ -12,3 +12,4 @@ TEMPO_STEP=16
 PROCESS_WORKERS=32
 MIDI_DIR_PATH="data/midis/SymphonyNet_Dataset"
 DATA_NAME="snd"
+TEST_PATHLIST='config/test/snd_test_pathlist.txt'

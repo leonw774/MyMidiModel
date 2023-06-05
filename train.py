@@ -29,6 +29,12 @@ from util.generation import generate_piece
 def parse_args():
     data_parser = ArgumentParser()
     data_parser.add_argument(
+        '--test-pathlist',
+        type=str,
+        default='',
+        help='The text file recording what files in the dataset are for only testing'
+    )
+    data_parser.add_argument(
         '--max-seq-length',
         type=int
     )
@@ -90,7 +96,7 @@ def parse_args():
         '--split-ratio',
         type=float,
         nargs=2,
-        default=[9, 1],
+        default=[95, 5],
         help='The split ratio for training and validation. \
             If one is set to -1 and the other N, for exmaple (-1, N) it means (len(complete_dataset) - N, N) \
             Default is %(default)s.'
@@ -177,11 +183,6 @@ def parse_args():
         dest='log_file_path',
         type=str,
         default='',
-    )
-    global_parser.add_argument(
-        '--primer-measure-length',
-        type=int,
-        default=4
     )
     global_parser.add_argument(
         '--seed',
@@ -362,7 +363,10 @@ def main():
 
     ######## Make dataset
 
-    complete_dataset = MidiDataset(data_dir_path=args.corpus_dir_path, **vars(args.data), verbose=is_main_process)
+    complete_dataset = MidiDataset(
+        data_dir_path=args.corpus_dir_path, 
+        **vars(args.data), 
+        verbose=is_main_process)
     if is_main_process:
         logging.info('Made MidiDataset')
     train_ratio, valid_ratio = args.train.split_ratio
@@ -379,24 +383,6 @@ def main():
     if is_main_process:
         logging.info('Size of training set: %d', len(train_dataset))
         logging.info('Size of validation set: %d', len(valid_dataset))
-
-    ######## Get random conditional primer from complete_dataset
-
-    while True:
-        try:
-            cond_primer_index = np.random.randint(len(complete_dataset.pieces))
-            cond_primer_array = complete_dataset.pieces[str(cond_primer_index)]
-            cond_primer_text_list = array_to_text_list(cond_primer_array, vocabs)
-            cond_primer_text_list = get_first_k_measures(cond_primer_text_list, args.primer_measure_length)
-            cond_primer_array = text_list_to_array(cond_primer_text_list, vocabs).astype(np.int32)
-            break
-        except Exception:
-            continue
-    if cond_primer_array.shape[0] > args.data.max_seq_length:
-        cond_primer_array = cond_primer_array[:args.data.max_seq_length]
-    cond_primer_array = torch.from_numpy(np.expand_dims(cond_primer_array, axis=0))
-    if is_main_process:
-        logging.info('Conditional generation primer is #%d', cond_primer_index)
 
     ######## Make dataloader
 

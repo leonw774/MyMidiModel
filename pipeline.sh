@@ -105,7 +105,8 @@ if [ "$do_bpe" == true ]; then
     cp "${corpus_dir_path}/pathlist" "$bpe_corpus_dir_path"
 
     # run learn_vocab
-    bpe/learn_vocab $BPE_DOLOG $BPE_CLEARLINE "$corpus_dir_path" "$bpe_corpus_dir_path" $BPE_ITER_NUM $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER | tee -a "$log_path"
+    bpe/learn_vocab $BPE_DOLOG $BPE_CLEARLINE "$corpus_dir_path" "$bpe_corpus_dir_path" \
+        $BPE_ITER_NUM $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER | tee -a "$log_path"
     
     bpe_exit_code=${PIPESTATUS[0]}
     if [ $bpe_exit_code -ne 0 ]; then
@@ -198,13 +199,15 @@ else
     launch_command="python3"
 fi
 $launch_command train.py \
-    --max-seq-length $MAX_SEQ_LENGTH --pitch-augmentation-range $PITCH_AUGMENTATION_RANGE --virtaul-piece-step-ratio $VIRTUAL_PIECE_STEP_RATIO \
+    --max-seq-length $MAX_SEQ_LENGTH --test-pathlist "$TEST_PATHLIST" --pitch-augmentation-range $PITCH_AUGMENTATION_RANGE \
+    --virtaul-piece-step-ratio $VIRTUAL_PIECE_STEP_RATIO \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
     --batch-size $BATCH_SIZE --max-updates $MAX_UPDATES --max-grad-norm $MAX_GRAD_NORM --split-ratio $SPLIT_RATIO \
     --validation-interval $VALIDATION_INTERVAL --early-stop $EARLY_STOP --loss-nonpadding-dim $LOSS_NONPAD_DIM \
     --lr-peak $LEARNING_RATE_PEAK --lr-warmup-updates $LEARNING_RATE_WARMUP_UPDATES \
     --lr-decay-end-updates $LEARNING_RATE_DECAY_END_UPDATES --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
-    --use-device $USE_DEVICE --primer-measure-length $PRIMER_LENGTH --log "$log_path" $train_other_args "$corpus_dir_path" "$model_dir_path"
+    --use-device $USE_DEVICE --log "$log_path" $train_other_args -- \
+    "$corpus_dir_path" "$model_dir_path"
 
 test "$?" -ne 0 && { echo "Training failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
 
