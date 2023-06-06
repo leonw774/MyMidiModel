@@ -12,4 +12,5 @@ TEMPO_STEP=16
 PROCESS_WORKERS=1
 MIDI_DIR_PATH="data/test_midis"
 DATA_NAME="test_midis"
+TEST_PATHLIST='configs/test/empty_test_pathlist.txt'
 MIDI_TO_CORPUS_VERBOSE=true
