@@ -42,7 +42,7 @@ else
         test -d $primers_dir_path && rm -r $primers_dir_path
         mkdir "$primers_dir_path"
         while read test_midi_path; do
-            cp "$midi_dir_path/$test_midi_path" "$primers_dir_path"
+            cp "${midi_dir_path}/${test_midi_path}" "$primers_dir_path"
         done < $test_pathlist
 
         echo "Getting evaluation features of $midi_dir_path" | tee -a "$log_path" 
@@ -96,10 +96,11 @@ else
     mkdir "${model_dir_path}/eval_samples/instr_cond"
     start_time=$SECONDS
     # Loop each line in test_pathlist
-    while read eval_sample_midi_path; do
-        echo "Primer file: $eval_sample_midi_path"
-        primer_name=$(basename "$eval_sample_midi_path" .mid)
-        python3 generate_with_model.py $seed_option -p "$eval_sample_midi_path" -l 0 --no-tqdm \
+    while read test_midi_path; do
+        complete_test_midi_path="${midi_dir_path}/${test_midi_path}"
+        echo "Primer file: $complete_test_midi_path"
+        primer_name=$(basename "$complete_test_midi_path" .mid)
+        python3 generate_with_model.py $seed_option -p "$complete_test_midi_path" -l 0 --no-tqdm \
             --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/${primer_name}"
     done < $test_pathlist
@@ -123,10 +124,11 @@ else
     mkdir "${model_dir_path}/eval_samples/primer_cont"
     start_time=$SECONDS
     # Loop each line in test_pathlist
-    while read eval_sample_midi_path; do
-        echo "Primer file: $eval_sample_midi_path"
-        primer_name=$(basename "$eval_sample_midi_path" .mid)
-        python3 generate_with_model.py $seed_option -p "$eval_sample_midi_path" -l $primer_measure_length --no-tqdm \
+    while read test_midi_path; do
+        complete_test_midi_path="${midi_dir_path}/${test_midi_path}"
+        echo "Primer file: $complete_test_midi_path"
+        primer_name=$(basename "$complete_test_midi_path" .mid)
+        python3 generate_with_model.py $seed_option -p "$complete_test_midi_path" -l $primer_measure_length --no-tqdm \
             --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
             "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/${primer_name}"
     done < $test_pathlist
