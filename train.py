@@ -19,12 +19,9 @@ from torch.optim import AdamW, lr_scheduler
 # from torch.profiler import profile, record_function, ProfilerActivity
 import torchinfo
 
-from util.midi import piece_to_midi, get_first_k_measures
-from util.corpus import (ATTR_NAME_INDEX, ALL_ATTR_NAMES, OUTPUTABLE_ATTR_NAMES,
-                         get_corpus_vocabs, array_to_text_list, text_list_to_array)
+from util.corpus import ATTR_NAME_INDEX, ALL_ATTR_NAMES, OUTPUTABLE_ATTR_NAMES, get_corpus_vocabs
 from util.dataset import MidiDataset, collate_mididataset
 from util.model import MyMidiTransformer, compute_losses, compute_permutable_subseq_losses
-from util.generation import generate_piece
 
 def parse_args():
     data_parser = ArgumentParser()

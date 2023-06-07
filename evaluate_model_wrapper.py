@@ -54,7 +54,7 @@ def parse_args():
     )
     parser.add_argument(
         'test_pathlist',
-        type=int
+        type=str
     )
     parser.add_argument(
         'primer_measure_length',
