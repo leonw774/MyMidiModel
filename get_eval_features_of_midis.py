@@ -238,10 +238,10 @@ def main():
         for features in sampled_midis_eval_features
     ]
     logging.info(
-        '%d notes involved in evaluation. Avg. #note per piece: %f. Avg. midi playback time per piece: %f.',
+        '%d notes involved in evaluation. Avg. #note per piece: %f. Tot. midi playback time: %f.',
         np.sum(eval_features_stats['notes_number_per_piece']),
         np.mean(eval_features_stats['notes_number_per_piece']),
-        np.mean(sampled_midi_length)
+        np.sum(sampled_midi_length)
     )
 
     logging.info('\t'.join([
