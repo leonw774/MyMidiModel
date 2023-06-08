@@ -189,6 +189,12 @@ def main():
 
         if os.path.isfile(args.primer):
             primer_piece = midi_to_piece(MidiFile(args.primer), **model.vocabs.paras)
+            primer_text_list = primer_piece.split(' ')
+            if args.unit == 'measure':
+                primer_text_list = get_first_k_measures(primer_text_list, args.primer_length)
+            elif args.unit == 'nth':
+                primer_text_list = get_first_k_nths(primer_text_list, nth, args.primer_length)
+            primer_piece = ' '.join(primer_text_list)
 
             if len(model.vocabs.bpe_shapes_list) > 0 and args.primer_length > 0:
                 # model use BPE, then apply it
@@ -235,13 +241,7 @@ def main():
                 print('Failed to parse primer as corpus: following exception raised')
                 raise e
 
-        if args.unit == 'measure':
-            primer_text_list = get_first_k_measures(primer_text_list, args.primer_length)
-
-        elif args.unit == 'nth':
-            primer_text_list = get_first_k_nths(primer_text_list, nth, args.primer_length)
-
-        else: # args.unit == 'token'
+        if args.unit == 'token':
             if len(primer_text_list) < args.primer_length:
                 raise ValueError(f'primer_text_list has less than primer_length={args.primer_length} tokens.')
             primer_text_list = primer_text_list[:args.primer_length]
