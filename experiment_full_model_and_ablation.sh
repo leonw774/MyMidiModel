@@ -21,19 +21,15 @@ fi
 
 
 # full component
-./pipeline.sh $dataset_name ours_sample1.0 linear_base --use-existed
-# ./pipeline.sh lmd_full ours_sample1.0 linear_base --use-existed
+./pipeline.sh $dataset_name ours_sample1.0 linear_small --use-existed
 
 test -z "$do_ablation" && exit 0
 
 # no BPE
-./pipeline.sh $dataset_name no_bpe linear_base --use-existed
-# ./pipeline.sh lmd_full no_bpe linear_base --use-existed
+./pipeline.sh $dataset_name no_bpe linear_small --use-existed
 
 # not use MPS order as position number
-./pipeline.sh $dataset_name ours_sample1.0 linear_base_no_mps --use-existed
-# ./pipeline.sh lmd_full ours_sample1.0 linear_bas_no_MPS  --use-existed
+./pipeline.sh $dataset_name ours_sample1.0 linear_small_no_mps --use-existed
 
 # no continuative duration encoding
-./pipeline.sh "${dataset_name}_no_contin" ours_sample1.0 linear_base --use-existed
-# ./pipeline.sh lmd_full_no_contin ours_sample1.0 linear_base  --use-existed
+./pipeline.sh "${dataset_name}_no_contin" ours_sample1.0 linear_small --use-existed
