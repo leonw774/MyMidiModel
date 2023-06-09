@@ -54,24 +54,16 @@ ATTR_NAME_INDEX = {
     'dur': 2, 'durations': 2,
     'vel': 3, 'velocities': 3,
     'trn': 4, 'track_numbers': 4,
-    'ins': 5, 'instruments': 5, # context
-    'mps': 6, 'mps_numbers': 6, # positional
-    'tis': 7, 'time_signatures': 7 # context
-    # 'tmp': 8, 'tempos': 8, # context
+    'mps': 5, 'mps_numbers': 5, # position number
 }
 
 ALL_ATTR_NAMES = [
-    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments', 'mps_numbers', 'time_signatures'
+    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'mps_numbers'
 ]
 
-ESSENTAIL_ATTR_NAMES = [
+OUTPUT_ATTR_NAMES = [
     'events', 'pitchs', 'durations', 'velocities', 'track_numbers'
 ]
-
-OUTPUTABLE_ATTR_NAMES = [
-    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'instruments'
-]
-
 
 def piece_to_array(piece: str, vocabs: Vocabs, input_memory: Union[dict, None] = None, output_memory: bool = False) -> np.ndarray:
     return text_list_to_array(piece.split(' '), vocabs, input_memory, output_memory)
@@ -83,8 +75,8 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
     """
         Serialize pieces into numpy array for the model input.
 
-        Each token is processed into an 8-dimensional vector:
-            event, pitch, duration, velocity, track_number, instrument, mps_number, time signature
+        Each token is processed into an 6-dimensional vector:
+            event, pitch, duration, velocity, track_number, mps_number
 
         Positional embedding of body section:
         ```
@@ -113,21 +105,16 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
         last_array_len = 0
         x = np.full((len(text_list), len(ALL_ATTR_NAMES)), fill_value=padding, dtype=np.uint16)
         track_program_mapping = dict()
-        # cur_position_cursor = 0
         cur_mps_number = 0
-        # cur_tempo_id = padding
-        cur_time_sig_id = padding
     elif isinstance(input_memory, dict):
         last_array_len = input_memory['last_array'].shape[0]
         x = np.full((last_array_len+len(text_list), len(ALL_ATTR_NAMES)), fill_value=padding, dtype=np.uint16)
         x[:last_array_len] = input_memory['last_array']
         track_program_mapping = input_memory['track_program_mapping']
-        # cur_position_cursor = input_memory['cur_position_cursor']
         cur_mps_number = input_memory['cur_mps_number']
-        # cur_tempo_id = input_memory['cur_tempo_id']
-        cur_time_sig_id = input_memory['cur_time_sig_id']
     else:
         raise ValueError('input_memory is not None nor a dictionary')
+
     for h, text in enumerate(text_list):
         if len(text) > 0:
             typename = text[0]
@@ -149,11 +136,9 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             track_program_mapping[track_number] = vocabs.instruments.text2id[instrument]
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][ATTR_NAME_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
-            # x[i][ATTR_NAME_INDEX['ins']] = vocabs.instruments.text2id[instrument]
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
 
         elif typename == tokens.MEASURE_EVENTS_CHAR:
-            cur_time_sig_id = vocabs.time_signatures.text2id[text]
             cur_mps_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
@@ -164,17 +149,12 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             cur_mps_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
-            x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
-            # because tempo come after position and the position token was assigned to previous tempo's id
-            # x[cur_position_cursor][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
 
         elif typename == tokens.POSITION_EVENTS_CHAR:
             cur_mps_number += 1
             # cur_position_cursor = i
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
-            x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
-            # x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
 
         elif typename == tokens.NOTE_EVENTS_CHAR or typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             event_text, *attr = text.split(':')
@@ -186,10 +166,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             assert attr[3] in track_program_mapping, 'Invalid track number'
             if x[i-1][ATTR_NAME_INDEX['trn']] == 0:
                 cur_mps_number += 1
-            x[i][ATTR_NAME_INDEX['ins']] = track_program_mapping[attr[3]]
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
-            x[i][ATTR_NAME_INDEX['tis']] = cur_time_sig_id
-            # x[i][ATTR_NAME_INDEX['tmp']] = cur_tempo_id
 
         else:
             raise ValueError('unknown typename')
@@ -199,8 +176,6 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
                 'track_program_mapping': track_program_mapping,
                 # 'cur_position_cursor': cur_position_cursor,
                 'cur_mps_number': cur_mps_number,
-                'cur_time_sig_id': cur_time_sig_id,
-                # 'cur_tempo_id': cur_tempo_id,
             }
     else:
         return x
@@ -212,7 +187,7 @@ def array_to_text_list(array, vocabs: Vocabs):
         Expect array to be numpy-like array
     """
     assert len(array.shape) == 2 and array.shape[0] > 0, f'Bad numpy array shape: {array.shape}'
-    assert len(ESSENTAIL_ATTR_NAMES) <= array.shape[1] <= len(ALL_ATTR_NAMES), \
+    assert array.shape[1] == len(OUTPUT_ATTR_NAMES) or array.shape[1] == len(ALL_ATTR_NAMES), \
             f'Bad numpy array shape: {array.shape}'
 
 

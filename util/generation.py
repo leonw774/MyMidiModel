@@ -9,8 +9,7 @@ from . import tokens
 from .tokens import b36str2int
 from .midi import piece_to_midi
 from .vocabs import Vocabs
-from .corpus import (ATTR_NAME_INDEX, ALL_ATTR_NAMES, ESSENTAIL_ATTR_NAMES, OUTPUTABLE_ATTR_NAMES,
-                     array_to_text_list, text_list_to_array)
+from .corpus import (ATTR_NAME_INDEX, ALL_ATTR_NAMES, OUTPUT_ATTR_NAMES, array_to_text_list, text_list_to_array)
 from .model import MyMidiTransformer
 
 
@@ -41,7 +40,7 @@ def adjust_probs_with_context(
         if the next token in context_text_list has them and force the position tokens to be ordered increasingly in time
     """
     assert len(context_text_list) > 0, 'Empty context_text_list'
-    assert len(probs_list) == len(OUTPUTABLE_ATTR_NAMES) or len(probs_list) == len(OUTPUTABLE_ATTR_NAMES) - 1, 'Bad probs_list'
+    assert len(probs_list) == len(OUTPUT_ATTR_NAMES), 'Bad probs_list'
 
     bos_index = vocabs.events.text2id[tokens.BEGIN_TOKEN_STR]
     sep_index = vocabs.events.text2id[tokens.SEP_TOKEN_STR]
@@ -263,15 +262,9 @@ def generate_piece(
                     for l in batched_logits # l has shape (1, seq_length, attr_vocab_size)
                 ]
 
-            # re-arrange output order to array order
-            array_order_logits = [0] * len(ESSENTAIL_ATTR_NAMES)
-            for attr_name in ESSENTAIL_ATTR_NAMES:
-                model_output_index = model.output_attr_names.index(attr_name)
-                array_order_logits[ATTR_NAME_INDEX[attr_name]] = last_logits[model_output_index]
-
             probs_list = [
                 F.softmax(l / t, dim=0)
-                for l, t in zip(array_order_logits, softmax_temperature) # l has shape (attr_vocab_size,)
+                for l, t in zip(last_logits, softmax_temperature) # l has shape (attr_vocab_size,)
             ]
             if use_prob_adjustment:
                 # prevent many bad format in advance

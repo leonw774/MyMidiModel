@@ -27,7 +27,9 @@ echo "model_dir_path=${model_dir_path} midi_to_piece_paras_option=${midi_to_piec
 echo "num_workers=${num_workers} log_path=${log_path} softmax_temperature=${softmax_temperature} nucleus_sampling_threshold=${nucleus_sampling_threshold}" | tee -a "$log_path"
 
 if [ "$sample_number" == 0 ]; then
-    echo "No test files"
+    echo "No test files."
+    echo "evaluate_model.py exit."
+    exit 0
 else
     test_eval_feature_path="${midi_dir_path}/eval_features.json"
     test_primers_eval_feature_path="${midi_dir_path}/eval_features_primer${primer_measure_length}.json"

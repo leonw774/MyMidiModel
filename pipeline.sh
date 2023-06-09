@@ -156,26 +156,10 @@ if [ -d "$model_dir_path" ]; then
 echo "Model dir: $model_dir_path"
 
 train_other_args=""
-if [ "$USE_PERMUTABLE_SUBSEQ_LOSS" == true ]; then
-    python3 -c "import torch;import mps_loss" 2>&1 | grep ModuleNotFoundError
-    # if module not exist, install
-    if [ "$?" -eq 0 ]; then
-        cd util/pytorch/mps_loss
-        python3 setup.py install
-        cd ../../..
-        # check if success
-        python3 -c "import torch;import mps_loss" 2>&1 | grep ModuleNotFoundError
-        test "$?" -eq 0 && { echo "mps_loss extension setup failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
-    fi
-    train_other_args="$train_other_args --use-permutable-subseq-loss"
-fi
 test "$PERMUTE_MPS" == true            && train_other_args="$train_other_args --permute-mps"
 test "$PERMUTE_TRACK_NUMBER" == true   && train_other_args="$train_other_args --permute-track-number"
 test "$USE_LINEAR_ATTENTION" == true   && train_other_args="$train_other_args --use-linear-attn"
 test "$NOT_USE_MPS_NUMBER" == true     && train_other_args="$train_other_args --not-use-mps-number"
-test "$INPUT_CONTEXT" == true          && train_other_args="$train_other_args --input-context"
-test "$INPUT_INSTRUMENTS" == true      && train_other_args="$train_other_args --input-instruments"
-test "$OUTPUT_INSTRUMENTS" == true     && train_other_args="$train_other_args --output-instruments"
 test -n "$MAX_PIECE_PER_GPU"           && train_other_args="$train_other_args --max-pieces-per-gpu $MAX_PIECE_PER_GPU"
 test -n "$SEED"                        && train_other_args="$train_other_args --seed $SEED"
 test -n "$train_other_args" && { echo "Appended '$train_other_args' to train.py's argument" | tee -a "$log_path" ; }
@@ -199,8 +183,8 @@ else
     launch_command="python3"
 fi
 $launch_command train.py \
-    --max-seq-length $MAX_SEQ_LENGTH --test-pathlist "$TEST_PATHLIST" --pitch-augmentation-range $PITCH_AUGMENTATION_RANGE \
-    --virtaul-piece-step-ratio $VIRTUAL_PIECE_STEP_RATIO \
+    --test-pathlist "$TEST_PATHLIST" --max-seq-length $MAX_SEQ_LENGTH \
+    --pitch-augmentation-range $PITCH_AUGMENTATION_RANGE --virtaul-piece-step-ratio $VIRTUAL_PIECE_STEP_RATIO \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
     --batch-size $BATCH_SIZE --max-updates $MAX_UPDATES --max-grad-norm $MAX_GRAD_NORM --split-ratio $SPLIT_RATIO \
     --validation-interval $VALIDATION_INTERVAL --early-stop $EARLY_STOP --loss-nonpadding-dim $LOSS_NONPAD_DIM \

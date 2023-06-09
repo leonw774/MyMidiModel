@@ -19,9 +19,9 @@ from torch.optim import AdamW, lr_scheduler
 # from torch.profiler import profile, record_function, ProfilerActivity
 import torchinfo
 
-from util.corpus import ATTR_NAME_INDEX, ALL_ATTR_NAMES, OUTPUTABLE_ATTR_NAMES, get_corpus_vocabs
+from util.corpus import ALL_ATTR_NAMES, OUTPUT_ATTR_NAMES, get_corpus_vocabs
 from util.dataset import MidiDataset, collate_mididataset
-from util.model import MyMidiTransformer, compute_losses, compute_permutable_subseq_losses
+from util.model import MyMidiTransformer, compute_losses
 
 def parse_args():
     data_parser = ArgumentParser()
@@ -73,18 +73,6 @@ def parse_args():
     )
     model_parser.add_argument(
         '--not-use-mps-number',
-        action='store_true',
-    )
-    model_parser.add_argument(
-        '--input-context',
-        action='store_true',
-    )
-    model_parser.add_argument(
-        '--input-instruments',
-        action='store_true',
-    )
-    model_parser.add_argument(
-        '--output-instruments',
         action='store_true',
     )
 
@@ -142,10 +130,6 @@ def parse_args():
     train_parser.add_argument(
         '--lr-decay-end-ratio',
         type=float
-    )
-    train_parser.add_argument(
-        '--use-permutable-subseq-loss',
-        action='store_true'
     )
     train_parser.add_argument(
         '--early-stop',
@@ -337,12 +321,8 @@ def main():
     loss_file_path = os.path.join(args.model_dir_path, 'loss.csv')
     with open(loss_file_path, 'w+', encoding='utf8') as loss_file:
         loss_csv_head = 'step,'
-        train_output_attr_name = ['train_' + n for n in OUTPUTABLE_ATTR_NAMES]
-        valid_output_attr_name = ['valid_' + n for n in OUTPUTABLE_ATTR_NAMES]
-        if not args.model.output_instruments:
-            # remove instruments from output attribute names
-            train_output_attr_name = train_output_attr_name[:-1]
-            valid_output_attr_name = valid_output_attr_name[:-1]
+        train_output_attr_name = ['train_' + n for n in OUTPUT_ATTR_NAMES]
+        valid_output_attr_name = ['valid_' + n for n in OUTPUT_ATTR_NAMES]
         loss_csv_head += ','.join(
             train_output_attr_name + ['train_sum']
             + valid_output_attr_name + ['valid_sum']
@@ -462,7 +442,7 @@ def main():
     if is_main_process:
         logging.info('Begin training')
     train_dataloader_iter = iter(train_dataloader)
-    valid_dataloader_iter = iter(valid_dataloader)
+    # valid_dataloader_iter = iter(valid_dataloader)
     pad1bottom = (0, 0, 0, 1)
     min_avg_valid_loss = float('inf')
     early_stop_counter = 0
@@ -480,7 +460,7 @@ def main():
             desc=f'Training:{start_num_updates}~{start_num_updates+args.train.validation_interval}',
             ncols=100
         )
-        for updates in training_tqdm:
+        for _ in training_tqdm:
             train_loss_list.append(0.0)
             train_head_losses_list.append([0.0 for _ in train_output_attr_name])
             for _ in range(gradient_accumulation_steps):
@@ -502,21 +482,12 @@ def main():
                 # forward_time += time() - start_forward_time
 
                 # start_backward_time = time()
-                if args.train.use_permutable_subseq_loss:
-                    batch_mps_number_seq = batch_seqs[:, 1:, ATTR_NAME_INDEX['mps']]
-                    loss, head_losses = compute_permutable_subseq_losses(
-                        prediction,
-                        batch_target_seqs,
-                        batch_mps_number_seq,
-                    )
-                    # print('compute_permutable_subseq_losses use time:', time() - start_backward_time)
-                else:
-                    loss, head_losses = compute_losses(
-                        prediction,
-                        batch_target_seqs,
-                        args.train.loss_nonpadding_dim
-                    )
-                    # print('compute_losses use time:', time() - start_backward_time)
+                loss, head_losses = compute_losses(
+                    prediction,
+                    batch_target_seqs,
+                    args.train.loss_nonpadding_dim
+                )
+                # print('compute_losses use time:', time() - start_backward_time)
                 # assert all(not torch.isnan(head_l).any() for head_l in head_losses)
 
                 loss = loss / gradient_accumulation_steps
@@ -562,18 +533,10 @@ def main():
                     batch_target_seqs = batch_target_seqs.to(args.use_device)
                 prediction = model(batch_input_seqs)
 
-                if args.train.use_permutable_subseq_loss:
-                    batch_mps_number_seq = batch_seqs[:, 1:, ATTR_NAME_INDEX['mps']]
-                    loss, head_losses = compute_permutable_subseq_losses(
-                        prediction,
-                        batch_target_seqs,
-                        batch_mps_number_seq
-                    )
-                else:
-                    loss, head_losses = compute_losses(
-                        prediction,
-                        batch_target_seqs,
-                    )
+                loss, head_losses = compute_losses(
+                    prediction,
+                    batch_target_seqs,
+                )
                 if args.use_parallel:
                     # need to gather, otherwise each process see different losses
                     gathered_loss = accelerator.gather(loss)
