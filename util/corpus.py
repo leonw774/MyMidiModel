@@ -169,7 +169,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
 
         else:
-            raise ValueError('unknown typename')
+            raise ValueError('unknown typename: ' + typename)
     if output_memory:
         return x, {
                 'last_array': x,
