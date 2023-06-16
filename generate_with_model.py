@@ -98,6 +98,12 @@ def read_args():
         help='What device the model would be on.'
     )
     parser.add_argument(
+        '--workers', '-w',
+        type=int,
+        default=8,
+        help='Number of workers for applying BPE vocabs if used.'
+    )
+    parser.add_argument(
         '--print-exception',
         action='store_true',
         help='When model fail to generate next toke that satisfy the rule. Print out the exception message.'
@@ -223,6 +229,8 @@ def main():
                             tmp_out_corpus_file_path,
                             tmp_shape_vocab_file_path
                         ]
+                        if args.workers > 1:
+                            apply_args.append(str(args.workers))
                         subprocess.run(apply_args, check=True, stdout=subprocess.DEVNULL)
                         # get content from output
                         with open(to_corpus_file_path(tmp_out_corpus_dir_path), 'r', encoding='utf8') as tmp_out_corpus:
