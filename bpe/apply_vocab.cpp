@@ -32,8 +32,8 @@ int main(int argc, char *argv[]) {
                 exit(1);
         }
     }
-    if (argc - nonOptStartIndex != 3) {
-        std::cout << "Bad number of non-optional arguments: " << argc - nonOptStartIndex << " != 3\n";
+    if (argc - nonOptStartIndex != 3 || argc - nonOptStartIndex != 4) {
+        std::cout << "Bad number of non-optional arguments: should be 3 or 4. Get " << argc - nonOptStartIndex << "\n";
         for (int i = 0; i < argc; ++i) {
             std::cout << argv[i] << " ";
         }
