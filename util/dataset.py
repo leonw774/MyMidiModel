@@ -20,9 +20,9 @@ class MidiDataset(Dataset):
     def __init__(
             self,
             data_dir_path: str,
-            test_pathlist: str,
             max_seq_length: int,
-            virtaul_piece_step_ratio: float = 0,
+            test_pathlist: str = None,
+            virtual_piece_step_ratio: float = 0,
             permute_mps: bool = False,
             permute_track_number: bool = False,
             pitch_augmentation_range: int = 0,
@@ -32,9 +32,9 @@ class MidiDataset(Dataset):
             Parameters:
             - data_dir_path: Expected to have 'arrays.npz', 'pathlist' and 'vocabs.json'
 
-            - virtaul_piece_step_ratio: If > 0, will create multiple virtual pieces by splitting overlength pieces.
+            - virtual_piece_step_ratio: If > 0, will create multiple virtual pieces by splitting overlength pieces.
               The start point of samples will be at the first measure token that has index just greater than
-              max_seq_length * virtaul_piece_step_ratio * N, where N is positive integer. Default is 0.
+              max_seq_length * virtual_piece_step_ratio * N, where N is positive integer. Default is 0.
 
             - permute_mps: Whether or not the dataset should permute all the maximal permutable subsequences
               before returning in `__getitem__`. Default is False.
@@ -49,8 +49,8 @@ class MidiDataset(Dataset):
         self.vocabs = get_corpus_vocabs(data_dir_path)
         assert max_seq_length >= 0
         self.max_seq_length = max_seq_length
-        assert 0 <= virtaul_piece_step_ratio <= 1
-        self.virtaul_piece_step_ratio = virtaul_piece_step_ratio
+        assert 0 <= virtual_piece_step_ratio <= 1
+        self.virtual_piece_step_ratio = virtual_piece_step_ratio
         assert isinstance(permute_mps, bool)
         self.permute_mps = permute_mps
         assert isinstance(permute_track_number, bool)
@@ -60,9 +60,11 @@ class MidiDataset(Dataset):
 
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
         all_pathlist = [p.strip() for p in open(os.path.join(data_dir_path, 'pathlist'), 'r', encoding='utf8').readlines()]
-        if test_pathlist != '':
+        if test_pathlist is not None and test_pathlist != '':
             assert os.path.exists(test_pathlist)
             test_pathlist = [p.strip() for p in open(test_pathlist, 'r', encoding='utf8').readlines()]
+        else:
+            test_pathlist = []
         if verbose:
             print('Reading', npz_path)
         available_memory_size = psutil.virtual_memory().available
@@ -113,7 +115,7 @@ class MidiDataset(Dataset):
 
         # the default zeros will be replaced by body start index
         self._piece_body_start_index = [0] * self.number_of_pieces
-        virtual_piece_step = max(1, int(max_seq_length * virtaul_piece_step_ratio))
+        virtual_piece_step = max(1, int(max_seq_length * virtual_piece_step_ratio))
         self._virtual_piece_start_index = [[0] for _ in range(self.number_of_pieces)]
 
         self._file_mps_sep_indices = [[] for _ in range(self.number_of_pieces)]
@@ -134,7 +136,7 @@ class MidiDataset(Dataset):
             self._virtual_piece_start_index[trainnum][0] = j + 1
 
             # create virtual pieces from overlength pieces
-            if virtaul_piece_step_ratio > 0:
+            if virtual_piece_step_ratio > 0:
                 if self.pieces[filename].shape[0] > max_seq_length:
                     measure_indices = list(
                         np.flatnonzero(

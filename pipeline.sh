@@ -184,7 +184,7 @@ else
 fi
 $launch_command train.py \
     --test-pathlist "$TEST_PATHLIST" --max-seq-length $MAX_SEQ_LENGTH \
-    --pitch-augmentation-range $PITCH_AUGMENTATION_RANGE --virtaul-piece-step-ratio $VIRTUAL_PIECE_STEP_RATIO \
+    --pitch-augmentation-range $PITCH_AUGMENTATION_RANGE --virtual-piece-step-ratio $VIRTUAL_PIECE_STEP_RATIO \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
     --batch-size $BATCH_SIZE --max-updates $MAX_UPDATES --max-grad-norm $MAX_GRAD_NORM --split-ratio $SPLIT_RATIO \
     --validation-interval $VALIDATION_INTERVAL --early-stop $EARLY_STOP --loss-nonpadding-dim $LOSS_NONPAD_DIM \

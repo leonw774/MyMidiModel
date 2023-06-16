@@ -5,7 +5,6 @@ models/**/*
 bpe/learn_vocab
 bpe/apply_vocab
 extracted
-set_cuda_device_env_var.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

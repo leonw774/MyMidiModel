@@ -36,9 +36,9 @@ def parse_args():
         type=int
     )
     data_parser.add_argument(
-        '--virtaul-piece-step-ratio',
+        '--virtual-piece-step-ratio',
         type=float,
-        default=0.25
+        default=0
     )
     data_parser.add_argument(
         '--permute-mps',

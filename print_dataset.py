@@ -17,9 +17,9 @@ parser.add_argument(
     help='Default is %(default)s'
 )
 parser.add_argument(
-    '--measure-sample-step-ratio',
+    '--virtual-piece-step-ratio',
     type=float,
-    default=0.5,
+    default=0,
     help='Default is %(default)s'
 )
 parser.add_argument(
@@ -53,24 +53,23 @@ parser.add_argument(
     help='Default is %(default)s'
 )
 parser.add_argument(
-    'corpus_dir_path',
-    type=str,
-    nargs='?',
-    default='data/corpus/test_midis_nth32_r32_d32_v16_t24_200_16',
-    help='Default is %(default)s'
+    'data_dir_path',
+    type=str
 )
 args = parser.parse_args()
 if args.seed is not None:
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
+data_args = {
+    k: v
+    for k, v in vars(args).items()
+    if k not in {'batch_size', 'output_midi', 'seed'}
+}
+print(data_args)
+
 dataset = MidiDataset(
-    data_dir_path=args.corpus_dir_path,
-    max_seq_length=args.max_seq_length,
-    measure_sample_step_ratio=args.measure_sample_step_ratio,
-    permute_mps=args.permute_mps,
-    permute_track_number=args.permute_track_number,
-    pitch_augmentation_range=args.pitch_augmentation_range,
+    **data_args,
     verbose=True
 )
 vocabs = dataset.vocabs
