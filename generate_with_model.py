@@ -196,12 +196,11 @@ def main():
         if os.path.isfile(args.primer):
             primer_piece = midi_to_piece(MidiFile(args.primer), **model.vocabs.paras)
             primer_text_list = primer_piece.split(' ')
-            if args.primer_length > 0:
-                if args.unit == 'measure':
-                    primer_text_list = get_first_k_measures(primer_text_list, args.primer_length)
-                elif args.unit == 'nth':
-                    primer_text_list = get_first_k_nths(primer_text_list, nth, args.primer_length)
-                primer_text_list.append(END_TOKEN_STR)
+            if args.unit == 'measure':
+                primer_text_list = get_first_k_measures(primer_text_list, args.primer_length)
+            elif args.unit == 'nth':
+                primer_text_list = get_first_k_nths(primer_text_list, nth, args.primer_length)
+            primer_text_list.append(END_TOKEN_STR)
             primer_piece = ' '.join(primer_text_list)
 
             if len(model.vocabs.bpe_shapes_list) > 0 and args.primer_length > 0:
@@ -238,10 +237,11 @@ def main():
                         with open(to_corpus_file_path(tmp_out_corpus_dir_path), 'r', encoding='utf8') as tmp_out_corpus:
                             merged_piece = tmp_out_corpus.readline() # get first piece
                         primer_text_list = merged_piece.split(' ')
-                        if primer_text_list[-1] == END_TOKEN_STR:
-                            primer_text_list.pop()
             else:
                 primer_text_list = primer_piece.split(' ')
+
+            if primer_text_list[-1] == END_TOKEN_STR:
+                primer_text_list.pop()
 
         else: # os.path.isdir(args.primer):
             # we expect the corpus file has same midi parameters as the model

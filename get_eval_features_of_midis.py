@@ -81,9 +81,7 @@ def parse_args():
         '--reference-file-path',
         type=str,
         default='',
-        help='Should set to a path to a reference result JSON file (Q).\
-            If is set, the result of MIDI_DIR_PATH (P) will include KL divergence of pitch, duration, and velocity\
-            of MIDI_DIR_PATH from the those in Q (That is: KL(P||Q))'
+        help='Should set to a path to a reference result JSON file.'
     )
     parser.add_argument(
         '--seed',
