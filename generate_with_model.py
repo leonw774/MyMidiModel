@@ -279,8 +279,11 @@ def main():
                 if len(text_list) > 0
             ]
             if len(primer_text_list_list) < args.sample_number:
-                print(f'The number of processed primers ({len(primer_path_list)}) is less than required sample number ({args.sample_number})')
-                print(f'Will only generate {len(primer_path_list)} pieces')
+                print(
+                    f'The number of processed primers ({len(primer_path_list)}) \
+                    is less than required sample number ({args.sample_number}). \
+                    Will only generate {len(primer_path_list)} pieces'
+                )
                 args.sample_number = len(primer_path_list)
 
         for primer_text_list in primer_text_list_list:
