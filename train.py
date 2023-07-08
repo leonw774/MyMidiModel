@@ -341,8 +341,8 @@ def main():
     ######## Make dataset
 
     complete_dataset = MidiDataset(
-        data_dir_path=args.corpus_dir_path, 
-        **vars(args.data), 
+        data_dir_path=args.corpus_dir_path,
+        **vars(args.data),
         verbose=is_main_process)
     if is_main_process:
         logging.info('Made MidiDataset')

@@ -65,6 +65,12 @@ fi
 
 test -z "$model_dir_path" && exit 0 
 
+test -f test_primer_paths && rm test_primer_paths
+touch test_primer_paths
+while read primer_file_path; do
+    echo "${midi_dir_path}/${primer_file_path}" >> test_primer_paths;
+done < $test_pathlist
+
 ### Evaluate model unconditional generation
 
 has_midis=""
@@ -97,15 +103,9 @@ else
     echo "Generating $sample_number instrument-conditioned samples" | tee -a "$log_path"
     mkdir "${model_dir_path}/eval_samples/instr_cond"
     start_time=$SECONDS
-    # Loop each line in test_pathlist
-    while read test_midi_path; do
-        complete_test_midi_path="${midi_dir_path}/${test_midi_path}"
-        echo "Primer file: $complete_test_midi_path"
-        primer_name=$(basename "$complete_test_midi_path" .mid)
-        python3 generate_with_model.py $seed_option -p "$complete_test_midi_path" -l 0 --no-tqdm \
-            --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
-            "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/${primer_name}"
-    done < $test_pathlist
+    python3 generate_with_model.py $seed_option -p "test_primer_paths" -l 0 -n $sample_number --no-tqdm \
+        --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
+        "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/instr_cond"
     duration=$(( $SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
 fi
@@ -125,15 +125,9 @@ else
     echo "Generating $sample_number prime-continuation samples" | tee -a "$log_path"
     mkdir "${model_dir_path}/eval_samples/primer_cont"
     start_time=$SECONDS
-    # Loop each line in test_pathlist
-    while read test_midi_path; do
-        complete_test_midi_path="${midi_dir_path}/${test_midi_path}"
-        echo "Primer file: $complete_test_midi_path"
-        primer_name=$(basename "$complete_test_midi_path" .mid)
-        python3 generate_with_model.py $seed_option -p "$complete_test_midi_path" -l $primer_measure_length --no-tqdm \
-            --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
-            "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/${primer_name}"
-    done < $test_pathlist
+    python3 generate_with_model.py $seed_option -p "test_primer_paths" -l 0 -n $sample_number --no-tqdm \
+        --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
+        "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/primer_cont"
     duration=$(( $SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
 fi
@@ -144,4 +138,5 @@ python3 get_eval_features_of_midis.py $seed_option $midi_to_piece_paras_option -
     --workers $num_workers --reference-file-path "$test_primers_eval_feature_path" "${model_dir_path}/eval_samples/primer_cont"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
 
+rm test_primer_paths
 echo "evaluated_model.sh exit." | tee -a "$log_path" 

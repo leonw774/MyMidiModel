@@ -2,6 +2,7 @@ from argparse import ArgumentParser, Namespace
 import os
 import subprocess
 import tempfile
+from time import time
 from traceback import format_exc
 
 import numpy as np
@@ -22,9 +23,10 @@ def read_args():
         '--primer', '-p',
         type=str,
         default=None,
-        help='A MIDI or a single-piece corpus file that used as the primer in conditional generation.\n\
-            If the extension is not "*.mid" or "*.midi", \
-                the program will try to parse it as a corpus text file containing only one piece.\n\
+        help='A MIDI file, or a text file containing a list of MIDI file paths \
+            that would be used as the primer in conditional generation.\n\
+            If the extension is "*.mid" or "*.midi", I will try to parse it as MIDI.\n\
+            Otherwise, I will try to parse it as a list of paths to midi files, separated by newlines.\n\
             If this option is not set, unconditional generation will be performed.'
     )
     parser.add_argument(
@@ -162,11 +164,74 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
         print(format_exc())
 
 
+def primer_file_to_test_list(primer_path: str, primer_length: int, length_unit: str, vocabs, worker_number: int = 1) -> list:
+    try:
+        primer_piece = midi_to_piece(MidiFile(primer_path), **vocabs.paras)
+    except Exception:
+        return []
+    primer_text_list = primer_piece.split(' ')
+    if length_unit == 'measure':
+        primer_text_list = get_first_k_measures(primer_text_list, primer_length)
+    elif length_unit == 'nth':
+        primer_text_list = get_first_k_nths(primer_text_list, vocabs.paras['nth'], primer_length)
+    primer_text_list.append(END_TOKEN_STR)
+    primer_piece = ' '.join(primer_text_list)
+
+    if len(vocabs.bpe_shapes_list) > 0 and primer_length > 0:
+        # model use BPE, then apply it
+        with tempfile.TemporaryDirectory() as tmp_in_corpus_dir_path:
+            # make tmp corpus
+            with open(to_corpus_file_path(tmp_in_corpus_dir_path), 'w+', encoding='utf8') as tmp_corpus_file:
+                tmp_corpus_file.write(primer_piece + '\n')
+            with open(to_paras_file_path(tmp_in_corpus_dir_path), 'w+', encoding='utf8') as tmp_paras_file:
+                tmp_paras_file.write(dump_corpus_paras(vocabs.paras))
+            # make tmp shape_vocab
+            tmp_shape_vocab_file_path = os.path.join(tmp_in_corpus_dir_path, 'shape_vocab')
+            with open(tmp_shape_vocab_file_path, 'w+', encoding='utf8') as shape_vocab_file:
+                shape_vocab_file.write('\n'.join(vocabs.bpe_shapes_list) + '\n')
+            # make sure the current working directory is correct
+            assert os.path.abspath(os.getcwd()) == os.path.dirname(os.path.abspath(__file__))
+            # make sure the program is there and new
+            subprocess.run(['make', '-C', './bpe'], check=True, stdout=subprocess.DEVNULL)
+            with tempfile.TemporaryDirectory() as tmp_out_corpus_dir_path:
+                tmp_out_corpus_file_path = to_corpus_file_path(tmp_out_corpus_dir_path)
+                # ./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath
+                apply_args = [
+                    './bpe/apply_vocab',
+                    # '-log',
+                    # '-clearLine',
+                    tmp_in_corpus_dir_path,
+                    tmp_out_corpus_file_path,
+                    tmp_shape_vocab_file_path
+                ]
+                if worker_number > 1:
+                    apply_args.append(str(worker_number))
+                subprocess.run(apply_args, check=True, stdout=subprocess.DEVNULL)
+                # get content from output
+                with open(to_corpus_file_path(tmp_out_corpus_dir_path), 'r', encoding='utf8') as tmp_out_corpus:
+                    merged_piece = tmp_out_corpus.readline().strip() # get first piece
+                primer_text_list = merged_piece.split(' ')
+    else:
+        primer_text_list = primer_piece.split(' ')
+
+    if primer_text_list[-1] == END_TOKEN_STR:
+        primer_text_list.pop()
+
+    if length_unit == 'token':
+        if len(primer_text_list) < primer_length:
+            raise ValueError(f'primer_text_list has less than primer_length={primer_length} tokens.')
+        primer_text_list = primer_text_list[:primer_length]
+
+    return primer_text_list
+
+
 def main():
     args = read_args()
     if args.seed is not None:
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
+
+    overhead_time_begin = time()
 
     # device
     if not args.use_device.startswith('cuda') and args.use_device != 'cpu':
@@ -178,99 +243,68 @@ def main():
     # model
     model = torch.load(args.model_file_path, map_location=torch.device(args.use_device))
     assert isinstance(model, MyMidiTransformer)
-    nth = model.vocabs.paras['nth']
     if args.max_generation_step == -1:
         args.max_generation_step = model.max_seq_length
 
     if args.output_file_path.endswith('.mid'):
         args.output_file_path = args.output_file_path[:-4]
 
-    # primer
-    primer_seq = None
-    if args.primer is not None:
-        primer_text_list = []
+    overhead_time = time() - overhead_time_begin
+    primer_process_time_begin = time()
 
-        if not os.path.exists(args.primer):
+    # primer
+    primer_seq_list = []
+    if args.primer is  None:
+        primer_seq_list = [None] * args.sample_number
+    else:
+        print('Processing primer')
+        if not os.path.isfile(args.primer):
             raise FileNotFoundError()
 
-        if os.path.isfile(args.primer):
-            primer_piece = midi_to_piece(MidiFile(args.primer), **model.vocabs.paras)
-            primer_text_list = primer_piece.split(' ')
-            if args.unit == 'measure':
-                primer_text_list = get_first_k_measures(primer_text_list, args.primer_length)
-            elif args.unit == 'nth':
-                primer_text_list = get_first_k_nths(primer_text_list, nth, args.primer_length)
-            primer_text_list.append(END_TOKEN_STR)
-            primer_piece = ' '.join(primer_text_list)
+        if args.primer.endswith('.mid') or args.primer.endswith('.midi'):
+            primer_text_list = primer_file_to_test_list(args.primer, args.primer_length, args.unit, model.vocabs, args.workers)
+            primer_text_list_list = [primer_text_list] * args.sample_number
+        else: # we guess it is a list of paths to midi files
+            primer_path_list = open(args.primer, 'r', encoding='utf8').readlines()
+            primer_path_list = primer_path_list[:args.sample_number]
+            primer_path_list = [p.strip() for p in primer_path_list]
+            assert all(p.endswith('.mid') or p.endswith('.midi') for p in primer_path_list)
+            assert all(os.path.isfile(p) for p in primer_path_list)
+            primer_text_list_list = [
+                primer_file_to_test_list(pp, args.primer_length, args.unit, model.vocabs, args.workers)
+                for pp in primer_path_list[:args.sample_number]
+            ]
+            primer_text_list_list = [
+                text_list for text_list in primer_text_list_list
+                if len(text_list) > 0
+            ]
+            if len(primer_text_list_list) < args.sample_number:
+                print(f'The number of processed primers ({len(primer_path_list)}) is less than required sample number ({args.sample_number})')
+                print(f'Will only generate {len(primer_path_list)} pieces')
+                args.sample_number = len(primer_path_list)
 
-            if len(model.vocabs.bpe_shapes_list) > 0 and args.primer_length > 0:
-                # model use BPE, then apply it
-                with tempfile.TemporaryDirectory() as tmp_in_corpus_dir_path:
-                    # make tmp corpus
-                    with open(to_corpus_file_path(tmp_in_corpus_dir_path), 'w+', encoding='utf8') as tmp_corpus_file:
-                        tmp_corpus_file.write(primer_piece + '\n')
-                    with open(to_paras_file_path(tmp_in_corpus_dir_path), 'w+', encoding='utf8') as tmp_paras_file:
-                        tmp_paras_file.write(dump_corpus_paras(model.vocabs.paras))
-                    # make tmp shape_vocab
-                    tmp_shape_vocab_file_path = os.path.join(tmp_in_corpus_dir_path, 'shape_vocab')
-                    with open(tmp_shape_vocab_file_path, 'w+', encoding='utf8') as shape_vocab_file:
-                        shape_vocab_file.write('\n'.join(model.vocabs.bpe_shapes_list) + '\n')
-                    # make sure the current working directory is correct
-                    assert os.path.abspath(os.getcwd()) == os.path.dirname(os.path.abspath(__file__))
-                    # make sure the program is there and new
-                    subprocess.run(['make', '-C', './bpe'], check=True, stdout=subprocess.DEVNULL)
-                    with tempfile.TemporaryDirectory() as tmp_out_corpus_dir_path:
-                        tmp_out_corpus_file_path = to_corpus_file_path(tmp_out_corpus_dir_path)
-                        # ./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath
-                        apply_args = [
-                            './bpe/apply_vocab',
-                            # '-log',
-                            # '-clearLine',
-                            tmp_in_corpus_dir_path,
-                            tmp_out_corpus_file_path,
-                            tmp_shape_vocab_file_path
-                        ]
-                        if args.workers > 1:
-                            apply_args.append(str(args.workers))
-                        subprocess.run(apply_args, check=True, stdout=subprocess.DEVNULL)
-                        # get content from output
-                        with open(to_corpus_file_path(tmp_out_corpus_dir_path), 'r', encoding='utf8') as tmp_out_corpus:
-                            merged_piece = tmp_out_corpus.readline() # get first piece
-                        primer_text_list = merged_piece.split(' ')
-            else:
-                primer_text_list = primer_piece.split(' ')
+        for primer_text_list in primer_text_list_list:
+            # turn primer text list into array
+            primer_seq = text_list_to_array(primer_text_list, vocabs=model.vocabs)
+            if model.permute_track_number:
+                primer_seq = permute_track_number(primer_seq, model.vocabs.track_numbers.size)
+            primer_seq = np.expand_dims(primer_seq, axis=0).astype(np.int32)
+            primer_seq = torch.from_numpy(primer_seq)
+            primer_seq_list.append(primer_seq)
+        print(len(primer_seq_list))
 
-            if primer_text_list[-1] == END_TOKEN_STR:
-                primer_text_list.pop()
-
-        else: # os.path.isdir(args.primer):
-            # we expect the corpus file has same midi parameters as the model
-            try:
-                with CorpusReader(args.primer) as corpus_reader:
-                    piece = next(iter(corpus_reader)) # get first piece
-                primer_text_list = piece.split()
-            except Exception as e:
-                print('Failed to parse primer as corpus: following exception raised')
-                raise e
-
-        if args.unit == 'token':
-            if len(primer_text_list) < args.primer_length:
-                raise ValueError(f'primer_text_list has less than primer_length={args.primer_length} tokens.')
-            primer_text_list = primer_text_list[:args.primer_length]
-
-        # turn primer text list into array
-        primer_seq = text_list_to_array(primer_text_list, vocabs=model.vocabs)
-        if model.permute_track_number:
-            primer_seq = permute_track_number(primer_seq, model.vocabs.track_numbers.size)
-        primer_seq = np.expand_dims(primer_seq, axis=0).astype(np.int32)
-        primer_seq = torch.from_numpy(primer_seq)
+    primer_process_time = time() - primer_process_time_begin
+    generation_time_begin = time()
 
     if args.sample_number == 1:
-        gen_handler(model, primer_seq, args, args.output_file_path)
+        gen_handler(model, primer_seq_list[0], args, args.output_file_path)
     else:
-        for i in range(1, args.sample_number+1):
-            gen_handler(model, primer_seq, args, f'{args.output_file_path}_{i}')
-            print(f'generated {args.output_file_path}_{i}')
+        for i, primer_seq in enumerate(primer_seq_list):
+            gen_handler(model, primer_seq, args, f'{args.output_file_path}_{i+1}')
+            print(f'generated {args.output_file_path}_{i+1}')
+
+    generation_time = time() - generation_time_begin
+    print(f'overhead_time:{overhead_time}\tprimer_process_time:{primer_process_time}\tgeneration_time:{generation_time}')
 
     return 0
 
