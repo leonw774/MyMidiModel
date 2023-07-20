@@ -51,7 +51,8 @@ def read_args():
         '--sample-number', '-n',
         type=int,
         default=1,
-        help='How many sample will be generated. Default is %(default)s.'
+        help='How many sample will be generated. Default is %(default)s\
+            Set it as -1 to use all primers in the primer list if provided.'
     )
     parser.add_argument(
         '--output-text', '-o',
@@ -255,6 +256,7 @@ def main():
     # primer
     primer_seq_list = []
     if args.primer is  None:
+        assert args.sample_number > 0
         primer_seq_list = [None] * args.sample_number
     else:
         print('Processing primer')
@@ -262,11 +264,15 @@ def main():
             raise FileNotFoundError()
 
         if args.primer.endswith('.mid') or args.primer.endswith('.midi'):
+            assert args.sample_number > 0
             primer_text_list = primer_file_to_test_list(args.primer, args.primer_length, args.unit, model.vocabs, args.workers)
             primer_text_list_list = [primer_text_list] * args.sample_number
         else: # we guess it is a list of paths to midi files
             primer_path_list = open(args.primer, 'r', encoding='utf8').readlines()
-            primer_path_list = primer_path_list[:args.sample_number]
+            if args.sample_number == -1:
+                args.sample_number = len(primer_path_list)
+            else:
+                primer_path_list = primer_path_list[:args.sample_number]
             primer_path_list = [p.strip() for p in primer_path_list]
             assert all(p.endswith('.mid') or p.endswith('.midi') for p in primer_path_list)
             assert all(os.path.isfile(p) for p in primer_path_list)
@@ -278,13 +284,20 @@ def main():
                 text_list for text_list in primer_text_list_list
                 if len(text_list) > 0
             ]
-            if len(primer_text_list_list) < args.sample_number:
-                print(
-                    f'The number of processed primers ({len(primer_path_list)}) \
-                    is less than required sample number ({args.sample_number}). \
-                    Will only generate {len(primer_path_list)} pieces'
-                )
-                args.sample_number = len(primer_path_list)
+            if len(primer_text_list_list) != 1 or args.sample_number != 1:
+                if len(primer_text_list_list) < args.sample_number:
+                    print(
+                        f'The number of primer paths in the list is {len(primer_path_list)}, \
+                        less than required sample number ({args.sample_number}). \
+                        Will only generate {len(primer_path_list)} pieces.'
+                    )
+                    args.sample_number = len(primer_path_list)
+                else:
+                    print(f'The number of primer paths in the list is {len(primer_path_list)}, \
+                        greater than or equal to required sample number ({args.sample_number}). \
+                        Will used first {args.sample_number} to generate pieces.'
+                    )
+                    print('Hint: Set sample number as -1 to use all primers in the primer list.')
 
         for primer_text_list in primer_text_list_list:
             # turn primer text list into array
@@ -294,7 +307,7 @@ def main():
             primer_seq = np.expand_dims(primer_seq, axis=0).astype(np.int32)
             primer_seq = torch.from_numpy(primer_seq)
             primer_seq_list.append(primer_seq)
-        print(len(primer_seq_list))
+
 
     primer_process_time = time() - primer_process_time_begin
     generation_time_begin = time()
