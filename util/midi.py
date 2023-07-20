@@ -693,13 +693,14 @@ def get_first_k_measures(text_list: str, k: int):
     """
         input expect a valid, well-formated text list of piece
         return the text list of the number 1 to k (inclusive) measures of the piece
+        end-of-sequence token would be DROPPED
         but if k = 0, return jsut the head section
     """
     assert isinstance(k, int) and k >= 0, f'k must be positive integer or zero, get {k}'
     m_count = 0
     end_index = 0
     for i, text in enumerate(text_list):
-        if text[0] == tokens.MEASURE_EVENTS_CHAR:
+        if text[0] == tokens.MEASURE_EVENTS_CHAR or text == tokens.END_TOKEN_STR:
             m_count += 1
         if m_count > k:
             end_index = i
@@ -713,6 +714,7 @@ def get_after_k_measures(text_list: str, k: int):
     """
         input expect a valid, well-formated text list of piece
         return the text list of the number k + 1 to the last measures of the piece
+        end-of-sequence token would be KEEPED
     """
     assert isinstance(k, int) and k > 0, f'k must be positive integer, get {k}'
     m_count = 0
