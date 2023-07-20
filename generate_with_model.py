@@ -1,9 +1,12 @@
 from argparse import ArgumentParser, Namespace
+from functools import partial
 import os
 import subprocess
 import tempfile
 from time import time
+from tqdm import tqdm
 from traceback import format_exc
+from typing import List
 
 import numpy as np
 import torch
@@ -51,8 +54,8 @@ def read_args():
         '--sample-number', '-n',
         type=int,
         default=1,
-        help='How many sample will be generated. Default is %(default)s\
-            Set it as -1 to use all primers in the primer list if provided.'
+        help='How many sample will be generated. Default is %(default)s.\
+            Set it as 0 to use all primers in the primer list if provided.'
     )
     parser.add_argument(
         '--output-text', '-o',
@@ -165,25 +168,48 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
         print(format_exc())
 
 
-def primer_file_to_test_list(primer_path: str, primer_length: int, length_unit: str, vocabs, worker_number: int = 1) -> list:
-    try:
-        primer_piece = midi_to_piece(MidiFile(primer_path), **vocabs.paras)
-    except Exception:
-        return []
+def cut_primer_piece(primer_piece: str, primer_length: int, length_unit: str, nth: int) -> str:
     primer_text_list = primer_piece.split(' ')
     if length_unit == 'measure':
         primer_text_list = get_first_k_measures(primer_text_list, primer_length)
     elif length_unit == 'nth':
-        primer_text_list = get_first_k_nths(primer_text_list, vocabs.paras['nth'], primer_length)
-    primer_text_list.append(END_TOKEN_STR)
-    primer_piece = ' '.join(primer_text_list)
+        primer_text_list = get_first_k_nths(primer_text_list, nth, primer_length)
+    if primer_text_list[-1] != END_TOKEN_STR:
+        primer_text_list.append(END_TOKEN_STR)
+    processed_primer_piece = ' '.join(primer_text_list)
+    return processed_primer_piece
+
+
+def midi_file_list_to_text_list_list(
+        primer_paths: List[str],
+        primer_length: int,
+        length_unit: str,
+        vocabs,
+        worker_number: int = 1) -> List[List[str]]:
+    """
+        Read the midi files, cut them, write them into corpus, apply BPE, return the primers in text_list form
+    """
+    primer_piece_list: List[str] = []
+    for midi_path in tqdm(primer_paths, desc='Encoding midi files to text representation'):
+        try:
+            p = midi_to_piece(MidiFile(midi_path), **vocabs.paras)
+            primer_piece_list.append(p)
+        except Exception:
+            pass
+    # apply measure and nth cut
+    partial_cut_primer_piece = partial(
+        cut_primer_piece,
+        primer_length=primer_length, length_unit=length_unit, nth=vocabs.paras['nth']
+    )
+    primer_piece_list = list(map(partial_cut_primer_piece, primer_piece_list))
 
     if len(vocabs.bpe_shapes_list) > 0 and primer_length > 0:
+        print('Applying BPE')
         # model use BPE, then apply it
         with tempfile.TemporaryDirectory() as tmp_in_corpus_dir_path:
             # make tmp corpus
             with open(to_corpus_file_path(tmp_in_corpus_dir_path), 'w+', encoding='utf8') as tmp_corpus_file:
-                tmp_corpus_file.write(primer_piece + '\n')
+                tmp_corpus_file.write('\n'.join(primer_piece_list) + '\n')
             with open(to_paras_file_path(tmp_in_corpus_dir_path), 'w+', encoding='utf8') as tmp_paras_file:
                 tmp_paras_file.write(dump_corpus_paras(vocabs.paras))
             # make tmp shape_vocab
@@ -210,20 +236,33 @@ def primer_file_to_test_list(primer_path: str, primer_length: int, length_unit: 
                 subprocess.run(apply_args, check=True, stdout=subprocess.DEVNULL)
                 # get content from output
                 with open(to_corpus_file_path(tmp_out_corpus_dir_path), 'r', encoding='utf8') as tmp_out_corpus:
-                    merged_piece = tmp_out_corpus.readline().strip() # get first piece
-                primer_text_list = merged_piece.split(' ')
+                    merged_piece_list = [
+                        line.strip()
+                        for line in tmp_out_corpus.readlines()
+                    ]
+                primer_text_list_list = [
+                    merged_piece.split(' ')
+                    for merged_piece in merged_piece_list
+                ]
     else:
-        primer_text_list = primer_piece.split(' ')
+        primer_text_list_list = [
+            piece.split(' ')
+            for piece in primer_piece_list
+        ]
 
-    if primer_text_list[-1] == END_TOKEN_STR:
-        primer_text_list.pop()
+    # remove end-of-sequence token
+    for text_list in primer_text_list_list:
+        if text_list[-1] == END_TOKEN_STR:
+            text_list.pop()
 
-    if length_unit == 'token':
-        if len(primer_text_list) < primer_length:
-            raise ValueError(f'primer_text_list has less than primer_length={primer_length} tokens.')
-        primer_text_list = primer_text_list[:primer_length]
+    # apply token cut
+    primer_text_list_list = [
+        text_list[:primer_length]
+        for text_list in primer_text_list_list
+        if len(text_list) >= primer_length
+    ]
 
-    return primer_text_list
+    return primer_text_list_list
 
 
 def main():
@@ -240,6 +279,7 @@ def main():
     if not torch.cuda.is_available():
         print('--use-device is set to \'cuda\' but found no CUDA device. Changed to CPU.')
         args.use_device = 'cpu'
+    assert args.sample_number > 0
 
     # model
     model = torch.load(args.model_file_path, map_location=torch.device(args.use_device))
@@ -264,40 +304,33 @@ def main():
             raise FileNotFoundError()
 
         if args.primer.endswith('.mid') or args.primer.endswith('.midi'):
-            assert args.sample_number > 0
-            primer_text_list = primer_file_to_test_list(args.primer, args.primer_length, args.unit, model.vocabs, args.workers)
-            primer_text_list_list = [primer_text_list] * args.sample_number
+            print('From midi file:', args.primer)
+            primer_path_list = [args.primer]
+            primer_text_list_list = midi_file_list_to_text_list_list(primer_path_list, args.primer_length, args.unit, model.vocabs, args.workers)
+            primer_text_list_list = primer_text_list_list * args.sample_number
         else: # we guess it is a list of paths to midi files
+            print('From path list:', args.primer)
+            
             primer_path_list = open(args.primer, 'r', encoding='utf8').readlines()
-            if args.sample_number == -1:
-                args.sample_number = len(primer_path_list)
-            else:
+            print(f'Read {len(primer_path_list)} lines')
+            
+            if args.sample_number != 0:
                 primer_path_list = primer_path_list[:args.sample_number]
             primer_path_list = [p.strip() for p in primer_path_list]
             assert all(p.endswith('.mid') or p.endswith('.midi') for p in primer_path_list)
             assert all(os.path.isfile(p) for p in primer_path_list)
-            primer_text_list_list = [
-                primer_file_to_test_list(pp, args.primer_length, args.unit, model.vocabs, args.workers)
-                for pp in primer_path_list[:args.sample_number]
-            ]
-            primer_text_list_list = [
-                text_list for text_list in primer_text_list_list
-                if len(text_list) > 0
-            ]
-            if len(primer_text_list_list) != 1 or args.sample_number != 1:
-                if len(primer_text_list_list) < args.sample_number:
-                    print(
-                        f'The number of primer paths in the list is {len(primer_path_list)}, \
-                        less than required sample number ({args.sample_number}). \
-                        Will only generate {len(primer_path_list)} pieces.'
-                    )
-                    args.sample_number = len(primer_path_list)
-                else:
-                    print(f'The number of primer paths in the list is {len(primer_path_list)}, \
-                        greater than or equal to required sample number ({args.sample_number}). \
-                        Will used first {args.sample_number} to generate pieces.'
-                    )
-                    print('Hint: Set sample number as -1 to use all primers in the primer list.')
+            print(f'Keep first {len(primer_path_list)} lines with sample number setting to {args.sample_number}')
+            print('Hint: Set sample number as 0 to keep all primers in the primer list.')
+            
+            primer_text_list_list = midi_file_list_to_text_list_list(primer_path_list, args.primer_length, args.unit, model.vocabs, args.workers)
+            assert len(primer_text_list_list) != 0
+            print(f'Processed {len(primer_text_list_list)} files successfully.')
+            if len(primer_text_list_list) < args.sample_number:
+                print(
+                    f'Primer number less than designated sample number {args.sample_number}:',
+                    'will only generate', len(primer_text_list_list), 'pieces.'
+                )
+                args.sample_number = len(primer_text_list_list)
 
         for primer_text_list in primer_text_list_list:
             # turn primer text list into array
@@ -308,8 +341,8 @@ def main():
             primer_seq = torch.from_numpy(primer_seq)
             primer_seq_list.append(primer_seq)
 
-
     primer_process_time = time() - primer_process_time_begin
+    print('Begin Generation')
     generation_time_begin = time()
 
     if args.sample_number == 1:
