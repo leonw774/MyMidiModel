@@ -240,10 +240,10 @@ def midi_file_list_to_text_list_list(
                         line.strip()
                         for line in tmp_out_corpus.readlines()
                     ]
-                primer_text_list_list = [
-                    merged_piece.split(' ')
-                    for merged_piece in merged_piece_list
-                ]
+        primer_text_list_list = [
+            merged_piece.split(' ')
+            for merged_piece in merged_piece_list
+        ]
     else:
         primer_text_list_list = [
             piece.split(' ')
@@ -256,11 +256,12 @@ def midi_file_list_to_text_list_list(
             text_list.pop()
 
     # apply token cut
-    primer_text_list_list = [
-        text_list[:primer_length]
-        for text_list in primer_text_list_list
-        if len(text_list) >= primer_length
-    ]
+    if length_unit == 'token':
+        primer_text_list_list = [
+            text_list[:primer_length]
+            for text_list in primer_text_list_list
+            if len(text_list) >= primer_length
+        ]
 
     return primer_text_list_list
 
