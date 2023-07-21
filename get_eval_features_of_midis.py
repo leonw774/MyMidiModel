@@ -13,7 +13,7 @@ from typing import List, Dict
 import random
 
 from miditoolkit import MidiFile
-from mido import MidiFile as mido_MidiFile
+from mido import MidiFile as mido_MidiFile, UnknownMetaMessage
 import numpy as np
 from pandas import Series
 from tqdm import tqdm
@@ -27,6 +27,15 @@ from util.evaluations import (
     overlapping_area_of_estimated_gaussian,
     histogram_intersection
 )
+
+
+def fix_typeerror_from_msg_copy(mido_midi: mido_MidiFile):
+    for i, track in enumerate(mido_midi.tracks):
+        mido_midi.tracks[i] = [
+            msg
+            for msg in track
+            if msg.__class__ != UnknownMetaMessage
+        ]
 
 
 def parse_args():
@@ -194,10 +203,17 @@ def main():
         eval_features = [f for f in eval_features if f is not None]
         sampled_midis_eval_features += eval_features
         sampled_midi_file_paths += uncorrupt_midi_file_paths
-        sampled_midi_length += [
-            mido_MidiFile(midi_path).length
-            for midi_path in uncorrupt_midi_file_paths
-        ]
+        for midi_path in uncorrupt_midi_file_paths:
+            midomidi = mido_MidiFile(midi_path)
+            try:
+                ml = midomidi.length
+                sampled_midi_length.append(ml)
+            except TypeError:
+                # stupid bug
+                fix_typeerror_from_msg_copy(midomidi)
+                ml = midomidi.length
+                sampled_midi_length.append(ml)
+
         print(f'Processed {len(eval_features)} uncorrupted files out of {len(random_indices)} random indices')
 
     logging.info(
