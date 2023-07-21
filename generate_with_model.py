@@ -190,7 +190,7 @@ def midi_file_list_to_text_list_list(
         Read the midi files, cut them, write them into corpus, apply BPE, return the primers in text_list form
     """
     primer_piece_list: List[str] = []
-    for midi_path in tqdm(primer_paths, desc='Encoding midi files to text representation'):
+    for midi_path in tqdm(primer_paths, desc='Encoding midi files to text representation', ncols=0):
         try:
             p = midi_to_piece(MidiFile(midi_path), **vocabs.paras)
             primer_piece_list.append(p)
@@ -354,7 +354,8 @@ def main():
             print(f'generated {args.output_file_path}_{i+1}')
 
     generation_time = time() - generation_time_begin
-    print(f'overhead_time:{overhead_time}\tprimer_process_time:{primer_process_time}\tgeneration_time:{generation_time}')
+    total_time = overhead_time + primer_process_time + generation_time
+    print(f'overhead_time:{overhead_time}\tprimer_process_time:{primer_process_time}\tgeneration_time:{generation_time}\ttotal_time:{total_time}')
 
     return 0
 
