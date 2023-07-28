@@ -72,6 +72,11 @@ int mergeCounters(std::map<T, S> counterArray[], size_t arraySize) {
 
 size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit) {
     size_t totalNeighborNumber = 0;
+    // calculate the relative offset of all shapes in shapeDict
+    std::vector<unsigned int> relOffsets(shapeDict.size(), 0);
+    for (int t = 0; t < shapeDict.size(); ++t) {
+        relOffsets[t] = getMaxRelOffset(shapeDict[t]);
+    }
     // for each piece
     #pragma omp parallel for reduction(+: totalNeighborNumber)
     for (int i = 0; i < corpus.piecesMN.size(); ++i) {
@@ -81,8 +86,7 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // printTrack(corpus.piecesMN[i][j], shapeDict, k, 1);
                 unsigned int onsetTime = corpus.piecesMN[i][j][k].onset;
-                unsigned int maxRelOffset = getMaxRelOffset(shapeDict[corpus.piecesMN[i][j][k].shapeIndex]);
-                unsigned int offsetTime = corpus.piecesMN[i][j][k].onset + maxRelOffset * corpus.piecesMN[i][j][k].unit;
+                unsigned int offsetTime = onsetTime + relOffsets[corpus.piecesMN[i][j][k].shapeIndex] * corpus.piecesMN[i][j][k].unit;
                 unsigned int immdFollowOnset = -1;
                 int n = 1;
                 while (k+n < corpus.piecesMN[i][j].size() && n < MultiNote::neighborLimit) {
