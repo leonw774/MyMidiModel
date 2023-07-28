@@ -118,6 +118,7 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
 
 Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const std::vector<Shape>& shapeDict) {
     if (rmn.onset < lmn.onset) {
+        // return getShapeOfMultiNotePair(rmn, lmn, shapeDict);
         throw std::runtime_error("right multi-note has smaller onset than left multi-note");
     }
     Shape lShape = shapeDict[lmn.shapeIndex],
@@ -127,7 +128,6 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
     unsigned int leftUnit = lmn.unit;
     unsigned int rightUnit = rmn.unit;
     Shape pairShape;
-    bool badShape = false;
 
     unsigned int unitAndOnsets[rightSize*2+1];
     for (int i = 0; i < rightSize; ++i) {
@@ -173,7 +173,7 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
 }
 
 
-double calculateAvgMulpiSize(const Corpus& corpus, bool ingoreVelcocity) { // ingoreVelcocity is default false
+double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelcocity) { // ignoreVelcocity is default false
     unsigned int max_thread_num = omp_get_max_threads();
     std::vector<uint8_t> multipiSizes[max_thread_num];
     #pragma omp parallel for
@@ -185,21 +185,10 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ingoreVelcocity) { // in
             // value: occurence count
             std::map< uint64_t, uint8_t > thisTrackMulpiSizes;
 
-            unsigned int measureCursor = 0;
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
-                // update measureCursor
-                while (measureCursor < corpus.piecesTS[i].size() - 1) {
-                    if (!corpus.piecesTS[i][measureCursor].getT()) {
-                        if (corpus.piecesMN[i][j][k].onset < corpus.piecesTS[i][measureCursor+1].onset) {
-                            break;
-                        }
-                    }
-                    measureCursor++;
-                }
-
                 uint64_t key = corpus.piecesMN[i][j][k].onset;
                 key |= ((uint64_t) corpus.piecesMN[i][j][k].unit) << 32;
-                if (!ingoreVelcocity) {
+                if (!ignoreVelcocity) {
                     key |= ((uint64_t) corpus.piecesMN[i][j][k].vel) << 40;
                 }
                 thisTrackMulpiSizes[key] += 1;
@@ -264,6 +253,7 @@ std::vector<std::pair<Shape, unsigned int>> shapeScoring(
                         if (corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel) continue;
                     }
                     else {
+                        // mulpi
                         if (corpus.piecesMN[i][j][k].onset != corpus.piecesMN[i][j][k+n].onset) break;
                         if (corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel) continue;
                         if (corpus.piecesMN[i][j][k].unit != corpus.piecesMN[i][j][k+n].unit) continue;
