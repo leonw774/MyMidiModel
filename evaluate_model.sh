@@ -19,18 +19,28 @@ test -z "$nucleus_sampling_threshold" && nucleus_sampling_threshold=1.0
 test -n "$seed" && seed_option="--seed $seed"
 test -n "$midi_to_piece_paras" && midi_to_piece_paras_option="--midi-to-piece-paras ${midi_to_piece_paras}"
 
-sample_number=$(wc -l < $test_pathlist)
-
 echo "evaluated_model.sh start." | tee -a "$log_path"
-echo "midi_dir_path=${midi_dir_path} test_pathlist=${test_pathlist} primer_measure_length=${primer_measure_length} sample_number=${sample_number}" | tee -a "$log_path"
-echo "model_dir_path=${model_dir_path} midi_to_piece_paras_option=${midi_to_piece_paras_option} seed_option=${seed_option}" | tee -a "$log_path"
-echo "num_workers=${num_workers} log_path=${log_path} softmax_temperature=${softmax_temperature} nucleus_sampling_threshold=${nucleus_sampling_threshold}" | tee -a "$log_path"
+echo "midi_dir_path=${midi_dir_path} test_pathlist=${test_pathlist} primer_measure_length=${primer_measure_length} \
+      eval_sample_number=${eval_sample_number} sample_number=${sample_number} model_dir_path=${model_dir_path} \
+      midi_to_piece_paras_option=${midi_to_piece_paras_option} seed_option=${seed_option} num_workers=${num_workers} \
+      log_path=${log_path} softmax_temperature=${softmax_temperature} nucleus_sampling_threshold=${nucleus_sampling_threshold}" | tee -a "$log_path"
 
-if [ "$sample_number" == 0 ]; then
-    echo "No test files."
-    echo "evaluate_model.py exit."
-    exit 0
+test_file_number=$(wc -l < $test_pathlist)
+if [ -n "$eval_sample_number" ] && [ "$eval_sample_number" -gt 0 ]; then
+    sample_number=$eval_sample_number
 else
+    if [ "$test_file_number" == 0 ]; then
+        echo "Cannot decide sample number: there is no test files and eval_sample_number is not positive integer." | tee -a "$log_path"
+        echo "evaluate_model.py exit." | tee -a "$log_path"
+        exit 0
+    else
+        echo "Using the number of test files as sample number." | tee -a "$log_path"
+        sample_number=$test_file_number
+    fi
+fi
+
+if [ "$test_file_number" -gt 0 ]; then
+    # Have test files, then get their features
     test_eval_feature_path="${midi_dir_path}/eval_features.json"
     test_primers_eval_feature_path="${midi_dir_path}/eval_features_primer${primer_measure_length}.json"
     primers_dir_path="${midi_dir_path}/primers${primer_measure_length}"
@@ -92,6 +102,11 @@ echo "Get evaluation features of ${model_dir_path}/eval_samples/uncond" | tee -a
 python3 get_eval_features_of_midis.py $seed_option $midi_to_piece_paras_option --log $log_path --sample-number $sample_number \
     --workers $num_workers --reference-file-path "$test_eval_feature_path" "${model_dir_path}/eval_samples/uncond"
 test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+
+if [ "$test_file_number" == 0 ]; then
+    echo "There is no test files so instrument-conditioned and primer-continuation are omitted." | tee -a "$log_path"
+    exit 0
+fi
 
 ### Evaluate model instrument-conditiond generation
 

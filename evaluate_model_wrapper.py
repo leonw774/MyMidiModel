@@ -40,6 +40,12 @@ def parse_args():
         default=[1.0]
     )
     parser.add_argument(
+        '--eval-sample-number',
+        type=str,
+        default='0',
+        help='If this is not set, will use the number of lines in test_pathlist'
+    )
+    parser.add_argument(
         '--seed',
         type=int,
         nargs='?',
@@ -68,6 +74,10 @@ def parse_args():
 def main():
     args = parse_args()
     args_dict = vars(args)
+    try:
+        args_dict['eval_sample_number'] = int(args_dict['eval_sample_number'])
+    except ValueError:
+        args_dict['eval_sample_number'] = '0'
     # push
     for k, v in args_dict.items():
         if isinstance(v, list):

@@ -12,9 +12,11 @@
 
 ## Configuration Files (`configs`)
 
-- Config files in `configs/corpus` are parameters for `midi_to_corpus.py` and `make_arrays.py` (`MAX_TRACK_NUMBER`, `MAX_DURATION`, etc.)
-- Config files in `configs/bpe` are parameters for `bpe/learn_vocabs` (implementation of Multi-note BPE)
-- Config files in `configs/train` are parameters for `train.py`
+- Files in `configs/corpus` are parameters for `midi_to_corpus.py` and `make_arrays.py` (`MAX_TRACK_NUMBER`, `MAX_DURATION`, etc.)
+- Files in `configs/bpe` are parameters for `bpe/learn_vocabs` (implementation of Multi-note BPE)
+- Files in `configs/train` are parameters for `train.py`
+- Files in `configs/test` are lists of relative paths of midi files to be used as test files in datasets. They are referenced as a parameter in files of `configs/corpus`.
+- Files in `configs/eval_midi_to_piece_paras` are a parameter for `evaluate_model.sh` and `evaluated_model_wrapper.py`. They are referenced as a parameter in files of `configs/train`. We don't set it though cause the default is written in the code, but if you want a different parameter you can make a new file and reference the path.
 
 
 ## Corpus Structure (`data/corpus`)
@@ -23,7 +25,7 @@ Corpi are located at `data/corpus`. A complete "corpus" is directory containing 
 
 - `corpus`: A text file. Each `\n`-separated line is a text representation of a midi file. This is the "main form" of the representation. Created by `midi_to_corpus.py`.
 - `paras`: A yaml file that contains parameters of pre-processing used by `midi_to_corpus.py`. Created by `midi_to_corpus.py`.
-- `pathlist`: A text file. Each `\n`-separated line is the path of midi file corresponding to text representation in `corpus`. Created by `midi_to_corpus.py`.
+- `pathlist`: A text file. Each `\n`-separated line is the relative path of midi file corresponding to the text representation in `corpus`. Created by `midi_to_corpus.py`.
 - `vocabs.json`: The vocabulary to be used by the model. The format is defined in `util/vocabs.py`. Created by `make_arrays.py`.
 - `arrays.npz`: A zip file of numpy arrays in `.npy` format. Can be accessed by `numpy.load()` and it will return an instance of `NpzFile` class. This is the "final form" of the representation (i.e. include pre-computed positional encoding) that would be used to train model. Created by `make_arrays.py`.
 
@@ -51,7 +53,7 @@ Source codes:
 - `learn_vocab.cpp`
 - `functions.cpp` and `functions.hpp`: Other functions and algorithms.
 
-They should compile to:
+They should compile to two binaries with `make -C bpe/`:
 
 - `apply_vocab`: Apply merge operations with a known shape list to a corpus file. Output a new corpus file.
 - `learn_vocab`: Do Multi-node BPE to a corpus file. Output a new corpus file and a shape list in `shape_vocab`.
