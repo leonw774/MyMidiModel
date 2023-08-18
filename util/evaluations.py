@@ -209,9 +209,9 @@ def piece_to_features(
         max_token_number: int = int(1e4)) -> Dict[str, float]:
     '''
         Return:
-        - pitch class histogram entropy
-        - duration means and variant
-        - velocity means and variant
+        - pitch class histogram and entropy
+        - duration distribution, means and variant
+        - velocity histogram, means and variant
         - instrumentation self-similarity
         - grooving self-similarity
     '''
