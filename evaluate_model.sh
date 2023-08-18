@@ -140,7 +140,7 @@ else
     echo "Generating $sample_number prime-continuation samples" | tee -a "$log_path"
     mkdir "${model_dir_path}/eval_samples/primer_cont"
     start_time=$SECONDS
-    python3 generate_with_model.py $seed_option -p "test_primer_paths" -l 4 -n $sample_number --no-tqdm \
+    python3 generate_with_model.py $seed_option -p "test_primer_paths" -l $primer_measure_length -n $sample_number --no-tqdm \
         --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
         "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/primer_cont"
     duration=$(( $SECONDS - start_time ))
