@@ -10,6 +10,18 @@ if [ -z "$midi_dir_path" ] || [ -z "$test_pathlist" ] || [ -z "$primer_measure_l
     exit 1
 fi
 
+if [ ! -d "$midi_dir_path" ]; then
+    echo "$midi_dir_path is not a directory. " | tee -a "$log_path"
+    echo "evaluate_model.py exit." | tee -a "$log_path"
+    exit 1
+fi
+
+if [ ! -d "$test_pathlist" ]; then
+    echo "$test_pathlist is not a directory. " | tee -a "$log_path"
+    echo "evaluate_model.py exit." | tee -a "$log_path"
+    exit 1
+fi
+
 # optionals: set default and make option string
 test -z "$log_path" && log_path=/dev/null
 test -z "$num_workers" && num_workers=1
@@ -32,7 +44,7 @@ else
     if [ "$test_file_number" == 0 ]; then
         echo "Cannot decide sample number: there is no test files and eval_sample_number is not positive integer." | tee -a "$log_path"
         echo "evaluate_model.py exit." | tee -a "$log_path"
-        exit 0
+        exit 1
     else
         echo "Using the number of test files as sample number." | tee -a "$log_path"
         sample_number=$test_file_number
