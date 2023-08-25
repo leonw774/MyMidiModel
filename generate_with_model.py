@@ -14,7 +14,7 @@ from miditoolkit import MidiFile
 
 from util.tokens import BEGIN_TOKEN_STR, END_TOKEN_STR
 from util.midi import midi_to_piece, piece_to_midi, get_first_k_measures, get_first_k_nths
-from util.corpus_reader import CorpusReader
+# from util.corpus_reader import CorpusReader
 from util.corpus import text_list_to_array, to_corpus_file_path, to_paras_file_path, dump_corpus_paras, get_full_array_string
 from util.model import MyMidiTransformer
 from util.generation import generate_piece, permute_track_number
@@ -27,9 +27,9 @@ def read_args():
         type=str,
         default=None,
         help='A MIDI file, or a text file containing a list of MIDI file paths \
-            that would be used as the primer in conditional generation.\n\
-            If the extension is "*.mid" or "*.midi", I will try to parse it as MIDI.\n\
-            Otherwise, I will try to parse it as a list of paths to midi files, separated by newlines.\n\
+            that would be used as the primer in conditional generation. \
+            If the extension is "*.mid" or "*.midi", I will try to parse it as MIDI. \
+            Otherwise, I will try to parse it as a list of paths to midi files, separated by newlines. \
             If this option is not set, unconditional generation will be performed.'
     )
     parser.add_argument(
@@ -37,7 +37,7 @@ def read_args():
         type=int,
         default=0,
         help='How long from the start the primer music should be used. Default is %(default)s.\
-            The unit of these number is controlled with "--unit" option.\n\
+            The unit of these number is controlled with "--unit" option. \
             When --unit is "nth", the the length is counted with the token\'s start time.'
     )
     parser.add_argument(
@@ -45,17 +45,20 @@ def read_args():
         choices=['measure', 'nth', 'token'],
         default='measure',
         help='Specify the unit of PRIMER_LENGTH. \
-            If use "measure", primer will be the first PRIMER_LENGTH measures of the piece no matter how long is actually is.\n\
+            If use "measure", primer will be the first PRIMER_LENGTH measures of the piece no matter how long it actually is. \
             If use "nth", the length of a "nth"-note is the unit. \
-            The value of "nth" is determined by the setting of the dataset on which the model trained.\n\
+            The value of "nth" is determined by the setting of the dataset on which the model trained. \
             If use "tokens", primer will be the first PRIMER_LENGTH tokens of the piece.'
     )
     parser.add_argument(
         '--sample-number', '-n',
         type=int,
         default=1,
-        help='How many sample will be generated. Default is %(default)s.\
-            Set it as 0 to use all primers in the primer list if provided.'
+        help='How many sample will be generated. Default is %(default)s. \
+            If no primer used, it simply generate SAMPLE_NUMBER samples. \
+            If primer is a midi file, it generate SAMPLE_NUMBER samples using that primer repeatly. \
+            If primer is list of midi file paths, it generate samples with the first SAMPLE_NUMBER primers. \
+            Set it to 0 to use all primers in the list.'
     )
     parser.add_argument(
         '--output-text', '-o',
@@ -69,7 +72,7 @@ def read_args():
         '--max-generation-step', '--step', '-s',
         type=int,
         default=-1,
-        help='The maximum TOKENS in each sample would be generated. Default is models max sequence length.'
+        help='The maximum TOKENS in each sample would be generated. Default is the model\'s max sequence length.'
     )
     parser.add_argument(
         '--no-prob-adjustment',
@@ -93,7 +96,7 @@ def read_args():
         '--try-count-limit',
         type=int,
         default=100,
-        help='The model may fail to generate next token that satisfy the rule.\
+        help='The model may fail to generate next token that satisfy the format rule.\
             The generation ends when its trying times pass this limit.\
             Default is %(default)s.'
     )
@@ -112,7 +115,7 @@ def read_args():
     parser.add_argument(
         '--print-exception',
         action='store_true',
-        help='When model fail to generate next toke that satisfy the rule. Print out the exception message.'
+        help='When model fail to generate next token that satisfy the format rule. Print out the exception message.'
     )
     parser.add_argument(
         '--no-tqdm',
@@ -131,8 +134,8 @@ def read_args():
     parser.add_argument(
         'output_file_path',
         type=str,
-        help='The path of generated MIDI file(s).\n\
-            If SAMPLE_NUMBER == 1 (default), the path will be "{OUTPUT_FILE_PATH}.mid".\n\
+        help='The path of generated MIDI file(s). \
+            If SAMPLE_NUMBER == 1 (default), the path will be "{OUTPUT_FILE_PATH}.mid". \
             If SAMPLE_NUMBER > 1, the paths will be "{OUTPUT_FILE_PATH}_{i}.mid", where i is 1 ~ SAMPLE_NUMBER.'
     )
 
@@ -321,7 +324,7 @@ def main():
             assert all(p.endswith('.mid') or p.endswith('.midi') for p in primer_path_list)
             assert all(os.path.isfile(p) for p in primer_path_list)
             print(f'Keep first {len(primer_path_list)} lines with sample number setting to {args.sample_number}')
-            print('Hint: Set sample number as 0 to keep all primers in the primer list.')
+            print('Hint: Set sample number to 0 to keep all primers in the primer list.')
             
             primer_text_list_list = midi_file_list_to_text_list_list(primer_path_list, args.primer_length, args.unit, model.vocabs, args.workers)
             assert len(primer_text_list_list) != 0
