@@ -25,9 +25,9 @@ def parse_args():
         '--nth',
         dest='nth',
         type=int,
-        default=96,
-        help='The time unit length would be the length of a n-th note. Must be multiples of 4. \
-            Default is 96.'
+        default=32,
+        help='The time unit length would be the length of a n-th note. Must be a multiple of 4. \
+            Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--max-track-number',
@@ -41,7 +41,7 @@ def parse_args():
         '--max-duration',
         dest='max_duration',
         type=int,
-        default=96,
+        default=32,
         help='Max length of duration in unit of nth note. Default is %(default)s.'
     )
     handler_args_parser.add_argument(
@@ -49,7 +49,7 @@ def parse_args():
         dest='velocity_step',
         type=int,
         default=16,
-        help='Snap the value of velocities to multiple of this number. Default is %(default)s.'
+        help='Snap the value of velocities to multiples of this number. Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--tempo-quantization',

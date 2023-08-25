@@ -21,7 +21,7 @@ class MidiDataset(Dataset):
             self,
             data_dir_path: str,
             max_seq_length: int,
-            test_pathlist: str = None,
+            test_pathlist: List[str] = None,
             virtual_piece_step_ratio: float = 0,
             permute_mps: bool = False,
             permute_track_number: bool = False,
@@ -36,7 +36,9 @@ class MidiDataset(Dataset):
               The start point of samples will be at the first measure token that has index just greater than
               max_seq_length * virtual_piece_step_ratio * N, where N is positive integer. Default is 0.
 
-            - permute_mps: Whether or not the dataset should permute all the maximal permutable subsequences
+            - test_pathlist: The paths of files to exclude.
+
+            - permute_mps: Whether or not the dataset should permute all the maximal permutable subarrays
               before returning in `__getitem__`. Default is False.
 
             - permute_track_number: Permute all the track numbers relative to the instruments, as data augmentation.
@@ -61,7 +63,7 @@ class MidiDataset(Dataset):
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
         all_pathlist = [p.strip() for p in open(os.path.join(data_dir_path, 'pathlist'), 'r', encoding='utf8').readlines()]
         if test_pathlist is not None and test_pathlist != '':
-            assert os.path.exists(test_pathlist)
+            # assert os.path.exists(test_pathlist)
             test_pathlist = [p.strip() for p in open(test_pathlist, 'r', encoding='utf8').readlines()]
         else:
             test_pathlist = []
@@ -84,7 +86,7 @@ class MidiDataset(Dataset):
                 for filenum, midi_filepath in enumerate(all_pathlist)
                 if not any(midi_filepath.endswith(test_path) for test_path in test_pathlist)
                 # use endswith because the pathlist records the relative paths to midi files from project's root
-                # while test_pathlist record relative paths to midi files from dataset's root
+                # while test_pathlist MAY record relative paths to midi files from dataset's root OR project's root
             ]
             self.pieces = {
                 str(filenum): npz_file[str(filenum)]

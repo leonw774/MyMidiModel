@@ -1,6 +1,6 @@
 # MyMidiModel
 
-## Overall
+## How to run the code
 
 1. Create environment with conda: `conda env create --name {ENV_NAME} --file environment.yml`. You may need to clear cache first by `pip cache purge` and `conda clean --all`.
 2. Make you own copy of config files (e.g.: `./config/midi/my_setting.sh`) if you want to make some changes to the settings.
@@ -10,7 +10,7 @@
    - You can recreate our experiment by running `experiment*.sh` files.
 
 
-## Configuration Files (`configs`)
+## Configuration Files (`configs/`)
 
 - Files in `configs/corpus` are parameters for `midi_to_corpus.py` and `make_arrays.py` (`MAX_TRACK_NUMBER`, `MAX_DURATION`, etc.)
 - Files in `configs/bpe` are parameters for `bpe/learn_vocabs` (implementation of Multi-note BPE)
@@ -19,9 +19,14 @@
 - Files in `configs/eval_midi_to_piece_paras` are a parameter for `evaluate_model.sh` and `evaluated_model_wrapper.py`. They are referenced as a parameter in files of `configs/train`. We don't set it though cause the default is written in the code, but if you want a different parameter you can make a new file and reference the path.
 
 
-## Corpus Structure (`data/corpus`)
+## Datasets (`data/midis/`)
 
-Corpi are located at `data/corpus`. A complete "corpus" is directory containing at least 5 files in the following list.
+The datasets we used, SymphonyNet_Dataset and lmd_full, are expected to be found under `data/midis`. However, the path `midi_to_corpus.py` would be looking is the `MIDI_DIR_PATH` and `TEST_PATHLIST` set in the the corpus configuration file. So it could be in any place you want. Just set the path right.
+
+
+## Corpus Structure (`data/corpus/`)
+
+Corpi are located at `data/corpus/`. A complete "corpus" is directory containing at least 5 files in the following list.
 
 - `corpus`: A text file. Each `\n`-separated line is a text representation of a midi file. This is the "main form" of the representation. Created by `midi_to_corpus.py`.
 - `paras`: A yaml file that contains parameters of pre-processing used by `midi_to_corpus.py`. Created by `midi_to_corpus.py`.
@@ -29,17 +34,12 @@ Corpi are located at `data/corpus`. A complete "corpus" is directory containing 
 - `vocabs.json`: The vocabulary to be used by the model. The format is defined in `util/vocabs.py`. Created by `make_arrays.py`.
 - `arrays.npz`: A zip file of numpy arrays in `.npy` format. Can be accessed by `numpy.load()` and it will return an instance of `NpzFile` class. This is the "final form" of the representation (i.e. include pre-computed positional encoding) that would be used to train model. Created by `make_arrays.py`.
 
-Other possible files and directories:
+Other possible files and directories are:
 
 - `stats/`: A directoy that contains statistics about the corpus. Some figures outputed by `make_arrays.py` and by `plot_bpe_log.py` would be end up here.
 - `shape_vocab`: A text file created by `bpe/learn_vocab`. If exist, it will be read by `make_arrays.py` to help create `vocabs.json`.
 - `arrays/`: A temporary directory for placing the `.npy` files before they are zipped.
 - `make_array_debug.txt`: A text file that shows array content of the first piece in the corpus. Created by `make_arrays.py`.
-
-
-## Midi files (`data/midis`)
-
-The our config files expect the midi dataset to locate in `data/midis`. However, it can be in any place, as long as the `MIDI_DIR_PATH` is set accordingly.
 
 
 ## Multinote BPE (`bpe/`)
@@ -59,7 +59,7 @@ They should compile to two binaries with `make -C bpe/`:
 - `learn_vocab`: Do Multi-node BPE to a corpus file. Output a new corpus file and a shape list in `shape_vocab`.
 
 
-## Models (`models`)
+## Models (`models/`)
 
 - Model can be created by `train.py`
 - Learning rate schedule is hard-coded warmup and linear decay.
@@ -97,8 +97,8 @@ They should compile to two binaries with `make -C bpe/`:
 ### Some terms used in function name
 
 - A **"midi"** expects a `miditoolkit.MidiFile` instance.
-- A **"piece"** expects a string that would appears in a `\n`-separated line in `corpus`.
-- A **"text list"** expects a list of strings that comes from `piece.split(' ')` or become a piece after `' '.join(text_list)`.
+- A **"piece"** expects a line from `corpus`, without tailing `\n`.
+- A **"text list"** expects a list of strings that comes from `piece.split(' ')` or could become a piece after `' '.join(text_list)`.
 - An **"array"** expects a 2-d numpy array that encoded a piece with respect to a vocabulary set.
 
 
@@ -122,13 +122,13 @@ Shell scripts
   - Use python's `argparse` module to make using `evaluate_model.sh` easier.
 - `evaluate_model.sh`
    1. Arguments are passed as environment variables
-   2. Get evaluation features of the training dataset with the randomly sampled midi files using `get_eval_features_of_midis.py`
+   2. Get evaluation features of the dataset's `TEST_PATHLIST` files using `get_eval_features_of_midis.py`
    3. Get evaluation features of the unconditional, instrument-informed, and prime continution generation result of the model using the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`
 - `experiment_apply_learned_shapes_to_other.sh`
 - `experiment_bpe_parameters.sh`
 - `experiment_full_model_and_ablation.sh`
 - `pipeline.sh`:
-  1. Pre-process training midi files into a corpus with `midi_to_corpus.py`
+  1. Pre-process midi files into a corpus with `midi_to_corpus.py`
   2. If `DO_BPE` is "true", then run `bpe/learn_vocab` to create a new merged corpus. After it is done, run `verify_corpus_equality.py` to make sure there are no errors and run `plot_bpe_log.py` to visualize the loggings.
   3. Make arrays file and vocabs file of the corpus with `make_arrays.py`
   4. Train a model on the corpus with `train.py`
