@@ -16,8 +16,8 @@ if [ ! -d "$midi_dir_path" ]; then
     exit 1
 fi
 
-if [ ! -d "$test_pathlist" ]; then
-    echo "$test_pathlist is not a directory. " | tee -a "$log_path"
+if [ ! -f "$test_pathlist" ]; then
+    echo "$test_pathlist is not a file. " | tee -a "$log_path"
     echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 1
 fi
