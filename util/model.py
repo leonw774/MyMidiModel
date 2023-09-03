@@ -196,7 +196,7 @@ class MyMidiTransformer(nn.Module):
         # emb_sum = sum(embs)
         emb_sum = reduce(torch.add, embs) # cool trick
         if self.not_use_mps_number:
-            potision_number = torch.arange(x.size(1)).repeat((x.size(0), 1))
+            potision_number = torch.arange(x.size(1)).repeat((x.size(0), 1)).to(x.device)
             # potision_number has shape (batch_size, seq_size)
             pos_emb = self.positional_embedding_layer(potision_number)
             emb_sum = emb_sum + pos_emb
