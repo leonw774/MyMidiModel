@@ -42,9 +42,10 @@ touch "$log_path"
 
 ######## MAKE CORPUS ########
 
-test "$CONTINUING_NOTE" != true && NO_CONTIN="[no_contin]" 
+test "$CONTINUING_NOTE" != true && NO_CONTIN="[no_contin]"
+test "$USE_MERGE_DRUMS" != true && NO_CONTIN="[no_merge_drums]"
 
-corpus_dir_path="data/corpus/${DATA_NAME}${NO_CONTIN}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}_v${VELOCITY_STEP}_t${TEMPO_MIN}_${CONTINUING_NOTE}_${TEMPO_MAX}_${TEMPO_STEP}"
+corpus_dir_path="data/corpus/${DATA_NAME}${NO_CONTIN}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}_v${VELOCITY_STEP}_t${TEMPO_MIN}_${TEMPO_MAX}_${TEMPO_STEP}"
 
 do_midi_to_corpus=true
 do_bpe=false
