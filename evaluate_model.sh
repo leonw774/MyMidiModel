@@ -11,13 +11,13 @@ if [ -z "$midi_dir_path" ] || [ -z "$test_pathlist" ] || [ -z "$primer_measure_l
 fi
 
 if [ ! -d "$midi_dir_path" ]; then
-    echo "$midi_dir_path is not a directory. " | tee -a "$log_path"
+    echo "midi_dir_path: $midi_dir_path is not a directory. " | tee -a "$log_path"
     echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 1
 fi
 
 if [ ! -f "$test_pathlist" ]; then
-    echo "$test_pathlist is not a file. " | tee -a "$log_path"
+    echo "test_pathlist: $test_pathlist is not a file. " | tee -a "$log_path"
     echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 1
 fi
