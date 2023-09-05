@@ -113,16 +113,23 @@ fi
 echo "Get evaluation features of ${model_dir_path}/eval_samples/uncond" | tee -a "$log_path" 
 python3 get_eval_features_of_midis.py $seed_option $midi_to_piece_paras_option --log $log_path --sample-number $sample_number \
     --workers $num_workers --reference-file-path "$test_eval_feature_path" "${model_dir_path}/eval_samples/uncond"
-test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+
+if [ $? -ne 0 ]; then
+    echo "Evaluation failed. evaluate_model.sh exit." | tee -a "$log_path";
+    rm test_primer_paths
+    exit 1
+fi
 
 if [ "$test_file_number" == 0 ]; then
     echo "There is no test files so instrument-conditioned and primer-continuation are omitted." | tee -a "$log_path"
+    rm test_primer_paths
     echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 0
 fi
 
 if [ "$only_eval_uncond" == true ]; then
     echo "only_eval_uncond is set and true so instrument-conditioned and primer-continuation are omitted." | tee -a "$log_path"
+    rm test_primer_paths
     echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 0
 fi
@@ -147,7 +154,12 @@ fi
 echo "Get evaluation features of ${model_dir_path}/eval_samples/instr-cond" | tee -a "$log_path"
 python3 get_eval_features_of_midis.py $seed_option $midi_to_piece_paras_option --log $log_path --sample-number $sample_number \
     --workers $num_workers --reference-file-path "$test_eval_feature_path" "${model_dir_path}/eval_samples/instr_cond"
-test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+
+if [ $? -ne 0 ]; then
+    echo "Evaluation failed. evaluate_model.sh exit." | tee -a "$log_path";
+    rm test_primer_paths
+    exit 1
+fi
 
 ### Evaluate model prime continuation
 
@@ -170,7 +182,12 @@ echo "Get evaluation features of ${model_dir_path}/eval_samples/primer_cont" | t
 python3 get_eval_features_of_midis.py $seed_option $midi_to_piece_paras_option --log $log_path --sample-number $sample_number \
     --primer-measure-length $primer_measure_length \
     --workers $num_workers --reference-file-path "$test_primers_eval_feature_path" "${model_dir_path}/eval_samples/primer_cont"
-test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+
+if [ $? -ne 0 ]; then
+    echo "Evaluation failed. evaluate_model.sh exit." | tee -a "$log_path";
+    rm test_primer_paths
+    exit 1
+fi
 
 rm test_primer_paths
 echo "evaluated_model.sh exit." | tee -a "$log_path" 
