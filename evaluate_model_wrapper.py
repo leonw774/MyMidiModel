@@ -52,6 +52,13 @@ def parse_args():
         default='',
         const=''
     )
+    parser.add_argument(
+        '--only-eval-uncond',
+        type=str,
+        default='',
+        choices=('', 'true', 'false'),
+        help='Set it to "true" to omit instr-cond and primer-cont genetation evaluation'
+    )
 
     # required
     parser.add_argument(

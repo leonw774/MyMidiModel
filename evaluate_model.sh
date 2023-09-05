@@ -117,6 +117,13 @@ test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_pa
 
 if [ "$test_file_number" == 0 ]; then
     echo "There is no test files so instrument-conditioned and primer-continuation are omitted." | tee -a "$log_path"
+    echo "evaluate_model.py exit." | tee -a "$log_path"
+    exit 0
+fi
+
+if [ "$only_eval_uncond" == true ]; then
+    echo "only_eval_uncond is set and true so instrument-conditioned and primer-continuation are omitted." | tee -a "$log_path"
+    echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 0
 fi
 

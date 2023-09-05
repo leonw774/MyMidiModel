@@ -207,10 +207,14 @@ if [ -n "${NO_EVAL+x}" ]; then
     exit 0
 fi
 
+# $ONLY_EVAL_UNCOND is used like this:
+# ONLY_EVAL_UNCOND=true ./pipeline ... ... ...
+
 python3 evaluate_model_wrapper.py \
     --model-dir-path "$model_dir_path" --num-workers $PROCESS_WORKERS --midi-to-piece-paras "$EVAL_MIDI_TO_PIECE_PARAS_FILE" \
     --log-path "$log_path" --softmax-temperature $SOFTMAX_TEMPERATURE --nucleus-sampling-threshold $NUCLEUS_THRESHOLD \
-    --eval-sample-number "$EVAL_SAMPLE_NUMBER" --seed "$SEED" -- "$MIDI_DIR_PATH" "$TEST_PATHLIST" $PRIMER_LENGTH
+    --eval-sample-number "$EVAL_SAMPLE_NUMBER" --seed "$SEED" --only-eval-uncond "$ONLY_EVAL_UNCOND" \
+    -- "$MIDI_DIR_PATH" "$TEST_PATHLIST" $PRIMER_LENGTH
 
 test "$?" -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
 echo "All done. pipeline.sh exit." | tee -a "$log_path"

@@ -27,11 +27,11 @@ if [ $do_ablation != '--ablation' ]; then
     ./pipeline.sh $dataset_name ours_sample1.0 linear_small --use-existed
 else
     # no BPE
-    ./pipeline.sh $dataset_name no_bpe linear_small --use-existed
+    ONLY_EVAL_UNCOND=true ./pipeline.sh $dataset_name no_bpe linear_small --use-existed
 
     # not use MPS order as position number
-    ./pipeline.sh $dataset_name ours_sample1.0 linear_small_no_mps --use-existed
+    ONLY_EVAL_UNCOND=true ./pipeline.sh $dataset_name ours_sample1.0 linear_small_no_mps --use-existed
 
     # no continuative duration encoding
-    ./pipeline.sh "${dataset_name}_no_contin" ours_sample1.0 linear_small --use-existed
+    ONLY_EVAL_UNCOND=true ./pipeline.sh "${dataset_name}_no_contin" ours_sample1.0 linear_small --use-existed
 fi
