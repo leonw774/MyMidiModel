@@ -12,4 +12,4 @@ TEMPO_STEP=16
 PROCESS_WORKERS=32
 MIDI_DIR_PATH="data/midis/lmd_full"
 DATA_NAME="lmd_full"
-TEST_PATHLIST='configs/test/empty_test_pathlist.txt'
+TEST_PATHLIST='configs/test/lmd_full_test_pathlist.txt'
