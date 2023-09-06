@@ -195,8 +195,16 @@ class MyMidiTransformer(nn.Module):
         #     assert (emb == emb*mask).all(), f'{i}\n{x}\n{emb}\n{mask}\n{emb*mask}'
         # emb_sum = sum(embs)
         emb_sum = reduce(torch.add, embs) # cool trick
+
+        position_memory = None
         if self.not_use_mps_number:
-            potision_number = torch.arange(x.size(1)).repeat((x.size(0), 1)).to(x.device)
+            if memory is None:
+                potision_number = torch.arange(x.size(1)).repeat((x.size(0), 1)).to(x.device)
+                position_memory = 0
+            else:
+                position_memory = memory[1]
+                potision_number = torch.tensor([position_memory]).repeat((x.size(0), 1)).to(x.device)
+                position_memory += 1
             # potision_number has shape (batch_size, seq_size)
             pos_emb = self.positional_embedding_layer(potision_number)
             emb_sum = emb_sum + pos_emb
@@ -206,7 +214,8 @@ class MyMidiTransformer(nn.Module):
             if self.inferencing:
                 # no mask is needed when using recurrent for inference
                 emb_sum_dropout = emb_sum_dropout[:, 0] # become (batch_size, embed_size)
-                transformer_output, memory = self.transformer_decoder_inference(emb_sum_dropout, memory)
+                linear_tf_memory = None if memory is None else memory[0]
+                transformer_output, linear_tf_memory = self.transformer_decoder_inference(emb_sum_dropout, linear_tf_memory)
             else:
                 # in fast_transformer's FullMask class, 0 is masked, 1 is keep
                 causal_mask = self.causal_mask
@@ -231,7 +240,7 @@ class MyMidiTransformer(nn.Module):
         )
         # assert all(not torch.isnan(lg).any() for lg in logits), [torch.isnan(lg).nonzero(as_tuple=True) for lg in logits]
         if self.use_linear_attn and self.inferencing:
-            return logits_tuple, memory
+            return logits_tuple, (linear_tf_memory, position_memory)
         else:
             return logits_tuple
 
