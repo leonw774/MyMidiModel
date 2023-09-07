@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
     bool clearLine = false;
     bool doLog = false;
     int nonOptStartIndex = 1;
-    std::string cmdLineUsage = "./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath iterNum mergeCondition samplingRate minScoreLimit [workersNum]";
+    std::string cmdLineUsage = "./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath iterNum adjacency samplingRate minScoreLimit [workersNum]";
     while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
         switch (cmd_opt) {
@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
     std::string inCorpusDirPath(argv[nonOptStartIndex]);
     std::string outCorpusDirPath(argv[nonOptStartIndex+1]);
     int iterNum = atoi(argv[nonOptStartIndex+2]);
-    std::string mergeCondition(argv[nonOptStartIndex+3]);
+    std::string adjacency(argv[nonOptStartIndex+3]);
     double samplingRate = atof(argv[nonOptStartIndex+4]);
     double minScoreLimit = atof(argv[nonOptStartIndex+5]);
     int workersNum = -1; // -1 means use default
@@ -56,14 +56,14 @@ int main(int argc, char *argv[]) {
         std::cout << "Error: iterNum <= 0 or > 2045: " << iterNum << std::endl;
         return 1;
     }
-    if (mergeCondition != "ours" && mergeCondition != "mulpi") {
-        std::cout << "Error: mergeCondition is not \"ours\" or \"mulpi\": " << mergeCondition << std::endl;
+    if (adjacency != "ours" && adjacency != "mulpi") {
+        std::cout << "Error: adjacency is not \"ours\" or \"mulpi\": " << adjacency << std::endl;
         return 1;
     }
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
         << "outCorpusDirPath: " << outCorpusDirPath << '\n'
         << "iterNum: " << iterNum << '\n'
-        << "mergeCondition: " << mergeCondition << '\n'
+        << "adjacency: " << adjacency << '\n'
         << "samplingRate: " << samplingRate << '\n'
         << "minScoreLimit: " << minScoreLimit << '\n'
         << "workersNum: " << workersNum << std::endl;
@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
         // clac shape scores
         Shape maxScoreShape;
         partStartTimePoint = std::chrono::system_clock::now();
-        shapeScoreFreq = shapeScoring(corpus, shapeDict, mergeCondition, samplingRate);
+        shapeScoreFreq = shapeScoring(corpus, shapeDict, adjacency, samplingRate);
         std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScoreFreq);
         if (maxValPair.second <= minScoreLimit) {
             std::cout << "End iterations early because found best score <= minScoreLimit";

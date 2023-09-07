@@ -1,7 +1,7 @@
 #!/bin/bash
 # bpe parameters
 BPE_ITER_NUM=4
-MERGE_CONDITION="ours"
+ADJACENCY="ours"
 MIN_SCORE_LIMIT=1
 SAMPLE_RATE=1.0
 BPE_CLEARLINE=""

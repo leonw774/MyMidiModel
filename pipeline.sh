@@ -51,7 +51,7 @@ do_midi_to_corpus=true
 do_bpe=false
 if [ -n "${BPE_ITER_NUM+x}" ] && [ $BPE_ITER_NUM -ne 0 ]; then
     do_bpe=true
-    bpe_corpus_dir_path="${corpus_dir_path}_bpe${BPE_ITER_NUM}_${MERGE_CONDITION}_${SAMPLE_RATE}"
+    bpe_corpus_dir_path="${corpus_dir_path}_bpe${BPE_ITER_NUM}_${ADJACENCY}_${SAMPLE_RATE}"
     if [ -d "$bpe_corpus_dir_path" ] && [ -f "${bpe_corpus_dir_path}/corpus" ] && [ -f "${bpe_corpus_dir_path}/shape_vocab" ]; then
         if [ -n "$use_existed" ]; then
             echo "BPE Output directory: $bpe_corpus_dir_path already has corpus and shape_vocab file." | tee -a "$log_path"
@@ -109,12 +109,12 @@ if [ "$do_bpe" == true ]; then
 
     # run learn_vocab
     bpe/learn_vocab $BPE_DOLOG $BPE_CLEARLINE "$corpus_dir_path" "$bpe_corpus_dir_path" \
-        $BPE_ITER_NUM $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER | tee -a "$log_path"
+        $BPE_ITER_NUM $ADJACENCY $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER | tee -a "$log_path"
     
     bpe_exit_code=${PIPESTATUS[0]}
     if [ $bpe_exit_code -ne 0 ]; then
         echo "learn_vocab failed. exit code: $bpe_exit_code. pipeline.sh exit." | tee -a "$log_path"
-        echo "bpe/learn_vocab $BPE_DOLOG $BPE_CLEARLINE $corpus_dir_path "$bpe_corpus_dir_path" $BPE_ITER_NUM $MERGE_CONDITION $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER"
+        echo "bpe/learn_vocab $BPE_DOLOG $BPE_CLEARLINE $corpus_dir_path \"$bpe_corpus_dir_path\" $BPE_ITER_NUM $ADJACENCY $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER"
         rm -r "$bpe_corpus_dir_path"
         exit 1
     fi

@@ -213,13 +213,13 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelcocity) { // ig
 std::vector<std::pair<Shape, unsigned int>> shapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    const std::string& mergeCoundition,
+    const std::string& adjacency,
     double samplingRate
 ) {
     if (samplingRate <= 0 || 1 < samplingRate) {
         throw std::runtime_error("samplingRate in shapeScoring not in range (0, 1]");
     }
-    bool isOursMerge = (mergeCoundition == "ours");
+    bool isOursMerge = (adjacency == "ours");
 
     // std::chrono::time_point<std::chrono::system_clock> partStartTimePoint = std::chrono::system_clock::now();
     std::vector<std::pair<Shape, unsigned int>> shapeScore;

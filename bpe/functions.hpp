@@ -15,7 +15,7 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelocity=false);
 std::vector<std::pair<Shape, unsigned int>> shapeScoring(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
-    const std::string& mergeCoundition,
+    const std::string& adjacency,
     double samplingRate
 );
 
