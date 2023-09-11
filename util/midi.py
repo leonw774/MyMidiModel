@@ -165,11 +165,9 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
     for i in range(note_list_length):
         note_token = note_token_list[i]
         if note_token.duration > max_duration:
-            # if note_token.duration > max_duration * 20:
-            #     print(bin(note_token.onset))
-            #     print(bin(note_token.duration))
-            #     print(bin(note_token.onset+note_token.duration))
-            #     print('---')
+            # if not use_cont_note:
+            #     note_token.duration = max_duration
+            #     continue
             cur_dur = note_token.duration
             cur_onset = note_token.onset
             while cur_dur > 0:
