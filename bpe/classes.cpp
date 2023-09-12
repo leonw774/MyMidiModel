@@ -276,7 +276,7 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth) {
 
             case TRACK_EVENTS_CHAR:
                 corpus.piecesMN.back().push_back(Track());
-                for (i = 0; (a[i] = inCorpusFile.get()) != ':'; ++i); a[i] = '\0';
+                inCorpusFile.getline(a, 8, ':');
                 corpus.piecesTP.back().push_back((uint8_t) b36strtoi(a));
                 while (inCorpusFile.get() != ' '); // eat the track number
                 break;
@@ -284,21 +284,21 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth) {
             case MEASURE_EVENTS_CHAR:
                 curMeasureStart += curMeasureLength;
                 uint8_t numer, denom;
-                for (i = 0; (a[i] = inCorpusFile.get()) != '/'; ++i); a[i] = '\0';
+                inCorpusFile.getline(a, 8, '/');
                 numer = b36strtoi(a);
-                for (i = 0; (a[i] = inCorpusFile.get()) != ' '; ++i); a[i] = '\0';
+                inCorpusFile.getline(a, 8, ' ');
                 denom = b36strtoi(a);
                 curMeasureLength = numer * nth / denom;
                 corpus.piecesTS.back().push_back(TimeStructToken(curMeasureStart, false, numer, denom));
                 break;
 
             case TEMPO_EVENTS_CHAR:
-                for (i = 0; (a[i] = inCorpusFile.get()) != ' '; ++i); a[i] = '\0';
+                inCorpusFile.getline(a, 8, ' ');
                 corpus.piecesTS.back().push_back(TimeStructToken(curTime, true, b36strtoi(a), 0));
                 break;
 
             case POSITION_EVENTS_CHAR:
-                for (i = 0; (a[i] = inCorpusFile.get()) != ' '; ++i); a[i] = '\0';
+                inCorpusFile.getline(a, 8, ' ');
                 curTime = curMeasureStart + b36strtoi(a);
                 break;
 
@@ -307,13 +307,13 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth) {
                 if (isCont = (inCorpusFile.get() == '~')) {
                     inCorpusFile.get();
                 }
-                for (i = 0; (a[i] = inCorpusFile.get()) != ':'; ++i); a[i] = '\0';
+                inCorpusFile.getline(a, 8, ':');
                 p = b36strtoi(a);
-                for (i = 0; (a[i] = inCorpusFile.get()) != ':'; ++i); a[i] = '\0';
+                inCorpusFile.getline(a, 8, ':');
                 d = b36strtoi(a);
-                for (i = 0; (a[i] = inCorpusFile.get()) != ':'; ++i); a[i] = '\0';
+                inCorpusFile.getline(a, 8, ':');
                 v = b36strtoi(a);
-                for (i = 0; (a[i] = inCorpusFile.get()) != ' '; ++i); a[i] = '\0';
+                inCorpusFile.getline(a, 8, ' ');
                 t = b36strtoi(a);
                 corpus.piecesMN.back()[t].push_back(MultiNote(isCont, curTime, p, d, v));
                 break;
@@ -433,7 +433,7 @@ void writeOutputCorpusFile(
                     shapeStr = CONT_NOTE_EVENTS_STR;
                 }
                 else {
-                    shapeStr = MULTI_NOTE_EVENT_CHAR + shape2str(shapeDict[shapeIndex]);
+                    shapeStr = MULTI_NOTE_EVENTS_CHAR + shape2str(shapeDict[shapeIndex]);
                 }
                 outCorpusFile << shapeStr << ":" << itob36str(curMN.pitch)
                     << ":" << itob36str(curMN.unit)

@@ -23,7 +23,7 @@
 #define POSITION_EVENTS_CHAR    'P'
 #define TEMPO_EVENTS_CHAR       'T'
 #define NOTE_EVENTS_CHAR        'N'
-#define MULTI_NOTE_EVENT_CHAR   'U'
+#define MULTI_NOTE_EVENTS_CHAR   'U'
 
 // for convenience
 #define CONT_NOTE_EVENTS_STR    "N~"
