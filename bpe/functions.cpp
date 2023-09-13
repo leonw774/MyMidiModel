@@ -86,7 +86,7 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 // printTrack(corpus.piecesMN[i][j], shapeDict, k, 1);
                 unsigned int onsetTime = corpus.piecesMN[i][j][k].onset;
-                unsigned int offsetTime = onsetTime + relOffsets[corpus.piecesMN[i][j][k].shapeIndex] * corpus.piecesMN[i][j][k].unit;
+                unsigned int offsetTime = onsetTime + relOffsets[corpus.piecesMN[i][j][k].shapeIndex] * corpus.piecesMN[i][j][k].dur;
                 unsigned int immdFollowOnset = -1;
                 int n = 1;
                 while (k+n < corpus.piecesMN[i][j].size() && n < MultiNote::neighborLimit) {
@@ -125,27 +125,27 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
           rShape = shapeDict[rmn.shapeIndex];
     int leftSize = lShape.size(), rightSize = rShape.size();
     int pairSize = leftSize + rightSize;
-    unsigned int leftUnit = lmn.unit;
-    unsigned int rightUnit = rmn.unit;
+    unsigned int leftDur = lmn.dur;
+    unsigned int rightDur = rmn.dur;
     Shape pairShape;
 
     unsigned int unitAndOnsets[rightSize*2+1];
     for (int i = 0; i < rightSize; ++i) {
-        unitAndOnsets[i]           = rShape[i].getRelOnset() * rightUnit + rmn.onset - lmn.onset;
-        unitAndOnsets[i+rightSize] = rShape[i].relDur * rightUnit;
+        unitAndOnsets[i]           = rShape[i].getRelOnset() * rightDur + rmn.onset - lmn.onset;
+        unitAndOnsets[i+rightSize] = rShape[i].relDur * rightDur;
     }
-    unitAndOnsets[rightSize*2] = lmn.unit;
-    unsigned int newUnit = gcd(unitAndOnsets, rightSize*2+1);
+    unitAndOnsets[rightSize*2] = lmn.dur;
+    unsigned int newDur = gcd(unitAndOnsets, rightSize*2+1);
 
     // check to prevent overflow, because RelNote's onset is stored in uint8
     // if overflowed, return empty shape
     for (int i = 0; i < rightSize; ++i) {
-        if (unitAndOnsets[i] / newUnit > RelNote::onsetLimit) {
+        if (unitAndOnsets[i] / newDur > RelNote::onsetLimit) {
             return Shape();
         }
     }
     for (int i = 0; i < leftSize; ++i) {
-        if (lShape[i].getRelOnset() * leftUnit / newUnit > RelNote::onsetLimit) {
+        if (lShape[i].getRelOnset() * leftDur / newDur > RelNote::onsetLimit) {
             return Shape();
         }
     }
@@ -154,17 +154,17 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
         unsigned int temp = 0;
         if (i < leftSize) {
             if (i != 0) {
-                pairShape[i].setRelOnset(lShape[i].getRelOnset() * leftUnit / newUnit);
+                pairShape[i].setRelOnset(lShape[i].getRelOnset() * leftDur / newDur);
                 pairShape[i].relPitch = lShape[i].relPitch;
             }
-            pairShape[i].relDur = lShape[i].relDur * leftUnit / newUnit;
+            pairShape[i].relDur = lShape[i].relDur * leftDur / newDur;
             pairShape[i].setCont(lShape[i].isCont());
         }
         else {
             int j = i - leftSize;
-            pairShape[i].setRelOnset(unitAndOnsets[j] / newUnit);
+            pairShape[i].setRelOnset(unitAndOnsets[j] / newDur);
             pairShape[i].relPitch = rShape[j].relPitch + rmn.pitch - lmn.pitch;
-            pairShape[i].relDur = rShape[j].relDur * rightUnit / newUnit;
+            pairShape[i].relDur = rShape[j].relDur * rightDur / newDur;
             pairShape[i].setCont(rShape[j].isCont());
         }
     }
@@ -187,7 +187,7 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelcocity) { // ig
 
             for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
                 uint64_t key = corpus.piecesMN[i][j][k].onset;
-                key |= ((uint64_t) corpus.piecesMN[i][j][k].unit) << 32;
+                key |= ((uint64_t) corpus.piecesMN[i][j][k].dur) << 32;
                 if (!ignoreVelcocity) {
                     key |= ((uint64_t) corpus.piecesMN[i][j][k].vel) << 40;
                 }
@@ -256,7 +256,7 @@ std::vector<std::pair<Shape, unsigned int>> shapeScoring(
                         // mulpi
                         if (corpus.piecesMN[i][j][k].onset != corpus.piecesMN[i][j][k+n].onset) break;
                         if (corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel) continue;
-                        if (corpus.piecesMN[i][j][k].unit != corpus.piecesMN[i][j][k+n].unit) continue;
+                        if (corpus.piecesMN[i][j][k].dur != corpus.piecesMN[i][j][k+n].dur) continue;
                     }
                     Shape s = getShapeOfMultiNotePair(
                         corpus.piecesMN[i][j][k],

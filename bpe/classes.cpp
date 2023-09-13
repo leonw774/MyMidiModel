@@ -108,7 +108,7 @@ MultiNote::MultiNote(bool isCont, uint32_t o, uint8_t p, uint8_t d, uint8_t v) {
     shapeIndex = isCont ? 1 : 0;
     onset = o;
     pitch = p;
-    unit = d;
+    dur = d;
     vel = v;
     neighbor = 0;
 }
@@ -124,8 +124,8 @@ void printTrack(const Track& track, const std::vector<Shape>& shapeDict, const s
     for (int i = begin; i < begin + length; ++i) {
         std::cout << i << " - Shape=" << shape2str(shapeDict[track[i].shapeIndex]);
         std::cout << " onset=" << (int) track[i].onset
-                  << " basePitch=" << (int) track[i].pitch
-                  << " timeUnit=" << (int) track[i].unit
+                  << " pitch=" << (int) track[i].pitch
+                  << " duration=" << (int) track[i].dur
                   << " velocity=" << (int) track[i].vel;
         std::cout << " neighbor=" << (int) track[i].neighbor << std::endl;
     }
@@ -436,7 +436,7 @@ void writeOutputCorpusFile(
                     shapeStr = MULTI_NOTE_EVENTS_CHAR + shape2str(shapeDict[shapeIndex]);
                 }
                 outCorpusFile << shapeStr << ":" << itob36str(curMN.pitch)
-                    << ":" << itob36str(curMN.unit)
+                    << ":" << itob36str(curMN.dur)
                     << ":" << itob36str(curMN.vel)
                     << ":" << itob36str(minTrackIdx) << " ";
                 trackCurIdx[minTrackIdx]++;

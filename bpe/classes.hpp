@@ -93,7 +93,7 @@ struct MultiNote {
     uint16_t shapeIndex;
     static const uint16_t shapeIndexLimit = 0xffff - 2;
     uint8_t pitch;
-    uint8_t unit; // time unit of shape
+    uint8_t dur; // time stretch of shape
     uint8_t vel;
 
     // `neighbor` store relative index from this multinote to others

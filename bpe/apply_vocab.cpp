@@ -219,10 +219,10 @@ int main(int argc, char *argv[]) {
                             // change left multinote to merged multinote
                             // because the relnotes are sorted in same way as multinotes,
                             // the first relnote in the new shape is correspond to the first relnote in left multinote's original shape
-                            uint8_t newUnit = shapeDict[corpus.piecesMN[i][j][k].shapeIndex][0].relDur * corpus.piecesMN[i][j][k].unit / mergingShape[0].relDur;
+                            uint8_t newDur = shapeDict[corpus.piecesMN[i][j][k].shapeIndex][0].relDur * corpus.piecesMN[i][j][k].dur / mergingShape[0].relDur;
                             // unit cannot be greater than max_duration
-                            if (newUnit > maxDur) break;
-                            corpus.piecesMN[i][j][k].unit = newUnit;
+                            if (newDur > maxDur) break;
+                            corpus.piecesMN[i][j][k].dur = newDur;
                             corpus.piecesMN[i][j][k].shapeIndex = shapeIndex;
 
                             // mark right multinote to be removed by have vel set to 0
