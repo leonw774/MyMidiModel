@@ -91,17 +91,17 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
                 int n = 1;
                 while (k+n < corpus.piecesMN[i][j].size() && n < MultiNote::neighborLimit) {
                     // overlapping
-                    unsigned int nOnsetTime = (corpus.piecesMN[i][j][k+n]).onset;
+                    unsigned int nOnsetTime = corpus.piecesMN[i][j][k+n].onset;
                     if (nOnsetTime < offsetTime) { 
                         n++;
                     }
                     // immediately following
                     else if (immdFollowOnset == -1 || nOnsetTime == immdFollowOnset) {
-                        n++;
                         // we want offsetTime <= nOnsetTime <= offsetTime + gap limit
                         if (nOnsetTime - offsetTime > gapLimit) {
                             break;
                         }
+                        n++;
                         immdFollowOnset = nOnsetTime;
                     }
                     else {
@@ -210,7 +210,7 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelcocity) { // ig
 }
 
 
-std::vector<std::pair<Shape, unsigned int>> shapeScoring(
+std::vector<std::pair<Shape, unsigned int>> getShapeScore(
     const Corpus& corpus,
     const std::vector<Shape>& shapeDict,
     const std::string& adjacency,

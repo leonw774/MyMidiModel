@@ -120,6 +120,10 @@ bool MultiNote::operator < (const MultiNote& rhs) const {
     return onset < rhs.onset;
 }
 
+bool MultiNote::operator == (const MultiNote& rhs) const {
+    return shapeIndex == rhs.shapeIndex && onset == rhs.onset && pitch == rhs.pitch && dur == rhs.dur && vel == rhs.vel;
+}
+
 void printTrack(const Track& track, const std::vector<Shape>& shapeDict, const size_t begin, const size_t length) {
     for (int i = begin; i < begin + length; ++i) {
         std::cout << i << " - Shape=" << shape2str(shapeDict[track[i].shapeIndex]);

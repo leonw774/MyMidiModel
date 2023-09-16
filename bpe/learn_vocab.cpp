@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
         // clac shape scores
         Shape maxScoreShape;
         partStartTimePoint = std::chrono::system_clock::now();
-        shapeScoreFreq = shapeScoring(corpus, shapeDict, adjacency, samplingRate);
+        shapeScoreFreq = getShapeScore(corpus, shapeDict, adjacency, samplingRate);
         std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScoreFreq);
         if (maxValPair.second <= minScoreLimit) {
             std::cout << "End iterations early because found best score <= minScoreLimit";

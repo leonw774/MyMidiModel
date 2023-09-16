@@ -114,6 +114,8 @@ struct MultiNote {
     void setOnset(unsigned int o);
 
     bool operator < (const MultiNote& rhs) const;
+
+    bool operator == (const MultiNote& rhs) const;
 };
 
 typedef std::vector<MultiNote> Track;
