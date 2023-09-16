@@ -232,14 +232,13 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 // "delete" multinotes with vel == 0
-                // to prevent that back() is also to be removed, we iterate from back to front
+                // iterate from back to front to prevent messing up the index
                 for (int k = corpus.piecesMN[i][j].size() - 1; k >= 0; --k) {
                     if (corpus.piecesMN[i][j][k].vel == 0) {
-                        corpus.piecesMN[i][j][k] = corpus.piecesMN[i][j].back();
-                        corpus.piecesMN[i][j].pop_back();
+                        corpus.piecesMN[i][j].erase(corpus.piecesMN[i][j].begin()+k);
                     }
                 }
-                sort(corpus.piecesMN[i][j].begin(), corpus.piecesMN[i][j].end());
+                // sort(corpus.piecesMN[i][j].begin(), corpus.piecesMN[i][j].end());
             }
         }
         mergeTime = (std::chrono::system_clock::now() - partStartTimePoint) / oneSencondDur;
