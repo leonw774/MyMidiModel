@@ -160,14 +160,14 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
     # handle too long duration
     # continuing means this note may not have NOTE_OFF and is going to be continued by another note after its duration
     # it is represented with negative duration
-    continuing_duration = -max_duration if use_cont_note else max_duration
+    continuing_duration = -max_duration
     note_list_length = len(note_token_list)
     for i in range(note_list_length):
         note_token = note_token_list[i]
         if note_token.duration > max_duration:
-            # if not use_cont_note:
-            #     note_token.duration = max_duration
-            #     continue
+            if not use_cont_note:
+                note_token.duration = max_duration
+                continue
             cur_dur = note_token.duration
             cur_onset = note_token.onset
             while cur_dur > 0:

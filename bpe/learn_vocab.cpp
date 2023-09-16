@@ -228,7 +228,7 @@ int main(int argc, char *argv[]) {
                         }
                     }
                 }
-                // "delete" multinotes with vel == 0
+                // remove multinotes with vel == 0
                 // iterate from back to front to prevent messing up the index
                 for (int k = corpus.piecesMN[i][j].size() - 1; k >= 0; --k) {
                     if (corpus.piecesMN[i][j][k].vel == 0) {
