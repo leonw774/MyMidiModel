@@ -79,19 +79,20 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
     }
     // for each piece
     #pragma omp parallel for reduction(+: totalNeighborNumber)
-    for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+    for (int i = 0; i < corpus.mns.size(); ++i) {
         // for each track
-        for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
+        for (int j = 0; j < corpus.mns[i].size(); ++j) {
+            Track &curTrack = corpus.mns[i][j];
             // for each multinote
-            for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
+            for (int k = 0; k < curTrack.size(); ++k) {
                 // printTrack(corpus.piecesMN[i][j], shapeDict, k, 1);
-                unsigned int onsetTime = corpus.piecesMN[i][j][k].onset;
-                unsigned int offsetTime = onsetTime + relOffsets[corpus.piecesMN[i][j][k].shapeIndex] * corpus.piecesMN[i][j][k].dur;
+                unsigned int onsetTime = curTrack[k].onset;
+                unsigned int offsetTime = onsetTime + relOffsets[curTrack[k].shapeIndex] * curTrack[k].dur;
                 unsigned int immdFollowOnset = -1;
                 int n = 1;
-                while (k+n < corpus.piecesMN[i][j].size() && n < MultiNote::neighborLimit) {
+                while (k+n < curTrack.size() && n < MultiNote::neighborLimit) {
                     // overlapping
-                    unsigned int nOnsetTime = corpus.piecesMN[i][j][k+n].onset;
+                    unsigned int nOnsetTime = curTrack[k+n].onset;
                     if (nOnsetTime < offsetTime) { 
                         n++;
                     }
@@ -108,7 +109,7 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
                         break;
                     }
                 }
-                corpus.piecesMN[i][j][k].neighbor = n - 1;
+                curTrack[k].neighbor = n - 1;
                 totalNeighborNumber += n - 1;
             }
         }
@@ -177,19 +178,19 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelcocity) { // ig
     unsigned int max_thread_num = omp_get_max_threads();
     std::vector<uint8_t> multipiSizes[max_thread_num];
     #pragma omp parallel for
-    for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+    for (int i = 0; i < corpus.mns.size(); ++i) {
         int thread_num = omp_get_thread_num();
         // for each track
-        for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
+        for (int j = 0; j < corpus.mns[i].size(); ++j) {
+            const Track &curTrack = corpus.mns[i][j];
             // key: 64 bits: upper 16 unused, 8 for velocity, 8 for duration (time_unit), 32 for onset
             // value: occurence count
-            std::map< uint64_t, uint8_t > thisTrackMulpiSizes;
-
-            for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
-                uint64_t key = corpus.piecesMN[i][j][k].onset;
-                key |= ((uint64_t) corpus.piecesMN[i][j][k].dur) << 32;
+            std::map<uint64_t, uint8_t> thisTrackMulpiSizes;
+            for (int k = 0; k < curTrack.size(); ++k) {
+                uint64_t key = curTrack[k].onset;
+                key |= ((uint64_t) curTrack[k].dur) << 32;
                 if (!ignoreVelcocity) {
-                    key |= ((uint64_t) corpus.piecesMN[i][j][k].vel) << 40;
+                    key |= ((uint64_t) curTrack[k].vel) << 40;
                 }
                 thisTrackMulpiSizes[key] += 1;
             }
@@ -224,11 +225,8 @@ std::vector<std::pair<Shape, unsigned int>> getShapeScore(
     // std::chrono::time_point<std::chrono::system_clock> partStartTimePoint = std::chrono::system_clock::now();
     std::vector<std::pair<Shape, unsigned int>> shapeScore;
 
-    std::vector<double> shapeFreq(shapeDict.size(), 0);
-    size_t totalMultiNoteCount = 0;
-
     std::vector<unsigned int> samplePieceIndices;
-    for (int i = 0; i < corpus.piecesMN.size(); ++i) {
+    for (int i = 0; i < corpus.mns.size(); ++i) {
         if (samplingRate != 1.0) {
             if (((double) rand()) / RAND_MAX > samplingRate) continue;
         }
@@ -244,23 +242,24 @@ std::vector<std::pair<Shape, unsigned int>> getShapeScore(
         // to reduce the times we do "find" operations in big set
         std::map<Shape, unsigned int> tempScoreDiff;
         // for each track
-        for (int j = 0; j < corpus.piecesMN[i].size(); ++j) {
+        for (int j = 0; j < corpus.mns[i].size(); ++j) {
+            const Track &curTrack = corpus.mns[i][j];
             // for each multinote
-            for (int k = 0; k < corpus.piecesMN[i][j].size(); ++k) {
+            for (int k = 0; k < curTrack.size(); ++k) {
                 // for each neighbor
-                for (int n = 1; n <= corpus.piecesMN[i][j][k].neighbor; ++n) {
+                for (int n = 1; n <= curTrack[k].neighbor; ++n) {
                     if (isOursMerge) {
-                        if (corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel) continue;
+                        if (curTrack[k].vel != curTrack[k+n].vel) continue;
                     }
                     else {
                         // mulpi
-                        if (corpus.piecesMN[i][j][k].onset != corpus.piecesMN[i][j][k+n].onset) break;
-                        if (corpus.piecesMN[i][j][k].vel != corpus.piecesMN[i][j][k+n].vel) continue;
-                        if (corpus.piecesMN[i][j][k].dur != corpus.piecesMN[i][j][k+n].dur) continue;
+                        if (curTrack[k].onset != curTrack[k+n].onset) break;
+                        if (curTrack[k].vel != curTrack[k+n].vel) continue;
+                        if (curTrack[k].dur != curTrack[k+n].dur) continue;
                     }
                     Shape s = getShapeOfMultiNotePair(
-                        corpus.piecesMN[i][j][k],
-                        corpus.piecesMN[i][j][k+n],
+                        curTrack[k],
+                        curTrack[k+n],
                         shapeDict
                     );
                     // empty shape mean overflow happened

@@ -105,14 +105,6 @@ struct MultiNote {
 
     MultiNote(bool isCont, uint32_t o, uint8_t p, uint8_t d, uint8_t v);
 
-    unsigned int getShapeIndex() const;
-
-    void setShapeIndex(unsigned int s);
-
-    unsigned int getOnset() const;
-
-    void setOnset(unsigned int o);
-
     bool operator < (const MultiNote& rhs) const;
 
     bool operator == (const MultiNote& rhs) const;
@@ -141,11 +133,11 @@ struct TimeStructToken {
 
 struct Corpus {
     // Time structures
-    std::vector<std::vector<TimeStructToken>> piecesTS;
+    std::vector<std::vector<TimeStructToken>> timeStructs;
     // Multi-notes
-    std::vector<std::vector<Track>> piecesMN;
+    std::vector<std::vector<Track>> mns;
     // Track-program mapping
-    std::vector<std::vector<uint8_t>> piecesTP;
+    std::vector<std::vector<uint8_t>> trackInstrMap;
 
     void pushNewPiece();
     void shrink();
