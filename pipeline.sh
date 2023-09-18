@@ -108,13 +108,13 @@ if [ "$do_bpe" == true ]; then
     cp "${corpus_dir_path}/pathlist" "$bpe_corpus_dir_path"
 
     # run learn_vocab
-    bpe/learn_vocab $BPE_DOLOG $BPE_CLEARLINE "$corpus_dir_path" "$bpe_corpus_dir_path" \
+    bpe/learn_vocab $BPE_DOLOG "$corpus_dir_path" "$bpe_corpus_dir_path" \
         $BPE_ITER_NUM $ADJACENCY $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER | tee -a "$log_path"
     
     bpe_exit_code=${PIPESTATUS[0]}
     if [ $bpe_exit_code -ne 0 ]; then
         echo "learn_vocab failed. exit code: $bpe_exit_code. pipeline.sh exit." | tee -a "$log_path"
-        echo "bpe/learn_vocab $BPE_DOLOG $BPE_CLEARLINE $corpus_dir_path \"$bpe_corpus_dir_path\" $BPE_ITER_NUM $ADJACENCY $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER"
+        echo "bpe/learn_vocab $BPE_DOLOG $corpus_dir_path \"$bpe_corpus_dir_path\" $BPE_ITER_NUM $ADJACENCY $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER"
         rm -r "$bpe_corpus_dir_path"
         exit 1
     fi
