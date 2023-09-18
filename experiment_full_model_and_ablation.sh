@@ -24,14 +24,14 @@ fi
 
 if [ $do_ablation != '--ablation' ]; then
     # full model
-    ./pipeline.sh $dataset_name ours_sample1.0 linear_small --use-existed
+    ./pipeline.sh $dataset_name ours_sample1.0 linear_mid --use-existed
 else
     # no BPE
-    ONLY_EVAL_UNCOND=true ./pipeline.sh $dataset_name no_bpe linear_small --use-existed
+    ONLY_EVAL_UNCOND=true ./pipeline.sh $dataset_name no_bpe linear_mid --use-existed
 
     # not use MPS order as position number
-    ONLY_EVAL_UNCOND=true ./pipeline.sh $dataset_name ours_sample1.0 linear_small_no_mps --use-existed
+    ONLY_EVAL_UNCOND=true ./pipeline.sh $dataset_name ours_sample1.0 linear_mid_no_mps --use-existed
 
     # no continuative duration encoding
-    ONLY_EVAL_UNCOND=true ./pipeline.sh "${dataset_name}_no_contin" ours_sample1.0 linear_small --use-existed
+    ONLY_EVAL_UNCOND=true ./pipeline.sh "${dataset_name}_no_contin" ours_sample1.0 linear_mid --use-existed
 fi
