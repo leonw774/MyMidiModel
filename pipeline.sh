@@ -120,8 +120,8 @@ if [ "$do_bpe" == true ]; then
     fi
 
     # process bpe log
-    echo "sed -i 's/\r/\n/g ; s/\x1B\[2K//g' "$log_path""
-    sed -i 's/\r/\n/g ; s/\x1B\[2K//g' "$log_path"
+    # echo "sed -i 's/\r/\n/g ; s/\x1B\[2K//g' "$log_path""
+    # sed -i 's/\r/\n/g ; s/\x1B\[2K//g' "$log_path"
     python3 plot_bpe_log.py "$bpe_corpus_dir_path" "$log_path"
 
     # check if tokenized corpus is equal to original corpus
