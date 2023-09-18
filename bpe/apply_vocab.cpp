@@ -8,18 +8,14 @@
 int main(int argc, char *argv[]) {
     // read and validate args
     int cmd_opt = 0;
-    bool clearLine = false;
     bool doLog = false;
     int nonOptStartIndex = 1;
-    std::string cmdLineUsage = "./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath [workersNum]";
+    std::string cmdLineUsage = "./apply_vocab [-log] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath [workersNum]";
     while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
         switch (cmd_opt) {
             case 'l':
                 doLog = optarg;
-                break;
-            case 'c':
-                clearLine = optarg;
                 break;
             case '?':
                 if (isprint(optopt)) {
@@ -173,9 +169,6 @@ int main(int argc, char *argv[]) {
     // start from 2 because index 0, 1 are default shapes
     for (int shapeIndex = 2; shapeIndex < shapeDict.size(); ++shapeIndex) {
         iterStartTime = std::chrono::system_clock::now();
-        if (doLog && clearLine && shapeIndex != 2) {
-            std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
-        }
         size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth);
 
         Shape mergingShape = shapeDict[shapeIndex];
@@ -235,14 +228,10 @@ int main(int argc, char *argv[]) {
             // To exclude the time used on calculating metrics
             metricsTime += (std::chrono::system_clock::now() - partStartTime) / oneSencondDur;
             std::cout << multinoteCount << ", " << iterTime << ", " << mergeTime;
-            if (clearLine)  std::cout.flush();
-            else            std::cout << std::endl;
+            std::cout << std::endl;
         }
     }
 
-    if (clearLine) {
-        std::cout << '\n';
-    }
     if (!doLog) {
         multinoteCount = corpus.getMultiNoteCount();
     }

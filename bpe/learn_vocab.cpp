@@ -8,18 +8,14 @@
 int main(int argc, char *argv[]) {
     // read and validate args
     int cmd_opt = 0;
-    bool clearLine = false;
     bool doLog = false;
     int nonOptStartIndex = 1;
-    std::string cmdLineUsage = "./learn_vocab [-log] [-clearLine] inCorpusDirPath outCorpusDirPath iterNum adjacency samplingRate minScoreLimit [workersNum]";
+    std::string cmdLineUsage = "./learn_vocab [-log] inCorpusDirPath outCorpusDirPath iterNum adjacency samplingRate minScoreLimit [workersNum]";
     while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
         switch (cmd_opt) {
             case 'l':
                 doLog = optarg;
-                break;
-            case 'c':
-                clearLine = optarg;
                 break;
             case '?':
                 if (isprint(optopt)) {
@@ -148,9 +144,6 @@ int main(int argc, char *argv[]) {
     }
     for (int iterCount = 0; iterCount < iterNum; ++iterCount) {
         iterStartTime = std::chrono::system_clock::now();
-        if (doLog && clearLine && iterCount != 0) {
-            std::cout << "\33[2K\r"; // "\33[2K" is VT100 escape code that clear entire line
-        }
         size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth); 
 
         // clac shape scores
@@ -232,14 +225,10 @@ int main(int argc, char *argv[]) {
             // To exclude the time used on calculating metrics
             metricsTime += (std::chrono::system_clock::now() - partStartTime) / oneSencondDur;
             std::cout << multinoteCount << ", " << iterTime << ", " << findBestShapeTime << ", " << mergeTime;
-            if (clearLine)  std::cout.flush();
-            else            std::cout << std::endl;
+            std::cout << std::endl;
         }
     }
 
-    if (clearLine) {
-        std::cout << '\n';
-    }
     if (!doLog) {
         multinoteCount = corpus.getMultiNoteCount();
     }
