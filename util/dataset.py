@@ -32,9 +32,10 @@ class MidiDataset(Dataset):
             Parameters:
             - data_dir_path: Expected to have 'arrays.npz', 'pathlist' and 'vocabs.json'
 
-            - virtual_piece_step_ratio: If > 0, will create multiple virtual pieces by splitting overlength pieces.
+            - virtual_piece_step_ratio: If > 1, will create multiple virtual pieces by splitting overlength pieces.
               The start point of samples will be at the first measure token that has index just greater than
-              max_seq_length * virtual_piece_step_ratio * N, where N is positive integer. Default is 0.
+              max_seq_length / virtual_piece_step_ratio * N, where N is positive integer. Default is 1.
+              This value can not be smaller than 1. 
 
             - test_pathlist: The paths of files to exclude.
 
@@ -51,7 +52,7 @@ class MidiDataset(Dataset):
         self.vocabs = get_corpus_vocabs(data_dir_path)
         assert max_seq_length >= 0
         self.max_seq_length = max_seq_length
-        assert 0 <= virtual_piece_step_ratio <= 1
+        assert virtual_piece_step_ratio >= 1
         self.virtual_piece_step_ratio = virtual_piece_step_ratio
         assert isinstance(permute_mps, bool)
         self.permute_mps = permute_mps
@@ -119,7 +120,7 @@ class MidiDataset(Dataset):
 
         # the default zeros will be replaced by body start index
         self._piece_body_start_index = [0] * self.number_of_pieces
-        virtual_piece_step = max(1, int(max_seq_length * virtual_piece_step_ratio))
+        virtual_piece_step = max(1, int(max_seq_length / virtual_piece_step_ratio))
         self._virtual_piece_start_index = [[0] for _ in range(self.number_of_pieces)]
 
         self._file_mps_sep_indices = [[] for _ in range(self.number_of_pieces)]
