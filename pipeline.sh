@@ -190,7 +190,7 @@ $launch_command train.py \
     --pitch-augmentation-range $PITCH_AUGMENTATION_RANGE --virtual-piece-step-ratio $VIRTUAL_PIECE_STEP_RATIO \
     --layers-number $LAYERS_NUMBER --attn-heads-number $ATTN_HEADS_NUMBER --embedding-dim $EMBEDDING_DIM \
     --batch-size $BATCH_SIZE --max-updates $MAX_UPDATES --max-grad-norm $MAX_GRAD_NORM --split-ratio $SPLIT_RATIO \
-    --validation-interval $VALIDATION_INTERVAL --early-stop $EARLY_STOP --loss-nonpadding-dim $LOSS_NONPAD_DIM \
+    --validation-interval $VALIDATION_INTERVAL --early-stop $EARLY_STOP --loss-ignore-padding $LOSS_IGNORE_PAD \
     --lr-peak $LEARNING_RATE_PEAK --lr-warmup-updates $LEARNING_RATE_WARMUP_UPDATES \
     --lr-decay-end-updates $LEARNING_RATE_DECAY_END_UPDATES --lr-decay-end-ratio $LEARNING_RATE_DECAY_END_RATIO \
     --use-device $USE_DEVICE --log "$log_path" $train_other_args -- \

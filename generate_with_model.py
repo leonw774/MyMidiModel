@@ -307,17 +307,23 @@ def main():
         if not os.path.isfile(args.primer):
             raise FileNotFoundError()
 
+        encode_args = {
+            'primer_length': args.primer_length,
+            'length_unit': args.unit,
+            'vocabs': model.vocabs,
+            'worker_number': args.workers
+        }
         if args.primer.endswith('.mid') or args.primer.endswith('.midi'):
             print('From midi file:', args.primer)
             primer_path_list = [args.primer]
-            primer_text_list_list = midi_file_list_to_text_list_list(primer_path_list, args.primer_length, args.unit, model.vocabs, args.workers)
+            primer_text_list_list = midi_file_list_to_text_list_list(primer_path_list, **encode_args)
             primer_text_list_list = primer_text_list_list * args.sample_number
         else: # we guess it is a list of paths to midi files
             print('From path list:', args.primer)
-            
+
             primer_path_list = open(args.primer, 'r', encoding='utf8').readlines()
             print(f'Read {len(primer_path_list)} lines')
-            
+
             if args.sample_number != 0:
                 primer_path_list = primer_path_list[:args.sample_number]
             primer_path_list = [p.strip() for p in primer_path_list]
@@ -325,8 +331,8 @@ def main():
             assert all(os.path.isfile(p) for p in primer_path_list)
             print(f'Keep first {len(primer_path_list)} lines with sample number setting to {args.sample_number}')
             print('Hint: Set sample number to 0 to keep all primers in the primer list.')
-            
-            primer_text_list_list = midi_file_list_to_text_list_list(primer_path_list, args.primer_length, args.unit, model.vocabs, args.workers)
+
+            primer_text_list_list = midi_file_list_to_text_list_list(primer_path_list, **encode_args)
             assert len(primer_text_list_list) != 0
             print(f'Processed {len(primer_text_list_list)} files successfully.')
             if len(primer_text_list_list) < args.sample_number:
@@ -358,7 +364,11 @@ def main():
 
     generation_time = time() - generation_time_begin
     total_time = overhead_time + primer_process_time + generation_time
-    print(f'overhead_time:{overhead_time}\tprimer_process_time:{primer_process_time}\tgeneration_time:{generation_time}\ttotal_time:{total_time}')
+    print(f'overhead_time:{overhead_time}\t\
+        primer_process_time:{primer_process_time}\t\
+        generation_time:{generation_time}\t\
+        total_time:{total_time}'
+    )
 
     return 0
 
