@@ -4,12 +4,7 @@ from typing import List, Tuple
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
-# from torch.profiler import record_function
-
-try:
-    import mps_loss
-except ImportError:
-    pass
+import x_transformers
 
 try:
     from fast_transformers.builders import TransformerEncoderBuilder, RecurrentEncoderBuilder
@@ -122,14 +117,12 @@ class MyMidiTransformer(nn.Module):
 
         ######## Attention layer
 
+        # False is masked, True is keep
         if use_linear_attn:
-            # in fast_transformer's FullMask class, 0 is masked, 1 is keep
-            # but this causal (lower trianglur) mask is not actually used,
+            # this causal (lower trianglur) mask is passed but not actually used,
             # because the "causal-ness" is already implemented in the calculation of linear attention
-            self.causal_mask = FullMask(torch.tril(torch.ones(max_seq_length, max_seq_length), diagonal=0).bool())
-        else:
-            # in pytorch's official implementation, True is masked, False is keep
-            self.causal_mask = torch.triu(torch.ones(max_seq_length, max_seq_length), diagonal=1).bool()
+            self.causal_mask = torch.tril(torch.ones(max_seq_length, max_seq_length), diagonal=0).bool()
+            self.causal_mask = FullMask(self.causal_mask)
 
         # name's encoder, used as decoder
         if use_linear_attn:
@@ -149,17 +142,25 @@ class MyMidiTransformer(nn.Module):
             self.transformer_decoder_inference = RecurrentEncoderBuilder.from_dictionary(params).get()
             make_mirror(self.transformer_decoder, self.transformer_decoder_inference)
         else:
-            layer = nn.TransformerEncoderLayer(
-                d_model=embedding_dim,
-                nhead=attn_heads_number,
-                dim_feedforward=4*embedding_dim,
-                dropout=0.1,
-                batch_first=True
+             self.transformer_decoder = x_transformers.Decoder(
+                depth=layers_number,
+                dim=embedding_dim,
+                heads=attn_heads_number,
+                attn_dim_head=(embedding_dim // attn_heads_number),
+                attn_dropout=0.1,
+                ff_dropout=0.1
             )
-            self.transformer_decoder = nn.TransformerEncoder(
-                encoder_layer=layer,
-                num_layers=layers_number
-            )
+            # layer = nn.TransformerEncoderLayer(
+            #     d_model=embedding_dim,
+            #     nhead=attn_heads_number,
+            #     dim_feedforward=4*embedding_dim,
+            #     dropout=0.1,
+            #     batch_first=True
+            # )
+            # self.transformer_decoder = nn.TransformerEncoder(
+            #     encoder_layer=layer,
+            #     num_layers=layers_number
+            # )
         self.apply(self._init_weights)
         # set padding vectors to zeros because the _init_weights set it to something else
         with torch.no_grad():
@@ -220,20 +221,14 @@ class MyMidiTransformer(nn.Module):
                 # in fast_transformer's FullMask class, 0 is masked, 1 is keep
                 causal_mask = self.causal_mask
                 length_mask = FullMask(mask=x[..., 0].ne(0).bool().to(x.device))
-                transformer_output = self.transformer_decoder(
-                    emb_sum_dropout,
-                    causal_mask,
-                    length_mask
-                )
+                transformer_output = self.transformer_decoder(emb_sum_dropout, causal_mask, length_mask)
         else:
-            # in pytorch's official implementation, True is masked, False is keep
-            causal_mask = self.causal_mask[:x.size(1), :x.size(1)].to(x.device)
-            length_mask = x[..., 0].eq(0).to(x.device)
-            transformer_output = self.transformer_decoder(
-                emb_sum_dropout,
-                causal_mask,
-                length_mask
-            )
+            # Casual mask is not needed because x_transformer.Decoder is has causal=True on default
+            # causal_mask = self.causal_mask[:x.size(1), :x.size(1)].repeat(x.size(0), 1, 1).to(x.device)
+            # False is masked, True is keep
+            length_mask = x[..., 0].ne(0).to(x.device)
+            # print(length_mask)
+            transformer_output = self.transformer_decoder(emb_sum_dropout, mask=length_mask)
         transformer_output = self.layer_norm(transformer_output)
         logits_tuple = tuple(
             proj(transformer_output) for proj in self.project_linears

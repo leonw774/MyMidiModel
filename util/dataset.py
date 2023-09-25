@@ -214,6 +214,9 @@ class MidiDataset(Dataset):
 
         start_index = self._virtual_piece_start_index[trainnum][virtual_piece_number]
         end_index = start_index + self.max_seq_length - body_start_index # preserve space for head
+        if end_index < start_index:
+            end_index = start_index
+            body_start_index = self.max_seq_length
         # dont need to check end_index because if end_index > piece_length than numpy will just end the slice at piece_length
         head_array = np.array(self.pieces[self.train_filenames[trainnum]][:body_start_index]) # copy
         body_array = np.array(self.pieces[self.train_filenames[trainnum]][start_index:end_index]) # copy
@@ -223,18 +226,19 @@ class MidiDataset(Dataset):
         # to make sure mps number is smaller than max_mps_number
         # end_with_eos = sampled_array[-1, ATTR_NAME_INDEX['evt']] == self._eos_id
         # body_end_index = -1 if end_with_eos else sampled_array.shape[0]
-        try:
-            min_mps_number = np.min(sampled_array[body_start_index:, ATTR_NAME_INDEX['mps']])
-        except Exception as e:
-            print(sampled_array)
-            raise e
-        # magic number 4 because the first measure must have mps number 4
-        if min_mps_number != 4:
-            sampled_array[body_start_index:, ATTR_NAME_INDEX['mps']] -= (min_mps_number - 4)
+        if body_start_index != self.max_seq_length:
+            try:
+                min_mps_number = np.min(sampled_array[body_start_index:, ATTR_NAME_INDEX['mps']])
+            except Exception as e:
+                print(sampled_array)
+                raise e
+            # magic number 4 because the first measure must have mps number 4
+            if min_mps_number != 4:
+                sampled_array[body_start_index:, ATTR_NAME_INDEX['mps']] -= (min_mps_number - 4)
 
         # pitch augmentation
         # pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
-        if pitch_augment != 0:
+        if pitch_augment != 0 and body_start_index != self.max_seq_length:
             sampled_augmentable_pitches = self._augmentable_pitches[trainnum][start_index:end_index]
             # sometimes the sampled array does not contain any pitch-augmentable token
             sampled_body_pitch_col = sampled_array[body_start_index:, ATTR_NAME_INDEX['pit']]
@@ -262,11 +266,11 @@ class MidiDataset(Dataset):
             for i in range(max_track_number):
                 piece_trn_column[piece_trn_column_expand[i]] = perm[i]
 
-
-        if self.permute_mps:
+        if self.permute_mps and body_start_index != self.max_seq_length:
             mps_sep_indices_list = []
             mps_tokens_ranges = []
-            mps_sep_indices_list_head = [0, 1, body_start_index - 1] # BOS, first track token and body_start_index-1 is SEP
+            # BOS, first track token and body_start_index-1 is SEP
+            mps_sep_indices_list_head = [0, 1, body_start_index - 1]
             mps_sep_indices_list_body = [
                 i - start_index + body_start_index
                 for i in self._file_mps_sep_indices[trainnum]

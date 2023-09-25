@@ -33,7 +33,7 @@ USE_DEVICE='cpu'
 
 # eval
 EVAL_MIDI_TO_PIECE_PARAS_FILE=""
-EVAL_SAMPLE_NUMBER= # if not set, will used the number of test files
+EVAL_SAMPLE_NUMBER=10 # if not set, will used the number of test files
 PRIMER_LENGTH=4
 NUCLEUS_THRESHOLD=1.0
 SOFTMAX_TEMPERATURE=1.0
