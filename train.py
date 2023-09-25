@@ -110,7 +110,7 @@ def parse_args():
             Default is %(desult)s.'
     )
     train_parser.add_argument(
-        '--loss-nonpadding-dim',
+        '--loss-ignore-padding',
         type=str,
         choices=['all', 'attribute', 'none'],
         default='all'
@@ -295,6 +295,7 @@ def main():
 
     ckpt_dir_path = os.path.join(args.model_dir_path, 'ckpt')
     if is_main_process:
+        logging.info(strftime('==== train.py start at %Y%m%d-%H%M%S ===='))
         data_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.data).items()])
         model_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.model).items()])
         train_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.train).items()])
@@ -305,7 +306,6 @@ def main():
         logging.info('gradient_accumulation_steps:%d', gradient_accumulation_steps)
         logging.info(args_str)
 
-        logging.info(strftime('==== train.py start at %Y%m%d-%H%M%S ===='))
         if not os.path.isdir(args.model_dir_path):
             logging.info('Invalid model dir path: %s', args.model_dir_path)
             return 1
@@ -485,7 +485,7 @@ def main():
                 loss, head_losses = compute_losses(
                     prediction,
                     batch_target_seqs,
-                    args.train.loss_nonpadding_dim
+                    args.train.loss_ignore_padding
                 )
                 # print('compute_losses use time:', time() - start_backward_time)
                 # assert all(not torch.isnan(head_l).any() for head_l in head_losses)

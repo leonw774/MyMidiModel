@@ -273,7 +273,7 @@ class MyMidiTransformer(nn.Module):
 def compute_losses(
         pred_logits: List[Tensor],
         target_labels: Tensor,
-        nonpadding_dim: str = 'all') -> Tuple[Tensor, List[Tensor]]:
+        ignore_padding: str = 'all') -> Tuple[Tensor, List[Tensor]]:
     """
         - pred_logits is a list:
           - length: out_attr_number
@@ -294,7 +294,7 @@ def compute_losses(
             input=logits.transpose(1, 2),
             # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
             target=target_labels[..., k], # (batch_size, seq_size)
-            ignore_index=0, # padding is index 0
+            ignore_index=(0 if ignore_padding != 'back' else -100), # padding is index 0
             reduction='none' # return tensor size (batch_size, seq_size)
             # ignored index are 0.0
         )
@@ -307,12 +307,12 @@ def compute_losses(
         for no_reduce_head_losses in no_reduce_head_losses_list
     ]
 
-    if nonpadding_dim == 'all':
+    if ignore_padding == 'all':
         # average total losses by number of total non-padding labels
         num_nonpadding = torch.count_nonzero(target_labels) # ()
         loss = no_reduce_losses.sum() / num_nonpadding
 
-    elif nonpadding_dim == 'attribute':
+    elif ignore_padding == 'attribute':
         # average each attribute losses by number of its non-padding labels
         # like out_attr_number sequences with ignore paddings
         nonpadding_head_losses = [
@@ -321,9 +321,10 @@ def compute_losses(
         ]
         loss = torch.stack(nonpadding_head_losses).mean()
 
-    elif nonpadding_dim == 'none':
-        # still need to ignore the padding tokens at the end
-        loss = no_reduce_losses.sum() / torch.count_nonzero(target_labels[..., 0]) / target_labels.size(2)
+    elif ignore_padding == 'none':
+        # only ignore the padding tokens at the end
+        mask = (target_labels[..., 0] != 0).unsqueeze(2).repeat(1, 1, target_labels.size(2))
+        loss = (no_reduce_losses * mask).sum() / mask.sum()
 
     else:
         raise ValueError('nonpadding_level in compute_losses can only be \'all\', \'attribute\', or \'none\'.')
