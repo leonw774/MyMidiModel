@@ -50,8 +50,8 @@ dependencies:
   - pip=22.3.1=py38h06a4308_0
   - python=3.8.16=h7a1cb2a_2
   - python_abi=3.8=2_cp38
-  - pytorch::pytorch=1.12.1=py3.8_cuda11.3_cudnn8.3.2_0
-  - pytorch::pytorch-mutex=1.0=cuda
+  - pytorch=1.12.1=py3.8_cuda11.3_cudnn8.3.2_0
+  - pytorch-mutex=1.0=cuda
   - readline=8.2=h5eee18b_0
   - rhash=1.4.1=h3c74f83_1
   - setuptools=65.6.3=py38h06a4308_0
@@ -67,6 +67,7 @@ dependencies:
     - accelerate==0.18.0
     - contourpy==1.0.7
     - cycler==0.11.0
+    - einops==0.6.1
     - fonttools==4.38.0
     - importlib-resources==5.10.2
     - kiwisolver==1.4.4
@@ -89,4 +90,5 @@ dependencies:
     - tomli==2.0.1
     - torchinfo==1.7.2
     - tqdm==4.64.1
+    - x-transformers==1.22.19
     - zipp==3.13.0
