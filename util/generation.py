@@ -242,8 +242,9 @@ def generate_piece(
 
     # build memory for primer if use linear transformer
     if model.use_linear_attn:
-        for i in range(1, primer_length):
-            _, recurrent_memory = model(model.to_input_attrs(input_seq[:, :i]).to(model_device), recurrent_memory)
+        with torch.no_grad():
+            for i in range(1, primer_length):
+                _, recurrent_memory = model(model.to_input_attrs(input_seq[:, :i]).to(model_device), recurrent_memory)
 
     with torch.no_grad():
         for _ in tqdm(range(max_gen_step), disable=not show_tqdm):
