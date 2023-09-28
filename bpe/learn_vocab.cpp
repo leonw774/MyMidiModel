@@ -134,7 +134,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    std::vector<std::pair<Shape, unsigned int>> shapeScore;
     std::chrono::time_point<std::chrono::system_clock>iterStartTime;
     std::chrono::time_point<std::chrono::system_clock>partStartTime;
     double iterTime, findBestShapeTime, mergeTime, metricsTime = 0.0;
@@ -146,16 +145,15 @@ int main(int argc, char *argv[]) {
         iterStartTime = std::chrono::system_clock::now();
         size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth); 
 
-        // clac shape scores
-        Shape maxScoreShape;
+        // get shape scores
         partStartTime = std::chrono::system_clock::now();
-        shapeScore = getShapeScore(corpus, shapeDict, adjacency, samplingRate);
-        std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScore);
+        const flatten_shape_counter_t &shapeScore = getShapeScore(corpus, shapeDict, adjacency, samplingRate);
+        const std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScore);
         if (maxValPair.second <= minScoreLimit) {
             std::cout << "End iterations early because found best score <= minScoreLimit";
             break;
         }
-        maxScoreShape = maxValPair.first;
+        Shape maxScoreShape = maxValPair.first;
         if (doLog){
             std::cout << iterCount << ", " << (double) totalNeighborNumber / multinoteCount << ", "
                     << shapeScore.size() << ", "
@@ -198,10 +196,10 @@ int main(int argc, char *argv[]) {
                             // change left multinote to merged multinote
                             // because the relnotes are sorted in same way as multinotes,
                             // the first relnote in the new shape is correspond to the first relnote in left multinote's original shape
-                            uint8_t newDur = shapeDict[curTrack[k].shapeIndex][0].relDur * curTrack[k].dur / maxScoreShape[0].relDur;
+                            uint8_t newDur = shapeDict[curTrack[k].shapeIndex][0].relDur * curTrack[k].stretch / maxScoreShape[0].relDur;
                             // unit cannot be greater than max_duration
                             if (newDur > maxDur) continue;
-                            curTrack[k].dur = newDur;
+                            curTrack[k].stretch = newDur;
                             curTrack[k].shapeIndex = newShapeIndex;
 
                             // mark right multinote to be removed by setting vel to 0

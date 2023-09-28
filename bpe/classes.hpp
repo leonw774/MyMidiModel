@@ -81,6 +81,7 @@ unsigned int getMaxRelOffset(const Shape& s);
 
 std::vector<Shape> getDefaultShapeDict();
 
+typedef std::map<Shape, unsigned int> shape_counter_t;
 
 struct MultiNote {
     // onset:       Use 32 bits. When nth is 32, 0xffffffff of 32th notes is 4,473,924 minutes in
@@ -92,8 +93,8 @@ struct MultiNote {
     //              This mean iterNum cannot be greater than 0xffff - 2 = 65534
     uint16_t shapeIndex;
     static const uint16_t shapeIndexLimit = 0xffff - 2;
-    uint8_t pitch;
-    uint8_t dur; // time stretch of shape
+    uint8_t pitch;  // pitch shiht
+    uint8_t stretch;// time stretch
     uint8_t vel;
 
     // `neighbor` store relative index from this multinote to others

@@ -12,13 +12,15 @@ Shape getShapeOfMultiNotePair(
 
 double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelocity=false);
 
-std::vector<std::pair<Shape, unsigned int>> getShapeScore(
-    const Corpus& corpus,
+typedef std::vector<std::pair<Shape, unsigned int>> flatten_shape_counter_t;
+
+flatten_shape_counter_t getShapeScore(
+    Corpus& corpus,
     const std::vector<Shape>& shapeDict,
     const std::string& adjacency,
-    double samplingRate
+    const double samplingRate
 );
 
-std::pair<Shape, unsigned int> findMaxValPair(const std::vector<std::pair<Shape, unsigned int>>& shapeScore);
+std::pair<Shape, unsigned int> findMaxValPair(const flatten_shape_counter_t& shapeScore);
 
 #endif

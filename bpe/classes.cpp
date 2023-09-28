@@ -14,16 +14,10 @@ RelNote::RelNote(uint8_t c, uint8_t o, uint8_t p, uint8_t d) {
 
 // sort on rel onset first, and then rel pitch, rel duration, finally isCont.
 bool RelNote::operator < (const RelNote& rhs) const {
-    if (getRelOnset() == rhs.getRelOnset()) {
-        if (relPitch == rhs.relPitch) {
-            if (relDur == rhs.relDur) {
-                return isCont() > rhs.isCont();
-            }
-            return relDur < rhs.relDur;
-        }
-        return relPitch < rhs.relPitch;
-    }
-    return getRelOnset() < rhs.getRelOnset();
+    if (getRelOnset() != rhs.getRelOnset()) return getRelOnset() < rhs.getRelOnset(); 
+    if (relPitch != rhs.relPitch)           return relPitch < rhs.relPitch;
+    if (relDur != rhs.relDur)               return relDur < rhs.relDur;
+    return isCont() > rhs.isCont();
 }
 
 bool RelNote::operator == (const RelNote& rhs) const {
@@ -108,20 +102,18 @@ MultiNote::MultiNote(bool isCont, uint32_t o, uint8_t p, uint8_t d, uint8_t v) {
     shapeIndex = isCont ? 1 : 0;
     onset = o;
     pitch = p;
-    dur = d;
+    stretch = d;
     vel = v;
     neighbor = 0;
 }
 
 bool MultiNote::operator < (const MultiNote& rhs) const {
-    if (onset == rhs.onset) {
-        return pitch < rhs.pitch;
-    }
-    return onset < rhs.onset;
+    if (onset != rhs.onset) return onset < rhs.onset;
+    return pitch < rhs.pitch;
 }
 
 bool MultiNote::operator == (const MultiNote& rhs) const {
-    return shapeIndex == rhs.shapeIndex && onset == rhs.onset && pitch == rhs.pitch && dur == rhs.dur && vel == rhs.vel;
+    return shapeIndex == rhs.shapeIndex && onset == rhs.onset && pitch == rhs.pitch && stretch == rhs.stretch && vel == rhs.vel;
 }
 
 void printTrack(const Track& track, const std::vector<Shape>& shapeDict, const size_t begin, const size_t length) {
@@ -129,9 +121,9 @@ void printTrack(const Track& track, const std::vector<Shape>& shapeDict, const s
         std::cout << i << " - Shape=" << shape2str(shapeDict[track[i].shapeIndex]);
         std::cout << " onset=" << (int) track[i].onset
                   << " pitch=" << (int) track[i].pitch
-                  << " duration=" << (int) track[i].dur
-                  << " velocity=" << (int) track[i].vel;
-        std::cout << " neighbor=" << (int) track[i].neighbor << std::endl;
+                  << " stretch=" << (int) track[i].stretch
+                  << " velocity=" << (int) track[i].vel
+                  << " neighbor=" << (int) track[i].neighbor << std::endl;
     }
 }
 
@@ -440,7 +432,7 @@ void writeOutputCorpusFile(
                     shapeStr = MULTI_NOTE_EVENTS_CHAR + shape2str(shapeDict[shapeIndex]);
                 }
                 outCorpusFile << shapeStr << ":" << itob36str(curMN.pitch)
-                    << ":" << itob36str(curMN.dur)
+                    << ":" << itob36str(curMN.stretch)
                     << ":" << itob36str(curMN.vel)
                     << ":" << itob36str(minTrackIdx) << " ";
                 trackCurIdx[minTrackIdx]++;

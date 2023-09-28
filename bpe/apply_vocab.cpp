@@ -170,7 +170,6 @@ int main(int argc, char *argv[]) {
     for (int shapeIndex = 2; shapeIndex < shapeDict.size(); ++shapeIndex) {
         iterStartTime = std::chrono::system_clock::now();
         size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth);
-
         Shape mergingShape = shapeDict[shapeIndex];
         if (doLog){
             std::cout << shapeIndex << ", " << (double) totalNeighborNumber / multinoteCount << ", "
@@ -201,10 +200,10 @@ int main(int argc, char *argv[]) {
                             // change left multinote to merged multinote
                             // because the relnotes are sorted in same way as multinotes,
                             // the first relnote in the new shape is correspond to the first relnote in left multinote's original shape
-                            uint8_t newDur = shapeDict[curTrack[k].shapeIndex][0].relDur * curTrack[k].dur / mergingShape[0].relDur;
+                            uint8_t newDur = shapeDict[curTrack[k].shapeIndex][0].relDur * curTrack[k].stretch / mergingShape[0].relDur;
                             // unit cannot be greater than max_duration
                             if (newDur > maxDur) break;
-                            curTrack[k].dur = newDur;
+                            curTrack[k].stretch = newDur;
                             curTrack[k].shapeIndex = shapeIndex;
 
                             // mark right multinote to be removed by have vel set to 0
