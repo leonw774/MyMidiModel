@@ -172,7 +172,8 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < corpus.mns.size(); ++i) {
             // for each track
             #pragma omp parallel for
-            for (Track& track: corpus.mns[i]) {
+            for (int j = 0; j < corpus.mns[i].size(); ++j) {
+                Track& track = corpus.mns[i][j];
                 // for each multinote
                 for (int k = 0; k < track.size(); ++k) {
                     // for each neighbor
