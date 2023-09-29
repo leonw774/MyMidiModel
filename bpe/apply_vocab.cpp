@@ -200,10 +200,10 @@ int main(int argc, char *argv[]) {
                             // change left multinote to merged multinote
                             // because the relnotes are sorted in same way as multinotes,
                             // the first relnote in the new shape is correspond to the first relnote in left multinote's original shape
-                            uint8_t newDur = shapeDict[curTrack[k].shapeIndex][0].relDur * curTrack[k].stretch / mergingShape[0].relDur;
+                            uint8_t newStretch = GET_REL_DUR(shapeDict[curTrack[k].shapeIndex][0]) * curTrack[k].stretch / GET_REL_DUR(mergingShape[0]);
                             // unit cannot be greater than max_duration
-                            if (newDur > maxDur) break;
-                            curTrack[k].stretch = newDur;
+                            if (newStretch > maxDur) break;
+                            curTrack[k].stretch = newStretch;
                             curTrack[k].shapeIndex = shapeIndex;
 
                             // mark right multinote to be removed by have vel set to 0

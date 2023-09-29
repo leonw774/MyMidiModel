@@ -11,10 +11,11 @@
 #include <map>
 #include <unordered_map>
 #include <set>
+#include <unordered_set>
 #include <algorithm>
 #include <chrono>
 
-// these setting must correspond to what is defined in util/tokens.py
+// these setting must correspond to what is defined in tokens.py
 #define BEGIN_TOKEN_STR         "BOS"
 #define END_TOKEN_STR           "EOS"
 #define SEP_TOKEN_STR           "SEP"
@@ -23,51 +24,39 @@
 #define POSITION_EVENTS_CHAR    'P'
 #define TEMPO_EVENTS_CHAR       'T'
 #define NOTE_EVENTS_CHAR        'N'
-#define MULTI_NOTE_EVENTS_CHAR   'U'
+#define MULTI_NOTE_EVENTS_CHAR  'U'
 
 // for convenience
 #define CONT_NOTE_EVENTS_STR    "N~"
 
 struct RelNote {
-    uint8_t isContAndRelOnset;
+    uint8_t relOnset;
     int8_t relPitch;
-    uint8_t relDur;
-    static const uint8_t onsetLimit = 0x7f;
+    // upper 7 bits used by relDur and lower 1 bit used by isCont
+    // It means the maxDuration is 127 at maximum
+    uint8_t relDurAndIsCont;
+    static const uint8_t onsetLimit = 0xff;
+    static const uint8_t durLimit = 0x7f;
 
     RelNote();
 
     RelNote(uint8_t c, uint8_t o, uint8_t p, uint8_t d);
 
-    bool isCont() const;
+    // inline bool isCont() const;
 
-    void setCont(bool c);
+    // inline unsigned int getRelOnset() const;
 
-    unsigned int getRelOnset() const;
+    // inline void setRelOnset(const uint8_t o);
 
-    void setRelOnset(const uint8_t o);
+    bool operator<(const RelNote& rhs) const;
 
-    bool operator < (const RelNote& rhs) const;
-
-    bool operator == (const RelNote& rhs) const;
+    bool operator==(const RelNote& rhs) const;
 };
 
-// inline method should be implemented in header
-
-inline bool RelNote::isCont() const {
-    return isContAndRelOnset >> 7;
-}
-
-inline void RelNote::setCont(bool c) {
-    isContAndRelOnset = (c ? (isContAndRelOnset | 0x80) : (isContAndRelOnset & 0x7f));
-}
-
-inline unsigned int RelNote::getRelOnset() const {
-    return isContAndRelOnset & 0x7f;
-}
-
-inline void RelNote::setRelOnset(const uint8_t o) {
-    isContAndRelOnset = (isContAndRelOnset & 0x80) | (o & 0x7f);
-}
+// using macro is faster
+#define GET_IS_CONT(r)      (r.relDurAndIsCont & 1)
+#define GET_REL_DUR(r)      (r.relDurAndIsCont >> 1)
+#define SET_REL_DUR(r, o)   (r.relDurAndIsCont = (r.relDurAndIsCont & 1) | (o << 1))
 
 typedef std::vector<RelNote> Shape;
 
@@ -106,9 +95,9 @@ struct MultiNote {
 
     MultiNote(bool isCont, uint32_t o, uint8_t p, uint8_t d, uint8_t v);
 
-    bool operator < (const MultiNote& rhs) const;
+    bool operator<(const MultiNote& rhs) const;
 
-    bool operator == (const MultiNote& rhs) const;
+    bool operator==(const MultiNote& rhs) const;
 };
 
 typedef std::vector<MultiNote> Track;

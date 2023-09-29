@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
     nth = stoi(paras[std::string("nth")]);
     maxDur = stoi(paras[std::string("max_duration")]);
     maxTrackNum = stoi(paras[std::string("max_track_number")]);
-    if (nth <= 0 || maxDur <= 0 || maxDur > 255 || maxTrackNum <= 0) {
+    if (nth <= 0 || maxDur <= 0 || maxDur > RelNote::durLimit || maxTrackNum <= 0) {
         std::cout << "Corpus parameter error" << '\n'
                 << "nth: " << nth << '\n'
                 << "maxDuration: " << maxDur << '\n'
@@ -160,13 +160,6 @@ int main(int argc, char *argv[]) {
                     << "\"" << shape2str(maxScoreShape) << "\", "
                     << maxValPair.second << ", ";
         }
-        // check if shape has repeated relnote
-        for (int i = 1; i < maxScoreShape.size(); ++i) {
-            if (maxScoreShape[i] == maxScoreShape[i-1]) {
-                std::cout << "Found invalid shape: " << shape2str(maxScoreShape) << "\n";
-                return 1;
-            } 
-        }
         findBestShapeTime = (std::chrono::system_clock::now() - partStartTime) / oneSencondDur;
 
         unsigned int newShapeIndex = shapeDict.size();
@@ -179,39 +172,38 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < corpus.mns.size(); ++i) {
             // for each track
             #pragma omp parallel for
-            for (int j = 0; j < corpus.mns[i].size(); ++j) {
-                Track &curTrack = corpus.mns[i][j];
+            for (Track& track: corpus.mns[i]) {
                 // for each multinote
-                for (int k = 0; k < curTrack.size(); ++k) {
+                for (int k = 0; k < track.size(); ++k) {
                     // for each neighbor
-                    for (int n = 1; n <= curTrack[k].neighbor; ++n) {
-                        if (k + n >= curTrack.size()) {
+                    for (int n = 1; n <= track[k].neighbor; ++n) {
+                        if (k + n >= track.size()) {
                             continue;
                         }
-                        if (curTrack[k].vel == 0 || curTrack[k+n].vel == 0 || curTrack[k].vel != curTrack[k+n].vel) {
+                        if (track[k].vel == 0 || track[k+n].vel == 0 || track[k].vel != track[k+n].vel) {
                             continue;
                         }
-                        Shape s = getShapeOfMultiNotePair(curTrack[k], curTrack[k+n], shapeDict);
+                        Shape s = getShapeOfMultiNotePair(track[k], track[k+n], shapeDict);
                         if (s == maxScoreShape) {
                             // change left multinote to merged multinote
                             // because the relnotes are sorted in same way as multinotes,
                             // the first relnote in the new shape is correspond to the first relnote in left multinote's original shape
-                            uint8_t newDur = shapeDict[curTrack[k].shapeIndex][0].relDur * curTrack[k].stretch / maxScoreShape[0].relDur;
+                            uint8_t newStretch = GET_REL_DUR(shapeDict[track[k].shapeIndex][0]) * track[k].stretch / GET_REL_DUR(maxScoreShape[0]);
                             // unit cannot be greater than max_duration
-                            if (newDur > maxDur) continue;
-                            curTrack[k].stretch = newDur;
-                            curTrack[k].shapeIndex = newShapeIndex;
+                            if (newStretch > maxDur) continue;
+                            track[k].stretch = newStretch;
+                            track[k].shapeIndex = newShapeIndex;
 
                             // mark right multinote to be removed by setting vel to 0
-                            curTrack[k+n].vel = 0;
+                            track[k+n].vel = 0;
                             break;
                         }
                     }
                 }
                 // remove multinotes with vel == 0
-                curTrack.erase(
-                    std::remove_if(curTrack.begin(), curTrack.end(), [] (const MultiNote& m) {return m.vel == 0;}),
-                    curTrack.end()
+                track.erase(
+                    std::remove_if(track.begin(), track.end(), [] (const MultiNote& m) {return m.vel == 0;}),
+                    track.end()
                 );
             }
         }

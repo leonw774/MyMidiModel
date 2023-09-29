@@ -1,16 +1,21 @@
-all: apply_vocab learn_vocab ;
+CFLAGS = -O2
 
-apply_vocab: apply_vocab.cpp classes.o functions.o ;
-	g++ -g -fopenmp classes.o functions.o apply_vocab.cpp -o apply_vocab
+all: apply_vocab learn_vocab;
 
-learn_vocab: learn_vocab.cpp classes.o functions.o ;
-	g++ -g -fopenmp classes.o functions.o learn_vocab.cpp -o learn_vocab
+debug: CFLAGS = -pg -g
+debug: apply_vocab learn_vocab;
 
-functions.o: functions.cpp functions.hpp classes.hpp ;
-	g++ -g -c -fopenmp functions.cpp -o functions.o
+apply_vocab: apply_vocab.cpp classes.o functions.o;
+	g++ $(CFLAGS) -fopenmp classes.o functions.o apply_vocab.cpp -o apply_vocab
 
-classes.o: classes.cpp classes.hpp ;
-	g++ -g -c classes.cpp -o classes.o
+learn_vocab: learn_vocab.cpp classes.o functions.o;
+	g++ $(CFLAGS) -fopenmp classes.o functions.o learn_vocab.cpp -o learn_vocab
+
+functions.o: functions.cpp functions.hpp classes.hpp;
+	g++ $(CFLAGS) -c -fopenmp functions.cpp -o functions.o
+
+classes.o: classes.cpp classes.hpp;
+	g++ $(CFLAGS) -c classes.cpp -o classes.o
 
 clean: 
-	rm *.o learn_vocab apply_vocab
+	rm functions.o classes.o learn_vocab apply_vocab

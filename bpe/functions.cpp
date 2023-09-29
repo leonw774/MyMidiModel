@@ -123,21 +123,22 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
         // return getShapeOfMultiNotePair(rmn, lmn, shapeDict);
         throw std::runtime_error("right multi-note has smaller onset than left multi-note");
     }
-    Shape lShape = shapeDict[lmn.shapeIndex],
-          rShape = shapeDict[rmn.shapeIndex];
-    int leftSize = lShape.size(), rightSize = rShape.size();
-    int pairSize = leftSize + rightSize;
-    unsigned int leftStretch = lmn.stretch, rightStretch = rmn.stretch;
+    const Shape lShape = shapeDict[lmn.shapeIndex],
+                rShape = shapeDict[rmn.shapeIndex];
+    const int rightSize = rShape.size();
+    const unsigned int rightStretch = rmn.stretch;
 
-    unsigned int times[rightSize*2+1];
-    unsigned int deltaOnset = rmn.onset - lmn.onset;
-    for (int i = 0; i < rightSize; ++i) {
-        times[i]           = rShape[i].getRelOnset() * rightStretch + deltaOnset;
-        times[i+rightSize] = rShape[i].relDur * rightStretch;
+    // times = { right_onset_1, ..., right_onset_n, right_dur_1, ..., right_dur_n, left_stretch}
+    unsigned int times[rightSize*2+1]; 
+    int t = 0;
+    for (const RelNote& rRelNote: rShape) {
+        times[t] = (rRelNote.relOnset * rightStretch + rmn.onset - lmn.onset);
+        times[t+rightSize] = (unsigned int) GET_REL_DUR(rRelNote) * rightStretch;
+        t++;
     }
     times[rightSize*2] = lmn.stretch;
     unsigned int newStretch = gcd(times, rightSize*2+1);
-    unsigned int lStretchRatio = leftStretch / newStretch, rStretchRatio = rightStretch / newStretch;
+    unsigned int lStretchRatio = lmn.stretch / newStretch;
 
     // check to prevent overflow, because RelNote's onset is stored in uint8 and onsetLimit is 0x7f
     // if overflowed, return empty shape
@@ -146,36 +147,31 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
             return Shape();
         }
     }
-    for (int i = 0; i < leftSize; ++i) {
-        if (lShape[i].getRelOnset() * lStretchRatio > RelNote::onsetLimit) {
+    for (const RelNote& lRelNote: lShape) {
+        if (lRelNote.relOnset * lStretchRatio > RelNote::onsetLimit) {
             return Shape();
         }
     }
 
     Shape pairShape;
-    pairShape.reserve(pairSize);
-    for (int i = 0; i < pairSize; ++i) {
-        if (i < leftSize) {
-            pairShape.push_back(
-                RelNote(
-                    lShape[i].isCont(),
-                    lShape[i].getRelOnset() * lStretchRatio,
-                    lShape[i].relPitch,
-                    lShape[i].relDur * lStretchRatio
-                )
-            );
-        }
-        else {
-            int j = i - leftSize;
-            pairShape.push_back(
-                RelNote(
-                    rShape[j].isCont(),
-                    times[j] / newStretch,
-                    rShape[j].relPitch + rmn.pitch - lmn.pitch,
-                    times[j+rightSize] / newStretch
-                )
-            );
-        }
+    pairShape.reserve(lShape.size() + rShape.size());
+    for (const RelNote& lRelNote: lShape) {
+        pairShape.push_back(RelNote(
+            GET_IS_CONT(lRelNote),
+            lRelNote.relOnset * lStretchRatio,
+            lRelNote.relPitch,
+            GET_REL_DUR(lRelNote) * lStretchRatio
+        ));
+    }
+    t = 0;
+    for (const RelNote& rRelNote: rShape) {
+        pairShape.push_back(RelNote(
+            GET_IS_CONT(rRelNote),
+            times[t] / newStretch,
+            rRelNote.relPitch + rmn.pitch - lmn.pitch,
+            times[t+rightSize] / newStretch
+        ));
+        t++;
     }
     std::sort(pairShape.begin(), pairShape.end());
     return pairShape;
@@ -229,10 +225,6 @@ flatten_shape_counter_t getShapeScore(
     }
     bool isOursMerge = (adjacency == "ours");
 
-    // std::chrono::time_point<std::chrono::system_clock> partStartTimePoint = std::chrono::system_clock::now();
-    // std::chrono::time_point<std::chrono::system_clock> mapStartTimePoint;
-    // std::chrono::duration<double> mapDuration = std::chrono::duration<double>(0);
-
     std::vector<unsigned int> samplePieceIndices;
     for (int i = 0; i < corpus.mns.size(); ++i) {
         if (samplingRate != 1.0) {
@@ -248,7 +240,7 @@ flatten_shape_counter_t getShapeScore(
         int i = samplePieceIndices[h];
         int thread_num = omp_get_thread_num();
         // to reduce the times we do "find" operations in big set
-        std::map<Shape, unsigned int> tempScoreDiff;
+        shape_counter_t tempScoreDiff;
         // for each track
         for (const Track &track: corpus.mns[i]) {
             // for each multinote
@@ -264,32 +256,22 @@ flatten_shape_counter_t getShapeScore(
                         if (track[k].vel != track[k+n].vel) continue;
                         if (track[k].stretch != track[k+n].stretch) continue;
                     }
-                    Shape s = getShapeOfMultiNotePair(track[k], track[k+n], shapeDict);
+                    Shape shape = getShapeOfMultiNotePair(track[k], track[k+n], shapeDict);
                     // empty shape mean overflow happened
-                    if (s.size() == 0) continue;
-                    // shapeScoreParallel[thread_num][s] += 1;
-                    // mapStartTimePoint = std::chrono::system_clock::now();
-                    tempScoreDiff[s] += 1;
-                    // mapDuration += (std::chrono::system_clock::now() - mapStartTimePoint);
+                    if (shape.size() == 0) continue;
+                    tempScoreDiff[shape] += 1;
                 }
             }
         }
-        // mapStartTimePoint = std::chrono::system_clock::now();
         for (auto it = tempScoreDiff.cbegin(); it != tempScoreDiff.cend(); it++) {
             shapeScoreParallel[thread_num][it->first] += it->second;
         }
-        // mapDuration += (std::chrono::system_clock::now() - mapStartTimePoint);
     }
-    // std::cout << " map update time=" << mapDuration / std::chrono::duration<double>(1) << ' ';
-    // std::cout << " shape scoring time=" << (std::chrono::system_clock::now() - partStartTimePoint) / std::chrono::duration<double>(1) << ' ';
-    // partStartTimePoint = std::chrono::system_clock::now();
 
     int mergedIndex = mergeCounters(shapeScoreParallel, max_thread_num);
     flatten_shape_counter_t shapeScore;
     shapeScore.reserve(shapeScoreParallel[mergedIndex].size());
     shapeScore.assign(shapeScoreParallel[mergedIndex].cbegin(), shapeScoreParallel[mergedIndex].cend());
-
-    // std::cout << "merge mp result time=" << (std::chrono::system_clock::now() - partStartTimePoint) / std::chrono::duration<double>(1) << ' ';
     return shapeScore;
 }
 

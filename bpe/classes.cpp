@@ -4,26 +4,36 @@
   RelNote
 ********/
 
-RelNote::RelNote() : isContAndRelOnset(0), relPitch(0), relDur(0) {};
+RelNote::RelNote() : relOnset(0), relPitch(0), relDurAndIsCont(0) {};
 
 RelNote::RelNote(uint8_t c, uint8_t o, uint8_t p, uint8_t d) {
-    isContAndRelOnset = (c ? 0x80 : 0x00) | (o & 0x7f);
+    relOnset = o;
     relPitch = p;
-    relDur = d;
+    relDurAndIsCont = (d << 1) | (c ? 1 : 0); // in case c is not 1 or 0
 }
 
-// sort on rel onset first, and then rel pitch, rel duration, finally isCont.
-bool RelNote::operator < (const RelNote& rhs) const {
-    if (getRelOnset() != rhs.getRelOnset()) return getRelOnset() < rhs.getRelOnset(); 
-    if (relPitch != rhs.relPitch)           return relPitch < rhs.relPitch;
-    if (relDur != rhs.relDur)               return relDur < rhs.relDur;
-    return isCont() > rhs.isCont();
+// Sort on relOnset first, then relPitch, relDur, isCont
+// Decide how shape set should be represented sequentially on shape_vocab and vocab.json
+// This order allows for faster computation because we can access zero-point rel-note at O(1) time
+bool RelNote::operator<(const RelNote& rhs) const {
+    // if (relOnset != rhs.relOnset) return relOnset < rhs.relOnset; 
+    // if (relPitch != rhs.relPitch) return relPitch < rhs.relPitch;
+    // return relDurAndIsCont < rhs.relDurAndIsCont;
+
+    // uint32_t lhs_bytes = (relOnset << 16) | (relPitch << 8) | relDurAndIsCont;
+    // uint32_t rhs_bytes = (rhs.relOnset << 16) | (rhs.relPitch << 8) | rhs.relDurAndIsCont;
+
+    // wicked conversion: RelNote -> uint32_t
+    return
+        (*((uint32_t*) this) & 0x00ffffff) // we only want lower 3 bytes
+        <
+        (*((uint32_t*) &(rhs)) & 0x00ffffff);
 }
 
-bool RelNote::operator == (const RelNote& rhs) const {
-    return (isContAndRelOnset == rhs.isContAndRelOnset
+bool RelNote::operator==(const RelNote& rhs) const {
+    return (relOnset == rhs.relOnset
         && relPitch == rhs.relPitch
-        && relDur == rhs.relDur);
+        && relDurAndIsCont == rhs.relDurAndIsCont);
 }
 
 /********
@@ -65,10 +75,10 @@ std::string itob36str(int x) {
 
 std::string shape2str(const Shape& s) {
     std::stringstream ss;
-    for (int j = 0; j < s.size(); ++j) {
-        ss <<        itob36str(s[j].getRelOnset())
-          << "," << itob36str(s[j].relPitch)
-          << "," << itob36str(s[j].relDur) << (s[j].isCont() ? "~" : "") << ";";
+    for (const RelNote& r: s) {
+        ss <<        itob36str(r.relOnset)
+           << "," << itob36str(r.relPitch)
+           << "," << itob36str(GET_REL_DUR(r)) << (GET_IS_CONT(r) ? "~" : "") << ";";
     }
     return ss.str();
 }
@@ -81,10 +91,10 @@ std::vector<Shape> getDefaultShapeDict() {
 }
 
 unsigned int getMaxRelOffset(const Shape& s) {
-    unsigned int maxRelOffset = s[0].getRelOnset() + s[0].relDur;
-    for (int i = 1; i < s.size(); ++i) {
-        if (maxRelOffset < s[i].getRelOnset() + s[i].relDur) {
-            maxRelOffset = s[i].getRelOnset() + s[i].relDur;
+    unsigned int maxRelOffset = 0;
+    for (const RelNote& r: s) {
+        if (maxRelOffset < r.relOnset + (unsigned int) GET_REL_DUR(r)) {
+            maxRelOffset = r.relOnset + (unsigned int) GET_REL_DUR(r);
         }
     }
     return maxRelOffset;
@@ -107,12 +117,12 @@ MultiNote::MultiNote(bool isCont, uint32_t o, uint8_t p, uint8_t d, uint8_t v) {
     neighbor = 0;
 }
 
-bool MultiNote::operator < (const MultiNote& rhs) const {
+bool MultiNote::operator<(const MultiNote& rhs) const {
     if (onset != rhs.onset) return onset < rhs.onset;
     return pitch < rhs.pitch;
 }
 
-bool MultiNote::operator == (const MultiNote& rhs) const {
+bool MultiNote::operator==(const MultiNote& rhs) const {
     return shapeIndex == rhs.shapeIndex && onset == rhs.onset && pitch == rhs.pitch && stretch == rhs.stretch && vel == rhs.vel;
 }
 
