@@ -305,6 +305,7 @@ def main():
     else:
         print('Processing primer')
         if not os.path.isfile(args.primer):
+            print('Primer file not exists')
             raise FileNotFoundError()
 
         encode_args = {
@@ -364,10 +365,10 @@ def main():
 
     generation_time = time() - generation_time_begin
     total_time = overhead_time + primer_process_time + generation_time
-    print(f'overhead_time:{overhead_time}\t\
-        primer_process_time:{primer_process_time}\t\
-        generation_time:{generation_time}\t\
-        total_time:{total_time}'
+    print(f'overhead_time:{overhead_time:.3e} \
+        primer_process_time:{primer_process_time:.3e} \
+        generation_time:{generation_time:.3e} \
+        total_time:{total_time:.3e}'
     )
 
     return 0
