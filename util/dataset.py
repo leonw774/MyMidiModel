@@ -87,7 +87,7 @@ class MidiDataset(Dataset):
                 for filenum, midi_filepath in enumerate(all_pathlist)
                 if not any(midi_filepath.endswith(test_path) for test_path in test_pathlist)
                 # use endswith because the pathlist records the relative paths to midi files from project's root
-                # while test_pathlist MAY record relative paths to midi files from dataset's root OR project's root
+                # while test_pathlist record relative paths to midi files from dataset's root
             ]
             self.pieces = {
                 str(filenum): npz_file[str(filenum)]
@@ -97,7 +97,7 @@ class MidiDataset(Dataset):
 
         if verbose:
             print('Processing')
-        # The seperators of maximal permutable subsequence are:
+        # The seperators of maximal permutable subarray are:
         # BOS, EOS, SEP, PADDING, track-instrument token, measure tokens, position tokens
         # we stores their index number in _mps_separators
         # _mps_separators is empty when `permute_mps` is False

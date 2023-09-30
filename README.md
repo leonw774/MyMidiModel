@@ -31,6 +31,7 @@ Corpi are located at `data/corpus/`. A complete "corpus" is directory containing
 - `corpus`: A text file. Each `\n`-separated line is a text representation of a midi file. This is the "main form" of the representation. Created by `midi_to_corpus.py`.
 - `paras`: A yaml file that contains parameters of pre-processing used by `midi_to_corpus.py`. Created by `midi_to_corpus.py`.
 - `pathlist`: A text file. Each `\n`-separated line is the relative path of midi file corresponding to the text representation in `corpus`. Created by `midi_to_corpus.py`.
+  - The paths are relative to the project root, which is a mistake, as it should be relative to the dataset root. But I don't bother fix it.
 - `vocabs.json`: The vocabulary to be used by the model. The format is defined in `util/vocabs.py`. Created by `make_arrays.py`.
 - `arrays.npz`: A zip file of numpy arrays in `.npy` format. Can be accessed by `numpy.load()` and it will return an instance of `NpzFile` class. This is the "final form" of the representation (i.e. include pre-computed positional encoding) that would be used to train model. Created by `make_arrays.py`.
 
@@ -53,7 +54,7 @@ Source codes:
 - `learn_vocab.cpp`
 - `functions.cpp` and `functions.hpp`: Other functions and algorithms.
 
-They should compile to two binaries with `make -C bpe/`:
+They should compile to two binaries with `make -C bpe all`:
 
 - `apply_vocab`: Apply merge operations with a known shape list to a corpus file. Output a new corpus file.
 - `learn_vocab`: Do Multi-node BPE to a corpus file. Output a new corpus file and a shape list in `shape_vocab`.
