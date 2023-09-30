@@ -30,33 +30,43 @@
 #define CONT_NOTE_EVENTS_STR    "N~"
 
 struct RelNote {
-    uint8_t relOnset;
-    int8_t relPitch;
-    // upper 7 bits used by relDur and lower 1 bit used by isCont
-    // It means the maxDuration is 127 at maximum
-    uint8_t relDurAndIsCont;
-    static const uint8_t onsetLimit = 0xff;
+    // relDurAndIsCont: Upper 7 bits used by relDur and lower 1 bit used by isCont
+    uint8_t relDurAndIsCont;    // Lowest byte
+    int8_t relPitch;            // Middle byte
+    uint8_t relOnset;           // Highest byte
+    // Members are ordered such that it's value is:
+    //      (MSB) aRandomByte relOnset relPitch relDur isCont (LSB)
+    // when viewed as unsigned 32bit int
+
+    static const uint8_t onsetLimit = 0x7f;
     static const uint8_t durLimit = 0x7f;
 
     RelNote();
 
-    RelNote(uint8_t c, uint8_t o, uint8_t p, uint8_t d);
+    RelNote(uint8_t o, uint8_t p, uint8_t d, uint8_t c);
 
-    // inline bool isCont() const;
+    inline bool isCont() const;
 
-    // inline unsigned int getRelOnset() const;
+    inline uint8_t getRelDur() const;
 
-    // inline void setRelOnset(const uint8_t o);
+    inline void setRelDur(const uint8_t o);
 
     bool operator<(const RelNote& rhs) const;
 
     bool operator==(const RelNote& rhs) const;
 };
 
-// using macro is faster
-#define GET_IS_CONT(r)      (r.relDurAndIsCont & 1)
-#define GET_REL_DUR(r)      (r.relDurAndIsCont >> 1)
-#define SET_REL_DUR(r, o)   (r.relDurAndIsCont = (r.relDurAndIsCont & 1) | (o << 1))
+inline bool RelNote::isCont() const {
+    return relDurAndIsCont & 1;
+}
+
+inline uint8_t RelNote::getRelDur() const {
+    return relDurAndIsCont >> 1;
+}
+
+inline void RelNote::setRelDur(uint8_t o) {
+    relDurAndIsCont = (relDurAndIsCont & 1) | (o << 1);
+}
 
 typedef std::vector<RelNote> Shape;
 
@@ -73,11 +83,11 @@ std::vector<Shape> getDefaultShapeDict();
 typedef std::map<Shape, unsigned int> shape_counter_t;
 
 struct MultiNote {
-    // onset:       Use 32 bits. When nth is 32, 0xffffffff of 32th notes is 4,473,924 minutes in
+    // onset:       When nth is 32, 0xffffffff of 32th notes is 4,473,924 minutes in
     //              the tempo of 120 quarter note per minute,
     uint32_t onset;
     static const uint32_t onsetLimit = 0xffffffff;
-    // shapeIndex:  Use 16 bits. The index of shape in the shapeDict.
+    // shapeIndex:  The index of shape in the shapeDict.
     //              0: DEFAULT_SHAPE_REGULAR, 1: DEFAULT_SHAPE_CONT
     //              This mean iterNum cannot be greater than 0xffff - 2 = 65534
     uint16_t shapeIndex;

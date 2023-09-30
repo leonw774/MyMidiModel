@@ -6,13 +6,13 @@
 
 RelNote::RelNote() : relOnset(0), relPitch(0), relDurAndIsCont(0) {};
 
-RelNote::RelNote(uint8_t c, uint8_t o, uint8_t p, uint8_t d) {
+RelNote::RelNote(uint8_t o, uint8_t p, uint8_t d, uint8_t c) {
     relOnset = o;
     relPitch = p;
     relDurAndIsCont = (d << 1) | (c ? 1 : 0); // in case c is not 1 or 0
 }
 
-// Sort on relOnset first, then relPitch, relDur, isCont
+// Compoare on relOnset first and then relPitch, relDur, isCont
 // Decide how shape set should be represented sequentially on shape_vocab and vocab.json
 // This order allows for faster computation because we can access zero-point rel-note at O(1) time
 bool RelNote::operator<(const RelNote& rhs) const {
@@ -23,7 +23,7 @@ bool RelNote::operator<(const RelNote& rhs) const {
     // uint32_t lhs_bytes = (relOnset << 16) | (relPitch << 8) | relDurAndIsCont;
     // uint32_t rhs_bytes = (rhs.relOnset << 16) | (rhs.relPitch << 8) | rhs.relDurAndIsCont;
 
-    // wicked conversion: RelNote -> uint32_t
+    // wicked casting: RelNote -> uint32_t
     return
         (*((uint32_t*) this) & 0x00ffffff) // we only want lower 3 bytes
         <
@@ -78,23 +78,23 @@ std::string shape2str(const Shape& s) {
     for (const RelNote& r: s) {
         ss <<        itob36str(r.relOnset)
            << "," << itob36str(r.relPitch)
-           << "," << itob36str(GET_REL_DUR(r)) << (GET_IS_CONT(r) ? "~" : "") << ";";
+           << "," << itob36str(r.getRelDur()) << (r.isCont() ? "~" : "") << ";";
     }
     return ss.str();
 }
 
 std::vector<Shape> getDefaultShapeDict() {
     return {
-        {RelNote(0, 0, 0, 1)}, // DEFAULT_SHAPE_REGULAR
-        {RelNote(1, 0, 0, 1)}  // DEFAULT_SHAPE_CONT
+        {RelNote(0, 0, 1, 0)}, // DEFAULT_SHAPE_REGULAR
+        {RelNote(0, 0, 1, 1)}  // DEFAULT_SHAPE_CONT
     };
 }
 
 unsigned int getMaxRelOffset(const Shape& s) {
     unsigned int maxRelOffset = 0;
     for (const RelNote& r: s) {
-        if (maxRelOffset < r.relOnset + (unsigned int) GET_REL_DUR(r)) {
-            maxRelOffset = r.relOnset + (unsigned int) GET_REL_DUR(r);
+        if (maxRelOffset < r.relOnset + (unsigned int) r.getRelDur()) {
+            maxRelOffset = r.relOnset + (unsigned int) r.getRelDur();
         }
     }
     return maxRelOffset;
