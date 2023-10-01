@@ -34,7 +34,15 @@ def parse_args():
         default=[1.0]
     )
     parser.add_argument(
-        '--nucleus-sampling-threshold',
+        '--sample-function',
+        type=str,
+        nargs='?',
+        choices=('none', 'top-k', 'top-p', 'nucleus'),
+        const='none',
+        default='none'
+    )
+    parser.add_argument(
+        '--sample-threshold',
         type=float,
         nargs='+',
         default=[1.0]
@@ -43,7 +51,7 @@ def parse_args():
         '--eval-sample-number',
         type=str,
         default='0',
-        help='If this is not set, will use the number of lines in test_pathlist'
+        help='If this is zero, will use the number of lines in test_pathlist'
     )
     parser.add_argument(
         '--seed',

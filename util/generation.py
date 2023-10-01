@@ -145,6 +145,19 @@ def adjust_probs_with_context(
     return normed_probs_list
 
 
+def default_sampling(probs: torch.Tensor, threshold):
+    return torch.multinomial(probs, 1)
+
+
+def top_k_sampling(probs: torch.Tensor, threshold: float):
+    k = probs.shape[0] * threshold
+    sorted_probs, sorted_indices = torch.sort(probs, dim=-1, descending=True)
+    topk_probs = sorted_probs[:k]
+    sampled_topk = torch.multinomial(topk_probs, 1)
+    sampled_index = sorted_indices[sampled_topk]
+    return sampled_index
+
+
 def nucleus_sampling(probs: torch.Tensor, threshold: float):
     assert 0 < threshold <= 1.0
     if threshold == 1.0:
@@ -167,7 +180,8 @@ def generate_piece(
         softmax_temperature: Union[List[float], None] = None,
         try_count_limit: int = 1000,
         use_prob_adjustment: bool = True,
-        nucleus_sampling_threshold:  Union[List[float], None] = None,
+        sample_function: Union[str, None] = 'nucleus',
+        sample_threshold:  Union[List[float], None] = None,
         print_exception: bool = False,
         show_tqdm: bool = False,
         ignore_pending_note_error: bool = True) -> List[str]:
@@ -210,21 +224,35 @@ def generate_piece(
             elif t[0] == tokens.TEMPO_EVENTS_CHAR:
                 event_family_indices[4].add(i)
 
+    # prepare sampling method
     if softmax_temperature is None:
         softmax_temperature = [1.0] * len(model.output_attrs_indices)
     elif isinstance(softmax_temperature, list):
         if len(softmax_temperature) == 1:
             softmax_temperature = softmax_temperature * len(model.output_attrs_indices)
         elif len(softmax_temperature) != len(model.output_attrs_indices):
-            raise ValueError('length of softmax_temperature can only be 1 or out_attr_num. Get ' + str(softmax_temperature))
+            raise ValueError('Length of softmax_temperature can only be 1 or out_attr_num. Get ' + str(softmax_temperature))
 
-    if nucleus_sampling_threshold is None:
-        nucleus_sampling_threshold = [1.0] * len(model.output_attrs_indices)
-    elif isinstance(nucleus_sampling_threshold, list):
-        if len(nucleus_sampling_threshold) == 1:
-            nucleus_sampling_threshold = nucleus_sampling_threshold * len(model.output_attrs_indices)
-        elif len(nucleus_sampling_threshold) != len(model.output_attrs_indices):
-            raise ValueError('length of nucleus_sampling_threshold can only be 1 or out_attr_num. Get ' + str(nucleus_sampling_threshold))
+    sample = None
+    if sample_function is None:
+        sample_threshold = 'none'
+    assert sample_function in ('none', 'top-k', 'top-p', 'nucleus')
+    if sample_function == 'none':
+        sample = default_sampling
+    elif sample_function == 'topk':
+        sample = top_k_sampling
+    elif sample_function == 'top-p' or sample_function == 'nucleus':
+        sample = nucleus_sampling
+    else:
+        raise ValueError('Value of sample_function should be one of "none", "top-k", "top-p", "nucleus". Get ' + sample_function)
+
+    if sample_threshold is None:
+       sample_threshold = [1.0] * len(model.output_attrs_indices)
+    elif isinstance(sample_threshold, list):
+        if len(sample_threshold) == 1:
+            sample_threshold = sample_threshold * len(model.output_attrs_indices)
+        elif len(sample_threshold) != len(model.output_attrs_indices):
+            raise ValueError('Length of sample_threshold can only be 1 or out_attr_num. Get ' + str(sample_threshold))
 
     text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs)
 
@@ -275,8 +303,8 @@ def generate_piece(
             try_count = 0
             while try_count < try_count_limit:
                 sampled_attrs = [
-                    nucleus_sampling(probs, threshold)
-                    for probs, threshold in zip(probs_list, nucleus_sampling_threshold)
+                    sample(probs, threshold)
+                    for probs, threshold in zip(probs_list, sample_threshold)
                 ]
                 # print(sampled_attrs)
                 try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, out_attr_num)

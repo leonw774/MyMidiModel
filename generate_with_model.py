@@ -41,7 +41,7 @@ def read_args():
             When --unit is "nth", the the length is counted with the token\'s start time.'
     )
     parser.add_argument(
-        '--unit',
+        '--unit', '-u',
         choices=['measure', 'nth', 'token'],
         default='measure',
         help='Specify the unit of PRIMER_LENGTH. \
@@ -86,7 +86,16 @@ def read_args():
         help='Control the temperature of softmax before multinomial sampling. Default is %(default)s.'
     )
     parser.add_argument(
-        '--nucleus-sampling-threshold', '--nu',
+        '--sample-function', '-f',
+        type=str,
+        nargs='?',
+        choices=('none', 'top-k', 'top-p', 'nucleus'),
+        const='none',
+        default='none',
+        help='The sample function to used. Choice "top-p" is the same as "nucleus". Default is %(default)s'
+    )
+    parser.add_argument(
+        '--sample-threshold', '--threshold', '-e',
         type=float,
         nargs='+',
         default=[1.0],
@@ -151,7 +160,7 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
             softmax_temperature=args.softmax_temperature,
             try_count_limit=args.try_count_limit,
             use_prob_adjustment=(not args.no_prob_adjustment),
-            nucleus_sampling_threshold=args.nucleus_sampling_threshold,
+            sample_threshold=args.sample_threshold,
             print_exception=args.print_exception,
             show_tqdm=(not args.no_tqdm)
         )

@@ -6,7 +6,7 @@ if [ -z "$midi_dir_path" ] || [ -z "$test_pathlist" ] || [ -z "$primer_measure_l
     echo "Required variables:"
     echo -e "\tmidi_dir_path test_pathlist primer_measure_length"
     echo "Optional variables:"
-    echo -e "\tmodel_dir_path num_workers log_path midi_to_piece_paras softmax_temperature nucleus_sampling_threshold seed"
+    echo -e "\tmodel_dir_path num_workers log_path midi_to_piece_paras softmax_temperature sample_function sample_threshold seed"
     exit 1
 fi
 
@@ -26,16 +26,17 @@ fi
 test -z "$log_path" && log_path=/dev/null
 test -z "$num_workers" && num_workers=1
 test -z "$softmax_temperature" && softmax_temperature=1.0
-test -z "$nucleus_sampling_threshold" && nucleus_sampling_threshold=1.0
+test -z "$sample_function" && sample_function=1.0
+test -z "$sample_threshold" && sample_threshold=1.0
 
 test -n "$seed" && seed_option="--seed $seed"
 test -n "$midi_to_piece_paras" && midi_to_piece_paras_option="--midi-to-piece-paras ${midi_to_piece_paras}"
 
 echo "evaluated_model.sh start." | tee -a "$log_path"
 echo "midi_dir_path=${midi_dir_path} test_pathlist=${test_pathlist} primer_measure_length=${primer_measure_length} \
-      eval_sample_number=${eval_sample_number} sample_number=${sample_number} model_dir_path=${model_dir_path} \
-      midi_to_piece_paras_option=${midi_to_piece_paras_option} seed_option=${seed_option} num_workers=${num_workers} \
-      log_path=${log_path} softmax_temperature=${softmax_temperature} nucleus_sampling_threshold=${nucleus_sampling_threshold}" | tee -a "$log_path"
+eval_sample_number=${eval_sample_number} sample_number=${sample_number} model_dir_path=${model_dir_path} \
+midi_to_piece_paras_option=${midi_to_piece_paras_option} seed_option=${seed_option} num_workers=${num_workers} \
+log_path=${log_path} softmax_temperature=${softmax_temperature} sample_function=${sample_threshold} sample_function=${sample_threshold}" | tee -a "$log_path"
 
 test_file_number=$(wc -l < $test_pathlist)
 if [ -n "$eval_sample_number" ] && [ "$eval_sample_number" -gt 0 ]; then
@@ -104,7 +105,7 @@ else
     start_time=$SECONDS
     mkdir "${model_dir_path}/eval_samples/uncond"
     python3 generate_with_model.py $seed_option --sample-number $sample_number --no-tqdm \
-        --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
+        --softmax-temperature $softmax_temperature --sample-function $sample_function --sample-threshold $sample_threshold -- \
         "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/uncond/uncond"
     duration=$(( $SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
@@ -145,7 +146,7 @@ else
     mkdir "${model_dir_path}/eval_samples/instr_cond"
     start_time=$SECONDS
     python3 generate_with_model.py $seed_option -p "test_primer_paths" -l 0 -n $sample_number --no-tqdm \
-        --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
+        --softmax-temperature $softmax_temperature --sample-function $sample_function --sample-threshold $sample_threshold -- \
         "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/instr_cond"
     duration=$(( $SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
@@ -172,7 +173,7 @@ else
     mkdir "${model_dir_path}/eval_samples/primer_cont"
     start_time=$SECONDS
     python3 generate_with_model.py $seed_option -p "test_primer_paths" -l $primer_measure_length -n $sample_number --no-tqdm \
-        --softmax-temperature $softmax_temperature --nucleus-sampling-threshold $nucleus_sampling_threshold -- \
+        --softmax-temperature $softmax_temperature --sample-function $sample_function --sample-threshold $sample_threshold -- \
         "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/primer_cont"
     duration=$(( $SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
