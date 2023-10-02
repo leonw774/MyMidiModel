@@ -36,7 +36,7 @@ echo "evaluated_model.sh start." | tee -a "$log_path"
 echo "midi_dir_path=${midi_dir_path} test_pathlist=${test_pathlist} primer_measure_length=${primer_measure_length} \
 eval_sample_number=${eval_sample_number} sample_number=${sample_number} model_dir_path=${model_dir_path} \
 midi_to_piece_paras_option=${midi_to_piece_paras_option} seed_option=${seed_option} num_workers=${num_workers} \
-log_path=${log_path} softmax_temperature=${softmax_temperature} sample_function=${sample_threshold} sample_function=${sample_threshold}" | tee -a "$log_path"
+log_path=${log_path} softmax_temperature=${softmax_temperature} sample_function=${sample_function} sample_threshold=${sample_threshold}" | tee -a "$log_path"
 
 test_file_number=$(wc -l < $test_pathlist)
 if [ -n "$eval_sample_number" ] && [ "$eval_sample_number" -gt 0 ]; then
