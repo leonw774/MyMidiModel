@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) {
             relOnset = b36strtoi(relOnsetStr.c_str());
             relPitch = b36strtoi(relPitchStr.c_str());
             relDur = b36strtoi(relDurStr.c_str());
-            shape.push_back(RelNote(isCont, relOnset, relPitch, relDur));
+            shape.push_back(RelNote(relOnset, relPitch, relDur, isCont));
         }
         // std::cout << shape2str(shape) << '\n' << line << std::endl;
         shapeDict.push_back(shape);
