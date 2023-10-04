@@ -7,6 +7,7 @@ if [ $# -eq 0 ]; then
 else 
     if [ $# -eq 1 ]; then
         dataset_name=$1
+        do_ablation='no'
     else
         if [ $# -eq 2 ]; then
             dataset_name=$1
