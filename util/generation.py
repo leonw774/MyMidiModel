@@ -260,10 +260,7 @@ def generate_piece(
     primer_length = input_seq.shape[1]
     max_gen_step = min(model.max_seq_length, steps+primer_length) - primer_length
     if max_gen_step <= 0:
-        print('generate_piece: start_seq is longer than model\'s max_seq_length. No generation is performed.')
-        if text_list[-1] != tokens.END_TOKEN_STR:
-            text_list.append(tokens.END_TOKEN_STR)
-        return text_list
+        raise ValueError('generate_piece: start_seq is longer than model\'s max_seq_length. No generation is performed.')
     end_with_end_token = False
     recurrent_memory = None
     _, array_memory = text_list_to_array(text_list, model.vocabs, input_memory=None, output_memory=True)
