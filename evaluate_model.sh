@@ -26,7 +26,7 @@ fi
 test -z "$log_path" && log_path=/dev/null
 test -z "$num_workers" && num_workers=1
 test -z "$softmax_temperature" && softmax_temperature=1.0
-test -z "$sample_function" && sample_function=1.0
+test -z "$sample_function" && sample_function=none
 test -z "$sample_threshold" && sample_threshold=1.0
 
 test -n "$seed" && seed_option="--seed $seed"

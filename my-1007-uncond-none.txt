@@ -1,0 +1,11 @@
+==== get_eval_features_of_midis.py start at 20231007-205633 ====
+Using all (1853) midis in the dataset
+Done. Sampling 1853 midi files from models/my-1007-uncond-none takes 528.310 seconds.
+2433369 notes involved in evaluation. Avg. #note per piece: 1313.205073. Tot. midi playback time: 150180.372110.
+pitch_class_entropy	pitchs_mean	pitchs_var	durations_mean	durations_var	velocities_mean	velocities_var	instrumentation_self_similarity	grooving_self_similarity
+2.1071879148360813	61.86535829001731	175.97009060072722	0.9369568042768465	1.2326636946472198	90.06811460567894	67.19644952388188	0.6861270862354963	0.9743644913974634
+Computing KLd, OA, and HI of pitch, duration, and velocity of midis in models/my-1007-uncond-none from data/midis/SymphonyNet_Dataset/eval_features.json
+pitch_histogram_KLD	duration_distribution_KLD	velocity_histogram_KLD	pitch_histogram_OA	duration_distribution_OA	velocity_histogram_OA	pitch_histogram_HI	duration_distribution_HI	velocity_histogram_HI
+0.022223029393557327	0.04811524045392915	0.20967616910554757	0.9781662067021593	0.9813945151394947	0.8543280583175366	0.9322656719226365	0.7822714600241909	0.6285260976854581
+Outputed evaluation features JSON at models/my-1007-uncond-none/eval_features.json
+==== get_eval_features_of_midis.py exit ====

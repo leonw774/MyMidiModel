@@ -212,7 +212,7 @@ fi
 
 python3 evaluate_model_wrapper.py \
     --model-dir-path "$model_dir_path" --num-workers $PROCESS_WORKERS --midi-to-piece-paras "$EVAL_MIDI_TO_PIECE_PARAS_FILE" \
-    --log-path "$log_path" --softmax-temperature $SOFTMAX_TEMPERATURE --sample-function $SAMPLE_FUNC --sample-threshold $SAMPLE_THRESHOLD \
+    --log-path "$log_path" --softmax-temperature $SOFTMAX_TEMPERATURE --sample-function $SAMPLE_FUNCTION --sample-threshold $SAMPLE_THRESHOLD \
     --eval-sample-number "$EVAL_SAMPLE_NUMBER" --seed "$SEED" --only-eval-uncond "$ONLY_EVAL_UNCOND" \
     -- "$MIDI_DIR_PATH" "$TEST_PATHLIST" $PRIMER_LENGTH
 
