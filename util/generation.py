@@ -244,7 +244,7 @@ def generate_piece(
     elif sample_function == 'top-p' or sample_function == 'nucleus':
         sample = nucleus_sampling
     else:
-        raise ValueError('Value of sample_function should be one of "none", "top-k", "top-p", "nucleus". Get ' + sample_function)
+        raise ValueError('Value of sample_function should be "none", "top-k", "top-p", or "nucleus". Get ' + sample_function)
 
     if sample_threshold is None:
        sample_threshold = [1.0] * len(model.output_attrs_indices)
