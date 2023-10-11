@@ -133,7 +133,7 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
     int t = 0;
     for (const RelNote& rRelNote: rShape) {
         times[t] = (rRelNote.relOnset * rightStretch + rmn.onset - lmn.onset);
-        times[t+rightSize] = (unsigned int) rRelNote.getRelDur() * rightStretch;
+        times[t+rightSize] = (unsigned int) rRelNote.relDur * rightStretch;
         t++;
     }
     times[rightSize*2] = lmn.stretch;
@@ -159,8 +159,8 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
         pairShape.push_back(RelNote(
             lRelNote.relOnset * lStretchRatio,
             lRelNote.relPitch,
-            lRelNote.getRelDur() * lStretchRatio,
-            lRelNote.isCont()
+            lRelNote.relDur * lStretchRatio,
+            lRelNote.isCont
         ));
     }
     t = 0;
@@ -169,7 +169,7 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
             times[t] / newStretch,
             rRelNote.relPitch + rmn.pitch - lmn.pitch,
             times[t+rightSize] / newStretch,
-            rRelNote.isCont()
+            rRelNote.isCont
         ));
         t++;
     }

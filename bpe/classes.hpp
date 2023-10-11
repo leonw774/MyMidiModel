@@ -30,10 +30,10 @@
 #define CONT_NOTE_EVENTS_STR    "N~"
 
 struct RelNote {
-    // relDurAndIsCont: Upper 7 bits used by relDur and lower 1 bit used by isCont
-    uint8_t relDurAndIsCont;    // Lowest byte
-    int8_t relPitch;            // Middle byte
-    uint8_t relOnset;           // Highest byte
+    uint8_t isCont : 1; // Lowest byte: lower 1 bit
+    uint8_t relDur : 7; // Lowest byte: upper 7 bits
+    int8_t relPitch;    // Middle byte
+    uint8_t relOnset;   // Highest byte
     // Members are ordered such that it's value is:
     //      (MSB) aRandomByte relOnset relPitch relDur isCont (LSB)
     // when viewed as unsigned 32bit int
@@ -45,28 +45,12 @@ struct RelNote {
 
     RelNote(uint8_t o, uint8_t p, uint8_t d, uint8_t c);
 
-    inline bool isCont() const;
-
-    inline uint8_t getRelDur() const;
-
     inline void setRelDur(const uint8_t o);
 
     bool operator<(const RelNote& rhs) const;
 
     bool operator==(const RelNote& rhs) const;
 };
-
-inline bool RelNote::isCont() const {
-    return relDurAndIsCont & 1;
-}
-
-inline uint8_t RelNote::getRelDur() const {
-    return relDurAndIsCont >> 1;
-}
-
-inline void RelNote::setRelDur(uint8_t o) {
-    relDurAndIsCont = (relDurAndIsCont & 1) | (o << 1);
-}
 
 typedef std::vector<RelNote> Shape;
 

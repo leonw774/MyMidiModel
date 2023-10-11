@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
                             // change left multinote to merged multinote
                             // because the relnotes are sorted in same way as multinotes,
                             // the first relnote in the new shape is correspond to the first relnote in left multinote's original shape
-                            uint8_t newStretch = shapeDict[track[k].shapeIndex][0].getRelDur() * track[k].stretch / maxScoreShape[0].getRelDur();
+                            uint8_t newStretch = shapeDict[track[k].shapeIndex][0].relDur * track[k].stretch / maxScoreShape[0].relDur;
                             // unit cannot be greater than max_duration
                             if (newStretch > maxDur) continue;
                             track[k].stretch = newStretch;

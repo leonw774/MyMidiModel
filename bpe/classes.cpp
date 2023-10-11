@@ -4,12 +4,13 @@
   RelNote
 ********/
 
-RelNote::RelNote() : relOnset(0), relPitch(0), relDurAndIsCont(0) {};
+RelNote::RelNote() : relOnset(0), relPitch(0), relDur(0), isCont(0) {};
 
 RelNote::RelNote(uint8_t o, uint8_t p, uint8_t d, uint8_t c) {
     relOnset = o;
     relPitch = p;
-    relDurAndIsCont = (d << 1) | (c ? 1 : 0); // in case c is not 1 or 0
+    relDur = d;
+    isCont = c;
 }
 
 // Compoare on relOnset first and then relPitch, relDur, isCont
@@ -18,10 +19,8 @@ RelNote::RelNote(uint8_t o, uint8_t p, uint8_t d, uint8_t c) {
 bool RelNote::operator<(const RelNote& rhs) const {
     // if (relOnset != rhs.relOnset) return relOnset < rhs.relOnset; 
     // if (relPitch != rhs.relPitch) return relPitch < rhs.relPitch;
-    // return relDurAndIsCont < rhs.relDurAndIsCont;
-
-    // uint32_t lhs_bytes = (relOnset << 16) | (relPitch << 8) | relDurAndIsCont;
-    // uint32_t rhs_bytes = (rhs.relOnset << 16) | (rhs.relPitch << 8) | rhs.relDurAndIsCont;
+    // if (relDur != rhs.relDur) return relDur < rhs.relDur;
+    // return isCont < rhs.isCont;
 
     // wicked casting: RelNote -> uint32_t
     return
@@ -31,9 +30,11 @@ bool RelNote::operator<(const RelNote& rhs) const {
 }
 
 bool RelNote::operator==(const RelNote& rhs) const {
-    return (relOnset == rhs.relOnset
-        && relPitch == rhs.relPitch
-        && relDurAndIsCont == rhs.relDurAndIsCont);
+    // return (relOnset == rhs.relOnset
+    //     && relPitch == rhs.relPitch
+    //     && relDur == rhs.relDur
+    //     && isCont == rhs.isCont);
+    return (*((uint32_t*) this) & 0x00ffffff) == (*((uint32_t*) &(rhs)) & 0x00ffffff);
 }
 
 /********
@@ -78,7 +79,7 @@ std::string shape2str(const Shape& s) {
     for (const RelNote& r: s) {
         ss <<        itob36str(r.relOnset)
            << "," << itob36str(r.relPitch)
-           << "," << itob36str(r.getRelDur()) << (r.isCont() ? "~" : "") << ";";
+           << "," << itob36str(r.relDur) << (r.isCont ? "~" : "") << ";";
     }
     return ss.str();
 }
@@ -93,8 +94,8 @@ std::vector<Shape> getDefaultShapeDict() {
 unsigned int getMaxRelOffset(const Shape& s) {
     unsigned int maxRelOffset = 0;
     for (const RelNote& r: s) {
-        if (maxRelOffset < r.relOnset + (unsigned int) r.getRelDur()) {
-            maxRelOffset = r.relOnset + (unsigned int) r.getRelDur();
+        if (maxRelOffset < r.relOnset + (unsigned int) r.relDur) {
+            maxRelOffset = r.relOnset + (unsigned int) r.relDur;
         }
     }
     return maxRelOffset;
