@@ -61,6 +61,13 @@ def parse_args():
         const=''
     )
     parser.add_argument(
+        '--use-device',
+        type=str,
+        nargs='?',
+        default='',
+        const=''
+    )
+    parser.add_argument(
         '--only-eval-uncond',
         type=str,
         default='',

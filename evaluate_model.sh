@@ -30,12 +30,13 @@ test -z "$sample_function" && sample_function=none
 test -z "$sample_threshold" && sample_threshold=1.0
 
 test -n "$seed" && seed_option="--seed $seed"
+test -n "$use_device" && use_device_option="--use-device $use_device"
 test -n "$midi_to_piece_paras" && midi_to_piece_paras_option="--midi-to-piece-paras ${midi_to_piece_paras}"
 
 echo "evaluated_model.sh start." | tee -a "$log_path"
 echo "midi_dir_path=${midi_dir_path} test_pathlist=${test_pathlist} primer_measure_length=${primer_measure_length} \
 eval_sample_number=${eval_sample_number} sample_number=${sample_number} model_dir_path=${model_dir_path} \
-midi_to_piece_paras_option=${midi_to_piece_paras_option} seed_option=${seed_option} num_workers=${num_workers} \
+midi_to_piece_paras_option=${midi_to_piece_paras_option} seed_option=${seed_option} use_device_option=${use_device_option} num_workers=${num_workers} \
 log_path=${log_path} softmax_temperature=${softmax_temperature} sample_function=${sample_function} sample_threshold=${sample_threshold}" | tee -a "$log_path"
 
 test_file_number=$(wc -l < $test_pathlist)
@@ -108,7 +109,7 @@ else
     echo "Generating $sample_number unconditional samples" | tee -a "$log_path"
     start_time=$SECONDS
     mkdir "${model_dir_path}/eval_samples/uncond"
-    python3 generate_with_model.py $seed_option --sample-number $sample_number --no-tqdm \
+    python3 generate_with_model.py $seed_option $use_device_option --sample-number $sample_number --no-tqdm \
         --softmax-temperature $softmax_temperature --sample-function $sample_function --sample-threshold $sample_threshold -- \
         "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/uncond/uncond"
     duration=$(( $SECONDS - start_time ))
@@ -149,7 +150,7 @@ else
     echo "Generating $sample_number instrument-conditioned samples" | tee -a "$log_path"
     mkdir "${model_dir_path}/eval_samples/instr_cond"
     start_time=$SECONDS
-    python3 generate_with_model.py $seed_option -p "test_primer_paths" -l 0 -n $sample_number --no-tqdm \
+    python3 generate_with_model.py $seed_option $use_device_option -p "test_primer_paths" -l 0 -n $sample_number --no-tqdm \
         --softmax-temperature $softmax_temperature --sample-function $sample_function --sample-threshold $sample_threshold -- \
         "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/instr_cond"
     duration=$(( $SECONDS - start_time ))
@@ -176,7 +177,7 @@ else
     echo "Generating $sample_number prime-continuation samples" | tee -a "$log_path"
     mkdir "${model_dir_path}/eval_samples/primer_cont"
     start_time=$SECONDS
-    python3 generate_with_model.py $seed_option -p "test_primer_paths" -l $primer_measure_length -n $sample_number --no-tqdm \
+    python3 generate_with_model.py $seed_option $use_device_option -p "test_primer_paths" -l $primer_measure_length -n $sample_number --no-tqdm \
         --softmax-temperature $softmax_temperature --sample-function $sample_function --sample-threshold $sample_threshold -- \
         "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/primer_cont"
     duration=$(( $SECONDS - start_time ))

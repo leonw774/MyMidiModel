@@ -127,9 +127,14 @@ def read_args():
         help='When model fail to generate next token that satisfy the format rule. Print out the exception message.'
     )
     parser.add_argument(
-        '--no-tqdm',
+        '--no-sample-tqdm', '--no-tqdm',
         action='store_true',
-        help='No tqdm progress bar when generating samples.'
+        help='No tqdm progress bar for single sample generation.'
+    )
+    parser.add_argument(
+        '--no-total-tqdm',
+        action='store_true',
+        help='No tqdm progress bar for all samples generation.'
     )
     parser.add_argument(
         '--seed',
@@ -162,7 +167,7 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
             use_prob_adjustment=(not args.no_prob_adjustment),
             sample_threshold=args.sample_threshold,
             print_exception=args.print_exception,
-            show_tqdm=(not args.no_tqdm)
+            show_tqdm=(not args.no_sample_tqdm)
         )
         if gen_text_list == BEGIN_TOKEN_STR + ' ' + END_TOKEN_STR:
             print(f'{output_file_path}: generated empty piece. will not output file.')
@@ -368,16 +373,19 @@ def main():
     if args.sample_number == 1:
         gen_handler(model, primer_seq_list[0], args, args.output_file_path)
     else:
+        pbar = tqdm(desc='Total samples', total=len(primer_seq_list), ncols=0)
         for i, primer_seq in enumerate(primer_seq_list):
             gen_handler(model, primer_seq, args, f'{args.output_file_path}_{i+1}')
-            print(f'generated {args.output_file_path}_{i+1}')
+            # print(f'generated {args.output_file_path}_{i+1}')
+            pbar.update()
+        pbar.close()
 
     generation_time = time() - generation_time_begin
     total_time = overhead_time + primer_process_time + generation_time
-    print(f'overhead_time:{overhead_time:.3e} \
-        primer_process_time:{primer_process_time:.3e} \
-        generation_time:{generation_time:.3e} \
-        total_time:{total_time:.3e}'
+    print(f'overhead_time:{overhead_time:.4g} \
+        primer_process_time:{primer_process_time:.4g} \
+        generation_time:{generation_time:.4g} \
+        total_time:{total_time:.4g}'
     )
 
     return 0

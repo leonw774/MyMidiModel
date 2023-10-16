@@ -272,7 +272,7 @@ def generate_piece(
                 _, recurrent_memory = model(model.to_input_attrs(input_seq[:, :i]).to(model_device), recurrent_memory)
 
     with torch.no_grad():
-        for _ in tqdm(range(max_gen_step), disable=not show_tqdm):
+        for _ in tqdm(range(max_gen_step), disable=not show_tqdm, leave=None):
             input_seq_in_attr_device = model.to_input_attrs(input_seq).to(model_device)
             if model.use_linear_attn:
                 # return batched_last_logits because inferencing is True
