@@ -382,10 +382,10 @@ def main():
 
     generation_time = time() - generation_time_begin
     total_time = overhead_time + primer_process_time + generation_time
-    print(f'overhead_time:{overhead_time:.4g} \
-        primer_process_time:{primer_process_time:.4g} \
-        generation_time:{generation_time:.4g} \
-        total_time:{total_time:.4g}'
+    print(f'overhead_time:{overhead_time:g} \
+        primer_process_time:{primer_process_time:g} \
+        generation_time:{generation_time:g} \
+        total_time:{total_time:g}'
     )
 
     return 0
