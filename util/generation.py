@@ -150,6 +150,7 @@ def default_sampling(probs: torch.Tensor, threshold):
 
 
 def top_k_sampling(probs: torch.Tensor, threshold: float):
+    assert 0 < threshold <= 1.0
     k = probs.shape[0] * threshold
     sorted_probs, sorted_indices = torch.sort(probs, dim=-1, descending=True)
     topk_probs = sorted_probs[:k]
@@ -236,15 +237,14 @@ def generate_piece(
     sample = None
     if sample_function is None:
         sample_threshold = 'none'
-    assert sample_function in ('none', 'top-k', 'top-p', 'nucleus')
+    assert sample_function in ('none', 'top-k', 'top-p', 'nucleus'),\
+        'Value of sample_function should be "none", "top-k", "top-p", or "nucleus". Get ' + sample_function
     if sample_function == 'none':
         sample = default_sampling
     elif sample_function == 'topk':
         sample = top_k_sampling
     elif sample_function == 'top-p' or sample_function == 'nucleus':
         sample = nucleus_sampling
-    else:
-        raise ValueError('Value of sample_function should be "none", "top-k", "top-p", or "nucleus". Get ' + sample_function)
 
     if sample_threshold is None:
        sample_threshold = [1.0] * len(model.output_attrs_indices)
