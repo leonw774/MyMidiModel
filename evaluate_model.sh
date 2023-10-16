@@ -88,11 +88,15 @@ fi
 
 test -z "$model_dir_path" && exit 0 
 
-test -f test_primer_paths && rm test_primer_paths
-touch test_primer_paths
-while read primer_file_path; do
-    echo "${midi_dir_path}/${primer_file_path}" >> test_primer_paths;
+test -f "${model_dir_path}/eval_primer_paths" && rm "${model_dir_path}/eval_primer_paths"
+touch "${model_dir_path}/eval_primer_paths"
+while read -r primer_file_path; do
+    echo "${midi_dir_path}/${primer_file_path}" >> "${model_dir_path}/eval_primer_paths";
 done < $test_pathlist
+
+if [ ! -d "${model_dir_path}/eval_samples" ]; then
+    mkdir "${model_dir_path}/eval_samples"
+fi
 
 ### Evaluate model unconditional generation
 
