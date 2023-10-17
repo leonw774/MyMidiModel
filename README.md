@@ -127,7 +127,7 @@ Shell scripts
    1. Arguments are passed as environment variables.
    2. Get evaluation features of the dataset's `TEST_PATHLIST` files using `get_eval_features_of_midis.py`.
    3. Get evaluation features of the unconditional, instrument-informed, and prime continution generation result of the model using the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`.
-- `experiment/`: Pre-programmed experiment execution
+- `experiment_script/`: Pre-programmed experiment execution script
   - `apply_learned_shapes_to_other.sh`
   - `bpe_parameters.sh`
   - `full_model_and_ablation.sh`

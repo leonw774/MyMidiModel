@@ -12,4 +12,4 @@ TEMPO_STEP=16
 PROCESS_WORKERS=8
 MIDI_DIR_PATH="data/midis/Symbolic_Orchestral_Dataset"
 DATA_NAME="sod"
-TEST_PATHLIST='configs/test/empty_test_pathlist.txt'
+TEST_PATHLIST='configs/test/sod_test_pathlist.txt'
