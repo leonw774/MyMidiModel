@@ -1,7 +1,6 @@
 from argparse import ArgumentParser
 import os
 import subprocess
-from traceback import format_exc
 
 def parse_args():
     parser = ArgumentParser()

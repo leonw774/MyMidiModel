@@ -3,7 +3,7 @@
 
 if ! { [ $# == 6 ] || [ $# == 5 ]; }; then
     echo "Expect arguments to be:"
-    echo "- Three configuration file name for midi preprocessing, bpe, and training/model setting"
+    echo "- Three configuration file name for midi preprocessing, bpe, and model setting"
     echo "- Two paths to the model directory and the log file"
     echo "- A optional torch device specification"
     exit 1
@@ -11,7 +11,7 @@ fi
 
 corpus_config_file_path="configs/corpus/"$1".sh"
 bpe_config_file_path="configs/bpe/"$2".sh"
-train_config_file_path="configs/train/"$3".sh"
+train_config_file_path="configs/model/"$3".sh"
 model_dir_path=$4
 log_path=$5
 use_device=$6

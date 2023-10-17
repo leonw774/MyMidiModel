@@ -5,12 +5,12 @@ if [ $# -eq 4 ]; then
     if [ $4 == '--use-existed' ]; then
         use_existed="--use-existed"
     else
-        echo "Expect arguments to be three configuration file name for midi preprocessing, bpe, and training/model setting, and an optional '--use-existed' flag at the fourth position."
+        echo "Expect arguments to be three configuration file name for midi preprocessing, bpe, and model/eval setting, and an optional '--use-existed' flag at the fourth position."
         exit 1
     fi
 else
     if [ $# -ne 3 ]; then
-        echo "Expect arguments to be three configuration file name for midi preprocessing, bpe, and training/model setting, and an optional '--use-existed' flag at the fourth position."
+        echo "Expect arguments to be three configuration file name for midi preprocessing, bpe, and model/eval setting, and an optional '--use-existed' flag at the fourth position."
         exit 1
     fi
 fi
@@ -19,7 +19,7 @@ fi
 full_config_name=$1"-"$2"-"$3
 corpus_config_file_path="configs/corpus/"$1".sh"
 bpe_config_file_path="configs/bpe/"$2".sh"
-train_config_file_path="configs/train/"$3".sh"
+train_config_file_path="configs/model/"$3".sh"
 
 for config_file_path in $corpus_config_file_path $bpe_config_file_path $train_config_file_path
 do
@@ -125,7 +125,7 @@ if [ "$do_bpe" == true ]; then
     python3 plot_bpe_log.py "$bpe_corpus_dir_path" "$log_path"
 
     # check if tokenized corpus is equal to original corpus
-    python3 verify_corpus_equality.py "$corpus_dir_path" "$bpe_corpus_dir_path" $PROCESS_WORKERS | tee -a "$log_path"
+    python3 test_script/verify_corpus_equality.py "$corpus_dir_path" "$bpe_corpus_dir_path" $PROCESS_WORKERS | tee -a "$log_path"
     verify_exit_code=${PIPESTATUS[0]}
     test $verify_exit_code -ne 0 && { echo "Corpus equality verification failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
 fi

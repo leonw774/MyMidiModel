@@ -108,15 +108,16 @@ They should compile to two binaries with `make -C bpe all`:
 Pythons scripts
 
 - `evaluate_model_wrapper.py`: Use python's `argparse` module to make using `evaluate_model.sh` easier.
-- `extract.py`: Extract piece(s) from the given corpus directory into text representation(s), midi file(s), or piano-roll graph(s) in png.
 - `generate_with_models.py`: Use trained model to generate midi files, with or without a primer.
 - `get_eval_features_of_midis.py`: Do as per its name. It will sample midi files in a directory. Output results as a JSON file `eval_feature_stats.json` right at the directory.
 - `make_arrays.py`: Generate `vocabs.json` and `arrays.npz` from `corpus` and `shape_vocab` if it exists.
 - `midi_to_corpus.py`: Pre-process midi files into a "corpus". The parameter would be stored in `paras`. It creates `corpus`, `paras`, and `pathlist` in the corpus directory.
 - `plot_bpe_log.py`: Make figures to visualize the data in the log files that contains the loggings of Multi-note BPE program.
-- `print_dataset.py`: Print out the results of dataset `__getitem__` and other related things.
+- `test_script/`: Used for debugging
+  - `extract.py`: Extract piece(s) from the given corpus directory into text representation(s), midi file(s), or piano-roll graph(s) in png.
+  - `print_dataset.py`: Print out the results of dataset `__getitem__` and other related things.
+  - `verify_corpus_equality.py`: Make sure two corpus are representing the same midi files.
 - `train.py`: Train a model from a corpus.
-- `verify_corpus_equality.py`: Make sure two corpus are representing the same midi files.
 
 Shell scripts
 
@@ -126,9 +127,10 @@ Shell scripts
    1. Arguments are passed as environment variables.
    2. Get evaluation features of the dataset's `TEST_PATHLIST` files using `get_eval_features_of_midis.py`.
    3. Get evaluation features of the unconditional, instrument-informed, and prime continution generation result of the model using the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`.
-- `experiment_apply_learned_shapes_to_other.sh`
-- `experiment_bpe_parameters.sh`
-- `experiment_full_model_and_ablation.sh`
+- `experiment/`: Pre-programmed experiment execution
+  - `apply_learned_shapes_to_other.sh`
+  - `bpe_parameters.sh`
+  - `full_model_and_ablation.sh`
 - `pipeline.sh`:
   1. Pre-process midi files into a corpus with `midi_to_corpus.py`.
   2. If `DO_BPE` is "true", then run `bpe/learn_vocab` to create a new merged corpus. After it is done, run `verify_corpus_equality.py` to make sure there are no errors and run `plot_bpe_log.py` to visualize the loggings.

@@ -4,9 +4,9 @@ import os
 import subprocess
 import tempfile
 from time import time
-from tqdm import tqdm
 from traceback import format_exc
 from typing import List
+from tqdm import tqdm
 
 import numpy as np
 import torch
