@@ -241,7 +241,7 @@ def generate_piece(
         'Value of sample_function should be "none", "top-k", "top-p", or "nucleus". Get ' + sample_function
     if sample_function == 'none':
         sample = default_sampling
-    elif sample_function == 'topk':
+    elif sample_function == 'top-k':
         sample = top_k_sampling
     elif sample_function == 'top-p' or sample_function == 'nucleus':
         sample = nucleus_sampling
