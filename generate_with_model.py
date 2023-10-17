@@ -165,6 +165,7 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
             softmax_temperature=args.softmax_temperature,
             try_count_limit=args.try_count_limit,
             use_prob_adjustment=(not args.no_prob_adjustment),
+            sample_function=args.sample_function,
             sample_threshold=args.sample_threshold,
             print_exception=args.print_exception,
             show_tqdm=(not args.no_sample_tqdm)
