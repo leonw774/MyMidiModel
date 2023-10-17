@@ -151,7 +151,7 @@ def default_sampling(probs: torch.Tensor, threshold):
 
 def top_k_sampling(probs: torch.Tensor, threshold: float):
     assert 0 < threshold <= 1.0
-    k = probs.shape[0] * threshold
+    k = int(probs.shape[0] * threshold)
     sorted_probs, sorted_indices = torch.sort(probs, dim=-1, descending=True)
     topk_probs = sorted_probs[:k]
     sampled_topk = torch.multinomial(topk_probs, 1)
