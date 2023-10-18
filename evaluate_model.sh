@@ -122,20 +122,20 @@ python3 get_eval_features_of_midis.py $seed_option $midi_to_piece_paras_option -
 
 if [ $? -ne 0 ]; then
     echo "Evaluation failed. evaluate_model.sh exit." | tee -a "$log_path";
-    rm test_primer_paths
+    rm "${model_dir_path}/eval_primer_paths"
     exit 1
 fi
 
 if [ "$test_file_number" == 0 ]; then
     echo "There is no test files so instrument-conditioned and primer-continuation are omitted." | tee -a "$log_path"
-    rm test_primer_paths
+    rm "${model_dir_path}/eval_primer_paths"
     echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 0
 fi
 
 if [ "$only_eval_uncond" == true ]; then
     echo "only_eval_uncond is set and true so instrument-conditioned and primer-continuation are omitted." | tee -a "$log_path"
-    rm test_primer_paths
+    rm "${model_dir_path}/eval_primer_paths"
     echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 0
 fi
@@ -150,7 +150,7 @@ else
     echo "Generating $sample_number instrument-conditioned samples" | tee -a "$log_path"
     mkdir "${model_dir_path}/eval_samples/instr_cond"
     start_time=$SECONDS
-    python3 generate_with_model.py $seed_option $use_device_option -p "test_primer_paths" -l 0 -n $sample_number --no-tqdm \
+    python3 generate_with_model.py $seed_option $use_device_option -p "${model_dir_path}/eval_primer_paths" -l 0 -n $sample_number --no-tqdm \
         --softmax-temperature $softmax_temperature --sample-function $sample_function --sample-threshold $sample_threshold -- \
         "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/instr_cond/instr_cond"
     duration=$(( $SECONDS - start_time ))
@@ -163,7 +163,7 @@ python3 get_eval_features_of_midis.py $seed_option $midi_to_piece_paras_option -
 
 if [ $? -ne 0 ]; then
     echo "Evaluation failed. evaluate_model.sh exit." | tee -a "$log_path";
-    rm test_primer_paths
+    rm "${model_dir_path}/eval_primer_paths"
     exit 1
 fi
 
@@ -177,7 +177,7 @@ else
     echo "Generating $sample_number prime-continuation samples" | tee -a "$log_path"
     mkdir "${model_dir_path}/eval_samples/primer_cont"
     start_time=$SECONDS
-    python3 generate_with_model.py $seed_option $use_device_option -p "test_primer_paths" -l $primer_measure_length -n $sample_number --no-tqdm \
+    python3 generate_with_model.py $seed_option $use_device_option -p "${model_dir_path}/eval_primer_paths" -l $primer_measure_length -n $sample_number --no-tqdm \
         --softmax-temperature $softmax_temperature --sample-function $sample_function --sample-threshold $sample_threshold -- \
         "${model_dir_path}/best_model.pt" "${model_dir_path}/eval_samples/primer_cont/primer_cont"
     duration=$(( $SECONDS - start_time ))
@@ -191,9 +191,9 @@ python3 get_eval_features_of_midis.py $seed_option $midi_to_piece_paras_option -
 
 if [ $? -ne 0 ]; then
     echo "Evaluation failed. evaluate_model.sh exit." | tee -a "$log_path";
-    rm test_primer_paths
+    rm "${model_dir_path}/eval_primer_paths"
     exit 1
 fi
 
-rm test_primer_paths
+rm "${model_dir_path}/eval_primer_paths"
 echo "evaluated_model.sh exit." | tee -a "$log_path" 

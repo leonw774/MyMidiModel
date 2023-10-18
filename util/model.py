@@ -111,7 +111,6 @@ class MyMidiTransformer(nn.Module):
             )
             for vsize in self.logit_vocabs_size
         ])
-        self.layer_norm = nn.LayerNorm(normalized_shape=embedding_dim, eps=1e-6)
 
         self.use_linear_attn = use_linear_attn
 
@@ -142,7 +141,7 @@ class MyMidiTransformer(nn.Module):
             self.transformer_decoder_inference = RecurrentEncoderBuilder.from_dictionary(params).get()
             make_mirror(self.transformer_decoder, self.transformer_decoder_inference)
         else:
-             self.transformer_decoder = x_transformers.Decoder(
+            self.transformer_decoder = x_transformers.Decoder(
                 depth=layers_number,
                 dim=embedding_dim,
                 heads=attn_heads_number,
@@ -161,6 +160,7 @@ class MyMidiTransformer(nn.Module):
             #     encoder_layer=layer,
             #     num_layers=layers_number
             # )
+
         self.apply(self._init_weights)
         # set padding vectors to zeros because the _init_weights set it to something else
         with torch.no_grad():
@@ -229,7 +229,6 @@ class MyMidiTransformer(nn.Module):
             length_mask = x[..., 0].ne(0).to(x.device)
             # print(length_mask)
             transformer_output = self.transformer_decoder(emb_sum_dropout, mask=length_mask)
-        transformer_output = self.layer_norm(transformer_output)
         logits_tuple = tuple(
             proj(transformer_output) for proj in self.project_linears
         )

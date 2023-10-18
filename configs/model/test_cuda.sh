@@ -34,6 +34,7 @@ USE_DEVICE='cuda'
 # eval
 EVAL_MIDI_TO_PIECE_PARAS_FILE=""
 EVAL_SAMPLE_NUMBER=10 # if not set, will used the number of test files
+ONLY_EVAL_UNCOND=true
 PRIMER_LENGTH=4
 SAMPLE_FUNCTION='none'
 SAMPLE_THRESHOLD=1.0
