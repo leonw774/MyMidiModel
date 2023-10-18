@@ -160,6 +160,7 @@ class MyMidiTransformer(nn.Module):
             #     encoder_layer=layer,
             #     num_layers=layers_number
             # )
+        self.layer_norm = nn.LayerNorm(normalized_shape=embedding_dim, eps=1e-6)
 
         self.apply(self._init_weights)
         # set padding vectors to zeros because the _init_weights set it to something else
@@ -229,6 +230,7 @@ class MyMidiTransformer(nn.Module):
             length_mask = x[..., 0].ne(0).to(x.device)
             # print(length_mask)
             transformer_output = self.transformer_decoder(emb_sum_dropout, mask=length_mask)
+        transformer_output = self.layer_norm(transformer_output)
         logits_tuple = tuple(
             proj(transformer_output) for proj in self.project_linears
         )
@@ -280,17 +282,16 @@ def compute_losses(
 
         return a list of losses of each head
     """
-    # basically treat seq_size as one of the K dimensions and K = 1
     # target_labels have to be long int
     target_labels = target_labels.long()
     no_reduce_head_losses_list = [
         F.cross_entropy(
             input=logits.transpose(1, 2),
             # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
+            # basically treat seq_size as one of the K dimensions and K = 1
             target=target_labels[..., k], # (batch_size, seq_size)
-            ignore_index=(0 if ignore_padding != 'back' else -100), # padding is index 0
+            ignore_index=(0 if ignore_padding != 'none' else -100), # padding is index 0
             reduction='none' # return tensor size (batch_size, seq_size)
-            # ignored index are 0.0
         )
         for k, logits in enumerate(pred_logits)
     ]
