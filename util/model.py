@@ -38,7 +38,7 @@ class MyMidiTransformer(nn.Module):
             attn_heads_number: int,
             embedding_dim: int,
             not_use_mps_number: bool,
-            embedding_dropout_rate: float = 0.1
+            dropout_rate: float = 0.1
             ) -> None:
         super().__init__()
 
@@ -89,7 +89,7 @@ class MyMidiTransformer(nn.Module):
             )
         else:
             self.positional_embedding_layer = None
-        self.embedding_dropout = nn.Dropout(embedding_dropout_rate)
+        self.embedding_dropout = nn.Dropout(dropout_rate)
 
         ######## Outputs
 
@@ -134,7 +134,7 @@ class MyMidiTransformer(nn.Module):
                 'value_dimensions': embedding_dim // attn_heads_number,
                 'feed_forward_dimensions': 4 * embedding_dim, # same as SymphonyNet
                 'attention_type': 'causal-linear',
-                'dropout': 0.1, # same as SymphonyNet
+                'dropout': dropout_rate,
                 'feature_map': MY_ELU_FEATURE_MAP  # make the model pickle-able
             }
             self.transformer_decoder = TransformerEncoderBuilder.from_dictionary(params).get()
@@ -146,21 +146,21 @@ class MyMidiTransformer(nn.Module):
                 dim=embedding_dim,
                 heads=attn_heads_number,
                 attn_dim_head=(embedding_dim // attn_heads_number),
-                attn_dropout=0.1,
-                ff_dropout=0.1
+                attn_dropout=dropout_rate,
+                ff_dropout=dropout_rate
             )
             # layer = nn.TransformerEncoderLayer(
             #     d_model=embedding_dim,
             #     nhead=attn_heads_number,
             #     dim_feedforward=4*embedding_dim,
-            #     dropout=0.1,
+            #     dropout=dropout_rate,
             #     batch_first=True
             # )
             # self.transformer_decoder = nn.TransformerEncoder(
             #     encoder_layer=layer,
             #     num_layers=layers_number
             # )
-        self.layer_norm = nn.LayerNorm(normalized_shape=embedding_dim, eps=1e-6)
+        # self.layer_norm = nn.LayerNorm(normalized_shape=embedding_dim, eps=1e-6)
 
         self.apply(self._init_weights)
         # set padding vectors to zeros because the _init_weights set it to something else
@@ -230,7 +230,7 @@ class MyMidiTransformer(nn.Module):
             length_mask = x[..., 0].ne(0).to(x.device)
             # print(length_mask)
             transformer_output = self.transformer_decoder(emb_sum_dropout, mask=length_mask)
-        transformer_output = self.layer_norm(transformer_output)
+        # transformer_output = self.layer_norm(transformer_output)
         logits_tuple = tuple(
             proj(transformer_output) for proj in self.project_linears
         )
