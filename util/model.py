@@ -298,7 +298,7 @@ def compute_losses(
     # (batch_size, seq_size, out_attr_number) <- [(batch_size, seq_size) ... (batch_size, seq_size)]
     no_reduce_losses = torch.stack(no_reduce_head_losses_list, dim=2)
     head_losses = [
-        no_reduce_head_losses.mean()
+        no_reduce_head_losses.sum() / torch.count_nonzero(no_reduce_head_losses)
         for no_reduce_head_losses in no_reduce_head_losses_list
     ]
 
