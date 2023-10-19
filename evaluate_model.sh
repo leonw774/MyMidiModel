@@ -122,20 +122,20 @@ python3 get_eval_features_of_midis.py $seed_option $midi_to_piece_paras_option -
 
 if [ $? -ne 0 ]; then
     echo "Evaluation failed. evaluate_model.sh exit." | tee -a "$log_path";
-    rm "${model_dir_path}/eval_primer_paths"
+    # rm "${model_dir_path}/eval_primer_paths"
     exit 1
 fi
 
 if [ "$test_file_number" == 0 ]; then
     echo "There is no test files so instrument-conditioned and primer-continuation are omitted." | tee -a "$log_path"
-    rm "${model_dir_path}/eval_primer_paths"
+    # rm "${model_dir_path}/eval_primer_paths"
     echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 0
 fi
 
 if [ "$only_eval_uncond" == true ]; then
     echo "only_eval_uncond is set and true so instrument-conditioned and primer-continuation are omitted." | tee -a "$log_path"
-    rm "${model_dir_path}/eval_primer_paths"
+    # rm "${model_dir_path}/eval_primer_paths"
     echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 0
 fi
@@ -163,7 +163,7 @@ python3 get_eval_features_of_midis.py $seed_option $midi_to_piece_paras_option -
 
 if [ $? -ne 0 ]; then
     echo "Evaluation failed. evaluate_model.sh exit." | tee -a "$log_path";
-    rm "${model_dir_path}/eval_primer_paths"
+    # rm "${model_dir_path}/eval_primer_paths"
     exit 1
 fi
 
@@ -191,9 +191,9 @@ python3 get_eval_features_of_midis.py $seed_option $midi_to_piece_paras_option -
 
 if [ $? -ne 0 ]; then
     echo "Evaluation failed. evaluate_model.sh exit." | tee -a "$log_path";
-    rm "${model_dir_path}/eval_primer_paths"
+    # rm "${model_dir_path}/eval_primer_paths"
     exit 1
 fi
 
-rm "${model_dir_path}/eval_primer_paths"
+# rm "${model_dir_path}/eval_primer_paths"
 echo "evaluated_model.sh exit." | tee -a "$log_path" 
