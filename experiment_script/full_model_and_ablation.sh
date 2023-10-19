@@ -25,7 +25,7 @@ fi
 
 model_setting="vanilla_small_lr2e-4"
 if [[ "$dataset_name" == lmd_full* ]]; then
-    model_setting="vanilla_small_lr1e-4"
+    model_setting="vanilla_small_lr5e-4"
 fi
 
 if [ "$do_ablation" != '--ablation' ]; then
