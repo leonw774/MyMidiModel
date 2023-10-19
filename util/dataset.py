@@ -84,7 +84,7 @@ class MidiDataset(Dataset):
             npz_file = np.load(npz_path)
             self.train_filenames = [
                 str(filenum)
-                for filenum, midi_filepath in tqdm(enumerate(all_pathlist))
+                for filenum, midi_filepath in tqdm(enumerate(all_pathlist), disable=not verbose)
                 if not midi_filepath.endswith(tuple(test_pathlist))
                 # use endswith because the pathlist records the relative paths to midi files from project's root
                 # while test_pathlist record relative paths to midi files from dataset's root
