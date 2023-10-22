@@ -73,10 +73,10 @@ class MidiDataset(Dataset):
         available_memory_size = psutil.virtual_memory().available
         npz_zipinfo_list = zipfile.ZipFile(npz_path).infolist()
         array_memory_size = sum([zinfo.file_size for zinfo in npz_zipinfo_list])
-        if array_memory_size >= available_memory_size - 4e9: # keep 4G for other things
+        if array_memory_size >= available_memory_size - 1e9:
             if verbose:
-                print('Memory size not enough. Panic')
-                raise OSError('Memory size not enough. Panic')
+                print(f'Memory size not enough. Need {array_memory_size//1024} KB, but only {available_memory_size//1024} KB available.')
+            raise OSError('Memory size not enough.')
         else:
             # load into memory to be faster
             if verbose:
