@@ -125,7 +125,7 @@ if [ "$do_bpe" == true ]; then
     python3 plot_bpe_log.py "$bpe_corpus_dir_path" "$log_path"
 
     # check if tokenized corpus is equal to original corpus
-    python3 test_script/verify_corpus_equality.py "$corpus_dir_path" "$bpe_corpus_dir_path" $PROCESS_WORKERS | tee -a "$log_path"
+    python3 verify_corpus_equality.py "$corpus_dir_path" "$bpe_corpus_dir_path" $PROCESS_WORKERS | tee -a "$log_path"
     verify_exit_code=${PIPESTATUS[0]}
     test $verify_exit_code -ne 0 && { echo "Corpus equality verification failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
 fi
@@ -206,9 +206,6 @@ if [ -n "${NO_EVAL+x}" ]; then
     echo "pipeline.sh exit."
     exit 0
 fi
-
-# $ONLY_EVAL_UNCOND is used like this:
-# ONLY_EVAL_UNCOND=true ./pipeline ... ... ...
 
 python3 evaluate_model_wrapper.py \
     --model-dir-path "$model_dir_path" --num-workers $PROCESS_WORKERS --midi-to-piece-paras "$EVAL_MIDI_TO_PIECE_PARAS_FILE" \

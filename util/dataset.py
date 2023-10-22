@@ -21,7 +21,7 @@ class MidiDataset(Dataset):
             self,
             data_dir_path: str,
             max_seq_length: int,
-            test_pathlist: List[str] = None,
+            test_pathlist_file_path: str = None,
             virtual_piece_step_ratio: float = 0,
             permute_mps: bool = False,
             permute_track_number: bool = False,
@@ -37,7 +37,7 @@ class MidiDataset(Dataset):
               max_seq_length / virtual_piece_step_ratio * N, where N is positive integer. Default is 1.
               This value can not be smaller than 1. 
 
-            - test_pathlist: The paths of files to exclude.
+            - test_pathlist_file_path: The paths of files to exclude.
 
             - permute_mps: Whether or not the dataset should permute all the maximal permutable subarrays
               before returning in `__getitem__`. Default is False.
@@ -62,12 +62,12 @@ class MidiDataset(Dataset):
         self.pitch_augmentation_range = pitch_augmentation_range
 
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
-        all_pathlist = [p.strip() for p in open(os.path.join(data_dir_path, 'pathlist'), 'r', encoding='utf8').readlines()]
-        if test_pathlist is not None and test_pathlist != '':
-            # assert os.path.exists(test_pathlist)
-            test_pathlist = [p.strip() for p in open(test_pathlist, 'r', encoding='utf8').readlines()]
+        all_path_list = [p.strip() for p in open(os.path.join(data_dir_path, 'pathlist'), 'r', encoding='utf8').readlines()]
+        if test_pathlist_file_path is not None and test_pathlist_file_path != '':
+            # assert os.path.exists(test_pathlist_file_path)
+            test_paths_tuple = (p.strip() for p in open(test_pathlist_file_path, 'r', encoding='utf8').readlines())
         else:
-            test_pathlist = []
+            test_paths_tuple = tuple()
         if verbose:
             print('Reading', npz_path)
         available_memory_size = psutil.virtual_memory().available
@@ -84,10 +84,10 @@ class MidiDataset(Dataset):
             npz_file = np.load(npz_path)
             self.train_filenames = [
                 str(filenum)
-                for filenum, midi_filepath in tqdm(enumerate(all_pathlist), disable=not verbose)
-                if not midi_filepath.endswith(tuple(test_pathlist))
+                for filenum, midi_filepath in tqdm(enumerate(all_path_list), disable=not verbose)
+                if not midi_filepath.endswith(test_paths_tuple)
                 # use endswith because the pathlist records the relative paths to midi files from project's root
-                # while test_pathlist record relative paths to midi files from dataset's root
+                # while test_paths_tuple record relative paths to midi files from dataset's root
             ]
             self.pieces = {
                 str(filenum): npz_file[str(filenum)]

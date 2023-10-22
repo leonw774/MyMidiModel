@@ -108,15 +108,14 @@ They should compile to two binaries with `make -C bpe all`:
 Pythons scripts
 
 - `evaluate_model_wrapper.py`: Use python's `argparse` module to make using `evaluate_model.sh` easier.
+- `extract.py`: Used for debugging. Extract piece(s) from the given corpus directory into text representation(s), midi file(s), or piano-roll graph(s) in png.
 - `generate_with_models.py`: Use trained model to generate midi files, with or without a primer.
 - `get_eval_features_of_midis.py`: Do as per its name. It will sample midi files in a directory. Output results as a JSON file `eval_feature_stats.json` right at the directory.
 - `make_arrays.py`: Generate `vocabs.json` and `arrays.npz` from `corpus` and `shape_vocab` if it exists.
 - `midi_to_corpus.py`: Pre-process midi files into a "corpus". The parameter would be stored in `paras`. It creates `corpus`, `paras`, and `pathlist` in the corpus directory.
 - `plot_bpe_log.py`: Make figures to visualize the data in the log files that contains the loggings of Multi-note BPE program.
-- `test_script/`: Used for debugging
-  - `extract.py`: Extract piece(s) from the given corpus directory into text representation(s), midi file(s), or piano-roll graph(s) in png.
-  - `print_dataset.py`: Print out the results of dataset `__getitem__` and other related things.
-  - `verify_corpus_equality.py`: Make sure two corpus are representing the same midi files.
+- `print_dataset.py`: Used for debugging. Print out the results of dataset `__getitem__` and other related things.
+- `verify_corpus_equality.py`: To make sure two corpus are representing the same midi files.
 - `train.py`: Train a model from a corpus.
 
 Shell scripts
