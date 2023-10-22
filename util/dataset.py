@@ -35,7 +35,7 @@ class MidiDataset(Dataset):
             - virtual_piece_step_ratio: If > 1, will create multiple virtual pieces by splitting overlength pieces.
               The start point of samples will be at the first measure token that has index just greater than
               max_seq_length / virtual_piece_step_ratio * N, where N is positive integer. Default is 1.
-              This value can not be smaller than 1. 
+              This value can not be smaller than 1.
 
             - test_pathlist_file_path: The paths of files to exclude.
 
@@ -70,25 +70,26 @@ class MidiDataset(Dataset):
             test_paths_tuple = tuple()
         if verbose:
             print('Reading', npz_path)
+        self.train_filenames = [
+            str(filenum)
+            for filenum, midi_filepath in tqdm(enumerate(all_path_list), disable=not verbose)
+            if not midi_filepath.endswith(test_paths_tuple)
+            # use endswith because the pathlist records the relative paths to midi files from project's root
+            # while test_paths_tuple record relative paths to midi files from dataset's root
+        ]
+
         available_memory_size = psutil.virtual_memory().available
         npz_zipinfo_list = zipfile.ZipFile(npz_path).infolist()
         array_memory_size = sum([zinfo.file_size for zinfo in npz_zipinfo_list])
         if array_memory_size >= available_memory_size - 1e9:
             if verbose:
-                print(f'Memory size not enough. Need {array_memory_size//1024} KB, but only {available_memory_size//1024} KB available.')
-            raise OSError('Memory size not enough.')
+                print(f'Memory not enough. Need {array_memory_size//1024} KB. Only {available_memory_size//1024} KB available.')
+            raise OSError('Memory not enough.')
         else:
             # load into memory to be faster
             if verbose:
                 print('Loading arrays to memory')
             npz_file = np.load(npz_path)
-            self.train_filenames = [
-                str(filenum)
-                for filenum, midi_filepath in tqdm(enumerate(all_path_list), disable=not verbose)
-                if not midi_filepath.endswith(test_paths_tuple)
-                # use endswith because the pathlist records the relative paths to midi files from project's root
-                # while test_paths_tuple record relative paths to midi files from dataset's root
-            ]
             self.pieces = {
                 str(filenum): npz_file[str(filenum)]
                 for filenum in tqdm(self.train_filenames, disable=not verbose, ncols=0)
