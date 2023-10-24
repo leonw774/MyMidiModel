@@ -65,7 +65,7 @@ class MidiDataset(Dataset):
         all_path_list = [p.strip() for p in open(os.path.join(data_dir_path, 'pathlist'), 'r', encoding='utf8').readlines()]
         if test_pathlist_file_path is not None and test_pathlist_file_path != '':
             # assert os.path.exists(test_pathlist_file_path)
-            test_paths_tuple = (p.strip() for p in open(test_pathlist_file_path, 'r', encoding='utf8').readlines())
+            test_paths_tuple = tuple(p.strip() for p in open(test_pathlist_file_path, 'r', encoding='utf8').readlines())
         else:
             test_paths_tuple = tuple()
         if verbose:
