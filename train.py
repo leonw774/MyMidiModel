@@ -27,9 +27,10 @@ def parse_args():
     data_parser = ArgumentParser()
     data_parser.add_argument(
         '--test-pathlist',
+        dest='test_pathlist_file_path',
         type=str,
         default='',
-        help='The text file recording what files in the dataset are for only testing'
+        help='The path to the text file recording the testing files of the dataset'
     )
     data_parser.add_argument(
         '--max-seq-length',
