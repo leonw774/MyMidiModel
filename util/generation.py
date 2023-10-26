@@ -181,16 +181,19 @@ def generate_piece(
         softmax_temperature: Union[List[float], None] = None,
         try_count_limit: int = 1000,
         use_prob_adjustment: bool = True,
-        sample_function: Union[str, None] = 'nucleus',
+        sample_function: Union[str, None] = 'none',
         sample_threshold:  Union[List[float], None] = None,
         print_exception: bool = False,
         show_tqdm: bool = False,
         ignore_pending_note_error: bool = True) -> List[str]:
     """
-        Expect start_seq to be Tensor with shape: (1, seq_size, all_attr_number) or None
-        If start_seq is None, will use `text_list_to_array([BEGIN_TOKEN_STR])` as start_seq
-        ignore_pending_note_error is default to be True, otherwise model cannot generate continuing note
-        return the text list of the generated piece
+        Expect `start_seq` to be Tensor with shape: `(1, seq_size, all_attr_number)` or `None`.
+
+        If `start_seq` is None, will use `text_list_to_array([BEGIN_TOKEN_STR])`.
+
+        `ignore_pending_note_error` is default to be True, otherwise model cannot generate continuing note
+
+        Return generated result as text list
     """
     if start_seq is not None:
         exception_msg = f'start_seq\'s shape have to be (1, seq_length, all_attr_number), get {start_seq.shape}'

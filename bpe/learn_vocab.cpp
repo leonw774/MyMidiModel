@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
     int cmd_opt = 0;
     bool doLog = false;
     int nonOptStartIndex = 1;
-    std::string cmdLineUsage = "./learn_vocab [-log] inCorpusDirPath outCorpusDirPath iterNum adjacency samplingRate minScoreLimit [workersNum]";
+    std::string cmdLineUsage = "./learn_vocab [-log] inCorpusDirPath outCorpusDirPath iterNum adjacency samplingRate minScoreLimit [workerNum]";
     while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
         switch (cmd_opt) {
@@ -42,10 +42,10 @@ int main(int argc, char *argv[]) {
     std::string adjacency(argv[nonOptStartIndex+3]);
     double samplingRate = atof(argv[nonOptStartIndex+4]);
     double minScoreLimit = atof(argv[nonOptStartIndex+5]);
-    int workersNum = -1; // -1 means use default
+    int workerNum = -1; // -1 means use default
     if (argc - nonOptStartIndex == 7) {
-        workersNum = atoi(argv[nonOptStartIndex+6]);
-        omp_set_num_threads(workersNum);
+        workerNum = atoi(argv[nonOptStartIndex+6]);
+        omp_set_num_threads(workerNum);
     }
     
     if (iterNum <= 0 || MultiNote::shapeIndexLimit < iterNum) {
@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
         << "adjacency: " << adjacency << '\n'
         << "samplingRate: " << samplingRate << '\n'
         << "minScoreLimit: " << minScoreLimit << '\n'
-        << "workersNum: " << workersNum << std::endl;
+        << "workerNum: " << workerNum << std::endl;
 
     // open files
     std::string inCorpusFilePath = inCorpusDirPath + "/corpus";

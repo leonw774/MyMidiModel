@@ -1,18 +1,41 @@
 import bisect
 from collections import Counter
 from fractions import Fraction
+import functools
 import itertools
 from math import log, isnan, sqrt
 from math import e as math_e
+from multiprocessing import Pool
 import random
 from statistics import NormalDist
-from typing import Dict, Union
+from typing import Dict, List, Union
 
 import numpy as np
 from miditoolkit import MidiFile
+from pandas import Series
+from tqdm import tqdm
 
 from .tokens import b36str2int, MEASURE_EVENTS_CHAR, END_TOKEN_STR
 from .midi import piece_to_midi, midi_to_piece, get_after_k_measures
+
+
+EVAL_SCALAR_FEATURE_NAMES = [
+    'pitch_class_entropy',
+    # 'pitchs_mean',
+    # 'pitchs_var',
+    # 'durations_mean',
+    # 'durations_var',
+    # 'velocities_mean',
+    # 'velocities_var',
+    'instrumentation_self_similarity',
+    'grooving_self_similarity'
+]
+
+EVAL_DISTRIBUTION_FEATURE_NAMES = [
+    'pitch_histogram',
+    'duration_distribution',
+    'velocity_histogram'
+]
 
 
 def _entropy(x: Union[list, dict], base: float = math_e) -> float:
@@ -183,21 +206,28 @@ def midi_to_features(
         midi_to_piece_paras: Union[dict, None] = None,
         primer_measure_length: int = 0,
         max_pairs_number: int = int(1e6),
-        max_token_number: int = int(1e4)) -> Dict[str, float]:
+        max_token_number: int = int(1e4)) -> Union[Dict[str, float], None]:
 
     if midi_to_piece_paras is None:
         midi_to_piece_paras = EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT
     else:
-        assert isinstance(midi_to_piece_paras, dict)
+        # assert isinstance(midi_to_piece_paras, dict)
+        if not isinstance(midi_to_piece_paras, dict):
+            return None
         if len(midi_to_piece_paras) == 0:
             midi_to_piece_paras = EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT
         else:
-            assert all(k in midi_to_piece_paras for k in EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT)
+            # assert all(k in midi_to_piece_paras for k in EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT)
+            if all(k in midi_to_piece_paras for k in EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT):
+                return None
     nth = midi_to_piece_paras['nth']
-    temp_piece = midi_to_piece(
-        midi=midi,
-        **midi_to_piece_paras
-    )
+    try:
+        temp_piece = midi_to_piece(
+            midi=midi,
+            **midi_to_piece_paras
+        )
+    except AssertionError:
+        return None
     return piece_to_features(temp_piece, nth, primer_measure_length, max_pairs_number, max_token_number)
 
 
@@ -206,7 +236,7 @@ def piece_to_features(
         nth: int,
         primer_measure_length: int = 0,
         max_pairs_number: int = int(1e6),
-        max_token_number: int = int(1e4)) -> Dict[str, float]:
+        max_token_number: int = int(1e4)) -> dict:
     '''
         Return:
         - pitch class histogram and entropy
@@ -246,32 +276,32 @@ def piece_to_features(
         pitch_class_entropy = _entropy(pitch_class_histogram, base=2)
     except ValueError:
         pitch_class_entropy = float('nan')
-    pitchs_mean = np.mean(pitchs) if len(pitchs) > 0 else float('nan')
-    pitchs_var = np.var(pitchs) if len(pitchs) > 0 else float('nan')
+    # pitchs_mean = np.mean(pitchs) if len(pitchs) > 0 else float('nan')
+    # pitchs_var = np.var(pitchs) if len(pitchs) > 0 else float('nan')
 
     duration_distribution = Counter([f'{d.numerator}/{d.denominator}' for d in durations])
-    durations_as_float = [float(d) for d in durations]
-    durations_mean = np.mean(durations_as_float) if len(durations) > 0 else float('nan')
-    durations_var = np.var(durations_as_float) if len(durations) > 0 else float('nan')
+    # durations_as_float = [float(d) for d in durations]
+    # durations_mean = np.mean(durations_as_float) if len(durations) > 0 else float('nan')
+    # durations_var = np.var(durations_as_float) if len(durations) > 0 else float('nan')
 
     velocity_histogram = {v:0 for v in range(128)}
     for v in velocities:
         velocity_histogram[v] += 1
-    velocities_mean = np.mean(velocities) if len(velocities) > 0 else float('nan')
-    velocities_var = np.var(velocities) if len(velocities) > 0 else float('nan')
+    # velocities_mean = np.mean(velocities) if len(velocities) > 0 else float('nan')
+    # velocities_var = np.var(velocities) if len(velocities) > 0 else float('nan')
 
     if isnan(pitch_class_entropy):
         return {
             'pitch_histogram': pitch_histogram,
             'pitch_class_entropy': pitch_class_entropy,
-            'pitchs_mean': pitchs_mean,
-            'pitchs_var': pitchs_var,
+            # 'pitchs_mean': pitchs_mean,
+            # 'pitchs_var': pitchs_var,
             'duration_distribution': duration_distribution,
-            'durations_mean': durations_mean,
-            'durations_var': durations_var,
+            # 'durations_mean': durations_mean,
+            # 'durations_var': durations_var,
             'velocity_histogram': velocity_histogram,
-            'velocities_mean': velocities_mean,
-            'velocities_var': velocities_var,
+            # 'velocities_mean': velocities_mean,
+            # 'velocities_var': velocities_var,
             'instrumentation_self_similarity': float('nan'),
             'grooving_self_similarity': float('nan')
         }
@@ -335,33 +365,164 @@ def piece_to_features(
     features = {
         'pitch_histogram': pitch_histogram,
         'pitch_class_entropy': pitch_class_entropy,
-        'pitchs_mean': pitchs_mean,
-        'pitchs_var': pitchs_var,
+        # 'pitchs_mean': pitchs_mean,
+        # 'pitchs_var': pitchs_var,
         'duration_distribution': duration_distribution,
-        'durations_mean': durations_mean,
-        'durations_var': durations_var,
+        # 'durations_mean': durations_mean,
+        # 'durations_var': durations_var,
         'velocity_histogram': velocity_histogram,
-        'velocities_mean': velocities_mean,
-        'velocities_var': velocities_var,
+        # 'velocities_mean': velocities_mean,
+        # 'velocities_var': velocities_var,
         'instrumentation_self_similarity': instrumentation_self_similarity,
         'grooving_self_similarity': grooving_self_similarity
     }
     return features
 
-EVAL_SCALAR_FEATURE_NAMES = [
-    'pitch_class_entropy',
-    'pitchs_mean',
-    'pitchs_var',
-    'durations_mean',
-    'durations_var',
-    'velocities_mean',
-    'velocities_var',
-    'instrumentation_self_similarity',
-    'grooving_self_similarity'
-]
 
-EVAL_DISTRIBUTION_FEATURE_NAMES = [
-    'pitch_histogram',
-    'duration_distribution',
-    'velocity_histogram'
-]
+def compare_with_ref(source_eval_features: dict, reference_eval_features: dict):
+    """
+        Add KLD, OA, and HI of distribution features into source eval features
+    """
+    # KL Divergence
+    for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
+        source_eval_features[fname+'_KLD'] = kl_divergence(
+            source_eval_features[fname],
+            reference_eval_features[fname],
+            ignore_pred_zero=True
+        )
+
+    # Overlapping area of estimated gaussian distribution
+    for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
+        # because the keys are strings and are represented as interger (pitch & velocity) and fraction (duration)
+        source_eval_features[fname+'_OA'] = overlapping_area_of_estimated_gaussian(
+            {float(Fraction(k)): v for k, v in source_eval_features[fname].items()},
+            {float(Fraction(k)): v for k, v in reference_eval_features[fname].items()}
+        )
+
+    # (Normalized) Histogram intersection
+    for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
+        source_eval_features[fname+'_HI'] = histogram_intersection(
+            source_eval_features[fname],
+            reference_eval_features[fname]
+        )
+
+
+def aggregate_features(features_list: List[Dict[str, float]]) -> dict:
+    aggr_eval_features = dict()
+
+    # aggregate scalar features
+    aggr_scalar_eval_features = {
+        fname: [
+            fs[fname]
+            for fs in features_list
+        ]
+        for fname in EVAL_SCALAR_FEATURE_NAMES
+    }
+    for fname in EVAL_SCALAR_FEATURE_NAMES:
+        fname_description = dict(Series(aggr_scalar_eval_features[fname], dtype='float64').dropna().describe())
+        fname_description: Dict[str, np.float64]
+        aggr_eval_features[fname] = {
+            k: float(v) for k, v in fname_description.items()
+        }
+
+    # aggregate distribution features
+    for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
+        aggr_eval_features[fname] = dict(sum(
+            [Counter(features[fname]) for features in features_list],
+            Counter() # starting value of empty counter
+        ))
+        # cast the keys into strings! because the reference distribution is read from json
+        aggr_eval_features[fname] = {str(k): v for k, v in aggr_eval_features[fname].items()}
+
+    # aggregate others
+    aggr_eval_features['notes_number_per_piece'] = [
+        sum(features['pitch_histogram'].values())
+        for features in features_list
+    ]
+
+    return aggr_eval_features
+
+
+def midi_list_to_features(
+        midi_list: List[MidiFile],
+        midi_to_piece_paras: Union[dict, None] = None,
+        primer_measure_length: int = 0,
+        max_pairs_number: int = int(1e6),
+        worker_number: int = 1,
+        use_tqdm: bool = False):
+    """
+        Given a list of midis, returns:
+        - A list of indices of processable uncorrupted midi
+        - Their aggregated features
+    """
+
+    midi_to_features_partial = functools.partial(
+        midi_to_features,
+        midi_to_piece_paras=midi_to_piece_paras,
+        primer_measure_length=primer_measure_length,
+        max_pairs_number=max_pairs_number
+    )
+    eval_features_list: List[ Dict[str, float] ] = []
+    if worker_number > 1:
+        with Pool(worker_number) as p:
+            eval_features_list = list(tqdm(
+                p.imap(midi_to_features_partial, midi_list),
+                total=len(midi_list),
+                ncols=100,
+                desc='Calculating features',
+                disable=not use_tqdm
+            ))
+    else:
+        eval_features_list = list(tqdm(
+            map(midi_to_features_partial, midi_list),
+            total=len(midi_list),
+            ncols=100,
+            desc='Calculating features',
+            disable=not use_tqdm
+        ))
+
+    uncorrupt_midi_indices_list = [
+        i
+        for i, _ in enumerate(midi_list)
+        if eval_features_list[i] is not None
+    ]
+    eval_features_list = [f for f in eval_features_list if f is not None]
+    aggr_eval_features = aggregate_features(eval_features_list)
+    return uncorrupt_midi_indices_list, aggr_eval_features
+
+
+def piece_list_to_features(
+        piece_list: List[str],
+        nth: int,
+        primer_measure_length: int = 0,
+        max_pairs_number: int = int(1e6),
+        worker_number: int = 1,
+        use_tqdm: bool = False):
+    """
+        Given a list of pieces, returns their aggregated features
+    """
+    piece_to_features_partial = functools.partial(
+        piece_to_features,
+        nth=nth,
+        primer_measure_length=primer_measure_length,
+        max_pairs_number=max_pairs_number
+    )
+    eval_features_list: List[ Dict[str, float] ] = []
+    if worker_number > 1:
+        with Pool(worker_number) as p:
+            eval_features_list = list(tqdm(
+                p.imap(piece_to_features_partial, piece_list),
+                total=len(piece_list),
+                ncols=100,
+                disable=not use_tqdm
+            ))
+    else:
+        eval_features_list = list(tqdm(
+            map(piece_to_features_partial, piece_list),
+            total=len(piece_list),
+            ncols=100,
+            disable=not use_tqdm
+        ))
+    eval_features_list = [f for f in eval_features_list if f is not None]
+    aggr_eval_features = aggregate_features(eval_features_list)
+    return aggr_eval_features

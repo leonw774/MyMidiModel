@@ -43,7 +43,7 @@ def parse_args():
         help='If set, it means that BPE was performed, and we will try to read the shape_vocab file under corpus_dir_path.'
     )
     parser.add_argument(
-        '--mp-worker-number',
+        '--worker-number',
         type=int,
         default=1
     )
@@ -149,7 +149,7 @@ def main():
 
         os.makedirs(npy_dir_path)
         array_list = []
-        with Pool(args.mp_worker_number) as p:
+        with Pool(args.worker_number) as p:
             array_list = list(
                 tqdm(
                     p.imap(

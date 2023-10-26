@@ -12,7 +12,7 @@ def parse_args():
         default=''
     )
     parser.add_argument(
-        '--num-workers',
+        '--worker-number',
         type=int,
         default=1
     )
@@ -80,7 +80,7 @@ def parse_args():
         type=str,
     )
     parser.add_argument(
-        'test_pathlist',
+        'test_paths_file',
         type=str
     )
     parser.add_argument(

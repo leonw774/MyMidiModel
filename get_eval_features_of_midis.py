@@ -1,53 +1,28 @@
 from argparse import ArgumentParser
-from collections import Counter
-from fractions import Fraction
 import glob
 import json
 import logging
-from multiprocessing import Pool
 import os
-from psutil import cpu_count
+import random
 from time import strftime, time
 from traceback import format_exc
-from typing import List, Dict
-import random
 
 from miditoolkit import MidiFile
-from mido import MidiFile as mido_MidiFile, UnknownMetaMessage
+from mido import UnknownMetaMessage, MidiFile as mido_MidiFile
 import numpy as np
-from pandas import Series
-from tqdm import tqdm
+from psutil import cpu_count
 
 from util.corpus import get_corpus_paras
 from util.evaluations import (
     EVAL_SCALAR_FEATURE_NAMES,
     EVAL_DISTRIBUTION_FEATURE_NAMES,
-    midi_to_features,
-    kl_divergence,
-    overlapping_area_of_estimated_gaussian,
-    histogram_intersection
+    midi_list_to_features,
+    compare_with_ref
 )
-
-
-def fix_typeerror_from_msg_copy(mido_midi: mido_MidiFile):
-    for i, track in enumerate(mido_midi.tracks):
-        mido_midi.tracks[i] = [
-            msg
-            for msg in track
-            if msg.__class__ != UnknownMetaMessage
-        ]
 
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument(
-        '--sample-number',
-        type=int,
-        default=-1,
-        help='The number of random selected sample to be use to evaluate.\
-            If it is set to -1, all the files would be used.\
-                Default is %(default)s.'
-    )
     parser.add_argument(
         '--midi-to-piece-paras',
         type=str,
@@ -56,7 +31,7 @@ def parse_args():
             Default is empty string and `util.evaluations.EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT` will be used.'
     )
     parser.add_argument(
-        '--workers',
+        '--worker-number',
         type=int,
         default=min(cpu_count(), 4)
     )
@@ -74,11 +49,6 @@ def parse_args():
         dest='log_file_path',
         type=str,
         default='',
-    )
-    parser.add_argument(
-        '--output-sampled-file-paths',
-        action='store_true',
-        help='If set, the paths of the sampled files would be output to \"MIDI_DIR_PATH/eval_pathlist.txt\"'
     )
     parser.add_argument(
         '--max-pairs-number',
@@ -101,23 +71,20 @@ def parse_args():
         'midi_dir_path',
         type=str,
         help='Find all midi files under this directory recursively,\
-            and output the result JSON file (\"eval_feature_stats.json\") at this path.'
+            and output the result JSON file (\"eval_features.json\") at this path.'
     )
     return parser.parse_args()
 
 
-def midi_to_features_wrapper(args_dict: dict):
-    try:
-        midifile_obj = MidiFile(args_dict['midi_file_path'])
-        features = midi_to_features(
-            midi=midifile_obj,
-            primer_measure_length=args_dict['primer_measure_length'],
-            max_pairs_number=args_dict['max_pairs_number']
-        )
-    except Exception:
-        # print(format_exc())
-        return None
-    return features
+
+def fix_typeerror_from_msg_copy(mido_midi: mido_MidiFile):
+    for i, track in enumerate(mido_midi.tracks):
+        mido_midi.tracks[i] = [
+            msg
+            for msg in track
+            if msg.__class__ != UnknownMetaMessage
+        ]
+
 
 def main():
     args = parse_args()
@@ -146,18 +113,13 @@ def main():
         logging.info('Invalid dir path: %s', args.midi_dir_path)
         return 1
 
-    file_path_list = glob.glob(args.midi_dir_path+'/**/*.mid', recursive=True)
-    file_path_list += glob.glob(args.midi_dir_path+'/**/*.midi', recursive=True)
-    file_path_list += glob.glob(args.midi_dir_path+'/**/*.MID', recursive=True)
+    midi_path_list = glob.glob(args.midi_dir_path+'/**/*.mid', recursive=True)
+    midi_path_list += glob.glob(args.midi_dir_path+'/**/*.midi', recursive=True)
+    midi_path_list += glob.glob(args.midi_dir_path+'/**/*.MID', recursive=True)
 
-    dataset_size = len(file_path_list)
+    dataset_size = len(midi_path_list)
     assert dataset_size > 0, f'No midi files found in {args.midi_dir_path}'
-    if args.sample_number == -1:
-        logging.info('Using all (%d) midis in the dataset', dataset_size)
-        args.sample_number = dataset_size
-    elif dataset_size < args.sample_number:
-        logging.info('Dataset size (%d) is smaller than given sample number (%d)', dataset_size, args.sample_number)
-        args.sample_number = dataset_size
+    logging.info('Found total (%d) midis in %s', dataset_size, args.midi_dir_path)
 
     if args.midi_to_piece_paras != '':
         assert os.path.isfile(args.midi_to_piece_paras), f'{args.midi_to_piece_paras} doesn\'t exist or is not a file'
@@ -165,143 +127,74 @@ def main():
     else:
         paras_dict = None
 
-    args.workers = min(args.workers, dataset_size)
+    args.worker_number = min(args.worker_number, dataset_size)
 
-    sampled_midis_eval_features: List[ Dict[str, float] ] = []
-    sample_able_indices = set(range(dataset_size))
-    sampled_midi_file_paths = []
-    sampled_midi_length = []
+    # filter out midi paths that can not processed by miditoolkit or mido
+    midi_list = []
+    new_midi_path_list = []
+    for p in midi_path_list:
+        try:
+            midi_list.append(MidiFile(p))
+            new_midi_path_list.append(p)
+        except:
+            pass
+    midi_path_list = new_midi_path_list
 
     start_time = time()
-    while len(sampled_midis_eval_features) < args.sample_number and len(sample_able_indices) > 0:
-        if args.sample_number >= len(sample_able_indices):
-            random_indices = list(sample_able_indices)
-            sample_able_indices.clear()
-        else:
-            random_indices = random.sample(list(sample_able_indices), args.sample_number - len(sampled_midis_eval_features))
-            sample_able_indices.difference_update(random_indices)
-
-        eval_args_dict_list = [
-            {
-                'midi_file_path': file_path_list[idx],
-                'midi_to_piece_paras': paras_dict,
-                'primer_measure_length': args.primer_measure_length,
-                'max_pairs_number': args.max_pairs_number
-            }
-            for idx in random_indices
-        ]
-        with Pool(args.workers) as p:
-            eval_features = list(tqdm(
-                p.imap(midi_to_features_wrapper, eval_args_dict_list),
-                total=len(random_indices)
-            ))
-        uncorrupt_midi_file_paths = [
-            file_path_list[idx]
-            for n, idx in enumerate(random_indices)
-            if eval_features[n] is not None
-        ]
-        eval_features = [f for f in eval_features if f is not None]
-        sampled_midis_eval_features += eval_features
-        sampled_midi_file_paths += uncorrupt_midi_file_paths
-        for midi_path in uncorrupt_midi_file_paths:
-            midomidi = mido_MidiFile(midi_path)
-            try:
-                ml = midomidi.length
-                sampled_midi_length.append(ml)
-            except TypeError:
-                # stupid bug
-                fix_typeerror_from_msg_copy(midomidi)
-                ml = midomidi.length
-                sampled_midi_length.append(ml)
-
-        print(f'Processed {len(eval_features)} uncorrupted files out of {len(random_indices)} random indices')
-
+    uncorrupt_midi_indices_list, aggr_eval_features = midi_list_to_features(
+        midi_list=midi_list,
+        midi_to_piece_paras=paras_dict,
+        primer_measure_length=args.primer_measure_length,
+        max_pairs_number=args.max_pairs_number,
+        worker_number=args.worker_number,
+        use_tqdm=True
+    )
     logging.info(
-        'Done. Sampling %d midi files from %s takes %.3f seconds.',
-        len(sampled_midis_eval_features),
-        args.midi_dir_path,
+        'Processed %d uncorrupted files out of %d takes %.3f seconds.',
+        len(uncorrupt_midi_indices_list),
+        dataset_size,
         time() - start_time
     )
 
-    eval_features_stats = dict()
-    # process scalar features
-    aggr_scalar_eval_features = {
-        fname: [
-            fs[fname]
-            for fs in sampled_midis_eval_features
-        ]
-        for fname in EVAL_SCALAR_FEATURE_NAMES
-    }
-    for fname in EVAL_SCALAR_FEATURE_NAMES:
-        fname_description = dict(Series(aggr_scalar_eval_features[fname], dtype='float64').dropna().describe())
-        fname_description: Dict[str, np.float64]
-        eval_features_stats[fname] = {
-            k: float(v) for k, v in fname_description.items()
-        }
-    # process distribution features
-    for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
-        eval_features_stats[fname] = dict(sum(
-            [Counter(features[fname]) for features in sampled_midis_eval_features],
-            Counter() # starting value of empty counter
-        ))
-        # cast the keys into strings!!! because the reference distribution is read from json, and their keys are strings
-        eval_features_stats[fname] = {str(k): v for k, v in eval_features_stats[fname].items()}
-    # process other
-    eval_features_stats['notes_number_per_piece'] = [
-        sum(features['pitch_histogram'].values())
-        for features in sampled_midis_eval_features
-    ]
+    # compute midi durations
+    midi_length_list = []
+    for i in uncorrupt_midi_indices_list:
+        midi_path = midi_path_list[i]
+        midomidi = mido_MidiFile(midi_path)
+        try:
+            midi_dur = midomidi.length
+            midi_length_list.append(midi_dur)
+        except TypeError:
+            # stupid bug
+            fix_typeerror_from_msg_copy(midomidi)
+            midi_dur = midomidi.length
+            midi_length_list.append(midi_dur)
     logging.info(
         '%d notes involved in evaluation. Avg. #note per piece: %f. Tot. midi playback time: %f.',
-        np.sum(eval_features_stats['notes_number_per_piece']),
-        np.mean(eval_features_stats['notes_number_per_piece']),
-        np.sum(sampled_midi_length)
+        np.sum(aggr_eval_features['notes_number_per_piece']),
+        np.mean(aggr_eval_features['notes_number_per_piece']),
+        np.sum(midi_length_list)
     )
 
     logging.info('\t'.join([
         f'{fname}' for fname in EVAL_SCALAR_FEATURE_NAMES
     ]))
     logging.info('\t'.join([
-        f'{eval_features_stats[fname]["mean"]}' for fname in EVAL_SCALAR_FEATURE_NAMES
+        f'{aggr_eval_features[fname]["mean"]}' for fname in EVAL_SCALAR_FEATURE_NAMES
     ]))
 
     if args.reference_file_path != '':
         if os.path.isfile(args.reference_file_path):
+
             with open(args.reference_file_path, 'r', encoding='utf8') as reference_file:
                 try:
-                    reference_eval_features_stats = json.load(reference_file)
+                    reference_eval_features = json.load(reference_file)
                 except Exception:
                     logging.info('json.load(%s) failed', args.reference_file_path)
                     logging.info(format_exc())
                     return 1
-            logging.info(
-                'Computing KLd, OA, and HI of pitch, duration, and velocity of midis in %s from %s',
-                args.midi_dir_path,
-                args.reference_file_path
-            )
 
-            # KL Divergence
-            for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
-                eval_features_stats[fname+'_KLD'] = kl_divergence(
-                    eval_features_stats[fname],
-                    reference_eval_features_stats[fname],
-                    ignore_pred_zero=True
-                )
-
-            # Overlapping area of estimated gaussian distribution
-            for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
-                # because the keys are strings and are represented as interger (pitch & velocity) and fraction (duration)
-                eval_features_stats[fname+'_OA'] = overlapping_area_of_estimated_gaussian(
-                    {float(Fraction(k)): v for k, v in eval_features_stats[fname].items()},
-                    {float(Fraction(k)): v for k, v in reference_eval_features_stats[fname].items()}
-                )
-
-            # (Normalized) Histogram intersection
-            for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
-                eval_features_stats[fname+'_HI'] = histogram_intersection(
-                    eval_features_stats[fname],
-                    reference_eval_features_stats[fname]
-                )
+            compare_with_ref(aggr_eval_features, reference_eval_features)
 
             logging.info('\t'.join([
                 f'{fname}{suffix}'
@@ -310,7 +203,7 @@ def main():
             ]))
 
             logging.info('\t'.join([
-                f'{eval_features_stats[fname+suffix]}'
+                f'{aggr_eval_features[fname+suffix]}'
                 for suffix in ('_KLD', '_OA', '_HI')
                 for fname in EVAL_DISTRIBUTION_FEATURE_NAMES
             ]))
@@ -320,14 +213,8 @@ def main():
 
     eval_feat_file_path = os.path.join(args.midi_dir_path, 'eval_features.json')
     with open(eval_feat_file_path, 'w+', encoding='utf8') as eval_feat_file:
-        json.dump(eval_features_stats, eval_feat_file)
-        logging.info('Outputed evaluation features JSON at %s', eval_feat_file_path)
-
-    if args.output_sampled_file_paths:
-        eval_pathlist_file_path = os.path.join(args.midi_dir_path, 'eval_pathlist.txt')
-        with open(eval_pathlist_file_path, 'w+', encoding='utf8') as eval_pathlist_file:
-            eval_pathlist_file.write('\n'.join(sampled_midi_file_paths)+'\n')
-            logging.info('Outputed evaluation sampled file paths at %s', eval_pathlist_file_path)
+        json.dump(aggr_eval_features, eval_feat_file)
+    logging.info('Outputed evaluation features JSON at %s', eval_feat_file_path)
 
     logging.info(strftime('==== get_eval_features_of_midis.py exit ===='))
     return 0

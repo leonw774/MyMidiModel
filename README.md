@@ -7,21 +7,21 @@
 3. Run `./pipeline.sh {corpus_config_filename} {bpe_config_filename} {training_config_filename}` to do everything from pre-processing to model training at once.
    - You can add `--use-existed` at the end of the command to tell `pipeline.sh` to just use the existing data.
    - The config files are placed in `configs/corpus`, `configs/bpe` and `configs/train`.
-   - You can recreate our experiment by running `experiment*.sh` files.
+   - You can recreate our experiment by running `experiment_script/*.sh`.
 
 
 ## Configuration Files (`configs/`)
 
 - Files in `configs/corpus` are parameters for `midi_to_corpus.py` and `make_arrays.py` (`MAX_TRACK_NUMBER`, `MAX_DURATION`, etc.)
-- Files in `configs/bpe` are parameters for `bpe/learn_vocabs` (implementation of Multi-note BPE)
-- Files in `configs/train` are parameters for `train.py`
-- Files in `configs/test` are lists of relative paths of midi files to be used as test files in datasets. They are referenced as a parameter in files of `configs/corpus`.
-- Files in `configs/eval_midi_to_piece_paras` are a parameter for `evaluate_model.sh` and `evaluated_model_wrapper.py`. They are referenced as a parameter in files of `configs/train`. We don't set it though cause the default is written in the code, but if you want a different parameter you can make a new file and reference the path.
+- Files in `configs/bpe` are parameters for `bpe/learn_vocabs` (implementation of Multi-note BPE).
+- Files in `configs/model` are parameters for `train.py` and `evaluate_model*`.
+- Files in `configs/split` are lists of paths, relative to each dataset root, of midi files to be used as test set and validation set of the datasets. Their path are referenced as a parameter in files of `configs/corpus`.
+- Files in `configs/eval_midi_to_piece_paras` are a parameter for `evaluate_model.sh` and `evaluate_model_wrapper.py`. Their path are referenced as a parameter in files of `configs/train`. We don't set it though cause the default is written in the code, but if you want a different parameter you can make a new file and reference the path.
 
 
 ## Datasets (`data/midis/`)
 
-The datasets we used, SymphonyNet_Dataset and lmd_full, are expected to be found under `data/midis`. However, the path `midi_to_corpus.py` would be looking is the `MIDI_DIR_PATH` and `TEST_PATHLIST` set in the the corpus configuration file. So it could be in any place you want. Just set the path right.
+The datasets we used, SymphonyNet_Dataset and lmd_full, are expected to be found under `data/midis`. However, the path `midi_to_corpus.py` would be looking is the `MIDI_DIR_PATH` and `TEST_PATHS_FILE` set in the the corpus configuration file. So it could be in any place you want. Just set the path right.
 
 
 ## Corpus Structure (`data/corpus/`)
@@ -30,8 +30,8 @@ Corpi are located at `data/corpus/`. A complete "corpus" is directory containing
 
 - `corpus`: A text file. Each `\n`-separated line is a text representation of a midi file. This is the "main form" of the representation. Created by `midi_to_corpus.py`.
 - `paras`: A yaml file that contains parameters of pre-processing used by `midi_to_corpus.py`. Created by `midi_to_corpus.py`.
-- `pathlist`: A text file. Each `\n`-separated line is the relative path of midi file corresponding to the text representation in `corpus`. Created by `midi_to_corpus.py`.
-  - The paths are relative to the project root, which is a mistake, as it should be relative to the dataset root. But I don't bother fix it.
+- `pathlist`: A text file. Each `\n`-separated line is the path, relative to project root, of midi file corresponding to the text representation in `corpus`. Created by `midi_to_corpus.py`.
+  - Note that a corpus include all processable, uncorrupted midi file, including the test and validation files. The split of test and validation happens at training and evaluating stage.
 - `vocabs.json`: The vocabulary to be used by the model. The format is defined in `util/vocabs.py`. Created by `make_arrays.py`.
 - `arrays.npz`: A zip file of numpy arrays in `.npy` format. Can be accessed by `numpy.load()` and it will return an instance of `NpzFile` class. This is the "final form" of the representation (i.e. include pre-computed positional encoding) that would be used to train model. Created by `make_arrays.py`.
 
@@ -110,7 +110,7 @@ Pythons scripts
 - `evaluate_model_wrapper.py`: Use python's `argparse` module to make using `evaluate_model.sh` easier.
 - `extract.py`: Used for debugging. Extract piece(s) from the given corpus directory into text representation(s), midi file(s), or piano-roll graph(s) in png.
 - `generate_with_models.py`: Use trained model to generate midi files, with or without a primer.
-- `get_eval_features_of_midis.py`: Do as per its name. It will sample midi files in a directory. Output results as a JSON file `eval_feature_stats.json` right at the directory.
+- `get_eval_features_of_midis.py`: Do as per its name. It will get midi files in a directory. Output results as a JSON file `eval_feature_stats.json` at the root of the directory.
 - `make_arrays.py`: Generate `vocabs.json` and `arrays.npz` from `corpus` and `shape_vocab` if it exists.
 - `midi_to_corpus.py`: Pre-process midi files into a "corpus". The parameter would be stored in `paras`. It creates `corpus`, `paras`, and `pathlist` in the corpus directory.
 - `plot_bpe_log.py`: Make figures to visualize the data in the log files that contains the loggings of Multi-note BPE program.
@@ -124,7 +124,7 @@ Shell scripts
   - Read parameters from config files and used them as the arguments for `evaluate_model_wrapper.py`. This is for the convenience of the testing of evaluate/generation parameters.
 - `evaluate_model.sh`
    1. Arguments are passed as environment variables.
-   2. Get evaluation features of the dataset's `TEST_PATHLIST` files using `get_eval_features_of_midis.py`.
+   2. Get evaluation features of the dataset's `TEST_PATHS_FILE` files using `get_eval_features_of_midis.py`.
    3. Get evaluation features of the unconditional, instrument-informed, and prime continution generation result of the model using the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`.
 - `experiment_script/`: Pre-programmed experiment execution script
   - `apply_learned_shapes_to_other.sh`

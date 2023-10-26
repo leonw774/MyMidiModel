@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
     int cmd_opt = 0;
     bool doLog = false;
     int nonOptStartIndex = 1;
-    std::string cmdLineUsage = "./apply_vocab [-log] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath [workersNum]";
+    std::string cmdLineUsage = "./apply_vocab [-log] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath [workerNum]";
     while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
         switch (cmd_opt) {
@@ -39,16 +39,16 @@ int main(int argc, char *argv[]) {
     std::string inCorpusDirPath(argv[nonOptStartIndex]);
     std::string outCorpusFilePath(argv[nonOptStartIndex+1]);
     std::string vocabFilePath(argv[nonOptStartIndex+2]);
-    int workersNum = -1; // -1 means use default
+    int workerNum = -1; // -1 means use default
     if (argc - nonOptStartIndex == 4) {
-        workersNum = atoi(argv[nonOptStartIndex+3]);
-        omp_set_num_threads(workersNum);
+        workerNum = atoi(argv[nonOptStartIndex+3]);
+        omp_set_num_threads(workerNum);
     }
 
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
         << "outCorpusFilePath: " << outCorpusFilePath << '\n'
         << "vocabFilePath: " << vocabFilePath << '\n'
-        << "workersNum: " << workersNum << std::endl;
+        << "workerNum: " << workerNum << std::endl;
 
     // open files
     std::string inCorpusFilePath = inCorpusDirPath + "/corpus";

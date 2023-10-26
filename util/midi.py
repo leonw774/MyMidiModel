@@ -727,7 +727,8 @@ def get_after_k_measures(text_list: str, k: int):
             begin_index = i
             break
     if begin_index == 0:
-        raise ValueError(f'Music of text_list is shorter than or equal to {k} measures.')
+        # raise ValueError(f'Music of text_list is shorter than or equal to {k} measures.')
+        return text_list[:head_end_index] + [tokens.END_TOKEN_STR] # just return a piece that have no notes
     return text_list[:head_end_index] + text_list[begin_index:]
 
 

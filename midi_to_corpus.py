@@ -23,7 +23,6 @@ def parse_args():
     handler_args_parser = ArgumentParser()
     handler_args_parser.add_argument(
         '--nth',
-        dest='nth',
         type=int,
         default=32,
         help='The time unit length would be the length of a n-th note. Must be a multiple of 4. \
@@ -31,7 +30,6 @@ def parse_args():
     )
     handler_args_parser.add_argument(
         '--max-track-number',
-        dest='max_track_number',
         type=int,
         default=24,
         help='The maximum tracks nubmer to keep in text, if the input midi has more "instruments" than this value, \
@@ -39,14 +37,12 @@ def parse_args():
     )
     handler_args_parser.add_argument(
         '--max-duration',
-        dest='max_duration',
         type=int,
         default=32,
         help='Max length of duration in unit of nth note. Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--velocity-step',
-        dest='velocity_step',
         type=int,
         default=16,
         help='Snap the value of velocities to multiples of this number. Default is %(default)s.'
@@ -54,7 +50,6 @@ def parse_args():
     handler_args_parser.add_argument(
         '--tempo-quantization',
         nargs=3,
-        dest='tempo_quantization',
         type=int,
         default=[120-6*16, 120+5*16, 16], # 24, 200, 16
         metavar=('TEMPO_MIN', 'TEMPO_MAX', 'TEMPO_STEP'),
@@ -67,7 +62,6 @@ def parse_args():
     )
     handler_args_parser.add_argument(
         '--use-merge-drums',
-        dest='use_merge_drums',
         action='store_true'
     )
 
@@ -85,28 +79,24 @@ def parse_args():
     )
     main_parser.add_argument(
         '--use-existed',
-        dest='use_existed',
         action='store_true',
         help='If the corpus already existed, do nothing.'
     )
     main_parser.add_argument(
-        '-r', '--recursive',
+        '--recursive', '-r',
         action='store_true',
-        dest='recursive',
         help='If set, the input path will have to be directory path(s). \
             And all ".mid" files under them will be processed recursively.'
     )
     main_parser.add_argument(
-        '-w', '--workers',
-        dest='mp_worker_number',
+        '--worker_number', '-w',
         type=int,
         default=1,
         help='The number of worker for multiprocessing. Default is %(default)s. \
             If this number is 1 or below, multiprocessing would not be used.'
     )
     main_parser.add_argument(
-        '-o', '--output-dir-path',
-        dest='output_dir_path',
+        'output_dir_path',
         type=str,
         help='The path of the directory for the corpus.'
     )
@@ -186,7 +176,7 @@ def loop_func(
 def mp_func(
         midi_file_path_list: list,
         out_file: TextIOWrapper,
-        mp_worker_number: int,
+        worker_number: int,
         args_dict: dict):
 
     args_dict_list = list()
@@ -195,12 +185,12 @@ def mp_func(
         a['midi_file_path'] = midi_file_path
         a['n'] = n
         args_dict_list.append(a)
-    logging.info('Start pool with %d workers', mp_worker_number)
+    logging.info('Start pool with %d workers', worker_number)
 
     token_number_list = []
     good_path_list = []
     bad_reasons = Counter()
-    with Pool(mp_worker_number) as p:
+    with Pool(worker_number) as p:
         compressed_piece_list = list(tqdm(
             p.imap(handler, args_dict_list),
             total=len(args_dict_list)
@@ -310,11 +300,11 @@ def main():
     # write main corpus file
     with open(to_corpus_file_path(args.output_dir_path), 'w+', encoding='utf8') as out_corpus_file:
         handler_args_dict = vars(args.handler_args)
-        if args.mp_worker_number <= 1:
+        if args.worker_number <= 1:
             token_number_list, good_path_list = loop_func(file_path_list, out_corpus_file, handler_args_dict)
         else:
-            mp_worker_number = min(cpu_count(), args.mp_worker_number)
-            token_number_list, good_path_list = mp_func(file_path_list, out_corpus_file, mp_worker_number, handler_args_dict)
+            worker_number = min(cpu_count(), args.worker_number)
+            token_number_list, good_path_list = mp_func(file_path_list, out_corpus_file, worker_number, handler_args_dict)
 
     logging.info('Processed %d files', len(token_number_list))
     if len(token_number_list) > 0:

@@ -13,7 +13,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
 from . import tokens
-from .corpus import get_corpus_vocabs, ATTR_NAME_INDEX, get_full_array_string
+from .corpus import get_corpus_vocabs, to_pathlist_file_path, ATTR_NAME_INDEX, get_full_array_string
 
 class MidiDataset(Dataset):
 
@@ -21,7 +21,7 @@ class MidiDataset(Dataset):
             self,
             data_dir_path: str,
             max_seq_length: int,
-            test_pathlist_file_path: str = None,
+            excluded_path_list: List[str] = None,
             virtual_piece_step_ratio: float = 0,
             permute_mps: bool = False,
             permute_track_number: bool = False,
@@ -30,14 +30,14 @@ class MidiDataset(Dataset):
         ) -> None:
         """
             Parameters:
-            - data_dir_path: Expected to have 'arrays.npz', 'pathlist' and 'vocabs.json'
+            - data_dir_path: Expected a directory that have 'arrays.npz', 'pathlist' and 'vocabs.json'
 
             - virtual_piece_step_ratio: If > 1, will create multiple virtual pieces by splitting overlength pieces.
               The start point of samples will be at the first measure token that has index just greater than
               max_seq_length / virtual_piece_step_ratio * N, where N is positive integer. Default is 1.
               This value can not be smaller than 1.
 
-            - test_pathlist_file_path: The paths of files to exclude.
+            - excluded_path_list: The list of paths of the files to exclude.
 
             - permute_mps: Whether or not the dataset should permute all the maximal permutable subarrays
               before returning in `__getitem__`. Default is False.
@@ -45,8 +45,8 @@ class MidiDataset(Dataset):
             - permute_track_number: Permute all the track numbers relative to the instruments, as data augmentation.
               Default is False.
 
-            - pitch_augmentation_range: If set to P, will add a random value from -P to +P on all pitch values
-              as data augmentation. Default is 0.
+            - pitch_augmentation_range: If set to P, will add a random value from -P to +P (inclusive)
+              on all pitch values as data augmentation. Default is 0.
         """
 
         self.vocabs = get_corpus_vocabs(data_dir_path)
@@ -62,21 +62,22 @@ class MidiDataset(Dataset):
         self.pitch_augmentation_range = pitch_augmentation_range
 
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
-        all_path_list = [p.strip() for p in open(os.path.join(data_dir_path, 'pathlist'), 'r', encoding='utf8').readlines()]
-        if test_pathlist_file_path is not None and test_pathlist_file_path != '':
+        all_paths_list = [p.strip() for p in open(to_pathlist_file_path(data_dir_path), 'r', encoding='utf8').readlines()]
+        if excluded_path_list is not None and len(excluded_path_list) != 0:
             # assert os.path.exists(test_pathlist_file_path)
-            test_paths_tuple = tuple(p.strip() for p in open(test_pathlist_file_path, 'r', encoding='utf8').readlines())
+            excluded_paths_tuple = tuple(p.strip() for p in excluded_path_list)
         else:
-            test_paths_tuple = tuple()
+            excluded_paths_tuple = tuple()
         if verbose:
             print('Reading', npz_path)
-        self.train_filenames = [
-            str(filenum)
-            for filenum, midi_filepath in tqdm(enumerate(all_path_list), disable=not verbose)
-            if not midi_filepath.endswith(test_paths_tuple)
+        self.used_filenames = []
+        self.used_midi_paths = []
+        for filenum, midi_filepath in tqdm(enumerate(all_paths_list), disable=not verbose):
             # use endswith because the pathlist records the relative paths to midi files from project's root
-            # while test_paths_tuple record relative paths to midi files from dataset's root
-        ]
+            # while excluded_paths_tuple record relative paths to midi files from dataset's root
+            if not midi_filepath.endswith(excluded_paths_tuple):
+                self.used_filenames.append(str(filenum))
+                self.used_midi_paths.append(midi_filepath)
 
         available_memory_size = psutil.virtual_memory().available
         npz_zipinfo_list = zipfile.ZipFile(npz_path).infolist()
@@ -92,7 +93,7 @@ class MidiDataset(Dataset):
             npz_file = np.load(npz_path)
             self.pieces = {
                 str(filenum): npz_file[str(filenum)]
-                for filenum in tqdm(self.train_filenames, disable=not verbose, ncols=0)
+                for filenum in tqdm(self.used_filenames, disable=not verbose, ncols=0)
             }
         self.number_of_pieces = len(self.pieces)
 
@@ -116,7 +117,7 @@ class MidiDataset(Dataset):
         self._measure_ids = np.sort(np.array(self._measure_ids))
 
         # preprocessing
-        self._trainnum_indices = [0] * self.number_of_pieces
+        self._filenum_indices = [0] * self.number_of_pieces
         self._piece_lengths = [0] * self.number_of_pieces
 
         # the default zeros will be replaced by body start index
@@ -130,16 +131,16 @@ class MidiDataset(Dataset):
         self._pitch_augmentation_factor = self.pitch_augmentation_range * 2 + 1 # length of (-pa, ..., -1, 0, 1, ..., pa)
 
         cur_index = -1 # <-- !!! because the first element we add should become index 0
-        for trainnum, filename in tqdm(enumerate(self.train_filenames), disable=not verbose, ncols=0):
+        for filenum, filename in tqdm(enumerate(self.used_filenames), disable=not verbose, ncols=0):
 
             cur_piece_lengths = int(self.pieces[filename].shape[0])
-            self._piece_lengths[trainnum] = cur_piece_lengths
+            self._piece_lengths[filenum] = cur_piece_lengths
 
             j = 2 # because first token is BOS and second must be track as we excluded all empty midis
             while self.pieces[filename][j][ATTR_NAME_INDEX['evt']] != self._sep_id:
                 j += 1
-            self._piece_body_start_index[trainnum] = j + 1
-            self._virtual_piece_start_index[trainnum][0] = j + 1
+            self._piece_body_start_index[filenum] = j + 1
+            self._virtual_piece_start_index[filenum][0] = j + 1
 
             # create virtual pieces from overlength pieces
             if virtual_piece_step_ratio > 0:
@@ -155,7 +156,7 @@ class MidiDataset(Dataset):
                         if m_idx > cur_piece_lengths - virtual_piece_step:
                             break
                         if m_idx > virtual_piece_step * vp_step_num:
-                            self._virtual_piece_start_index[trainnum].append(m_idx)
+                            self._virtual_piece_start_index[filenum].append(m_idx)
                             vp_step_num += math.ceil((m_idx - (virtual_piece_step * vp_step_num)) / vp_step_num)
 
             if permute_mps:
@@ -172,7 +173,7 @@ class MidiDataset(Dataset):
                     body_mps_sep_indices,
                     np.array([self.pieces[filename].shape[0]]) # the EOS
                 ])
-                self._file_mps_sep_indices[trainnum] = mps_sep_indices
+                self._file_mps_sep_indices[filenum] = mps_sep_indices
 
             if self.pitch_augmentation_range != 0:
                 is_multinote_token = (self.pieces[filename][:, ATTR_NAME_INDEX['pit']]) != 0
@@ -180,11 +181,11 @@ class MidiDataset(Dataset):
                 # but different percussion sound
                 # assume instrument vocabulary is 0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
                 not_percussion_notes = (self.pieces[filename][:, ATTR_NAME_INDEX['ins']]) != 129
-                self._augmentable_pitches[trainnum] = np.logical_and(is_multinote_token, not_percussion_notes)
+                self._augmentable_pitches[filenum] = np.logical_and(is_multinote_token, not_percussion_notes)
 
-            cur_index += len(self._virtual_piece_start_index[trainnum]) * self._pitch_augmentation_factor
-            self._trainnum_indices[trainnum] = cur_index
-        self._max_index = cur_index
+            cur_index += len(self._virtual_piece_start_index[filenum]) * self._pitch_augmentation_factor
+            self._filenum_indices[filenum] = cur_index
+        self._max_index = cur_index if cur_index > 0 else 0
 
         if verbose:
             if permute_mps:
@@ -206,21 +207,21 @@ class MidiDataset(Dataset):
 
     def __getitem__(self, index):
 
-        trainnum = bisect.bisect_left(self._trainnum_indices, index)
-        body_start_index = self._piece_body_start_index[trainnum]
+        filenum = bisect.bisect_left(self._filenum_indices, index)
+        body_start_index = self._piece_body_start_index[filenum]
 
-        index_offset = index if trainnum == 0 else index - self._trainnum_indices[trainnum-1] - 1
+        index_offset = index if filenum == 0 else index - self._filenum_indices[filenum-1] - 1
         virtual_piece_number = index_offset // self._pitch_augmentation_factor
         pitch_augment = index_offset - virtual_piece_number * self._pitch_augmentation_factor - self.pitch_augmentation_range
 
-        start_index = self._virtual_piece_start_index[trainnum][virtual_piece_number]
+        start_index = self._virtual_piece_start_index[filenum][virtual_piece_number]
         end_index = start_index + self.max_seq_length - body_start_index # preserve space for head
         if end_index < start_index:
             end_index = start_index
             body_start_index = self.max_seq_length
         # dont need to check end_index because if end_index > piece_length than numpy will just end the slice at piece_length
-        head_array = np.array(self.pieces[self.train_filenames[trainnum]][:body_start_index]) # copy
-        body_array = np.array(self.pieces[self.train_filenames[trainnum]][start_index:end_index]) # copy
+        head_array = np.array(self.pieces[self.used_filenames[filenum]][:body_start_index]) # copy
+        body_array = np.array(self.pieces[self.used_filenames[filenum]][start_index:end_index]) # copy
         sampled_array = np.concatenate([head_array, body_array], axis=0)
         sampled_array = sampled_array.astype(np.int32) # was int16 to save space but torch ask for int
 
@@ -240,7 +241,7 @@ class MidiDataset(Dataset):
         # pitch augmentation
         # pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
         if pitch_augment != 0 and body_start_index != self.max_seq_length:
-            sampled_augmentable_pitches = self._augmentable_pitches[trainnum][start_index:end_index]
+            sampled_augmentable_pitches = self._augmentable_pitches[filenum][start_index:end_index]
             # sometimes the sampled array does not contain any pitch-augmentable token
             sampled_body_pitch_col = sampled_array[body_start_index:, ATTR_NAME_INDEX['pit']]
             if np.any(sampled_augmentable_pitches):
@@ -274,7 +275,7 @@ class MidiDataset(Dataset):
             mps_sep_indices_list_head = [0, 1, body_start_index - 1]
             mps_sep_indices_list_body = [
                 i - start_index + body_start_index
-                for i in self._file_mps_sep_indices[trainnum]
+                for i in self._file_mps_sep_indices[filenum]
                 if start_index <= i < end_index
             ]
             mps_sep_indices_list = mps_sep_indices_list_head + mps_sep_indices_list_body

@@ -116,7 +116,7 @@ def read_args():
         help='What device the model would be on.'
     )
     parser.add_argument(
-        '--workers', '-w',
+        '--worker-number', '-w',
         type=int,
         default=8,
         help='Number of workers for applying BPE vocabs if used.'
@@ -327,7 +327,7 @@ def main():
             'primer_length': args.primer_length,
             'length_unit': args.unit,
             'vocabs': model.vocabs,
-            'worker_number': args.workers
+            'worker_number': args.worker_number
         }
         if args.primer.endswith('.mid') or args.primer.endswith('.midi'):
             print('From midi file:', args.primer)
