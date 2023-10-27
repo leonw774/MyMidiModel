@@ -19,7 +19,7 @@ parser.add_argument(
 parser.add_argument(
     '--virtual-piece-step-ratio',
     type=float,
-    default=0,
+    default=1,
     help='Default is %(default)s'
 )
 parser.add_argument(
@@ -77,32 +77,15 @@ print('max_seq_length:', dataset.max_seq_length)
 print('permute_mps:', dataset.permute_mps)
 print('permute_track_number:', dataset.permute_track_number)
 
-train_len = int(len(dataset) * 0.8)
-valid_len = len(dataset) - train_len
-train_set, val_set = random_split(dataset, [train_len, valid_len])
-print(len(dataset), len(train_set), len(val_set))
+print('FIRST BATCH OF DATALOADER')
 
-# print('RANDOM SPLIT')
-
-# train_sample, train_mps_sep_indices = train_set[0]
-# train0 = train_sample.numpy()
-# print('TRAIN[0]')
-# print(get_input_array_format_string(train0, train_mps_sep_indices, vocabs))
-
-# val_sample, val_mps_sep_indices = val_set[0]
-# val0 = val_sample.numpy()
-# print('VAL[0]')
-# print(get_input_array_format_string(val0, val_mps_sep_indices, vocabs))
-
-print('FIRST BATCH OF TRAIN_DATALOADER')
-
-train_dataloader = DataLoader(
-    dataset=train_set,
+dataloader = DataLoader(
+    dataset=dataset,
     batch_size=args.batch_size,
     shuffle=False,
     collate_fn=collate_mididataset
 )
-batched_samples = next(iter(train_dataloader))
+batched_samples = next(iter(dataloader))
 for i, s in enumerate(batched_samples):
     print(f'BATCHED[{i}]')
     print(get_full_array_string(s.numpy(), vocabs))

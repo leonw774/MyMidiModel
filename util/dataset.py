@@ -52,7 +52,8 @@ class MidiDataset(Dataset):
         self.vocabs = get_corpus_vocabs(data_dir_path)
         assert max_seq_length >= 0
         self.max_seq_length = max_seq_length
-        assert virtual_piece_step_ratio >= 1
+        if virtual_piece_step_ratio < 1:
+            virtual_piece_step_ratio = 1
         self.virtual_piece_step_ratio = virtual_piece_step_ratio
         assert isinstance(permute_mps, bool)
         self.permute_mps = permute_mps
@@ -258,15 +259,11 @@ class MidiDataset(Dataset):
         if self.permute_track_number:
             max_track_number = self.vocabs.track_numbers.size - 1
             # add one because there is a padding token at the beginning of the vocab
-            perm = np.random.permutation(self.vocabs.track_numbers.size-1) + 1
+            perm = np.concatenate(([0], np.random.permutation(max_track_number) + 1))
             # view track number col
-            piece_trn_column = sampled_array[:, ATTR_NAME_INDEX['trn']]
-            piece_trn_column_expand = np.asarray([
-                (piece_trn_column == i + 1) for i in range(max_track_number)
-            ])
-            # permute track number
-            for i in range(max_track_number):
-                piece_trn_column[piece_trn_column_expand[i]] = perm[i]
+            trn_column = sampled_array[:, ATTR_NAME_INDEX['trn']]
+            for i, trn in enumerate(trn_column):
+                trn_column[i] = perm[trn]
 
         if self.permute_mps and body_start_index != self.max_seq_length:
             mps_sep_indices_list = []
