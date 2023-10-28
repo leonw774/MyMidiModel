@@ -73,7 +73,7 @@ class MidiDataset(Dataset):
             print('Reading', npz_path)
         self.used_filenames = []
         self.used_midi_paths = []
-        for filenum, midi_filepath in tqdm(enumerate(all_paths_list), disable=not verbose):
+        for filenum, midi_filepath in tqdm(enumerate(all_paths_list), desc='Exclude paths', disable=not verbose):
             # use endswith because the pathlist records the relative paths to midi files from project's root
             # while excluded_paths_tuple record relative paths to midi files from dataset's root
             if not midi_filepath.endswith(excluded_paths_tuple):
