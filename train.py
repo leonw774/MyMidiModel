@@ -470,7 +470,7 @@ def main():
         data_dir_path=args.corpus_dir_path,
         excluded_path_list=excluded_path_list_for_valid,
         **vars(args.data),
-        verbose=False
+        verbose=is_main_process
     )
     del excluded_path_list_for_valid
     if is_main_process:
