@@ -455,6 +455,7 @@ def main():
     del args.data.valid_paths_file_path
 
     excluded_path_list = valid_file_path_list + test_file_path_list
+    logging.info('Making training dataset')
     train_dataset = MidiDataset(
         data_dir_path=args.corpus_dir_path,
         excluded_path_list=excluded_path_list,
@@ -462,6 +463,8 @@ def main():
         verbose=is_main_process
     )
     del excluded_path_list
+
+    logging.info('Making valid dataset')
     excluded_path_list_for_valid = train_dataset.used_midi_paths + test_file_path_list
     valid_dataset = MidiDataset(
         data_dir_path=args.corpus_dir_path,
@@ -471,7 +474,6 @@ def main():
     )
     del excluded_path_list_for_valid
     if is_main_process:
-        logging.info('Made Dataset')
         logging.info('Size of training set: %d', len(train_dataset))
         logging.info('Size of validation set: %d', len(valid_dataset))
 
