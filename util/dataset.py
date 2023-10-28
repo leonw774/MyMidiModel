@@ -30,22 +30,22 @@ class MidiDataset(Dataset):
         ) -> None:
         """
             Parameters:
-            - data_dir_path: Expected a directory that have 'arrays.npz', 'pathlist' and 'vocabs.json'
+            - `data_dir_path`: Expected a directory that have 'arrays.npz', 'pathlist' and 'vocabs.json'
 
-            - virtual_piece_step_ratio: If > 1, will create multiple virtual pieces by splitting overlength pieces.
+            - `virtual_piece_step_ratio`: If > 1, will create multiple virtual pieces by splitting overlength pieces.
               The start point of samples will be at the first measure token that has index just greater than
-              max_seq_length / virtual_piece_step_ratio * N, where N is positive integer. Default is 1.
+              `max_seq_length` / `virtual_piece_step_ratio` * N, where N is positive integer. Default is 1.
               This value can not be smaller than 1.
 
-            - excluded_path_list: The list of paths of the files to exclude.
+            - `excluded_path_list`: The list of paths of the files to exclude.
 
-            - permute_mps: Whether or not the dataset should permute all the maximal permutable subarrays
+            - `permute_mps`: Whether or not the dataset should permute all the maximal permutable subarrays
               before returning in `__getitem__`. Default is False.
 
-            - permute_track_number: Permute all the track numbers relative to the instruments, as data augmentation.
+            - `permute_track_number`: Permute all the track numbers relative to the instruments, as data augmentation.
               Default is False.
 
-            - pitch_augmentation_range: If set to P, will add a random value from -P to +P (inclusive)
+            - `pitch_augmentation_range`: If set to P, will add a random value from -P to +P (inclusive)
               on all pitch values as data augmentation. Default is 0.
         """
 
@@ -313,9 +313,7 @@ class MidiDataset(Dataset):
 
 
 def collate_mididataset(seq_list: List[Tensor]) -> Tensor:
-    """
-        stack batched sequences with batch-first to becom 3-d array and pad them
-    """
+    """Stack batched sequences with batch-first to becom 3-d array and pad them"""
     # print('\n'.join(map(str, seq_list)))
     batched_seqs = pad_sequence(seq_list, batch_first=True, padding_value=0)
     return batched_seqs

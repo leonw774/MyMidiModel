@@ -252,13 +252,13 @@ class MyMidiTransformer(nn.Module):
         self.inferencing = False
 
     def inference(self) -> None:
-        '''
+        """
             Equivalent to
             ```
             model.eval()
             model.inferencing = True
             ```
-        '''
+        """
         # changing the order of these two expression will cause self.inferencing = False, weird
         super().eval()
         self.inferencing = True
@@ -271,6 +271,7 @@ def compute_losses(
         target_labels: Tensor,
         ignore_padding: str = 'all') -> Tuple[Tensor, List[Tensor]]:
     """
+        Parameters:
         - pred_logits is a list:
           - length: out_attr_number
           - elements are tenors with shape: (batch_size, seq_size, attr_vocab_size)
@@ -280,7 +281,7 @@ def compute_losses(
         - nonpadding_dim decide how to reduce the loss vector. Can be 'all', 'attribute', or 'none'.
           Default is 'all'.
 
-        return a list of losses of each head
+        Return final loss and a list of losses of each head.
     """
     # target_labels have to be long int
     target_labels = target_labels.long()

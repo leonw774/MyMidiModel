@@ -739,7 +739,7 @@ def main():
                 sample_threshold=args.eval.sample_threshold
             )
             log_generated_aggr_eval_features(generated_aggr_eval_features)
-        
+
         avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
         if avg_valid_loss >= min_avg_valid_loss:
             early_stop_counter += 1

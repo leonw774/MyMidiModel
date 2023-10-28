@@ -95,9 +95,7 @@ def kl_divergence(
         true: Union[list, dict],
         base: float = math_e,
         ignore_pred_zero: bool = False) -> float:
-    """
-        Calculate KL(true || pred)
-    """
+    """Calculate KL(true || pred)"""
     if isinstance(pred, list) and isinstance(true, list):
         assert len(pred) == len(true) and len(true) > 0
         sum_pred = sum(pred)
@@ -166,11 +164,10 @@ def overlapping_area_of_estimated_gaussian(distribution_1: Union[list, dict], di
 
 
 def random_sample_from_piece(piece: str, sample_measure_number: int):
-    '''
-        randomly sample a certain number of measures from a piece (in text list)
-        Return:
-        - sampled measures excerpt of the piece (in text list)
-    '''
+    """
+        Randomly sample a certain number of measures from a piece (in text list).
+        Return sampled measures excerpt of the piece (in text list).
+    """
     text_list = piece.split(' ')
     measure_indices = [
         i
@@ -207,6 +204,7 @@ def midi_to_features(
         primer_measure_length: int = 0,
         max_pairs_number: int = int(1e6),
         max_token_number: int = int(1e4)) -> Union[Dict[str, float], None]:
+    """If `midi_to_piece_paras` check and `midi_to_piece` failed, this function return None."""
 
     if midi_to_piece_paras is None:
         midi_to_piece_paras = EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT
@@ -236,15 +234,17 @@ def piece_to_features(
         nth: int,
         primer_measure_length: int = 0,
         max_pairs_number: int = int(1e6),
-        max_token_number: int = int(1e4)) -> dict:
-    '''
-        Return:
+        max_token_number: int = int(1e4)) -> Union[dict, None]:
+    """
+        Return a dict that contains:
         - pitch class histogram and entropy
         - duration distribution, means and variant
         - velocity histogram, means and variant
         - instrumentation self-similarity
         - grooving self-similarity
-    '''
+
+        Return None if piece_to_midi failed.
+    """
 
     if primer_measure_length > 0:
         piece = ' '.join(get_after_k_measures(piece.split(' '), primer_measure_length))
@@ -255,7 +255,10 @@ def piece_to_features(
             text_list.append(END_TOKEN_STR)
         piece = ' '.join(text_list)
 
-    midi = piece_to_midi(piece, nth, ignore_pending_note_error=True)
+    try:
+        midi = piece_to_midi(piece, nth, ignore_pending_note_error=True)
+    except AssertionError:
+        return None
     pitchs = []
     durations = []
     velocities = []
@@ -380,9 +383,7 @@ def piece_to_features(
 
 
 def compare_with_ref(source_eval_features: dict, reference_eval_features: dict):
-    """
-        Add KLD, OA, and HI of distribution features into source eval features
-    """
+    """Add KLD, OA, and HI of distribution features into source eval features"""
     # KL Divergence
     for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
         source_eval_features[fname+'_KLD'] = kl_divergence(
@@ -498,9 +499,7 @@ def piece_list_to_features(
         max_pairs_number: int = int(1e6),
         worker_number: int = 1,
         use_tqdm: bool = False):
-    """
-        Given a list of pieces, returns their aggregated features
-    """
+    """Given a list of pieces, returns their aggregated features"""
     piece_to_features_partial = functools.partial(
         piece_to_features,
         nth=nth,

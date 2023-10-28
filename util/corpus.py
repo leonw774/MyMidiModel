@@ -184,7 +184,7 @@ def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict
 def array_to_text_list(array, vocabs: Vocabs):
     """
         Inverse of text_list_to_array.
-        Expect array to be numpy-like array
+        Expect array to be numpy-like.
     """
     assert len(array.shape) == 2 and array.shape[0] > 0, f'Bad numpy array shape: {array.shape}'
     assert array.shape[1] == len(OUTPUT_ATTR_NAMES) or array.shape[1] == len(ALL_ATTR_NAMES), \

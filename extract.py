@@ -21,8 +21,7 @@ def read_args():
         '--indexing', '-i',
         type=str,
         required=True,
-        help=
-'''Required at least one indexing string.
+        help="""Required at least one indexing string.
 An indexing string is in the form of "INDEX" or "BEGIN:END".
 Multiple indexing strings are seperated by commas, surrounded by double-quotes.
 The former form specifies a index number to be extracted.
@@ -31,7 +30,7 @@ If any number A < 0, it will be replaced to CORPUS_LENGTH - A.
 If BEGIN is empty, 0 will be used. If END is empty, CORPUS_LENGTH will be used.
 BEGIN and END can not be empty at the same time.
 Example: --indexing ":2, 3:5, 7, -7, -5:-3, -2:"
-'''
+"""
     )
     parser.add_argument(
         '--extract-midi', '--midi',

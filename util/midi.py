@@ -134,7 +134,6 @@ def get_note_tokens(midi: MidiFile, max_duration: int, velocity_step: int, use_c
         Return all note token in the midi as a list sorted in the ascending orders of
         onset time, track number, pitch, duration, velocity and instrument.
     """
-
     for track in midi.instruments:
         for i, note in enumerate(track.notes):
             # sometimes mido/miditoolkit gives weird value to note.start and note.end that
@@ -710,9 +709,9 @@ def get_first_k_measures(text_list: str, k: int):
 
 def get_after_k_measures(text_list: str, k: int):
     """
-        input expect a valid, well-formated text list of piece
-        return the text list of the number k + 1 to the last measures of the piece
-        end-of-sequence token would be KEEPED
+        Input expect a valid text list.
+        Return the text list that contains from the `k + 1`-th measure to the last measures of the piece.
+        The end-of-sequence token would be KEEPED.
     """
     assert isinstance(k, int) and k > 0, f'k must be positive integer, get {k}'
     m_count = 0

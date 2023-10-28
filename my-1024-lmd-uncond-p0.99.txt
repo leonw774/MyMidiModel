@@ -1,0 +1,3 @@
+==== get_eval_features_of_midis.py start at 20231028-152430 ====
+Found total (6342) midis in models/my-1024-lmd-uncond-p0.99
+Processed 6342 uncorrupted files out of 6342 takes 373.608 seconds.

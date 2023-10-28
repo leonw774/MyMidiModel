@@ -205,7 +205,11 @@ def midi_file_list_to_text_list_list(
         vocabs,
         worker_number: int = 1) -> List[List[str]]:
     """
-        Read the midi files, cut them, write them into corpus, apply BPE, return the primers in text_list form
+        1. Read the midi files
+        2. cut them into primers
+        3. write them into corpus
+        4. apply BPE
+        5. return the primers in text_list form
     """
     primer_piece_list: List[str] = []
     for midi_path in tqdm(primer_paths, desc='Encoding midi files to text representation', ncols=0):
@@ -319,6 +323,7 @@ def main():
         primer_seq_list = [None] * args.sample_number
     else:
         print('Processing primer')
+        assert args.primer_length > 0
         if not os.path.isfile(args.primer):
             print('Primer file not exists')
             raise FileNotFoundError()

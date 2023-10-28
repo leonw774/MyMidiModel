@@ -34,10 +34,10 @@ def adjust_probs_with_context(
         probs_list: List[torch.Tensor],
         context_text_list: List[str],
         vocabs: Vocabs,
-        event_family_indices: Tuple[set]):
+        event_family_indices: Tuple[set]) -> List[torch.Tensor]:
     """
-        Set to zero to the prob of the attribute values that would definitily raise exception
-        if the next token in context_text_list has them and force the position tokens to be ordered increasingly in time
+        Set to zero to the prob of the attribute values that would definitily raise exception if the next token use them.
+        Also force the position tokens to be ordered increasingly.
     """
     assert len(context_text_list) > 0, 'Empty context_text_list'
     assert len(probs_list) == len(OUTPUT_ATTR_NAMES), 'Bad probs_list'
@@ -145,11 +145,11 @@ def adjust_probs_with_context(
     return normed_probs_list
 
 
-def default_sampling(probs: torch.Tensor, threshold):
+def default_sampling(probs: torch.Tensor, threshold) -> torch.Tensor:
     return torch.multinomial(probs, 1)
 
 
-def top_k_sampling(probs: torch.Tensor, threshold: float):
+def top_k_sampling(probs: torch.Tensor, threshold: float) -> torch.Tensor:
     assert 0 < threshold <= 1.0
     k = int(probs.shape[0] * threshold)
     sorted_probs, sorted_indices = torch.sort(probs, dim=-1, descending=True)
@@ -159,7 +159,7 @@ def top_k_sampling(probs: torch.Tensor, threshold: float):
     return sampled_index
 
 
-def nucleus_sampling(probs: torch.Tensor, threshold: float):
+def nucleus_sampling(probs: torch.Tensor, threshold: float) -> torch.Tensor:
     assert 0 < threshold <= 1.0
     if threshold == 1.0:
         return torch.multinomial(probs, 1)
@@ -191,9 +191,9 @@ def generate_piece(
 
         If `start_seq` is None, will use `text_list_to_array([BEGIN_TOKEN_STR])`.
 
-        `ignore_pending_note_error` is default to be True, otherwise model cannot generate continuing note
+        `ignore_pending_note_error` is default to be True, otherwise model cannot generate continuing note.
 
-        Return generated result as text list
+        Return generated result as text list.
     """
     if start_seq is not None:
         exception_msg = f'start_seq\'s shape have to be (1, seq_length, all_attr_number), get {start_seq.shape}'
@@ -250,7 +250,7 @@ def generate_piece(
         sample = nucleus_sampling
 
     if sample_threshold is None:
-       sample_threshold = [1.0] * len(model.output_attrs_indices)
+        sample_threshold = [1.0] * len(model.output_attrs_indices)
     elif isinstance(sample_threshold, list):
         if len(sample_threshold) == 1:
             sample_threshold = sample_threshold * len(model.output_attrs_indices)
