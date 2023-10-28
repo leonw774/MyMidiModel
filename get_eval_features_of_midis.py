@@ -11,6 +11,7 @@ from miditoolkit import MidiFile
 from mido import UnknownMetaMessage, MidiFile as mido_MidiFile
 import numpy as np
 from psutil import cpu_count
+from tqdm import tqdm
 
 from util.corpus import get_corpus_paras
 from util.evaluations import (
@@ -158,7 +159,7 @@ def main():
 
     # compute midi durations
     midi_length_list = []
-    for i in uncorrupt_midi_indices_list:
+    for i in tqdm(uncorrupt_midi_indices_list, desc='Getting MIDI durations', ncols=100):
         midi_path = midi_path_list[i]
         midomidi = mido_MidiFile(midi_path)
         try:
