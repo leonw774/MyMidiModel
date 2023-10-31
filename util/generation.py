@@ -17,16 +17,11 @@ from .model import MyMidiTransformer
 def permute_track_number(array: np.ndarray, track_number_size: int) -> np.ndarray:
     max_track_number = track_number_size - 1
     # add one because there is a padding token at the beginning of the vocab
-    perm = np.random.permutation(track_number_size-1) + 1
-    # view track number col
+    perm = np.concatenate(([0], np.random.permutation(max_track_number) + 1))
     new_array = array.copy()
-    piece_trn_column = new_array[:, ATTR_NAME_INDEX['trn']]
-    piece_trn_column_expand = np.asarray([
-        (piece_trn_column == i + 1) for i in range(max_track_number)
-    ])
-    # permute track number
-    for i in range(max_track_number):
-        piece_trn_column[piece_trn_column_expand[i]] = perm[i]
+    trn_column = new_array[:, ATTR_NAME_INDEX['trn']]
+    for i, trn in enumerate(trn_column):
+        trn_column[i] = perm[trn]
     return new_array
 
 
