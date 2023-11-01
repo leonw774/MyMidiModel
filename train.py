@@ -455,7 +455,8 @@ def main():
     del args.data.valid_paths_file_path
 
     excluded_path_list = valid_file_path_list + test_file_path_list
-    logging.info('Making training dataset')
+    if is_main_process:
+        logging.info('Making training dataset')
     train_dataset = MidiDataset(
         data_dir_path=args.corpus_dir_path,
         excluded_path_list=excluded_path_list,
@@ -464,7 +465,8 @@ def main():
     )
     del excluded_path_list
 
-    logging.info('Making valid dataset')
+    if is_main_process:
+        logging.info('Making valid dataset')
     excluded_path_list_for_valid = train_dataset.used_midi_paths + test_file_path_list
     valid_dataset = MidiDataset(
         data_dir_path=args.corpus_dir_path,
@@ -478,7 +480,7 @@ def main():
         logging.info('Size of validation set: %d', len(valid_dataset))
 
     valid_eval_features = dict()
-    if args.eval.valid_eval_sample_number > 0:
+    if is_main_process and args.eval.valid_eval_sample_number > 0:
         valid_eval_features_json_path = os.path.join(args.midi_dir_path, 'valid_eval_features.json')
         if os.path.isfile(valid_eval_features_json_path):
             logging.info('Getting valid set eval features from %s', valid_eval_features_json_path)
