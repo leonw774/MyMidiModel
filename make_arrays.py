@@ -23,18 +23,6 @@ from util.corpus import (to_shape_vocab_file_path, to_vocabs_file_path, to_array
                          text_list_to_array, get_full_array_string)
 
 
-def mp_handler(args_dict):
-    i = args_dict['i']
-    args_dict.pop('i')
-    try:
-        a = text_list_to_array(**args_dict)
-        return a
-    except:
-        print(f'Error at piece #{i}')
-        print(format_exc())
-        return np.empty(shape=(0,))
-
-
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
@@ -65,6 +53,18 @@ def parse_args():
         'corpus_dir_path'
     )
     return parser.parse_args()
+
+
+def mp_handler(args_dict):
+    i = args_dict['i']
+    args_dict.pop('i')
+    try:
+        a = text_list_to_array(**args_dict)
+        return a
+    except:
+        print(f'Error at piece #{i}')
+        print(format_exc())
+        return np.empty(shape=(0,))
 
 
 def main():

@@ -125,7 +125,7 @@ def quantize_velocity(velocty: int, velocity_step: int) -> int:
 
 
 NOTE_TIME_LIMIT = 0x3FFFF # 2^18 - 1
-# when tick/nth is 32, in tempo of bpm 120, 2^20 - 1 ticks are about 273 minutes / 4.55 hours
+# when tick/nth is 32, in tempo of bpm 120, 2^18 - 1 ticks are about 68 minutes
 NOTE_DURATION_LIMIT = 0x3FFF # 2^14 - 1
 # if a note may have duration > 17 minutes, we think the file is likely corrupted
 

@@ -140,7 +140,7 @@ def adjust_probs_with_context(
     return normed_probs_list
 
 
-def default_sampling(probs: torch.Tensor, threshold) -> torch.Tensor:
+def default_sampling(probs: torch.Tensor, _threshold) -> torch.Tensor:
     return torch.multinomial(probs, 1)
 
 

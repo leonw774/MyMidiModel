@@ -8,7 +8,6 @@ from matplotlib import pyplot as plt
 from matplotlib import cm
 from matplotlib.patches import Rectangle, Ellipse
 from matplotlib.figure import Figure
-from tqdm import tqdm
 import yaml
 
 from . import tokens
@@ -65,13 +64,12 @@ OUTPUT_ATTR_NAMES = [
     'events', 'pitchs', 'durations', 'velocities', 'track_numbers'
 ]
 
-def piece_to_array(piece: str, vocabs: Vocabs, input_memory: Union[dict, None] = None, output_memory: bool = False) -> np.ndarray:
-    return text_list_to_array(piece.split(' '), vocabs, input_memory, output_memory)
 
-def array_to_piece(array, vocabs: Vocabs):
-    return ' '.join(array_to_text_list(array, vocabs))
-
-def text_list_to_array(text_list: list, vocabs: Vocabs, input_memory: Union[dict, None] = None, output_memory: bool = False) -> np.ndarray:
+def text_list_to_array(
+        text_list: list,
+        vocabs: Vocabs,
+        input_memory: Union[dict, None] = None,
+        output_memory: bool = False) -> np.ndarray:
     """
         Serialize pieces into numpy array for the model input.
 
