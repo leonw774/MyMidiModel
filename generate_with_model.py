@@ -323,7 +323,7 @@ def main():
         primer_seq_list = [None] * args.sample_number
     else:
         print('Processing primer')
-        assert args.primer_length > 0
+        assert args.primer_length >= 0
         if not os.path.isfile(args.primer):
             print('Primer file not exists')
             raise FileNotFoundError()
