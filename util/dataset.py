@@ -71,13 +71,11 @@ class MidiDataset(Dataset):
             excluded_paths_tuple = tuple()
         if verbose:
             print('Reading', npz_path)
-        self.used_filenames = []
         self.used_midi_paths = []
-        for filenum, midi_filepath in tqdm(enumerate(all_paths_list), desc='Exclude paths', disable=not verbose):
+        for midi_filepath in tqdm(all_paths_list, desc='Exclude paths', disable=not verbose):
             # use endswith because the pathlist records the relative paths to midi files from project's root
             # while excluded_paths_tuple record relative paths to midi files from dataset's root
             if not midi_filepath.endswith(excluded_paths_tuple):
-                self.used_filenames.append(str(filenum))
                 self.used_midi_paths.append(midi_filepath)
 
         available_memory_size = psutil.virtual_memory().available
@@ -91,12 +89,12 @@ class MidiDataset(Dataset):
         if verbose:
             print('Loading arrays to memory')
         npz_file = np.load(npz_path)
-        self.pieces = {
-            str(filenum): npz_file[str(filenum)]
-            for filenum in tqdm(self.used_filenames, disable=not verbose, ncols=0)
-        }
-        self.number_of_pieces = len(self.pieces)
+        self.pieces = [
+            piece_array
+            for piece_array in tqdm(npz_file.values(), disable=not verbose, ncols=0)
+        ]
 
+        self.number_of_pieces = len(self.pieces)
         if verbose:
             print('Processing')
         # The seperators of maximal permutable subarray are:
@@ -117,7 +115,7 @@ class MidiDataset(Dataset):
         self._measure_ids = np.sort(np.array(self._measure_ids))
 
         # preprocessing
-        self._filenum_indices = [0] * self.number_of_pieces
+        self._piece_num_indices = [0] * self.number_of_pieces
         self._piece_lengths = [0] * self.number_of_pieces
 
         # the default zeros will be replaced by body start index
@@ -131,23 +129,23 @@ class MidiDataset(Dataset):
         self._pitch_augmentation_factor = self.pitch_augmentation_range * 2 + 1 # length of (-pa, ..., -1, 0, 1, ..., pa)
 
         cur_index = -1 # <-- !!! because the first element we add should become index 0
-        for filenum, filename in tqdm(enumerate(self.pieces.keys()), disable=not verbose, ncols=0):
+        for piece_num, piece_array in tqdm(enumerate(self.pieces), disable=not verbose, ncols=0):
 
-            cur_piece_lengths = int(self.pieces[filename].shape[0])
-            self._piece_lengths[filenum] = cur_piece_lengths
+            cur_piece_lengths = int(piece_array.shape[0])
+            self._piece_lengths[piece_num] = cur_piece_lengths
 
             j = 2 # because first token is BOS and second must be track as we excluded all empty midis
-            while self.pieces[filename][j][ATTR_NAME_INDEX['evt']] != self._sep_id:
+            while piece_array[j][ATTR_NAME_INDEX['evt']] != self._sep_id:
                 j += 1
-            self._piece_body_start_index[filenum] = j + 1
-            self._virtual_piece_start_index[filenum][0] = j + 1
+            self._piece_body_start_index[piece_num] = j + 1
+            self._virtual_piece_start_index[piece_num][0] = j + 1
 
             # create virtual pieces from overlength pieces
             if virtual_piece_step_ratio > 0:
-                if self.pieces[filename].shape[0] > max_seq_length:
+                if piece_array.shape[0] > max_seq_length:
                     measure_indices = list(
                         np.flatnonzero(
-                            np.isin(self.pieces[filename][:, ATTR_NAME_INDEX['evt']], self._measure_ids)
+                            np.isin(piece_array[:, ATTR_NAME_INDEX['evt']], self._measure_ids)
                         )
                     )
                     vp_step_num = 1
@@ -156,7 +154,7 @@ class MidiDataset(Dataset):
                         if m_idx > cur_piece_lengths - virtual_piece_step:
                             break
                         if m_idx > virtual_piece_step * vp_step_num:
-                            self._virtual_piece_start_index[filenum].append(m_idx)
+                            self._virtual_piece_start_index[piece_num].append(m_idx)
                             vp_step_num += math.ceil((m_idx - (virtual_piece_step * vp_step_num)) / vp_step_num)
 
             if permute_mps:
@@ -165,26 +163,26 @@ class MidiDataset(Dataset):
                 #   mps numbers are: 1  2  3  3  3  4  5  5  6  7  8  9  10 10
                 # we want the beginning indices of all mps:
                 #                   [0, 1, 2,       5, 6,    8, 9, 10,11,12]
-                mps_numbers = self.pieces[filename][:, ATTR_NAME_INDEX['mps']]
+                mps_numbers = piece_array[:, ATTR_NAME_INDEX['mps']]
                 # just find where the number increases
                 body_mps_sep_indices = np.where(mps_numbers[:-1] < mps_numbers[1:])[0]
                 mps_sep_indices = np.concatenate([
                     # np.arange(j + 1), # the head # actually don't need this because it is handled in __getitem__
                     body_mps_sep_indices,
-                    np.array([self.pieces[filename].shape[0]]) # the EOS
+                    np.array([piece_array.shape[0]]) # the EOS
                 ])
-                self._file_mps_sep_indices[filenum] = mps_sep_indices
+                self._file_mps_sep_indices[piece_num] = mps_sep_indices
 
             if self.pitch_augmentation_range != 0:
-                is_multinote_token = (self.pieces[filename][:, ATTR_NAME_INDEX['pit']]) != 0
+                is_multinote_token = (piece_array[:, ATTR_NAME_INDEX['pit']]) != 0
                 # the pitch attribute of drums / percussion instrument does not means actual note pitch
                 # but different percussion sound
                 # assume instrument vocabulary is 0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
-                not_percussion_notes = (self.pieces[filename][:, ATTR_NAME_INDEX['ins']]) != 129
-                self._augmentable_pitches[filenum] = np.logical_and(is_multinote_token, not_percussion_notes)
+                not_percussion_notes = (piece_array[:, ATTR_NAME_INDEX['ins']]) != 129
+                self._augmentable_pitches[piece_num] = np.logical_and(is_multinote_token, not_percussion_notes)
 
-            cur_index += len(self._virtual_piece_start_index[filenum]) * self._pitch_augmentation_factor
-            self._filenum_indices[filenum] = cur_index
+            cur_index += len(self._virtual_piece_start_index[piece_num]) * self._pitch_augmentation_factor
+            self._piece_num_indices[piece_num] = cur_index
         self._max_index = cur_index if cur_index > 0 else 0
 
         if verbose:
@@ -207,21 +205,21 @@ class MidiDataset(Dataset):
 
     def __getitem__(self, index):
 
-        filenum = bisect.bisect_left(self._filenum_indices, index)
-        body_start_index = self._piece_body_start_index[filenum]
+        piece_num = bisect.bisect_left(self._piece_num_indices, index)
+        body_start_index = self._piece_body_start_index[piece_num]
 
-        index_offset = index if filenum == 0 else index - self._filenum_indices[filenum-1] - 1
+        index_offset = index if piece_num == 0 else index - self._piece_num_indices[piece_num-1] - 1
         virtual_piece_number = index_offset // self._pitch_augmentation_factor
         pitch_augment = index_offset - virtual_piece_number * self._pitch_augmentation_factor - self.pitch_augmentation_range
 
-        start_index = self._virtual_piece_start_index[filenum][virtual_piece_number]
+        start_index = self._virtual_piece_start_index[piece_num][virtual_piece_number]
         end_index = start_index + self.max_seq_length - body_start_index # preserve space for head
         if end_index < start_index:
             end_index = start_index
             body_start_index = self.max_seq_length
         # dont need to check end_index because if end_index > piece_length than numpy will just end the slice at piece_length
-        head_array = np.array(self.pieces[self.used_filenames[filenum]][:body_start_index]) # copy
-        body_array = np.array(self.pieces[self.used_filenames[filenum]][start_index:end_index]) # copy
+        head_array = np.array(self.pieces[piece_num][:body_start_index]) # copy
+        body_array = np.array(self.pieces[piece_num][start_index:end_index]) # copy
         sampled_array = np.concatenate([head_array, body_array], axis=0)
         sampled_array = sampled_array.astype(np.int32) # was int16 to save space but torch ask for int
 
@@ -241,7 +239,7 @@ class MidiDataset(Dataset):
         # pitch augmentation
         # pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
         if pitch_augment != 0 and body_start_index != self.max_seq_length:
-            sampled_augmentable_pitches = self._augmentable_pitches[filenum][start_index:end_index]
+            sampled_augmentable_pitches = self._augmentable_pitches[piece_num][start_index:end_index]
             # sometimes the sampled array does not contain any pitch-augmentable token
             sampled_body_pitch_col = sampled_array[body_start_index:, ATTR_NAME_INDEX['pit']]
             if np.any(sampled_augmentable_pitches):
@@ -271,7 +269,7 @@ class MidiDataset(Dataset):
             mps_sep_indices_list_head = [0, 1, body_start_index - 1]
             mps_sep_indices_list_body = [
                 i - start_index + body_start_index
-                for i in self._file_mps_sep_indices[filenum]
+                for i in self._file_mps_sep_indices[piece_num]
                 if start_index <= i < end_index
             ]
             mps_sep_indices_list = mps_sep_indices_list_head + mps_sep_indices_list_body
