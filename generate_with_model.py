@@ -348,9 +348,9 @@ def main():
             if args.sample_number != 0:
                 primer_path_list = primer_path_list[:args.sample_number]
             primer_path_list = [p.strip() for p in primer_path_list]
-            assert all(p.endswith('.mid') or p.endswith('.midi') for p in primer_path_list)
+            assert all(p.endswith('.mid') or p.endswith('.MID') or p.endswith('.midi') for p in primer_path_list)
             assert all(os.path.isfile(p) for p in primer_path_list)
-            print(f'Keep first {len(primer_path_list)} lines with sample number setting to {args.sample_number}')
+            print(f'Keep first {len(primer_path_list)} lines as sample number is {args.sample_number}')
             print('Hint: Set sample number to 0 to keep all primers in the primer list.')
 
             primer_text_list_list = midi_file_list_to_text_list_list(primer_path_list, **encode_args)
