@@ -87,15 +87,14 @@ class MidiDataset(Dataset):
             if verbose:
                 print(f'Memory not enough. Need {array_memory_size//1024} KB. Only {available_memory_size//1024} KB available.')
             raise OSError('Memory not enough.')
-        else:
-            # load into memory to be faster
-            if verbose:
-                print('Loading arrays to memory')
-            npz_file = np.load(npz_path)
-            self.pieces = {
-                str(filenum): npz_file[str(filenum)]
-                for filenum in tqdm(self.used_filenames, disable=not verbose, ncols=0)
-            }
+        # load into memory to be faster
+        if verbose:
+            print('Loading arrays to memory')
+        npz_file = np.load(npz_path)
+        self.pieces = {
+            str(filenum): npz_file[str(filenum)]
+            for filenum in tqdm(self.used_filenames, disable=not verbose, ncols=0)
+        }
         self.number_of_pieces = len(self.pieces)
 
         if verbose:
@@ -132,7 +131,7 @@ class MidiDataset(Dataset):
         self._pitch_augmentation_factor = self.pitch_augmentation_range * 2 + 1 # length of (-pa, ..., -1, 0, 1, ..., pa)
 
         cur_index = -1 # <-- !!! because the first element we add should become index 0
-        for filenum, filename in tqdm(enumerate(self.used_filenames), disable=not verbose, ncols=0):
+        for filenum, filename in tqdm(enumerate(self.pieces.keys()), disable=not verbose, ncols=0):
 
             cur_piece_lengths = int(self.pieces[filename].shape[0])
             self._piece_lengths[filenum] = cur_piece_lengths
