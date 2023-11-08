@@ -435,11 +435,11 @@ def midi_to_piece(
     """
         Parameters:
         - midi_file_path: midi file path
-        - nth: to quantize notes to nth (96, 64 or 32)
+        - nth: to quantize onset and duration to multiples of the length of nth note (recommend 32, 48, or 96)
         - max_track_number: the maximum tracks nubmer to keep in text, if the input midi has more
           'instruments' than this value, some tracks would be merged or discard
         - max_duration: max length of duration in unit of nth note
-        - velocity_step: velocity to be quantize as (velocity_step//2, 3*velocity_step//2, 5*velocity_step//2, ...)
+        - velocity_step: to quantize velocity as multiples of velocity_step
         - use_cont_note: have contiuing notes or not
         - tempo_quantization: (min, max, step), where min and max are INCLUSIVE
         - use_merge_drums: to merge drums tracks or not

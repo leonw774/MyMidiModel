@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 
 import numpy as np
 import torch
-from torch.utils.data import random_split, DataLoader
+from torch.utils.data import DataLoader
 
 from util.midi import piece_to_midi
 from util.corpus import get_full_array_string, array_to_text_list
