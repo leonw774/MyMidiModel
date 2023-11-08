@@ -53,8 +53,10 @@ EndOfScoreToken = namedtuple(
     defaults=[float('inf'), TYPE_PRIORITY['EndOfScoreToken'],]
 )
 
+
+# determined with parameters to cover almost all reasonable usages
 def get_supported_time_signatures(
-        numerator_max: int = 24, # hard-coded default
+        numerator_max: int = 24,
         denominator_log2_max: int = 4, # 2, 4, 8, 16
         nd_raio_max: float = 3) -> set:
     return {
@@ -62,6 +64,15 @@ def get_supported_time_signatures(
         for denominator in [int(2 ** (log2d+1)) for log2d in range(denominator_log2_max)]
         for numerator in range(1, min(numerator_max+1, denominator*nd_raio_max+1))
     }
+
+# determined with hand-picked items based on occurence in datasets
+# def get_supported_time_signatures():
+#     supported_time_signatures = {
+#         (2,2),
+#         (1,4), (2,4), (3,4), (4,4), (5,4),
+#         (3,8), (6,8),
+#     }
+#     return supported_time_signatures
 
 # if use default (hard-coded), should be 66
 def get_largest_possible_position(nth: int, supported_time_signatures: set = None) -> int:
