@@ -66,7 +66,7 @@ def get_supported_time_signatures(
     }
 
 # determined with hand-picked items based on occurence in datasets
-# def get_supported_time_signatures():
+# def get_suported_time_signatures():
 #     supported_time_signatures = {
 #         (2,2),
 #         (1,4), (2,4), (3,4), (4,4), (5,4),

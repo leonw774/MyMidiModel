@@ -269,7 +269,7 @@ class MyMidiTransformer(nn.Module):
 def compute_losses(
         pred_logits: List[Tensor],
         target_labels: Tensor,
-        ignore_padding: str = 'all') -> Tuple[Tensor, List[Tensor]]:
+        ignore_padding: str = 'end') -> Tuple[Tensor, List[Tensor]]:
     """
         Parameters:
         - pred_logits is a list:
@@ -278,8 +278,8 @@ def compute_losses(
 
         - target_labels has shape: (batch_size, seq_size, out_attr_number)
 
-        - nonpadding_dim decide how to reduce the loss vector. Can be 'all', 'attribute', or 'none'.
-          Default is 'all'.
+        - nonpadding_dim decide how to reduce the loss vector. Can be 'all', 'attribute', or 'end'.
+          Default is 'end'.
 
         Return final loss and a list of losses of each head.
     """
@@ -291,38 +291,47 @@ def compute_losses(
             # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
             # basically treat seq_size as one of the K dimensions and K = 1
             target=target_labels[..., k], # (batch_size, seq_size)
-            ignore_index=(0 if ignore_padding != 'none' else -100), # padding is index 0
+            ignore_index=0, # padding is index 0
             reduction='none' # return tensor size (batch_size, seq_size)
         )
         for k, logits in enumerate(pred_logits)
     ]
     # (batch_size, seq_size, out_attr_number) <- [(batch_size, seq_size) ... (batch_size, seq_size)]
     no_reduce_losses = torch.stack(no_reduce_head_losses_list, dim=2)
-    head_losses = [
-        no_reduce_head_losses.sum() / torch.count_nonzero(no_reduce_head_losses)
-        for no_reduce_head_losses in no_reduce_head_losses_list
-    ]
 
     if ignore_padding == 'all':
         # average total losses by number of total non-padding labels
         num_nonpadding = torch.count_nonzero(target_labels) # ()
         loss = no_reduce_losses.sum() / num_nonpadding
+        head_losses = [
+            no_reduce_head_losses.sum() / torch.count_nonzero(no_reduce_head_losses)
+            for no_reduce_head_losses in no_reduce_head_losses_list
+        ]
 
     elif ignore_padding == 'attribute':
         # average each attribute losses by number of its non-padding labels
-        # like out_attr_number sequences with ignore paddings
+        # as if we have k sequences with ignore paddings == 'all'
         nonpadding_head_losses = [
             no_reduce_head_losses.sum() / torch.count_nonzero(no_reduce_head_losses)
             for no_reduce_head_losses in no_reduce_head_losses_list
         ]
         loss = torch.stack(nonpadding_head_losses).mean()
+        head_losses = [
+            no_reduce_head_losses.sum() / torch.count_nonzero(no_reduce_head_losses)
+            for no_reduce_head_losses in no_reduce_head_losses_list
+        ]
 
-    elif ignore_padding == 'none':
+    elif ignore_padding == 'end':
         # only ignore the padding tokens at the end
-        mask = (target_labels[..., 0] != 0).unsqueeze(2).repeat(1, 1, target_labels.size(2))
+        length_mask = (target_labels[..., ATTR_NAME_INDEX['evt']] != 0)
+        mask = length_mask.unsqueeze(2).repeat(1, 1, target_labels.size(2))
         loss = (no_reduce_losses * mask).sum() / mask.sum()
+        head_losses = [
+            no_reduce_head_losses.sum() / torch.count_nonzero(length_mask)
+            for no_reduce_head_losses in no_reduce_head_losses_list
+        ]
 
     else:
-        raise ValueError('nonpadding_level in compute_losses can only be \'all\', \'attribute\', or \'none\'.')
+        raise ValueError('nonpadding_level in compute_losses can only be \'all\', \'attribute\', or \'end\'.')
 
     return loss, head_losses

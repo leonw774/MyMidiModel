@@ -120,8 +120,8 @@ def parse_args():
     train_parser.add_argument(
         '--loss-ignore-padding',
         type=str,
-        choices=['all', 'attribute', 'none'],
-        default='all'
+        choices=['all', 'attribute', 'end'],
+        default='end'
     )
     train_parser.add_argument(
         '--lr-peak',
