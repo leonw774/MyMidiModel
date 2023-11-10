@@ -120,7 +120,7 @@ def parse_args():
     train_parser.add_argument(
         '--loss-ignore-padding',
         type=str,
-        choices=['all', 'attribute', 'end'],
+        choices=['all', 'all_attr', 'end'],
         default='end'
     )
     train_parser.add_argument(
@@ -271,8 +271,8 @@ def log_losses(
     avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
     logging.info(
         'Avg. train head losses: %s Avg. train loss: %.6f \nAvg. valid head losses: %s Avg. valid loss: %.6f',
-        ', '.join([f'{l:.3f}' for l in avg_train_head_losses]), avg_train_loss,
-        ', '.join([f'{l:.3f}' for l in avg_valid_head_losses]), avg_valid_loss
+        ', '.join([f'{l:.6f}' for l in avg_train_head_losses]), avg_train_loss,
+        ', '.join([f'{l:.6f}' for l in avg_valid_head_losses]), avg_valid_loss
     )
     if not loss_file_path:
         return
@@ -283,7 +283,7 @@ def log_losses(
             if idx != cur_num_updates:
                 loss_file.write(
                     f'{idx},'
-                    + ','.join([f'{l:.3f}' for l in train_head_losses]) + ',' # train head losses
+                    + ','.join([f'{l:.6f}' for l in train_head_losses]) + ',' # train head losses
                     + f'{sum(train_head_losses):.6f},' # train loss (sum)
                     # NO valid head losses and sum
                     + '\n'
@@ -291,9 +291,9 @@ def log_losses(
             else:
                 loss_file.write(
                     f'{idx},'
-                    + ','.join([f'{l:.3f}' for l in train_head_losses]) + ',' # train head losses
+                    + ','.join([f'{l:.6f}' for l in train_head_losses]) + ',' # train head losses
                     + f'{sum(train_head_losses):.6f},' # train loss (sum)
-                    + ','.join([f'{l:.3f}' for l in avg_valid_head_losses]) + ',' # avg valid head losses
+                    + ','.join([f'{l:.6f}' for l in avg_valid_head_losses]) + ',' # avg valid head losses
                     + f'{avg_valid_loss:.6f}' # avg valid loss (sum)
                     + '\n'
                 )

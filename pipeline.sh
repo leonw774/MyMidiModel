@@ -88,9 +88,8 @@ if [ "$do_midi_to_corpus" == true ]; then
 
     python3 midi_to_corpus.py \
         --nth "$NTH" --max-track-number "$MAX_TRACK_NUMBER" --max-duration "$MAX_DURATION" --velocity-step "$VELOCITY_STEP" \
-        --tempo-quantization "$TEMPO_MIN" "$TEMPO_MAX" "$TEMPO_STEP" --position-method "$POSITION_METHOD" \
-        --log "$log_path" -w "$WORKER_NUMBER" --recursive $use_existed "${midi_to_corpus_other_args[@]}" \
-        -- "$corpus_dir_path" "$MIDI_DIR_PATH"
+        --tempo-quantization "$TEMPO_MIN" "$TEMPO_MAX" "$TEMPO_STEP" --log "$log_path" -w "$WORKER_NUMBER" \
+        --recursive $use_existed "${midi_to_corpus_other_args[@]}" -o "$corpus_dir_path" -- "$MIDI_DIR_PATH"
     test "$?" -ne 0 && { echo "midi_to_text.py failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
 fi
 
@@ -137,10 +136,10 @@ fi
 if [ -n "${BPE_ITER_NUM+x}" ] && [ "$BPE_ITER_NUM" -ne 0 ]; then
     # replace corpus_dir_path to bpe_corpus_dir_path
     corpus_dir_path="$bpe_corpus_dir_path"
-    BPE_OPTION="--bpe"
+    bpe_option=("--bpe")
 fi
 
-python3 make_arrays.py --debug "$BPE_OPTION" --worker-number "$WORKER_NUMBER" --log "$log_path"  $use_existed -- "$corpus_dir_path"
+python3 make_arrays.py --worker-number "$WORKER_NUMBER" --log "$log_path" --debug $use_existed "${bpe_option[@]}" -- "$corpus_dir_path"
 test "$?" -ne 0 && { echo "text_to_array.py failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
 
 ######## TRAIN MODEL ########

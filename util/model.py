@@ -305,7 +305,7 @@ def compute_losses(
             for no_reduce_head_losses in no_reduce_head_losses_list
         ]
         # average total losses by number of total non-padding labels
-        num_nonpad_attr = torch.count_nonzero(target_labels) # ()
+        num_nonpad_attr = torch.count_nonzero(target_labels)
         loss = no_reduce_losses.sum() / num_nonpad_attr
 
     elif ignore_padding == 'all_attr':
@@ -319,8 +319,7 @@ def compute_losses(
 
     elif ignore_padding == 'end':
         # only ignore the padding tokens at the end
-        length_mask = (target_labels[..., ATTR_NAME_INDEX['evt']] != 0)
-        num_token = torch.count_nonzero(length_mask)
+        num_token = torch.count_nonzero(target_labels[..., ATTR_NAME_INDEX['evt']])
         loss = no_reduce_losses.sum() / num_token
         head_losses = [
             no_reduce_head_losses.sum() / num_token

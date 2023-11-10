@@ -96,12 +96,14 @@ def parse_args():
             If this number is 1 or below, multiprocessing would not be used.'
     )
     main_parser.add_argument(
-        'output_dir_path',
+        '--output-dir-path', '-o',
         type=str,
+        default='midi_to_corpus_output',
         help='The path of the directory for the corpus.'
     )
     main_parser.add_argument(
-        'input_path',
+        'input_path_list',
+        type=str,
         nargs='+', # store as list and at least one
         help='The path(s) of input files/directodries'
     )
@@ -232,10 +234,17 @@ def main():
         )
     logging.info(strftime('==== midi_to_corpus.py start at %Y%m%d-%H%M%SS ===='))
 
-    corpus_paras_str = '\n'.join([
-        str(k)+':'+str(v) for k, v in corpus_paras_dict.items()
-    ])
-    logging.info(corpus_paras_str)
+    logging.info(
+        '\n'.join([
+            f'{k}:{v}' for k, v in vars(args).items()
+            if k != 'handler_args'
+        ])
+    )
+    logging.info(
+        '\n'.join([
+            f'{k}:{v}' for k, v in corpus_paras_dict.items()
+        ])
+    )
 
     # check if output_dir_path is a directory
     if os.path.isdir(args.output_dir_path):
@@ -273,17 +282,17 @@ def main():
 
     start_time = time()
     file_path_list = list()
-    for inpath in args.input_path:
+    for input_path in args.input_path_list:
         if args.recursive:
-            if not os.path.isdir(inpath):
-                print(f'Input path {inpath} is not a directory or doesn\'t exist.')
-            file_path_list = glob.glob(inpath+'/**/*.mid', recursive=True)
-            file_path_list += glob.glob(inpath+'/**/*.midi', recursive=True)
-            file_path_list += glob.glob(inpath+'/**/*.MID', recursive=True)
+            if not os.path.isdir(input_path):
+                print(f'Input path {input_path} is not a directory or doesn\'t exist.')
+            file_path_list = glob.glob(input_path+'/**/*.mid', recursive=True)
+            file_path_list += glob.glob(input_path+'/**/*.midi', recursive=True)
+            file_path_list += glob.glob(input_path+'/**/*.MID', recursive=True)
         else:
-            if not os.path.isfile(inpath):
-                print(f'Input path {inpath} is not a file or doesn\'t exist.')
-            file_path_list.append(inpath)
+            if not os.path.isfile(input_path):
+                print(f'Input path {input_path} is not a file or doesn\'t exist.')
+            file_path_list.append(input_path)
 
     if len(file_path_list) == 0:
         logging.info('No file to process')
