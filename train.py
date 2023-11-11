@@ -31,7 +31,7 @@ from util.evaluations import (
     EVAL_SCALAR_FEATURE_NAMES
 )
 from util.generation import generate_piece
-from util.model import MyMidiTransformer, compute_losses
+from util.model import MyMidiTransformer, compute_losses, LOSS_PADDING_ARG_CHOICES, LOSS_PADDING_ARG_CHOICES_DEFAULT
 
 def parse_args():
     data_parser = ArgumentParser()
@@ -118,10 +118,10 @@ def parse_args():
             If this value is zero, gradient clipping will not be used. Default is %(desult)s.'
     )
     train_parser.add_argument(
-        '--loss-ignore-padding',
+        '--loss-padding',
         type=str,
-        choices=['all', 'all_attr', 'end'],
-        default='end'
+        choices=LOSS_PADDING_ARG_CHOICES,
+        default=LOSS_PADDING_ARG_CHOICES_DEFAULT
     )
     train_parser.add_argument(
         '--lr-peak',
@@ -639,7 +639,7 @@ def main():
                 loss, head_losses = compute_losses(
                     prediction,
                     batch_target_seqs,
-                    args.train.loss_ignore_padding
+                    args.train.loss_padding
                 )
                 # print('compute_losses use time:', time() - start_backward_time)
                 # assert all(not torch.isnan(head_l).any() for head_l in head_losses)
@@ -690,6 +690,7 @@ def main():
                 loss, head_losses = compute_losses(
                     prediction,
                     batch_target_seqs,
+                    args.train.loss_padding
                 )
                 if args.use_parallel:
                     # need to gather, otherwise each process see different losses

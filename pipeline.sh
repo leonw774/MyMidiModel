@@ -194,7 +194,7 @@ $launch_command train.py \
     \
     --layers-number "$LAYERS_NUMBER" --attn-heads-number "$ATTN_HEADS_NUMBER" --embedding-dim "$EMBEDDING_DIM" \
     --batch-size "$BATCH_SIZE" --max-updates "$MAX_UPDATES" --validation-interval "$VALIDATION_INTERVAL"  \
-    --max-grad-norm "$MAX_GRAD_NORM" --loss-ignore-padding "$LOSS_IGNORE_PAD" --early-stop "$EARLY_STOP" \
+    --max-grad-norm "$MAX_GRAD_NORM" --loss-padding "$LOSS_PADDING" --early-stop "$EARLY_STOP" \
     \
     --lr-peak "$LEARNING_RATE_PEAK" --lr-warmup-updates "$LEARNING_RATE_WARMUP_UPDATES" \
     --lr-decay-end-updates "$LEARNING_RATE_DECAY_END_UPDATES" --lr-decay-end-ratio "$LEARNING_RATE_DECAY_END_RATIO" \
