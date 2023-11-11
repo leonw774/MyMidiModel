@@ -320,7 +320,7 @@ def compute_losses(
     elif ignore_padding == 'end':
         # only ignore the padding tokens at the end
         num_token = torch.count_nonzero(target_labels[..., ATTR_NAME_INDEX['evt']])
-        loss = no_reduce_losses.sum() / num_token
+        loss = no_reduce_losses.sum() / num_token / target_labels.size(2)
         head_losses = [
             no_reduce_head_losses.sum() / num_token
             for no_reduce_head_losses in no_reduce_head_losses_list
