@@ -48,7 +48,6 @@ class MidiDataset(Dataset):
             - `pitch_augmentation_range`: If set to P, will add a random value from -P to +P (inclusive)
               on all pitch values as data augmentation. Default is 0.
         """
-
         self.vocabs = get_corpus_vocabs(data_dir_path)
         assert max_seq_length >= 0
         self.max_seq_length = max_seq_length
@@ -207,7 +206,6 @@ class MidiDataset(Dataset):
             print('Dataset object size:', self_size, 'bytes')
 
     def __getitem__(self, index):
-
         piece_num = bisect.bisect_left(self._piece_num_indices, index)
         body_start_index = self._piece_body_start_indices[piece_num]
 
@@ -306,7 +304,6 @@ class MidiDataset(Dataset):
                          f'{get_full_array_string(sampled_array, self.vocabs)}')
 
         return from_numpy(sampled_array)
-
 
     def __len__(self):
         return self._max_index

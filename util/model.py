@@ -52,7 +52,6 @@ class MyMidiTransformer(nn.Module):
         self.layers_number = layers_number
         self.attn_heads_number = attn_heads_number
         self.embedding_dim = embedding_dim
-
         self.not_use_mps_number = not_use_mps_number
 
         # set the to True ONLY when generating sample
@@ -265,8 +264,8 @@ class MyMidiTransformer(nn.Module):
 
 # end class MyMidiTransformer
 
-LOSS_PADDING_ARG_CHOICES = ['ignore_all', 'ignore_attr', 'as_wildcard', 'as_normal']
-LOSS_PADDING_ARG_CHOICES_DEFAULT = 'as_wildcard'
+LOSS_PADDING_ARG_CHOICES = ['ignore', 'wildcard', 'normal']
+LOSS_PADDING_ARG_CHOICES_DEFAULT = 'ignore'
 
 def compute_losses(
         pred_logits: List[Tensor],
@@ -292,23 +291,14 @@ def compute_losses(
             # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
             # basically treat seq_size as one of the K dimensions and K = 1
             target=target_labels[..., k], # (batch_size, seq_size)
-            ignore_index=(0 if padding != 'as_normal' else -100), # padding is index 0
+            ignore_index=(0 if padding != 'normal' else -100), # padding is index 0
             reduction='none' # return tensor size (batch_size, seq_size)
         )
         for k, logits in enumerate(pred_logits)
     ]
     # (batch_size, seq_size, out_attr_number) <- [(batch_size, seq_size) ... (batch_size, seq_size)]
 
-    if padding == 'ignore_all':
-        # average total losses by number of total non-padding labels
-        head_losses = [
-            head_losses.sum() / torch.count_nonzero(head_losses)
-            for head_losses in head_losses_list
-        ]
-        all_losses = torch.stack(head_losses_list, dim=2)
-        loss = all_losses.sum() / torch.count_nonzero(target_labels)
-
-    elif padding == 'ignore_attr':
+    if padding == 'ignore':
         # average each attribute losses by number of its non-padding labels
         # as if we have k sequences with ignore paddings == 'all'
         head_losses = [
@@ -317,7 +307,7 @@ def compute_losses(
         ]
         loss = torch.stack(head_losses).mean()
 
-    elif padding == 'as_wildcard':
+    elif padding == 'wildcard':
         # only ignore the padding labels at the end
         # the padding labels in the non-padding-event tokens are seen as wildcards that ANY predictions is correct
         num_token = torch.count_nonzero(target_labels[..., ATTR_NAME_INDEX['evt']])
@@ -327,7 +317,7 @@ def compute_losses(
         ]
         loss = torch.stack(head_losses).mean()
 
-    elif padding == 'as_normal':
+    elif padding == 'normal':
         # only ignore the padding labels at the end
         # the padding labels in the non-padding-event tokens are seen as normal labels and IS the correct answer
         num_token = torch.count_nonzero(target_labels[..., ATTR_NAME_INDEX['evt']])
@@ -338,6 +328,6 @@ def compute_losses(
         loss = torch.stack(head_losses).mean()
 
     else:
-        raise ValueError(f'`padding` argument in compute_losses can only be choosen from {LOSS_PADDING_ARG_CHOICES}.')
+        raise ValueError(f'`padding` argument in compute_losses can should be in {LOSS_PADDING_ARG_CHOICES}.')
 
     return loss, head_losses
