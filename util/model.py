@@ -102,7 +102,7 @@ class MyMidiTransformer(nn.Module):
             getattr(self.vocabs, ALL_ATTR_NAMES[i]).size
             for i in self.output_attrs_indices
         ]
-        self.project_linears = nn.ModuleList([
+        self.to_logit_linears = nn.ModuleList([
             nn.Linear(
                 in_features=embedding_dim,
                 out_features=vsize,
@@ -122,7 +122,6 @@ class MyMidiTransformer(nn.Module):
             self.causal_mask = torch.tril(torch.ones(max_seq_length, max_seq_length), diagonal=0).bool()
             self.causal_mask = FullMask(self.causal_mask)
 
-        # name's encoder, used as decoder
         if use_linear_attn:
             # https://linear-transformers.com/
             params = {
@@ -159,23 +158,12 @@ class MyMidiTransformer(nn.Module):
             #     encoder_layer=layer,
             #     num_layers=layers_number
             # )
-        # self.layer_norm = nn.LayerNorm(normalized_shape=embedding_dim, eps=1e-6)
 
-        self.apply(self._init_weights)
         # set padding vectors to zeros because the _init_weights set it to something else
         with torch.no_grad():
             for emb_layer in self.embedding_layers:
                 emb_layer.weight.data[0].zero_()
 
-    # copied from SymphonyNet
-    def _init_weights(self, module):
-        if isinstance(module, (nn.Linear, nn.Embedding)):
-            module.weight.data.normal_(mean=0.0, std=self.embedding_dim ** -0.5)
-            if isinstance(module, nn.Linear) and module.bias is not None:
-                module.bias.data.zero_()
-        elif isinstance(module, nn.LayerNorm):
-            module.bias.data.zero_()
-            module.weight.data.fill_(1.0)
 
     def to_input_attrs(self, batch_input_seqs: Tensor) -> Tensor:
         # expect batch_input_seqs has shape: (batch_size, seq_size, all_attr_num)
@@ -191,9 +179,6 @@ class MyMidiTransformer(nn.Module):
             # The recurrent model only need to receive the last element with size of (batch_size, embed_size)
             x = x[:, -1:] # become (batch_size, 1, embed_size)
         embs = [emb(x[..., i]) for i, emb in enumerate(self.embedding_layers)]
-        # for i, emb in enumerate(embs):
-        #     mask = x[..., i].ne(0).float()[..., None].to(x.device)
-        #     assert (emb == emb*mask).all(), f'{i}\n{x}\n{emb}\n{mask}\n{emb*mask}'
         # emb_sum = sum(embs)
         emb_sum = reduce(torch.add, embs) # cool trick
 
@@ -211,6 +196,7 @@ class MyMidiTransformer(nn.Module):
             emb_sum = emb_sum + pos_emb
 
         emb_sum_dropout = self.embedding_dropout(emb_sum)
+
         if self.use_linear_attn:
             if self.inferencing:
                 # no mask is needed when using recurrent for inference
@@ -220,19 +206,20 @@ class MyMidiTransformer(nn.Module):
             else:
                 # in fast_transformer's FullMask class, 0 is masked, 1 is keep
                 causal_mask = self.causal_mask
-                length_mask = FullMask(mask=x[..., 0].ne(0).bool().to(x.device))
+                length_mask = FullMask(mask=x[..., ATTR_NAME_INDEX['evt']].ne(0).bool().to(x.device))
                 transformer_output = self.transformer_decoder(emb_sum_dropout, causal_mask, length_mask)
         else:
             # Casual mask is not needed because x_transformer.Decoder is has causal=True on default
             # causal_mask = self.causal_mask[:x.size(1), :x.size(1)].repeat(x.size(0), 1, 1).to(x.device)
             # False is masked, True is keep
-            length_mask = x[..., 0].ne(0).to(x.device)
+            length_mask = x[..., ATTR_NAME_INDEX['evt']].ne(0).to(x.device)
             # print(length_mask)
             transformer_output = self.transformer_decoder(emb_sum_dropout, mask=length_mask)
-        # transformer_output = self.layer_norm(transformer_output)
+
         logits_tuple = tuple(
-            proj(transformer_output) for proj in self.project_linears
+            to_logit(transformer_output) for to_logit in self.to_logit_linears
         )
+
         # assert all(not torch.isnan(lg).any() for lg in logits), [torch.isnan(lg).nonzero(as_tuple=True) for lg in logits]
         if self.use_linear_attn and self.inferencing:
             return logits_tuple, (linear_tf_memory, position_memory)
