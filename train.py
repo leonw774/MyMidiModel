@@ -776,5 +776,10 @@ def main():
 
 
 if __name__ == '__main__':
-    exit_code = main()
-    exit(exit_code)
+    try:
+        exit_code = main()
+        exit(exit_code)
+    except KeyboardInterrupt as ki:
+        logging.info('Training stopped by KeyboardInterrupt')
+        logging.info('==== train.py exit ====')
+        exit(0)
