@@ -253,9 +253,9 @@ class MyMidiTransformer(nn.Module):
 
 LOSS_PADDING_ARG_CHOICES = ['ignore', 'wildcard', 'normal']
 """
-    - ignore: PADDING = IGNORE, no exception
-    - wildcard: ignore, but are counted as a token
-    - normal: the model have to correctly predict it to be padding
+    - ignore:   PADDING = IGNORE, no exception
+    - wildcard: ignore, but not completely ignore
+    - normal:   the model have to correctly predict it to be padding
 """
 LOSS_PADDING_ARG_CHOICES_DEFAULT = 'ignore'
 
@@ -284,7 +284,7 @@ def compute_losses(
         F.cross_entropy(
             input=logits.transpose(1, 2),
             # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
-            # basically treat seq_size as one of the K dimensions and K = 1
+            # because input shape should be (batch, category, dimensions... )
             target=target_labels[..., k], # (batch_size, seq_size)
             ignore_index=(0 if padding != 'normal' else -100), # padding is index 0
             reduction=(
@@ -296,10 +296,16 @@ def compute_losses(
         for k, logits in enumerate(pred_logits)
     ]
 
-    if padding != 'ignore':
+    if padding == 'wildcard':
         num_token = torch.count_nonzero(target_labels[..., ATTR_NAME_INDEX['evt']])
         head_losses = [
             head_loss.sum() / num_token
+            for head_loss in head_losses
+        ]
+    elif padding == 'normal':
+        length_mask = target_labels[..., ATTR_NAME_INDEX['evt']].ne(0)
+        head_losses = [
+            (head_loss * length_mask).sum() / length_mask.sum()
             for head_loss in head_losses
         ]
     loss = torch.stack(head_losses).mean()
