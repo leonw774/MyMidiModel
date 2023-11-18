@@ -268,9 +268,7 @@ def compute_losses(
         - `pred_logits` is a list:
           - length: out_attr_number
           - elements are tenors with shape: (batch_size, seq_size, attr_vocab_size)
-
         - `target_labels` has shape: (batch_size, seq_size, out_attr_number)
-
         - `padding` decide how to reduce the loss vector. Can be one in `LOSS_PADDING_ARG_CHOICE`.
 
         Return final loss and a list of losses of each head.
@@ -296,13 +294,7 @@ def compute_losses(
         for k, logits in enumerate(pred_logits)
     ]
 
-    if padding == 'wildcard':
-        num_token = torch.count_nonzero(target_labels[..., ATTR_NAME_INDEX['evt']])
-        head_losses = [
-            head_loss.sum() / num_token
-            for head_loss in head_losses
-        ]
-    elif padding == 'normal':
+    if padding != 'ignore':
         length_mask = target_labels[..., ATTR_NAME_INDEX['evt']].ne(0)
         head_losses = [
             (head_loss * length_mask).sum() / length_mask.sum()
