@@ -1,7 +1,7 @@
 import io
 import json
 import os
-from typing import Union
+from typing import Union, List
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -66,7 +66,7 @@ OUTPUT_ATTR_NAMES = [
 
 
 def text_list_to_array(
-        text_list: list,
+        text_list: List[str],
         vocabs: Vocabs,
         input_memory: Union[dict, None] = None,
         output_memory: bool = False) -> np.ndarray:
@@ -143,7 +143,6 @@ def text_list_to_array(
 
         elif typename == tokens.TEMPO_EVENTS_CHAR:
             event_text, *attr = text = text.split(':')
-            # cur_tempo_id = vocabs.tempos.text2id[event_text]
             cur_mps_number += 1
             x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
             x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
@@ -179,7 +178,7 @@ def text_list_to_array(
         return x
 
 
-def array_to_text_list(array, vocabs: Vocabs):
+def array_to_text_list(array, vocabs: Vocabs) -> List[str]:
     """
         Inverse of text_list_to_array.
         Expect array to be numpy-like.

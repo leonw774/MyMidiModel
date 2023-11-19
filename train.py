@@ -597,7 +597,6 @@ def main():
         logging.info('Begin training')
     train_dataloader_iter = iter(train_dataloader)
     # valid_dataloader_iter = iter(valid_dataloader)
-    pad1bottom = (0, 0, 0, 1)
     min_avg_valid_loss = float('inf')
     early_stop_counter = 0
 
@@ -606,8 +605,6 @@ def main():
         model.train()
         train_loss_list: List[float] = []
         train_head_losses_list: List[List[float]] = []
-        # forward_time = 0
-        # backward_time = 0
         training_tqdm = tqdm(
             range(args.train.validation_interval),
             disable=not is_main_process,
@@ -625,35 +622,27 @@ def main():
                     batch_seqs = next(train_dataloader_iter)
 
                 # batch_seqs has shape: (batch_size, seq_size, complete_attr_num)
-                batch_input_seqs = to_input_attrs(batch_seqs)
+                batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
                 batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
-                batch_target_seqs = pad(batch_target_seqs, pad1bottom, 'constant', 0) # pad one from back on token dim
                 if not args.use_parallel:
                     batch_input_seqs = batch_input_seqs.to(args.use_device)
                     batch_target_seqs = batch_target_seqs.to(args.use_device)
-                # start_forward_time = time()
                 prediction = model(batch_input_seqs)
-                # forward_time += time() - start_forward_time
 
-                # start_backward_time = time()
                 loss, head_losses = compute_losses(
                     prediction,
                     batch_target_seqs,
                     args.train.loss_padding
                 )
-                # print('compute_losses use time:', time() - start_backward_time)
-                # assert all(not torch.isnan(head_l).any() for head_l in head_losses)
-
                 loss = loss / gradient_accumulation_steps
 
                 if is_main_process:
                     # note that this only record the loss calculated on main process
                     train_loss_list[-1] += loss.item()
                     train_head_losses_list[-1] = [
-                        accu_l + head_l.item() / gradient_accumulation_steps
-                        for accu_l, head_l in zip(train_head_losses_list[-1], head_losses)
+                        accu_hl + hl.item() / gradient_accumulation_steps
+                        for accu_hl, hl in zip(train_head_losses_list[-1], head_losses)
                     ]
-                    # print(train_head_losses_list[-1])
 
                 if args.use_parallel:
                     accelerator.backward(loss)
@@ -670,10 +659,7 @@ def main():
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
-            # print('loss + back propagate use time:', time() - start_backward_time)
-            # backward_time += time() - start_backward_time
-            # end update
-        # print('Forward time', forward_time, 'Backward time', backward_time)
+        # end training interval
 
         model.eval()
         valid_loss_list: List[float] = []
