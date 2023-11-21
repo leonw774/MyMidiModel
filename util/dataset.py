@@ -70,14 +70,14 @@ class MidiDataset(Dataset):
             excluded_paths_tuple = tuple()
         if verbose:
             print('Reading', npz_path)
-        self.used_midi_paths = []
-        self.used_piece_num = set()
+        self.included_midi_paths = []
+        self.included_piece_num = set()
         for piece_num, midi_filepath in tqdm(enumerate(all_paths_list), desc='Exclude paths', disable=not verbose):
             # use endswith because the pathlist records the relative paths to midi files from project's root
             # while excluded_paths_tuple record relative paths to midi files from dataset's root
             if not midi_filepath.endswith(excluded_paths_tuple):
-                self.used_midi_paths.append(midi_filepath)
-                self.used_piece_num.add(piece_num)
+                self.included_midi_paths.append(midi_filepath)
+                self.included_piece_num.add(piece_num)
 
         available_memory_size = psutil.virtual_memory().available
         npz_zipinfo_list = zipfile.ZipFile(npz_path).infolist()
@@ -93,7 +93,7 @@ class MidiDataset(Dataset):
         self.pieces = [
             piece_array
             for piece_num_str, piece_array in tqdm(npz_file.items(), disable=not verbose, ncols=0)
-            if int(piece_num_str) in self.used_piece_num
+            if int(piece_num_str) in self.included_piece_num
         ]
 
         self.number_of_pieces = len(self.pieces)
