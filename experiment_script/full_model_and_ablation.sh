@@ -23,7 +23,7 @@ else
     fi
 fi
 
-model_setting="vanilla_small_lr4e-4"
+model_setting="vanilla_small_lr8e-4"
 
 if [ "$do_ablation" != '--ablation' ]; then
     # full model

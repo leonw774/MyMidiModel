@@ -300,6 +300,6 @@ def compute_losses(
             (head_loss * length_mask).sum() / length_mask.sum()
             for head_loss in head_losses
         ]
-    loss = sum(head_losses)
+    loss = torch.stack(head_losses).mean()
 
     return loss, head_losses
