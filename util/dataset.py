@@ -32,11 +32,11 @@ class MidiDataset(Dataset):
             Parameters:
             - `data_dir_path`: Expected a directory that have 'arrays.npz', 'pathlist' and 'vocabs.json'
 
-            - `virtual_piece_step_ratio`: This value can be 0, -1, or a number not smaller than 1. Default is 1.
-              - If >= 1, will create multiple virtual pieces by splitting overlength pieces.
+            - `virtual_piece_step_ratio`: This value can be 0, -1, or a number greater than 0. Default is 0.
+              - If > 0, will create multiple virtual pieces by splitting overlength pieces.
                 The start point of samples will be at the first measure token that has index just greater than
                 `max_seq_length` / `virtual_piece_step_ratio` * N, where N is positive integer.
-              - If == 0, each piece has only one virtual pieces, starting from index 0.
+              - If == 0, each piece has only one virtual piece, starting from the index 0.
               - If == -1, each piece, when accessed in `__getitem__`, will randomly started from any measure.
 
             - `excluded_path_list`: The list of relative or absolute paths of the files to exclude.
@@ -53,7 +53,7 @@ class MidiDataset(Dataset):
         self.vocabs = get_corpus_vocabs(data_dir_path)
         assert max_seq_length >= 0
         self.max_seq_length = max_seq_length
-        assert virtual_piece_step_ratio >= 1 or virtual_piece_step_ratio in (0, -1)
+        assert virtual_piece_step_ratio >= 0 or virtual_piece_step_ratio == -1
         self.virtual_piece_step_ratio = virtual_piece_step_ratio
         assert isinstance(permute_mps, bool)
         self.permute_mps = permute_mps
@@ -87,13 +87,11 @@ class MidiDataset(Dataset):
             if verbose:
                 print(f'Memory not enough. Need {array_memory_size//1024} KB. Only {available_memory_size//1024} KB available.')
             raise OSError('Memory not enough.')
-        # load into memory to be faster
-        if verbose:
-            print('Loading arrays to memory')
+        # load numpy arrays into memory to be faster
         npz_file = np.load(npz_path)
         self.pieces = [
             piece_array
-            for piece_num_str, piece_array in tqdm(npz_file.items(), disable=not verbose, ncols=0)
+            for piece_num_str, piece_array in tqdm(npz_file.items(), desc='Loading arrays to memory', disable=not verbose, ncols=0)
             if int(piece_num_str) in self.included_piece_num
         ]
 
