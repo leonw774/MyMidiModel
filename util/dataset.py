@@ -32,10 +32,12 @@ class MidiDataset(Dataset):
             Parameters:
             - `data_dir_path`: Expected a directory that have 'arrays.npz', 'pathlist' and 'vocabs.json'
 
-            - `virtual_piece_step_ratio`: If > 1, will create multiple virtual pieces by splitting overlength pieces.
-              The start point of samples will be at the first measure token that has index just greater than
-              `max_seq_length` / `virtual_piece_step_ratio` * N, where N is positive integer. Default is 1.
-              This value can not be smaller than 1.
+            - `virtual_piece_step_ratio`: This value can be 0, -1, or a number not smaller than 1. Default is 1.
+              - If >= 1, will create multiple virtual pieces by splitting overlength pieces.
+                The start point of samples will be at the first measure token that has index just greater than
+                `max_seq_length` / `virtual_piece_step_ratio` * N, where N is positive integer.
+              - If == 0, each piece has only one virtual pieces, starting from index 0.
+              - If == -1, each piece, when accessed in `__getitem__`, will randomly started from any measure.
 
             - `excluded_path_list`: The list of paths of the files to exclude.
 
@@ -51,8 +53,7 @@ class MidiDataset(Dataset):
         self.vocabs = get_corpus_vocabs(data_dir_path)
         assert max_seq_length >= 0
         self.max_seq_length = max_seq_length
-        if virtual_piece_step_ratio < 1:
-            virtual_piece_step_ratio = 1
+        assert virtual_piece_step_ratio >= 1 or virtual_piece_step_ratio in (0, -1)
         self.virtual_piece_step_ratio = virtual_piece_step_ratio
         assert isinstance(permute_mps, bool)
         self.permute_mps = permute_mps
@@ -70,13 +71,13 @@ class MidiDataset(Dataset):
             excluded_paths_tuple = tuple()
         if verbose:
             print('Reading', npz_path)
-        self.included_midi_paths = []
+        self.included_paths = []
         self.included_piece_num = set()
-        for piece_num, midi_filepath in tqdm(enumerate(all_paths_list), desc='Exclude paths', disable=not verbose):
+        for piece_num, midi_path in tqdm(enumerate(all_paths_list), desc='Exclude paths', disable=not verbose):
             # use endswith because the pathlist records the relative paths to midi files from project's root
             # while excluded_paths_tuple record relative paths to midi files from dataset's root
-            if not midi_filepath.endswith(excluded_paths_tuple):
-                self.included_midi_paths.append(midi_filepath)
+            if not midi_path.endswith(excluded_paths_tuple):
+                self.included_paths.append(midi_path)
                 self.included_piece_num.add(piece_num)
 
         available_memory_size = psutil.virtual_memory().available
@@ -120,10 +121,10 @@ class MidiDataset(Dataset):
         self._piece_num_indices = [0] * self.number_of_pieces
         self._piece_lengths = [0] * self.number_of_pieces
 
-        # the default zeros will be replaced by body start index
-        self._piece_body_start_indices = [0] * self.number_of_pieces
         virtual_piece_step = max(1, int(max_seq_length / virtual_piece_step_ratio))
-        self._virtual_piece_start_indices = [[0] for _ in range(self.number_of_pieces)]
+        self._piece_body_start_indices = [0] * self.number_of_pieces
+        self._piece_measures_indices = [0] * self.number_of_pieces
+        self._virtual_piece_start_indices = [[0] for _ in range(self.number_of_pieces)] # zeros will be replaced by body start index
 
         self._piece_mps_sep_indices = [[] for _ in range(self.number_of_pieces)]
 
@@ -143,21 +144,25 @@ class MidiDataset(Dataset):
             self._virtual_piece_start_indices[piece_num][0] = j + 1
 
             # create virtual pieces from overlength pieces
-            if virtual_piece_step_ratio > 0:
-                if piece_array.shape[0] > max_seq_length:
-                    measure_indices = list(
-                        np.flatnonzero(
-                            np.isin(piece_array[:, ATTR_NAME_INDEX['evt']], self._measure_ids)
-                        )
+            self._piece_measures_indices[piece_num] = []
+            if piece_array.shape[0] > max_seq_length:
+                self._piece_measures_indices[piece_num] = list(
+                    np.flatnonzero(
+                        np.isin(piece_array[:, ATTR_NAME_INDEX['evt']], self._measure_ids)
                     )
-                    vp_step_num = 1
-                    for m_idx in measure_indices:
-                        # the virtual piece can not be shorter than virtual_piece_step
-                        if m_idx > cur_piece_lengths - virtual_piece_step:
+                )
+
+            if virtual_piece_step_ratio > 0:
+                cur_vp_start_idx = virtual_piece_step
+                for m_idx in self._piece_measures_indices[piece_num]:
+                    if m_idx > cur_vp_start_idx:
+                        self._virtual_piece_start_indices[piece_num].append(m_idx)
+                        # increase cur_vp_start_idx until it passes m_idx
+                        increase_step_number = math.ceil((m_idx - cur_vp_start_idx) / virtual_piece_step)
+                        cur_vp_start_idx += increase_step_number * virtual_piece_step
+                        # if this virtual piece is already shorter than max_seq_len
+                        if m_idx > cur_piece_lengths - self.max_seq_length:
                             break
-                        if m_idx > virtual_piece_step * vp_step_num:
-                            self._virtual_piece_start_indices[piece_num].append(m_idx)
-                            vp_step_num += math.ceil((m_idx - (virtual_piece_step * vp_step_num)) / vp_step_num)
 
             if permute_mps:
                 # consider sequence: M  P  N  N  N  P  N  N  P  N  M  P  N  N
@@ -212,12 +217,16 @@ class MidiDataset(Dataset):
         index_offset = index if piece_num == 0 else index - self._piece_num_indices[piece_num-1] - 1
         virtual_piece_number = index_offset // self._pitch_augmentation_factor
         pitch_augment = index_offset - virtual_piece_number * self._pitch_augmentation_factor - self.pitch_augmentation_range
-
-        start_index = self._virtual_piece_start_indices[piece_num][virtual_piece_number]
+ 
+        if self.virtual_piece_step_ratio == -1:
+            start_index = np.random.choice(self._piece_measures_indices[piece_num])
+        else:
+            start_index = self._virtual_piece_start_indices[piece_num][virtual_piece_number]
         end_index = start_index + self.max_seq_length - body_start_index # preserve space for head
         if end_index < start_index:
             end_index = start_index
             body_start_index = self.max_seq_length
+
         # dont need to check end_index because if end_index > piece_length than numpy will just end the slice at piece_length
         head_array = np.array(self.pieces[piece_num][:body_start_index]) # copy
         body_array = np.array(self.pieces[piece_num][start_index:end_index]) # copy
