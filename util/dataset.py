@@ -142,17 +142,14 @@ class MidiDataset(Dataset):
                 j += 1
             self._piece_body_start_indices[piece_num] = j + 1
             self._virtual_piece_start_indices[piece_num][0] = j + 1
-
-            # create virtual pieces from overlength pieces
-            self._piece_measures_indices[piece_num] = []
-            if piece_array.shape[0] > max_seq_length:
-                self._piece_measures_indices[piece_num] = list(
-                    np.flatnonzero(
-                        np.isin(piece_array[:, ATTR_NAME_INDEX['evt']], self._measure_ids)
-                    )
+            self._piece_measures_indices[piece_num] = list(
+                np.flatnonzero(
+                    np.isin(piece_array[:, ATTR_NAME_INDEX['evt']], self._measure_ids)
                 )
+            )
 
-            if virtual_piece_step_ratio > 0:
+            # create more virtual pieces from overlength pieces
+            if virtual_piece_step_ratio > 0 and piece_array.shape[0] > max_seq_length:
                 cur_vp_start_idx = virtual_piece_step
                 for m_idx in self._piece_measures_indices[piece_num]:
                     if m_idx > cur_vp_start_idx:
