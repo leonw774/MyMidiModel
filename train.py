@@ -467,7 +467,7 @@ def main():
 
     if is_main_process:
         logging.info('Making valid dataset')
-    excluded_path_list_for_valid = train_dataset.used_midi_paths + test_file_path_list
+    excluded_path_list_for_valid = train_dataset.included_midi_paths + test_file_path_list
     valid_dataset = MidiDataset(
         data_dir_path=args.corpus_dir_path,
         excluded_path_list=excluded_path_list_for_valid,
