@@ -443,18 +443,18 @@ def main():
 
     ######## Make dataset
 
-    test_file_path_list = [
+    test_path_list = [
         p.strip()
         for p in open(args.data.test_paths_file_path, 'r', encoding='utf8').readlines()
     ]
-    valid_file_path_list = [
+    valid_path_list = [
         p.strip()
         for p in open(args.data.valid_paths_file_path, 'r', encoding='utf8').readlines()
     ]
     del args.data.test_paths_file_path
     del args.data.valid_paths_file_path
 
-    excluded_path_list = valid_file_path_list + test_file_path_list
+    excluded_path_list = valid_path_list + test_path_list
     if is_main_process:
         logging.info('Making training dataset')
     train_dataset = MidiDataset(
@@ -467,7 +467,7 @@ def main():
 
     if is_main_process:
         logging.info('Making valid dataset')
-    excluded_path_list_for_valid = train_dataset.included_midi_paths + test_file_path_list
+    excluded_path_list_for_valid = train_dataset.included_path_list + test_path_list
     valid_dataset = MidiDataset(
         data_dir_path=args.corpus_dir_path,
         excluded_path_list=excluded_path_list_for_valid,

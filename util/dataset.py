@@ -39,7 +39,7 @@ class MidiDataset(Dataset):
               - If == 0, each piece has only one virtual pieces, starting from index 0.
               - If == -1, each piece, when accessed in `__getitem__`, will randomly started from any measure.
 
-            - `excluded_path_list`: The list of paths of the files to exclude.
+            - `excluded_path_list`: The list of relative or absolute paths of the files to exclude.
 
             - `permute_mps`: Whether or not the dataset should permute all the maximal permutable subarrays
               before returning in `__getitem__`. Default is False.
@@ -66,18 +66,18 @@ class MidiDataset(Dataset):
         all_paths_list = [p.strip() for p in open(to_pathlist_file_path(data_dir_path), 'r', encoding='utf8').readlines()]
         if excluded_path_list is not None and len(excluded_path_list) != 0:
             # assert os.path.exists(test_pathlist_file_path)
-            excluded_paths_tuple = tuple(p.strip() for p in excluded_path_list)
+            excluded_path_tuple = tuple(p.strip() for p in excluded_path_list)
         else:
-            excluded_paths_tuple = tuple()
+            excluded_path_tuple = tuple()
         if verbose:
             print('Reading', npz_path)
-        self.included_paths = []
+        self.included_path_list = []
         self.included_piece_num = set()
         for piece_num, midi_path in tqdm(enumerate(all_paths_list), desc='Exclude paths', disable=not verbose):
             # use endswith because the pathlist records the relative paths to midi files from project's root
-            # while excluded_paths_tuple record relative paths to midi files from dataset's root
-            if not midi_path.endswith(excluded_paths_tuple):
-                self.included_paths.append(midi_path)
+            # while excluded_path_tuple may contain relative paths to midi files from dataset's root
+            if not midi_path.endswith(excluded_path_tuple):
+                self.included_path_list.append(midi_path)
                 self.included_piece_num.add(piece_num)
 
         available_memory_size = psutil.virtual_memory().available
