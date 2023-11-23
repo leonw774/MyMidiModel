@@ -3,7 +3,7 @@ from tqdm import tqdm
 
 from . import tokens
 from .tokens import (
-    int2b36str,
+    itob36str,
     get_largest_possible_position,
     get_supported_time_signatures
 )
@@ -22,10 +22,13 @@ class Vocabs:
                 self.text2id = {t:i for i, t in enumerate(init_obj)}
             elif isinstance(init_obj, dict):
                 self.size = init_obj['size']
-                self.id2text = {int(k): v for k, v in init_obj['id2text'].items()} # key are string in json
+                self.id2text = {int(k): v for k, v in init_obj['id2text'].items()}
                 self.text2id = init_obj['text2id']
             else:
-                raise TypeError(f'AttrVocab\'s init_obj can only be list or dict. Got {type(init_obj)}')
+                raise TypeError(
+                    f'AttrVocab\'s init_obj can only be list or dict.'
+                    f'Get {type(init_obj)}'
+                )
         def __len__(self) -> int:
             return self.size
 
@@ -88,11 +91,10 @@ def build_vocabs(
         paras: dict,
         bpe_shapes_list: list):
     """
-        Parameters:
-        - bpe_shapes_list: The multinote shape are learned by bpe algorithms.
-          If bpe is not performed, `bpe_shapes_list` should be empty
+    The `bpe_shapes_list` is list of multinote shape are learned by
+    bpe algorithm. If bpe is not performed, `bpe_shapes_list` should
+    be empty.
     """
-    # start_time = time()
 
     # Events include:
     # - begin-of-score, end-of-score and seperator
@@ -103,65 +105,88 @@ def build_vocabs(
     # - tempo change
 
     supported_time_signatures = get_supported_time_signatures()
-    largest_possible_position = get_largest_possible_position(paras['nth'], supported_time_signatures)
+    largest_possible_position = get_largest_possible_position(
+        paras['nth'], supported_time_signatures
+    )
 
-    event_multi_note_shapes = (
-        [tokens.NOTE_EVENTS_CHAR, tokens.NOTE_EVENTS_CHAR+'~']
-        + [tokens.MULTI_NOTE_EVENTS_CHAR+shape for shape in bpe_shapes_list]
-    )
-    event_track_instrument = (
-        [tokens.TRACK_EVENTS_CHAR+int2b36str(i) for i in range(129)]
-    )
-    event_position = (
-        [tokens.POSITION_EVENTS_CHAR+int2b36str(i) for i in range(largest_possible_position)]
-    )
+    event_multi_note_shapes = [tokens.NOTE_EVENTS_CHAR, tokens.NOTE_EVENTS_CHAR+'~']
+    event_multi_note_shapes += [
+        tokens.MULTI_NOTE_EVENTS_CHAR + shape
+        for shape in bpe_shapes_list
+    ]
+    event_track_instrument = [
+        tokens.TRACK_EVENTS_CHAR + itob36str(i)
+        for i in range(129)
+    ]
+    event_position = [
+        tokens.POSITION_EVENTS_CHAR+itob36str(i)
+        for i in range(largest_possible_position)
+    ]
     tempo_min, tempo_max, tempo_step = paras['tempo_quantization']
     event_tempo = [
-        tokens.TEMPO_EVENTS_CHAR+int2b36str(t) for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
+        tokens.TEMPO_EVENTS_CHAR + itob36str(t)
+        for t in range(tempo_min, tempo_max+tempo_step, tempo_step)
     ]
     event_measure_time_sig = [
-        f'{tokens.MEASURE_EVENTS_CHAR}{int2b36str(n)}/{int2b36str(d)}' for n, d in supported_time_signatures
+        f'{tokens.MEASURE_EVENTS_CHAR}{itob36str(n)}/{itob36str(d)}'
+        for n, d in supported_time_signatures
     ]
 
-    measure_substr = ' '+tokens.MEASURE_EVENTS_CHAR
+    measure_substr  = ' '+tokens.MEASURE_EVENTS_CHAR
     position_substr = ' '+tokens.POSITION_EVENTS_CHAR
-    tempo_substr = ' '+tokens.TEMPO_EVENTS_CHAR
+    tempo_substr    = ' '+tokens.TEMPO_EVENTS_CHAR
     max_mps_number = 0
     corpus_measure_time_sigs = set()
     token_count_per_piece = []
-    for piece in tqdm(corpus_reader):
+    for piece in tqdm(corpus_reader, desc='Find max mps number', ncols=100):
         measure_number = piece.count(measure_substr)
         position_number = piece.count(position_substr)
         tempo_number = piece.count(tempo_substr)
-        piece_max_mps_number = 2 * measure_number + 2 * position_number + tempo_number + 4 # +4 because head (3) and eos (1)
+        # +4 because head (3) and eos (1)
+        piece_max_mps_number = 2 * (measure_number + position_number) + tempo_number + 4
         max_mps_number = max(max_mps_number, piece_max_mps_number)
 
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
-        corpus_measure_time_sigs.update([text for text in text_list if text[0] == tokens.MEASURE_EVENTS_CHAR])
-    # should we remove time signatures that dont appears in target corpus?
+        corpus_measure_time_sigs.update(
+            [text for text in text_list if text[0] == tokens.MEASURE_EVENTS_CHAR]
+        )
+    # remove time signatures that dont appears in target corpus?
     # event_measure_time_sig = [t for t in event_measure_time_sig if t in corpus_measure_time_sigs]
 
     # padding token HAVE TO be at first
     event_vocab = (
-        tokens.SPECIAL_TOKENS_STR + event_multi_note_shapes + event_track_instrument + event_position
-        + event_measure_time_sig + event_tempo
+        tokens.SPECIAL_TOKENS_STR + event_multi_note_shapes + event_track_instrument
+        + event_position + event_measure_time_sig + event_tempo
     )
 
     pad_token = [tokens.PADDING_TOKEN_STR]
-    pitch_vocab = pad_token + list(map(int2b36str, range(128)))
-    duration_vocab = pad_token + list(map(int2b36str, range(1, paras['max_duration']+1))) # add 1 because range end is exclusive
-    velocity_vocab = pad_token + list(map(int2b36str, range(paras['velocity_step'], 128, paras['velocity_step'])))
-    track_number_vocab = pad_token + list(map(int2b36str, range(paras['max_track_number'])))
-    instrument_vocab = pad_token + list(map(int2b36str, range(129)))
-    # mps number and measure number are just increasing integer that generated dynamically in corpus.text_to_array
-    tempo_vocab = pad_token + event_tempo
-    time_sig_vocab = pad_token + event_measure_time_sig
+    pitch_vocab         = pad_token + list(
+        map(itob36str, range(128))
+    )
+    duration_vocab      = pad_token + list(
+        map(itob36str, range(1, paras['max_duration']+1)) # add 1 because range end is exclusive
+    )
+    velocity_vocab      = pad_token + list(
+        map(itob36str, range(paras['velocity_step'], 128, paras['velocity_step']))
+    )
+    track_number_vocab  = pad_token + list(
+        map(itob36str, range(paras['max_track_number']))
+    )
+    instrument_vocab    = pad_token + list(
+        map(itob36str, range(129))
+    )
+    # mps number and measure number are just increasing integer
+    # that generated dynamically in corpus.text_to_array
+    tempo_vocab         = pad_token + event_tempo
+    time_sig_vocab      = pad_token + event_measure_time_sig
 
+    avg_token_number = sum(token_count_per_piece) / len(token_count_per_piece)
     summary_string = (
-        f'Average tokens per piece: {sum(token_count_per_piece) / len(token_count_per_piece)}\n'\
+        f'Average tokens per piece: {avg_token_number}\n'\
         f'Event vocab size: {len(event_vocab)}\n'\
-        f'- Measure-time signature: {len(event_measure_time_sig)} (Existed in corpus: {len(corpus_measure_time_sigs)})\n'\
+        f'- Measure-time signature: {len(event_measure_time_sig)} '\
+        f'(Existed in corpus: {len(corpus_measure_time_sigs)})\n'\
         f'- Position: {len(event_position)}\n'\
         f'- Tempo: {len(event_tempo)} ({event_tempo})\n'\
         f'- Shape: {len(event_multi_note_shapes)}\n'\
@@ -170,7 +195,6 @@ def build_vocabs(
         f'Track number vocab size: {paras["max_track_number"]}\n'\
         f'Max MPS number: {max_mps_number}'
     )
-    # print(f'Vocabulary build time: {time()-start_time}')
 
     # build a dictionary for every token list
     vocabs = Vocabs(

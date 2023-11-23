@@ -22,12 +22,12 @@ mkdir "${base_path}/corpus/lmd--snd_ours_1.0"
     "${base_path}/corpus/lmd--snd_ours_1.0/corpus" \
     "${lmd_bpe_path}/shape_vocab" | tee "${base_path}/logs/lmd--snd_ours_1.0.log" -a
 
-sed -i 's/\r/\n/g ; s/\x1B\[2K//g' ${base_path}/logs/lmd--snd_ours_1.0.log
-python3 plot_bpe_log.py ${base_path}/corpus/lmd--snd_ours_1.0 ${base_path}/logs/lmd--snd_ours_1.0.log
+python3 plot_bpe_log.py "${base_path}/corpus/lmd--snd_ours_1.0" "${base_path}/logs/lmd--snd_ours_1.0.log"
 
 cp "${lmd_bpe_path}/shape_vocab" "${base_path}/corpus/lmd--snd_ours_1.0"
 cp "${lmd_bpe_path}/paras" "${base_path}/corpus/lmd--snd_ours_1.0"
-python3 make_arrays.py --bpe --log "${base_path}/logs/lmd--snd_ours_1.0.log" --debug "${base_path}/corpus/lmd--snd_ours_1.0"
+python3 make_arrays.py --bpe --log "${base_path}/logs/lmd--snd_ours_1.0.log" \
+    --debug "${base_path}/corpus/lmd--snd_ours_1.0"
 
 
 mkdir "${base_path}/corpus/snd--lmd_ours_1.0"
@@ -36,10 +36,10 @@ mkdir "${base_path}/corpus/snd--lmd_ours_1.0"
     "${base_path}/corpus/snd--lmd_ours_1.0/corpus" \
     "${snd_bpe_path}/shape_vocab" | tee "${base_path}/logs/snd--lmd_ours_1.0.log" -a
 
-sed -i 's/\r/\n/g ; s/\x1B\[2K//g' ${base_path}/logs/snd--lmd_ours_1.0.log
-python3 plot_bpe_log.py ${base_path}/corpus/snd--lmd_ours_1.0 ${base_path}/logs/snd--lmd_ours_1.0.log
+python3 plot_bpe_log.py "${base_path}/corpus/snd--lmd_ours_1.0" "${base_path}/logs/snd--lmd_ours_1.0.log"
 
 cp "${snd_bpe_path}/shape_vocab" "${base_path}/corpus/snd--lmd_ours_1.0"
 cp "${snd_bpe_path}/paras" "${base_path}/corpus/snd--lmd_ours_1.0"
-python3 make_arrays.py --bpe --log "${base_path}/logs/snd--lmd_ours_1.0.log" --debug "${base_path}/corpus/snd--lmd_ours_1.0"
+python3 make_arrays.py --bpe --log "${base_path}/logs/snd--lmd_ours_1.0.log" \
+    --debug "${base_path}/corpus/snd--lmd_ours_1.0"
 

@@ -118,8 +118,11 @@ class MyMidiTransformer(nn.Module):
         # False is masked, True is keep
         if use_linear_attn:
             # this causal (lower trianglur) mask is passed but not actually used,
-            # because the "causal-ness" is already implemented in the calculation of linear attention
-            self.causal_mask = torch.tril(torch.ones(max_seq_length, max_seq_length), diagonal=0).bool()
+            # because the "causal-ness" is already implemented in fast_transformers
+            self.causal_mask = torch.tril(
+                torch.ones(max_seq_length, max_seq_length),
+                diagonal=0
+            ).bool()
             self.causal_mask = FullMask(self.causal_mask)
 
         if use_linear_attn:
@@ -176,7 +179,8 @@ class MyMidiTransformer(nn.Module):
     def forward(self, x, memory=None):
         # x has shape: (batch_size, seq_size, in_attr_number)
         if self.use_linear_attn and self.inferencing:
-            # The recurrent model only need to receive the last element with size of (batch_size, embed_size)
+            # The recurrent linear transformer only need to receive the last element
+            # with shape of (batch_size, embed_size)
             x = x[:, -1:] # become (batch_size, 1, embed_size)
         embs = [emb(x[..., i]) for i, emb in enumerate(self.embedding_layers)]
         # emb_sum = sum(embs)
@@ -185,12 +189,12 @@ class MyMidiTransformer(nn.Module):
         position_memory = None
         if self.not_use_mps_number:
             if memory is None:
-                potision_number = torch.arange(x.size(1)).repeat((x.size(0), 1)).to(x.device)
+                bs, ss, _ = x.size
+                potision_number = torch.arange(ss).repeat((bs, 1)).to(x.device)
                 position_memory = 0
             else:
-                position_memory = memory[1]
-                potision_number = torch.tensor([position_memory]).repeat((x.size(0), 1)).to(x.device)
-                position_memory += 1
+                potision_number = torch.tensor([memory[1]]).repeat((bs, 1)).to(x.device)
+                position_memory = memory[1] + 1
             # potision_number has shape (batch_size, seq_size)
             pos_emb = self.positional_embedding_layer(potision_number)
             emb_sum = emb_sum + pos_emb
@@ -202,15 +206,22 @@ class MyMidiTransformer(nn.Module):
                 # no mask is needed when using recurrent for inference
                 emb_sum_dropout = emb_sum_dropout[:, 0] # become (batch_size, embed_size)
                 linear_tf_memory = None if memory is None else memory[0]
-                transformer_output, linear_tf_memory = self.transformer_decoder_inference(emb_sum_dropout, linear_tf_memory)
+                transformer_output, linear_tf_memory = self.transformer_decoder_inference(
+                    emb_sum_dropout,
+                    linear_tf_memory
+                )
             else:
                 # in fast_transformer's FullMask class, 0 is masked, 1 is keep
                 causal_mask = self.causal_mask
-                length_mask = FullMask(mask=x[..., ATTR_NAME_INDEX['evt']].ne(0).bool().to(x.device))
-                transformer_output = self.transformer_decoder(emb_sum_dropout, causal_mask, length_mask)
+                length_mask = x[..., ATTR_NAME_INDEX['evt']].ne(0).bool().to(x.device)
+                length_mask = FullMask(mask=length_mask)
+                transformer_output = self.transformer_decoder(
+                    emb_sum_dropout,
+                    causal_mask,
+                    length_mask
+                )
         else:
-            # Casual mask is not needed because x_transformer.Decoder is has causal=True on default
-            # causal_mask = self.causal_mask[:x.size(1), :x.size(1)].repeat(x.size(0), 1, 1).to(x.device)
+            # Casual mask is not needed because x_transformer.Decoder has causal=True on default
             # False is masked, True is keep
             length_mask = x[..., ATTR_NAME_INDEX['evt']].ne(0).to(x.device)
             # print(length_mask)
@@ -220,7 +231,6 @@ class MyMidiTransformer(nn.Module):
             to_logit(transformer_output) for to_logit in self.to_logit_linears
         )
 
-        # assert all(not torch.isnan(lg).any() for lg in logits), [torch.isnan(lg).nonzero(as_tuple=True) for lg in logits]
         if self.use_linear_attn and self.inferencing:
             return logits_tuple, (linear_tf_memory, position_memory)
         else:
@@ -228,7 +238,6 @@ class MyMidiTransformer(nn.Module):
 
     # Override the eval() and train() method to integrate the self.inferencing flag
     # Also added self.inference()
-
     def eval(self) -> None:
         super().eval()
         self.inferencing = False
@@ -239,13 +248,12 @@ class MyMidiTransformer(nn.Module):
 
     def inference(self) -> None:
         """
-            Equivalent to
-            ```
-            model.eval()
-            model.inferencing = True
+        Equivalent to
+        ```
+        model.eval()
+        model.inferencing = True
             ```
         """
-        # changing the order of these two expression will cause self.inferencing = False, weird
         super().eval()
         self.inferencing = True
 
@@ -253,9 +261,9 @@ class MyMidiTransformer(nn.Module):
 
 LOSS_PADDING_ARG_CHOICES = ['ignore', 'wildcard', 'normal']
 """
-    - ignore:   PADDING = IGNORE, no exception
-    - wildcard: ignore, but not completely ignore
-    - normal:   the model have to correctly predict it to be padding
+- ignore:   PADDING = IGNORE, no exception
+- wildcard: its loss is ignored, but its presence is not ignored
+- normal:   the model have to correctly predict it to be padding
 """
 LOSS_PADDING_ARG_CHOICES_DEFAULT = 'ignore'
 
@@ -264,17 +272,21 @@ def compute_losses(
         target_labels: Tensor,
         padding: str = LOSS_PADDING_ARG_CHOICES_DEFAULT) -> Tuple[Tensor, List[Tensor]]:
     """
-        Parameters:
-        - `pred_logits` is a list:
-          - length: out_attr_number
-          - elements are tenors with shape: (batch_size, seq_size, attr_vocab_size)
-        - `target_labels` has shape: (batch_size, seq_size, out_attr_number)
-        - `padding` decide how to reduce the loss vector. Can be one in `LOSS_PADDING_ARG_CHOICE`.
+    Parameters:
+    - `pred_logits` is a list:
+        - Length: out_attr_number
+        - Elements are tenors.
+          - Shape is (batch_size, seq_size, attr_vocab_size)
+    - `target_labels` has shape (batch_size, seq_size, out_attr_number)
+    - `padding` decide how to handle padding symbol and how to reduce
+      the loss vector. Can be one in `LOSS_PADDING_ARG_CHOICE`.
 
-        Return final loss and a list of losses of each head.
+    Return final loss and a list of losses of each head.
     """
     if padding not in LOSS_PADDING_ARG_CHOICES:
-        raise ValueError(f'`padding` argument in compute_losses can should be in {LOSS_PADDING_ARG_CHOICES}.')
+        raise ValueError(
+            f'`padding` argument in compute_losses should be in {LOSS_PADDING_ARG_CHOICES}.'
+        )
 
     # target_labels have to be long int
     target_labels = target_labels.long()

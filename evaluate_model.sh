@@ -1,12 +1,15 @@
 #!/bin/bash
 
+help_text="var1=value1 var2=value2 [...] varN=valueN ./evaluate_model.sh
+Required variables:
+\tmidi_dir_path test_paths_file primer_measure_length
+Optional variables:
+\tmodel_dir_path worker_number log_path midi_to_piece_paras\
+softmax_temperature sample_function sample_threshold seed
+"
 # check required variables
 if [ -z "$midi_dir_path" ] || [ -z "$test_paths_file" ] || [ -z "$primer_measure_length" ] ; then
-    echo "var1=value1 var2=value2 [...] varN=valueN ./evaluate_model.sh"
-    echo "Required variables:"
-    echo -e "\tmidi_dir_path test_paths_file primer_measure_length"
-    echo "Optional variables:"
-    echo -e "\tmodel_dir_path worker_number log_path midi_to_piece_paras softmax_temperature sample_function sample_threshold seed"
+    printf "%s" "$help_text"
     exit 1
 fi
 
@@ -23,28 +26,34 @@ if [ ! -f "$test_paths_file" ]; then
 fi
 
 # optionals: set default and make option string
-test -z "$log_path" && log_path=/dev/null
-test -z "$worker_number" && worker_number=1
+test -z "$log_path"            && log_path=/dev/null
+test -z "$worker_number"       && worker_number=1
 test -z "$softmax_temperature" && softmax_temperature=1.0
-test -z "$sample_function" && sample_function=none
-test -z "$sample_threshold" && sample_threshold=1.0
-
-test -n "$seed" && seed_option=("--seed" "$seed")
-test -n "$use_device" && use_device_option=("--use-device" "$use_device")
-test -n "$midi_to_piece_paras" && midi_to_piece_paras_option=("--midi-to-piece-paras" "$midi_to_piece_paras")
+test -z "$sample_function"     && sample_function=none
+test -z "$sample_threshold"    && sample_threshold=1.0
 
 echo "evaluated_model.sh start." | tee -a "$log_path"
-echo "midi_dir_path=${midi_dir_path} test_paths_file=${test_paths_file} primer_measure_length=${primer_measure_length} \
-eval_sample_number=${eval_sample_number} model_dir_path=${model_dir_path} worker_number=${worker_number} log_path=${log_path} \
-midi_to_piece_paras_option=${midi_to_piece_paras_option[*]} seed_option=${seed_option[*]} use_device_option=${use_device_option[*]} \
-softmax_temperature=${softmax_temperature} sample_function=${sample_function} sample_threshold=${sample_threshold}" | tee -a "$log_path"
+echo "midi_dir_path=${midi_dir_path}
+model_dir_path=${model_dir_path}
+test_paths_file=${test_paths_file}
+primer_measure_length=${primer_measure_length}
+eval_sample_number=${eval_sample_number}
+worker_number=${worker_number}
+midi_to_piece_paras=${midi_to_piece_paras}
+softmax_temperature=${softmax_temperature}
+sample_function=${sample_function}
+sample_threshold=${sample_threshold}
+seed=${seed}
+use_device=${use_device}
+log_path=${log_path}" | tee -a "$log_path"
 
 test_file_number=$(wc -l < "$test_paths_file")
 if [ -n "$eval_sample_number" ] && [ "$eval_sample_number" -gt 0 ]; then
     sample_number=$eval_sample_number
 else
     if [ "$test_file_number" == 0 ]; then
-        echo "Cannot decide sample number: there is no test files and eval_sample_number is not positive integer." | tee -a "$log_path"
+        echo "Cannot decide sample number:"\
+            "no test files or eval_sample_number given" | tee -a "$log_path"
         echo "evaluate_model.py exit." | tee -a "$log_path"
         exit 1
     else
@@ -55,35 +64,54 @@ fi
 
 if [ "$test_file_number" -gt 0 ]; then
     # Have test files, then get their features
-    test_eval_feature_path="${midi_dir_path}/test_eval_features.json"
-    test_primers_eval_feature_path="${midi_dir_path}/test_eval_features_primer${primer_measure_length}.json"
-    primers_dir_path="${midi_dir_path}/primers${primer_measure_length}"
+    test_files_copy_dir_path="test_files_copy"
+    test_eval_features_path="test_eval_features.json"
+    test_eval_features_primer_path="test_eval_features_primer${primer_measure_length}.json"
+
+    test_files_copy_dir_path="${midi_dir_path}/${test_files_copy_dir_path}"
+    test_eval_features_path="${midi_dir_path}/${test_eval_features_path}"
+    test_eval_features_primer_path="${midi_dir_path}/${test_eval_features_primer_path}"
 
     # Get features of dataset if no result file
 
-    if [ -f "$test_eval_feature_path" ] && [ -f "$test_primers_eval_feature_path" ]; then
-        echo "Midi dataset $midi_dir_path already has feature stats file." | tee -a "$log_path" 
+    if [ -f "$test_eval_features_path" ] && [ -f "$test_eval_features_primer_path" ]; then
+        echo "Midi dataset $midi_dir_path already has eval features file." | tee -a "$log_path"
     else
-        # Copy test files into primers_dir_path
-        test -d "$primers_dir_path" && rm -r "$primers_dir_path"
-        mkdir "$primers_dir_path"
+        # Copy test files into test_files_copy_dir_path
+        test -d "$test_files_copy_dir_path" && rm -r "$test_files_copy_dir_path"
+        mkdir "$test_files_copy_dir_path"
         while read -r test_midi_path; do
-            cp "${midi_dir_path}/${test_midi_path}" "$primers_dir_path"
+            cp "${midi_dir_path}/${test_midi_path}" "$test_files_copy_dir_path"
         done < "$test_paths_file"
 
-        echo "Getting evaluation features of $midi_dir_path" | tee -a "$log_path" 
-        python3 get_eval_features_of_midis.py "${seed_option[@]}" "${midi_to_piece_paras_option[@]}" --log "$log_path" \
-            --worker-number "$worker_number" -- "$primers_dir_path"
-        test $? -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
-        mv "${primers_dir_path}/eval_features.json" "$test_eval_feature_path"
+        echo "Get evaluation features of $midi_dir_path" | tee -a "$log_path"
+        python3 get_eval_features_of_midis.py \
+            --seed "$seed" --midi-to-piece-paras "$midi_to_piece_paras" \
+            --log "$log_path" --worker-number "$worker_number"\
+            -- "$test_files_copy_dir_path"
 
-        echo "Getting evaluation features without first $primer_measure_length measures" | tee -a "$log_path" 
-        python3 get_eval_features_of_midis.py "${seed_option[@]}" "${midi_to_piece_paras_option[@]}" --log "$log_path" \
-            --worker-number "$worker_number" --primer-measure-length "$primer_measure_length" -- "$primers_dir_path"
-        # move eval_features.json back to midi dir root
-        mv "${primers_dir_path}/eval_features.json" "$test_primers_eval_feature_path"
-        # delete primers_dir_path
-        # rm -r "$primers_dir_path"
+        if [ $? -ne 0 ]; then
+            echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
+            exit 1
+        fi
+        mv "${test_files_copy_dir_path}/eval_features.json" "$test_eval_features_path"
+
+        echo "Get evaluation features of $midi_dir_path"\
+            "without first $primer_measure_length measures" | tee -a "$log_path"
+        python3 get_eval_features_of_midis.py \
+            --seed "$seed" --midi-to-piece-paras "$midi_to_piece_paras" \
+            --log "$log_path" --worker-number "$worker_number" \
+            --primer-measure-length "$primer_measure_length"\
+            -- "$test_files_copy_dir_path"
+
+        if [ $? -ne 0 ]; then
+            echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
+            exit 1
+        fi
+        mv "${test_files_copy_dir_path}/eval_features.json" "$test_eval_features_primer_path"
+
+        # delete test_files_copy_dir_path
+        rm -r "$test_files_copy_dir_path"
     fi
 fi
 
@@ -105,37 +133,50 @@ fi
 
 has_midis=""
 ls "${eval_samples_dir}/uncond/"*.mid > /dev/null 2>&1 && has_midis="true"
+
 if [ -d "${eval_samples_dir}/uncond" ] && [ -n "$has_midis" ]; then
     echo "${eval_samples_dir}/uncond already has midi files."
+
 else
     echo "Generating $sample_number unconditional samples" | tee -a "$log_path"
-    start_time=$SECONDS
     mkdir "${eval_samples_dir}/uncond"
-    python3 generate_with_model.py "${seed_option[@]}" "${use_device_option[@]}" \
-        -n "$sample_number" --no-tqdm \
-        --softmax-temperature "$softmax_temperature" --sample-function "$sample_function" --sample-threshold "$sample_threshold" \
+
+    start_time=$SECONDS
+    python3 generate_with_model.py \
+        --seed "$seed" --use-device "$use_device" \
+        -n "$sample_number" --no-tqdm --softmax-temperature "$softmax_temperature" \
+        --sample-function "$sample_function" --sample-threshold "$sample_threshold" \
         -- "${model_dir_path}/best_model.pt" "${eval_samples_dir}/uncond/uncond"
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
 fi
 
 echo "Get evaluation features of ${eval_samples_dir}/uncond" | tee -a "$log_path" 
-python3 get_eval_features_of_midis.py "${seed_option[@]}" "${midi_to_piece_paras_option[@]}" --log "$log_path" \
-    --worker-number "$worker_number" --reference-file-path "$test_eval_feature_path" "${eval_samples_dir}/uncond"
+python3 get_eval_features_of_midis.py \
+    --seed "$seed" --midi-to-piece-paras "$midi_to_piece_paras" \
+    --log "$log_path" --worker-number "$worker_number" \
+    --reference-file-path "$test_eval_features_path" \
+    -- "${eval_samples_dir}/uncond"
 
 if [ $? -ne 0 ]; then
-    echo "Evaluation failed. evaluate_model.sh exit." | tee -a "$log_path";
+    echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
     exit 1
 fi
 
+### Check if stop here
+
 if [ "$test_file_number" == 0 ]; then
-    echo "There is no test files so instrument-conditioned and primer-continuation are omitted." | tee -a "$log_path"
+    echo "no test files given, "\
+        "instrument-conditioned and primer-continuation are omitted." \
+        | tee -a "$log_path"
     echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 0
 fi
 
 if [ "$only_eval_uncond" == true ]; then
-    echo "only_eval_uncond is set and true so instrument-conditioned and primer-continuation are omitted." | tee -a "$log_path"
+    echo "only_eval_uncond is set and true, "\
+        "instrument-conditioned and primer-continuation are omitted." \
+        | tee -a "$log_path"
     echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 0
 fi
@@ -144,26 +185,34 @@ fi
 
 has_midis=""
 ls "${eval_samples_dir}/instr_cond/"*.mid > /dev/null 2>&1 && has_midis="true"
+
 if [ -d "${eval_samples_dir}/instr_cond" ] && [ -n "$has_midis"  ]; then
     echo "${eval_samples_dir}/instr_cond already has midi files."
+
 else
     echo "Generating $sample_number instrument-conditioned samples" | tee -a "$log_path"
     mkdir "${eval_samples_dir}/instr_cond"
+
     start_time=$SECONDS
-    python3 generate_with_model.py "${seed_option[@]}" "${use_device_option[@]}" \
-        -p "$project_root_test_paths_file" -l 0 -n "$sample_number" --no-tqdm \
-        --softmax-temperature "$softmax_temperature" --sample-function "$sample_function" --sample-threshold "$sample_threshold" \
+    python3 generate_with_model.py \
+        --seed "$seed" --use-device "$use_device" \
+        -p "$project_root_test_paths_file" -l 0 \
+        -n "$sample_number" --no-tqdm --softmax-temperature "$softmax_temperature" \
+        --sample-function "$sample_function" --sample-threshold "$sample_threshold" \
         -- "${model_dir_path}/best_model.pt" "${eval_samples_dir}/instr_cond/instr_cond"
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
 fi
 
 echo "Get evaluation features of ${eval_samples_dir}/instr-cond" | tee -a "$log_path"
-python3 get_eval_features_of_midis.py "${seed_option[@]}" "${midi_to_piece_paras_option[@]}" --log "$log_path" \
-    --worker-number "$worker_number" --reference-file-path "$test_eval_feature_path" "${eval_samples_dir}/instr_cond"
+python3 get_eval_features_of_midis.py \
+    --seed "$seed" --midi-to-piece-paras "$midi_to_piece_paras" \
+    --log "$log_path" --worker-number "$worker_number" \
+    --reference-file-path "$test_eval_features_path" \
+    -- "${eval_samples_dir}/instr_cond"
 
 if [ $? -ne 0 ]; then
-    echo "Evaluation failed. evaluate_model.sh exit." | tee -a "$log_path";
+    echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
     exit 1
 fi
 
@@ -171,27 +220,35 @@ fi
 
 has_midis=""
 ls "${eval_samples_dir}/primer_cont/"*.mid > /dev/null 2>&1 && has_midis="true"
+
 if [ -d "${eval_samples_dir}/primer_cont" ] && [ -n "$has_midis" ]; then
     echo "${eval_samples_dir}/primer_cont already has midi files."
+
 else
     echo "Generating $sample_number prime-continuation samples" | tee -a "$log_path"
     mkdir "${eval_samples_dir}/primer_cont"
+
     start_time=$SECONDS
-    python3 generate_with_model.py "${seed_option[@]}" "${use_device_option[@]}" \
-        -p "$project_root_test_paths_file" -l "$primer_measure_length" -n "$sample_number" --no-tqdm \
-        --softmax-temperature "$softmax_temperature" --sample-function "$sample_function" --sample-threshold "$sample_threshold" \
+    python3 generate_with_model.py \
+        --seed "$seed" --use-device "$use_device" \
+        -p "$project_root_test_paths_file" -l "$primer_measure_length" \
+        -n "$sample_number" --no-tqdm --softmax-temperature "$softmax_temperature" \
+        --sample-function "$sample_function" --sample-threshold "$sample_threshold" \
         -- "${model_dir_path}/best_model.pt" "${eval_samples_dir}/primer_cont/primer_cont"
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
 fi
 
 echo "Get evaluation features of ${eval_samples_dir}/primer_cont" | tee -a "$log_path"
-python3 get_eval_features_of_midis.py "${seed_option[@]}" "${midi_to_piece_paras_option[@]}" \
-    --log "$log_path" --primer-measure-length "$primer_measure_length" --worker-number "$worker_number" \
-    --reference-file-path "$test_primers_eval_feature_path" "${eval_samples_dir}/primer_cont"
+python3 get_eval_features_of_midis.py \
+    --seed "$seed" --midi-to-piece-paras "$midi_to_piece_paras" \
+    --log "$log_path" --worker-number "$worker_number" \
+    --primer-measure-length "$primer_measure_length" \
+    --reference-file-path "$test_eval_features_primer_path" \
+    -- "${eval_samples_dir}/primer_cont"
 
 if [ $? -ne 0 ]; then
-    echo "Evaluation failed. evaluate_model.sh exit." | tee -a "$log_path";
+    echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
     exit 1
 fi
 

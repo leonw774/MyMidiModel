@@ -15,7 +15,7 @@ from miditoolkit import MidiFile
 from pandas import Series
 from tqdm import tqdm
 
-from .tokens import b36str2int, MEASURE_EVENTS_CHAR, END_TOKEN_STR
+from .tokens import b36strtoi, MEASURE_EVENTS_CHAR, END_TOKEN_STR
 from .midi import piece_to_midi, midi_to_piece, get_after_k_measures
 
 
@@ -136,7 +136,9 @@ def kl_divergence(
         raise TypeError('pred and true should be both list or dict')
 
 
-def overlapping_area_of_estimated_gaussian(distribution_1: Union[list, dict], distribution_2: Union[list, dict]) -> float:
+def overlapping_area_of_estimated_gaussian(
+        distribution_1: Union[list, dict],
+        distribution_2: Union[list, dict]) -> float:
     if isinstance(distribution_1, list) and isinstance(distribution_2, list):
         assert len(distribution_1) == len(distribution_2) and len(distribution_2) > 0
         mean_1 = np.mean(np.array(distribution_1))
@@ -145,14 +147,32 @@ def overlapping_area_of_estimated_gaussian(distribution_1: Union[list, dict], di
         std_2 = np.std(np.array(distribution_1))
     elif isinstance(distribution_1, dict) and isinstance(distribution_2, dict):
         assert len(distribution_1) > 0 and len(distribution_2) > 0
-        total_counts_1 = sum(count for count in distribution_1.values())
-        mean_1 = sum(number * count for number, count in distribution_1.items()) / total_counts_1
-        square_mean_1 = sum(number * number * count for number, count in distribution_1.items()) / total_counts_1
+        total_counts_1 = sum(
+            count
+            for count in distribution_1.values()
+        )
+        mean_1 = sum(
+            number * count
+            for number, count in distribution_1.items()
+        ) / total_counts_1
+        square_mean_1 = sum(
+            number * number * count
+            for number, count in distribution_1.items()
+        ) / total_counts_1
         std_1 = sqrt(square_mean_1 - mean_1 * mean_1)
 
-        total_counts_2 = sum(count for count in distribution_2.values())
-        mean_2 = sum(number * count for number, count in distribution_2.items()) / total_counts_2
-        square_mean_2 = sum(number * number * count for number, count in distribution_2.items()) / total_counts_2
+        total_counts_2 = sum(
+            count
+            for count in distribution_2.values()
+        )
+        mean_2 = sum(
+            number * count
+            for number, count in distribution_2.items()
+        ) / total_counts_2
+        square_mean_2 = sum(
+            number * number * count
+            for number, count in distribution_2.items()
+        ) / total_counts_2
         std_2 = sqrt(square_mean_2 - mean_2 * mean_2)
     else:
         raise TypeError('pred and true should be both list or dict')
@@ -165,8 +185,8 @@ def overlapping_area_of_estimated_gaussian(distribution_1: Union[list, dict], di
 
 def random_sample_from_piece(piece: str, sample_measure_number: int):
     """
-        Randomly sample a certain number of measures from a piece (in text list).
-        Return sampled measures excerpt of the piece (in text list).
+    Randomly sample a certain number of measures from a piece.
+    Return sampled measures excerpt of the piece.
     """
     text_list = piece.split(' ')
     measure_indices = [
@@ -179,9 +199,9 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
 
     start_measure_index = random.randint(0, len(measure_indices) - sample_measure_number)
     if start_measure_index + sample_measure_number < len(measure_indices):
-        sampled_body = text_list[start_measure_index : start_measure_index+sample_measure_number]
+        sampled_body = text_list[start_measure_index:start_measure_index+sample_measure_number]
     else:
-        sampled_body = text_list[start_measure_index :]
+        sampled_body = text_list[start_measure_index:]
 
     head = text_list[:measure_indices[0]]
     return head + sampled_body
@@ -193,7 +213,7 @@ EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT = {
     'max_duration': 48 * 4,
     'velocity_step': 1,
     'use_cont_note': True,
-    'tempo_quantization': (1, 512, 1), # like, shostakovich string quartet 8 mvt 2 uses 480 quarter notes per minute
+    'tempo_quantization': (1, 512, 1),
     'use_merge_drums': False
 }
 
@@ -204,7 +224,13 @@ def midi_to_features(
         primer_measure_length: int = 0,
         max_pairs_number: int = int(1e6),
         max_token_number: int = int(1e4)) -> Union[Dict[str, float], None]:
-    """If `midi_to_piece_paras` check and `midi_to_piece` failed, this function return None."""
+    """
+    Return the feature the piece of the midi processed with given
+    `midi_to_piece_paras`.
+
+    If the `midi_to_piece_paras` check and `midi_to_piece` failed,
+    this function return None.
+    """
 
     if midi_to_piece_paras is None:
         midi_to_piece_paras = EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT
@@ -226,7 +252,13 @@ def midi_to_features(
         )
     except AssertionError:
         return None
-    return piece_to_features(temp_piece, nth, primer_measure_length, max_pairs_number, max_token_number)
+    return piece_to_features(
+        piece=temp_piece,
+        nth=nth,
+        primer_measure_length=primer_measure_length,
+        max_pairs_number=max_pairs_number,
+        max_token_number=max_token_number
+    )
 
 
 def piece_to_features(
@@ -236,14 +268,14 @@ def piece_to_features(
         max_pairs_number: int = int(1e6),
         max_token_number: int = int(1e4)) -> Union[dict, None]:
     """
-        Return a dict that contains:
-        - pitch class histogram and entropy
-        - duration distribution, means and variant
-        - velocity histogram, means and variant
-        - instrumentation self-similarity
-        - grooving self-similarity
+    Return a dict that contains:
+    - pitch class histogram and entropy
+    - duration distribution, means and variant
+    - velocity histogram, means and variant
+    - instrumentation self-similarity
+    - grooving self-similarity
 
-        Return None if piece_to_midi failed.
+    Return None if piece_to_midi failed.
     """
 
     if primer_measure_length > 0:
@@ -296,7 +328,6 @@ def piece_to_features(
     if isnan(pitch_class_entropy):
         return {
             'pitch_histogram': pitch_histogram,
-            'pitch_class_entropy': pitch_class_entropy,
             # 'pitchs_mean': pitchs_mean,
             # 'pitchs_var': pitchs_var,
             'duration_distribution': duration_distribution,
@@ -305,6 +336,7 @@ def piece_to_features(
             'velocity_histogram': velocity_histogram,
             # 'velocities_mean': velocities_mean,
             # 'velocities_var': velocities_var,
+            'pitch_class_entropy': pitch_class_entropy,
             'instrumentation_self_similarity': float('nan'),
             'grooving_self_similarity': float('nan')
         }
@@ -315,7 +347,7 @@ def piece_to_features(
     for text in piece.split(' '):
         if text[0] == MEASURE_EVENTS_CHAR:
             measure_onsets.append(measure_onsets[-1] + cur_measure_length)
-            numer, denom = (b36str2int(x) for x in text[1:].split('/'))
+            numer, denom = (b36strtoi(x) for x in text[1:].split('/'))
             cur_measure_length = round(nth * numer / denom)
             max_measure_length = max(max_measure_length, cur_measure_length)
 
@@ -333,15 +365,17 @@ def piece_to_features(
     present_instrument = {track.program for track in midi.instruments}
     instrument_number = len(present_instrument)
     instrument_index_mapping = {program: idx for idx, program in enumerate(present_instrument)}
-    instrumentation_per_bar = np.zeros(shape=(len(measure_onsets), instrument_number), dtype=np.bool8)
+    bar_instrumentation = np.zeros(shape=(len(measure_onsets), instrument_number), dtype=np.bool8)
     grooving_per_bar = np.zeros(shape=(len(measure_onsets), max_position), dtype=np.bool8)
     for track in midi.instruments:
         for note in track.notes:
-            # find measure index so that the measure has the largest onset while smaller than note.start
+            # find measure index so that the measure has the largest onset
+            # while smaller than note.start
             measure_index = bisect.bisect_right(measure_onsets, note.start) - 1
-            instrumentation_per_bar[measure_index, instrument_index_mapping[track.program]] |= True
+            bar_instrumentation[measure_index, instrument_index_mapping[track.program]] |= True
             position = note.start - measure_onsets[measure_index]
-            assert position < max_position, (measure_index, measure_onsets[measure_index-1:measure_index+2], note.start)
+            assert position < max_position, \
+                   (measure_index, measure_onsets[measure_index-1:measure_index+2], note.start)
             grooving_per_bar[measure_index, position] |= True
 
     pairs = list(itertools.combinations(range(len(measure_onsets)), 2))
@@ -350,7 +384,7 @@ def piece_to_features(
 
     instrumentation_similarities = [
         1 - (
-            sum(np.logical_xor(instrumentation_per_bar[a], instrumentation_per_bar[b])) / instrument_number
+            sum(np.logical_xor(bar_instrumentation[a], bar_instrumentation[b])) / instrument_number
         )
         for a, b in pairs
     ]
@@ -383,7 +417,7 @@ def piece_to_features(
 
 
 def compare_with_ref(source_eval_features: dict, reference_eval_features: dict):
-    """Add KLD, OA, and HI of distribution features into source eval features"""
+    """Add KLD, OA, and HI of distributions into source eval features"""
     # KL Divergence
     for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
         source_eval_features[fname+'_KLD'] = kl_divergence(
@@ -394,7 +428,8 @@ def compare_with_ref(source_eval_features: dict, reference_eval_features: dict):
 
     # Overlapping area of estimated gaussian distribution
     for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
-        # because the keys are strings and are represented as interger (pitch & velocity) and fraction (duration)
+        # pitch & velocity are intergers, duration is fraction
+        # they could be strings load from JSON
         source_eval_features[fname+'_OA'] = overlapping_area_of_estimated_gaussian(
             {float(Fraction(k)): v for k, v in source_eval_features[fname].items()},
             {float(Fraction(k)): v for k, v in reference_eval_features[fname].items()}
@@ -420,7 +455,10 @@ def aggregate_features(features_list: List[Dict[str, float]]) -> dict:
         for fname in EVAL_SCALAR_FEATURE_NAMES
     }
     for fname in EVAL_SCALAR_FEATURE_NAMES:
-        fname_description = dict(Series(aggr_scalar_eval_features[fname], dtype='float64').dropna().describe())
+        f64_pandas_series = Series(aggr_scalar_eval_features[fname], dtype='float64')
+        fname_description = dict(
+            f64_pandas_series.dropna().describe()
+        )
         fname_description: Dict[str, np.float64]
         aggr_eval_features[fname] = {
             k: float(v) for k, v in fname_description.items()
@@ -432,8 +470,6 @@ def aggregate_features(features_list: List[Dict[str, float]]) -> dict:
             [Counter(features[fname]) for features in features_list],
             Counter() # starting value of empty counter
         ))
-        # cast the keys into strings! because the reference distribution is read from json
-        aggr_eval_features[fname] = {str(k): v for k, v in aggr_eval_features[fname].items()}
 
     # aggregate others
     aggr_eval_features['notes_number_per_piece'] = [
@@ -452,9 +488,9 @@ def midi_list_to_features(
         worker_number: int = 1,
         use_tqdm: bool = False):
     """
-        Given a list of midis, returns:
-        - A list of indices of processable uncorrupted midi
-        - Their aggregated features
+    Given a list of midis, returns:
+    - A list of indices of processable uncorrupted midi
+    - Their aggregated features
     """
 
     midi_to_features_partial = functools.partial(

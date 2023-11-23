@@ -15,7 +15,8 @@ def read_args():
         'output_path',
         metavar='OUTPUT_PATH',
         type=str,
-        help='The output file path will be "{OUTPUT_PATH}_{i}.mid", where i is the index number of piece in corpus.'
+        help='The output file path will be "{OUTPUT_PATH}_{i}.mid", \
+            where i is the index number of piece in corpus.'
     )
     parser.add_argument(
         '--indexing', '-i',
@@ -24,8 +25,8 @@ def read_args():
         help="""Required at least one indexing string.
 An indexing string is in the form of "INDEX" or "BEGIN:END".
 Multiple indexing strings are seperated by commas, surrounded by double-quotes.
-The former form specifies a index number to be extracted.
-The latter form specifies that the indices from BEGIN (inclusive) to END (exclusive) are to be extracted.
+The former form: extract piece at INDEX is to be .
+The latter form: extract pieces from indices BEGIN (inclusive) to END (exclusive).
 If any number A < 0, it will be replaced to CORPUS_LENGTH - A.
 If BEGIN is empty, 0 will be used. If END is empty, CORPUS_LENGTH will be used.
 BEGIN and END can not be empty at the same time.
@@ -35,17 +36,20 @@ Example: --indexing ":2, 3:5, 7, -7, -5:-3, -2:"
     parser.add_argument(
         '--extract-midi', '--midi',
         action='store_true',
-        help='Output midi file(s) stored in extracted pieces with path name "{OUTPUT_PATH}_{i}.mid"'
+        help='Output midi file(s) stored in extracted pieces \
+            with path name "{OUTPUT_PATH}_{i}.mid"'
     )
     parser.add_argument(
         '--extract-txt', '--txt',
         action='store_true',
-        help='Output text file(s) containing text representation of extracted pieces with path "{OUTPUT_PATH}_{i}.txt"'
+        help='Output text file(s) containing text representation of \
+            extracted pieces with path "{OUTPUT_PATH}_{i}.txt"'
     )
     parser.add_argument(
         '--extract-img', '--img',
         action='store_true',
-        help='Output PNG file(s) of the pianoroll representation of extracted pieces with path "{OUTPUT_PATH}_{i}.png"'
+        help='Output PNG file(s) of the pianoroll representation of \
+            extracted pieces with path "{OUTPUT_PATH}_{i}.png"'
     )
     args = parser.parse_args()
     return args
@@ -110,7 +114,11 @@ def main():
                 continue
 
             if args.extract_midi:
-                midi = piece_to_midi(piece, corpus_paras['nth'], ignore_pending_note_error=False)
+                midi = piece_to_midi(
+                    piece,
+                    corpus_paras['nth'],
+                    ignore_pending_note_error=False
+                )
                 midi.dump(f'{args.output_path}_{i}.mid')
 
             if args.extract_txt:

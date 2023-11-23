@@ -15,16 +15,16 @@ from util.corpus import get_corpus_paras
 def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -> bool:
     try:
         a_midi = piece_to_midi(a_piece, nth)
-    except:
-        print(f'exception in piece_to_midi of {a_corpus_dir} piece #{piece_index}')
+    except Exception:
+        print(f'exception in piece_to_midi of a_piece #{piece_index}')
         print(format_exc())
         # print('Piece:', a_piece)
         return False
 
     try:
         b_midi = piece_to_midi(b_piece, nth)
-    except:
-        print(f'exception in piece_to_midi of {b_corpus_dir} piece #{piece_index}')
+    except Exception:
+        print(f'exception in piece_to_midi of b_piece #{piece_index}')
         print(format_exc())
         # print('Piece:', b_piece)
         return False
@@ -37,7 +37,9 @@ def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -
         return False
 
     if any(
-            o_t.numerator != t_t.numerator or o_t.denominator != t_t.denominator or o_t.time != t_t.time
+            o_t.numerator != t_t.numerator
+            or o_t.denominator != t_t.denominator
+            or o_t.time != t_t.time
             for o_t, t_t in zip(a_midi.time_signature_changes, b_midi.time_signature_changes)
         ):
         print(f'time signature difference at piece#{piece_index}')
@@ -76,7 +78,8 @@ def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -
             (n.end, n.pitch, n.velocity)
             for n in b_track.notes
         })
-        if (a_track_note_starts != b_track_note_starts) or (a_track_note_ends != b_track_note_ends):
+        if ((a_track_note_starts != b_track_note_starts)
+            or (a_track_note_ends != b_track_note_ends)):
             # because sometimes there are two or more overlapping notes of same pitch and velocity
             # if there is a continuing note in them, they will cause ambiguity in note merging
             a_bytes_io = io.BytesIO()
@@ -84,17 +87,10 @@ def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -
             a_midi.dump(file=a_bytes_io)
             b_midi.dump(file=b_bytes_io)
             if a_bytes_io.getvalue() != b_bytes_io.getvalue():
-                # ab_note_start_union = a_track_note_starts.union(b_track_note_starts)
-                # diff_note_starts = ab_note_start_union.difference(a_track_note_starts.intersection(b_track_note_starts))
-                # diff_note_ends = ab_note_start_union.difference(a_track_note_ends.intersection(b_track_note_ends))
-                # print(
-                #     f'note starts diffs: {len(diff_note_starts)} / ({len(a_track_note_starts)} + {len(b_track_note_starts)})',
-                #     f'\nnote end diffs: {len(diff_note_ends)} / ({len(a_track_note_ends)} + {len(b_track_note_ends)})\n'
-                # )
-                # print(f'diff_note_starts\n{diff_note_starts}')
-                # print(f'diff_note_ends\n{diff_note_ends}', )
-                # print("---")
-                print(f'notes difference at piece#{piece_index}, track#{a_track_index_mapping[track_feature]}')
+                print(
+                    f'notes difference at piece#{piece_index}'
+                    f'track#{a_track_index_mapping[track_feature]}'
+                )
                 return False
     return True
 
@@ -103,9 +99,9 @@ def compare_wrapper(args_dict) -> bool:
 
 def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, worker_number: int) -> bool:
     """
-        Takes two corpus and check if they are "equal", that is,
-        all the pieces at the same index are representing the same midi information,
-        regardless of any token, shape or order differences.
+    Takes two corpus and check if they are "equal", that is, all the
+    pieces at the same index are representing the same midi
+    nformation, regardless of any token, shape or order differences.
     """
 
     paras = get_corpus_paras(a_corpus_dir)
@@ -113,15 +109,16 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, worker_number: 
         return False
 
     equality = True
-    with CorpusReader(a_corpus_dir) as a_corpus_reader, CorpusReader(b_corpus_dir) as b_corpus_reader:
+    with CorpusReader(a_corpus_dir) as a_corpus_reader, \
+         CorpusReader(b_corpus_dir) as b_corpus_reader:
         assert len(a_corpus_reader) == len(b_corpus_reader)
         corpus_length = len(a_corpus_reader)
         nth = paras['nth']
         args_zip = zip(
-            range(corpus_length),      # piece_index
-            a_corpus_reader,         # a_piece
-            b_corpus_reader,         # b_piece
-            repeat(nth, corpus_length) # nth
+            range(corpus_length),       # piece_index
+            a_corpus_reader,            # a_piece
+            b_corpus_reader,            # b_piece
+            repeat(nth, corpus_length)  # nth
         )
         args_dict_list = [
             {
@@ -134,7 +131,12 @@ def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, worker_number: 
         ]
 
         with Pool(worker_number) as p:
-            for result in tqdm(p.imap_unordered(compare_wrapper, args_dict_list), total=corpus_length):
+            tqdm_compare = tqdm(
+                p.imap_unordered(compare_wrapper, args_dict_list),
+                total=corpus_length,
+                ncols=100
+            )
+            for result in tqdm_compare:
                 if not result:
                     p.terminate()
                     equality = False

@@ -6,13 +6,19 @@ from .tokens import BEGIN_TOKEN_STR
 
 # to handle large file
 class CorpusReader:
+    """
+    Lazy read corpus file (which is often quite big)
+
+    In the first iteration call, the offsets of each line are cached.
+    After that, each line is obtained by file.seek() and file.read().
+    """
     def __init__(self, corpus_dir_path: str) -> None:
         self.file_path = os.path.join(corpus_dir_path, 'corpus')
         self.line_pos = []
         self.length = -1
         self.file = open(self.file_path, 'r', encoding='utf8')
 
-    def prepare():
+    def prepare(self) -> None:
         for _ in self:
             pass
 
@@ -35,7 +41,7 @@ class CorpusReader:
             tmp_line_pos = [0]
             tmp_length = 0
             offset = 0
-            for line in tqdm(self.file, desc=f'CorpusReader reading {self.file_path} '):
+            for line in tqdm(self.file, desc=f'CorpusReader reading {self.file_path}', ncols=0):
                 offset += len(line)
                 if len(self.line_pos) == 0:
                     tmp_line_pos.append(offset)

@@ -73,12 +73,17 @@ dataset = MidiDataset(
     verbose=True
 )
 vocabs = dataset.vocabs
-print('max_seq_length:', dataset.max_seq_length)
-print('permute_mps:', dataset.permute_mps)
-print('permute_track_number:', dataset.permute_track_number)
+print('len(dataset):', len(dataset))
+print('included_path_list:', dataset.included_path_list)
+print('included_piece_num:', dataset.included_piece_num)
+print('_piece_lengths:', dataset._piece_lengths)
+print('_piece_mps_sep_indices:', dataset._piece_mps_sep_indices)
+print('_piece_measures_indices:', dataset._piece_measures_indices)
+print('_piece_body_start_indices:', dataset._piece_body_start_indices)
+print('_virtual_piece_start_indices:', dataset._virtual_piece_start_indices)
+
 
 print('FIRST BATCH OF DATALOADER')
-
 dataloader = DataLoader(
     dataset=dataset,
     batch_size=args.batch_size,

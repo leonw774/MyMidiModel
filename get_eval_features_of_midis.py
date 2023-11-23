@@ -20,6 +20,7 @@ from util.evaluations import (
     midi_list_to_features,
     compare_with_ref
 )
+from util.type_wrappers import or_none
 
 
 def parse_args():
@@ -27,9 +28,12 @@ def parse_args():
     parser.add_argument(
         '--midi-to-piece-paras',
         type=str,
+        nargs='?',
+        const='',
         default='',
         help='The path of midi_to_piece parameters file (the YAML file).\
-            Default is empty string and `util.evaluations.EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT` will be used.'
+            Default is empty string and \
+            `util.evaluations.EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT` is used.'
     )
     parser.add_argument(
         '--worker-number',
@@ -43,7 +47,7 @@ def parse_args():
         metavar='k',
         help='If this option is not set, the features are computed from the whole piece.\
             If this option is set to %(metavar)s, which should be a positive integer,\
-            the features are computed from the number %(metavar)s+1 to the last measure of the piece.'
+            the features are computed from the number %(metavar)s+1 to the last measure.'
     )
     parser.add_argument(
         '--log',
@@ -55,7 +59,8 @@ def parse_args():
         '--max-pairs-number',
         type=int,
         default=int(1e6),
-        help='Maximal limit of measure pairs for calculating the self-similarities. Default is %(default)s.'
+        help='Maximal limit of measure pairs for calculating the self-similarities. \
+            Default is %(default)s.'
     )
     parser.add_argument(
         '--reference-file-path',
@@ -65,7 +70,7 @@ def parse_args():
     )
     parser.add_argument(
         '--seed',
-        type=int,
+        type=or_none(int),
         default=None
     )
     parser.add_argument(
@@ -123,7 +128,8 @@ def main():
     logging.info('Found total (%d) midis in %s', dataset_size, args.midi_dir_path)
 
     if args.midi_to_piece_paras != '':
-        assert os.path.isfile(args.midi_to_piece_paras), f'{args.midi_to_piece_paras} doesn\'t exist or is not a file'
+        assert os.path.isfile(args.midi_to_piece_paras), \
+            f'{args.midi_to_piece_paras} doesn\'t exist or is not a file'
         paras_dict = get_corpus_paras(args.midi_to_piece_paras)
     else:
         paras_dict = None
@@ -137,7 +143,7 @@ def main():
         try:
             midi_list.append(MidiFile(p))
             new_midi_path_list.append(p)
-        except:
+        except Exception:
             pass
     midi_path_list = new_midi_path_list
 
@@ -186,7 +192,6 @@ def main():
 
     if args.reference_file_path != '':
         if os.path.isfile(args.reference_file_path):
-
             with open(args.reference_file_path, 'r', encoding='utf8') as reference_file:
                 try:
                     reference_eval_features = json.load(reference_file)
@@ -210,7 +215,10 @@ def main():
             ]))
 
         else:
-            logging.info('%s is invalid path for reference result JSON file', args.reference_file_path)
+            logging.info(
+                '%s is invalid path for reference result JSON file',
+                args.reference_file_path
+            )
 
     eval_feat_file_path = os.path.join(args.midi_dir_path, 'eval_features.json')
     with open(eval_feat_file_path, 'w+', encoding='utf8') as eval_feat_file:
@@ -222,5 +230,5 @@ def main():
 
 
 if __name__ == '__main__':
-    exit_code = main()
-    exit(exit_code)
+    EXIT_CODE = main()
+    exit(EXIT_CODE)

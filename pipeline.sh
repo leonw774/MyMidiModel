@@ -1,30 +1,32 @@
 #!/bin/bash
 echo "pipeline.sh start."
-use_existed=""
+use_existed_flag=""
 if [ $# -eq 4 ]; then
     if [ "$4" == '--use-existed' ]; then
-        use_existed="--use-existed"
+        use_existed_flag="--use-existed"
     else
-        echo "Expect arguments to be three configuration file name for midi preprocessing, bpe, and model/eval setting, \
-              and an optional '--use-existed' flag at the fourth position."
+        echo "Expect arguments to be three configuration file name for \
+            midi preprocessing, bpe, and model/eval setting, \
+            and an optional '--use-existed' flag at the fourth position."
         exit 1
     fi
 else
     if [ $# -ne 3 ]; then
-        echo "Expect arguments to be three configuration file name for midi preprocessing, bpe, and model/eval setting, \
-              and an optional '--use-existed' flag at the fourth position."
+        echo "Expect arguments to be three configuration file name for \
+            midi preprocessing, bpe, and model/eval setting, \
+            and an optional '--use-existed' flag at the fourth position."
         exit 1
     fi
 fi
 
 # check if all argument is a file and execute them to get their vars
-full_config_name=$1"-$2-"$3
-corpus_config_file_path="configs/corpus/$1.sh"
-bpe_config_file_path="configs/bpe/$2.sh"
-train_config_file_path="configs/model/$3.sh"
+full_config_name="${1}-${2}-${3}"
+config_file_paths=()
+config_file_paths+=("configs/corpus/${1}.sh")
+config_file_paths+=("configs/bpe/${2}.sh")
+config_file_paths+=("configs/model/${3}.sh")
 
-for config_file_path in $corpus_config_file_path $bpe_config_file_path $train_config_file_path
-do
+for config_file_path in "${config_file_paths[@]}"; do
     if [ -f "$config_file_path" ]; then
         if source "$config_file_path"; then
             echo "source ${config_file_path}: success"
@@ -47,25 +49,38 @@ touch "$log_path"
 test "$CONTINUING_NOTE" != true && NO_CONTIN="[no_contin]"
 test "$USE_MERGE_DRUMS" != true && NO_CONTIN="[no_merge_drums]"
 
-corpus_dir_path="data/corpus/${DATA_NAME}${NO_CONTIN}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}_v${VELOCITY_STEP}_t${TEMPO_MIN}_${TEMPO_MAX}_${TEMPO_STEP}"
+corpus_dir_path="data/corpus/${DATA_NAME}"
+corpus_dir_path+="${NO_CONTIN}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}"
+corpus_dir_path+="_v${VELOCITY_STEP}_t${TEMPO_MIN}_${TEMPO_MAX}_${TEMPO_STEP}"
 
 do_midi_to_corpus=true
 do_bpe=false
 if [ -n "${BPE_ITER_NUM+x}" ] && [ "$BPE_ITER_NUM" -ne 0 ]; then
     do_bpe=true
-    bpe_corpus_dir_path="${corpus_dir_path}_bpe${BPE_ITER_NUM}_${ADJACENCY}_${SAMPLE_RATE}"
-    if [ -d "$bpe_corpus_dir_path" ] && [ -f "${bpe_corpus_dir_path}/corpus" ] && [ -f "${bpe_corpus_dir_path}/shape_vocab" ]; then
-        if [ -n "$use_existed" ]; then
-            echo "BPE Output directory: $bpe_corpus_dir_path already has corpus and shape_vocab file." | tee -a "$log_path"
-            echo "Flag --use-existed is set" | tee -a "$log_path"
-            echo "Learn bpe vocab is skipped" | tee -a "$log_path"
+    bpe_corpus_dir_path="${corpus_dir_path}"
+    bpe_corpus_dir_path+="_bpe${BPE_ITER_NUM}_${ADJACENCY}_${SAMPLE_RATE}"
+
+    if [ -d "$bpe_corpus_dir_path" ] \
+        && [ -f "${bpe_corpus_dir_path}/corpus" ] \
+        && [ -f "${bpe_corpus_dir_path}/shape_vocab" ]; then
+        
+        echo "BPE Output directory: $bpe_corpus_dir_path already" \
+            "has corpus and shape_vocab file." \
+            | tee -a "$log_path"
+
+        if [ -n "$use_existed_flag" ]; then
+            printf "Flag --use-existed is set\nLearn bpe vocab is skipped" \
+                | tee -a "$log_path"
             do_bpe=false
             do_midi_to_corpus=false
+
         else
-            echo "BPE Output directory: $bpe_corpus_dir_path already has corpus and shape_vocab file. Remove? (y=remove/n=skip bpe)" | tee -a "$log_path"
+            printf "Remove?\n(y=remove/n=skip bpe):" | tee -a "$log_path"
             read -r yn
+
+            # this grammar (the #[] operator) means in the variable $yn,
+            # any Y or y in first position will be dropped if they exist.
             if [ "$yn" == "${yn#[Yy]}" ]; then 
-            # this grammar (the #[] operator) means that, in the variable $yn, any Y or y in 1st position will be dropped if they exist.
                 # enter this block if yn != [Yy]
                 do_bpe=false
                 do_midi_to_corpus=false
@@ -78,26 +93,47 @@ if [ -n "${BPE_ITER_NUM+x}" ] && [ "$BPE_ITER_NUM" -ne 0 ]; then
 fi
 
 if [ "$do_midi_to_corpus" == true ]; then
-    midi_to_corpus_other_args=()
-    test "$CONTINUING_NOTE" == true && midi_to_corpus_other_args+=("--use-continuing-note")
-    test "$USE_MERGE_DRUMS" == true && midi_to_corpus_other_args+=("--use-merge-drums")
-    test "$MIDI_TO_CORPUS_VERBOSE" == true && midi_to_corpus_other_args+=("--verbose")
-    test -n "${#midi_to_corpus_other_args[@]}" && { echo "Appended \"${midi_to_corpus_other_args[*]}\" to midi_to_corpus's argument" | tee -a "$log_path" ; }
+    midi_to_corpus_flags=()
+
+    test "$CONTINUING_NOTE" == true && \
+        midi_to_corpus_flags+=("--use-continuing-note")
+
+    test "$USE_MERGE_DRUMS" == true && \
+        midi_to_corpus_flags+=("--use-merge-drums")
+
+    test "$MIDI_TO_CORPUS_VERBOSE" == true && \
+        midi_to_corpus_flags+=("--verbose")
+
+    if [ -n "${#midi_to_corpus_flags[@]}" ]; then
+        echo "Added '${midi_to_corpus_flags[*]}' to midi_to_corpus argument" \
+            | tee -a "$log_path"
+    fi
 
     echo "Corpus dir: ${corpus_dir_path}"
 
     python3 midi_to_corpus.py \
-        --nth "$NTH" --max-track-number "$MAX_TRACK_NUMBER" --max-duration "$MAX_DURATION" --velocity-step "$VELOCITY_STEP" \
-        --tempo-quantization "$TEMPO_MIN" "$TEMPO_MAX" "$TEMPO_STEP" --log "$log_path" -w "$WORKER_NUMBER" \
-        --recursive $use_existed "${midi_to_corpus_other_args[@]}" -o "$corpus_dir_path" -- "$MIDI_DIR_PATH"
-    test "$?" -ne 0 && { echo "midi_to_text.py failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+        --nth "$NTH" --max-track-number "$MAX_TRACK_NUMBER" \
+        --max-duration "$MAX_DURATION" --velocity-step "$VELOCITY_STEP" \
+        --tempo-quantization "$TEMPO_MIN" "$TEMPO_MAX" "$TEMPO_STEP" \
+        --log "$log_path" -w "$WORKER_NUMBER" -o "$corpus_dir_path" \
+        --recursive $use_existed_flag "${midi_to_corpus_flags[@]}" \
+        -- "$MIDI_DIR_PATH"
+
+    if [ $? -ne 0 ]; then
+        echo "midi_to_text.py failed. pipeline.sh exit." | tee -a "$log_path"
+        exit 1
+    fi
 fi
 
 if [ "$do_bpe" == true ]; then
     echo "Start learn bpe vocab" | tee -a "$log_path"
+    
     # compile
     make -C ./bpe
-    test "$?" -ne 0 && { echo "Compile error. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+    if [ $? -ne 0 ]; then
+        echo "Compile error. pipeline.sh exit." | tee -a "$log_path"
+        exit 1
+    fi
 
     # create new dir 
     if [ -d "$bpe_corpus_dir_path" ]; then
@@ -111,64 +147,77 @@ if [ "$do_bpe" == true ]; then
     cp "${corpus_dir_path}/pathlist" "$bpe_corpus_dir_path"
 
     # run learn_vocab
-    bpe/learn_vocab "$BPE_DOLOG" "$corpus_dir_path" "$bpe_corpus_dir_path" \
-        "$BPE_ITER_NUM" "$ADJACENCY" "$SAMPLE_RATE" "$MIN_SCORE_LIMIT" "$BPE_WORKER" | tee -a "$log_path"
+    bpe/learn_vocab \
+        "$BPE_DOLOG" "$corpus_dir_path" "$bpe_corpus_dir_path" \
+        "$BPE_ITER_NUM" "$ADJACENCY" "$SAMPLE_RATE" "$MIN_SCORE_LIMIT" \
+        "$BPE_WORKER" \
+        | tee -a "$log_path"
     
     bpe_exit_code=${PIPESTATUS[0]}
     if [ "$bpe_exit_code" -ne 0 ]; then
-        echo "learn_vocab failed. exit code: $bpe_exit_code. pipeline.sh exit." | tee -a "$log_path"
-        echo "bpe/learn_vocab $BPE_DOLOG $corpus_dir_path \"$bpe_corpus_dir_path\" $BPE_ITER_NUM $ADJACENCY $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER"
+        echo "learn_vocab failed. pipeline.sh exit." | tee -a "$log_path"
+        echo "Args: $BPE_DOLOG $corpus_dir_path $bpe_corpus_dir_path" \
+            "$BPE_ITER_NUM $ADJACENCY $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER"
         rm -r "$bpe_corpus_dir_path"
         exit 1
     fi
 
     # process bpe log
-    # echo "sed -i 's/\r/\n/g ; s/\x1B\[2K//g' "$log_path""
-    # sed -i 's/\r/\n/g ; s/\x1B\[2K//g' "$log_path"
     python3 plot_bpe_log.py "$bpe_corpus_dir_path" "$log_path"
 
     # check if tokenized corpus is equal to original corpus
-    python3 verify_corpus_equality.py "$corpus_dir_path" "$bpe_corpus_dir_path" "$WORKER_NUMBER" | tee -a "$log_path"
+    python3 verify_corpus_equality.py \
+        "$corpus_dir_path" "$bpe_corpus_dir_path" "$WORKER_NUMBER" | tee -a "$log_path"
     verify_exit_code=${PIPESTATUS[0]}
-    test "$verify_exit_code" -ne 0 && { echo "Corpus equality verification failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+    if [ "$verify_exit_code" -ne 0 ]; then
+        echo "Equality verification failed. pipeline.sh exit." | tee -a "$log_path";
+        exit 1
+    fi
 fi
 
 if [ -n "${BPE_ITER_NUM+x}" ] && [ "$BPE_ITER_NUM" -ne 0 ]; then
     # replace corpus_dir_path to bpe_corpus_dir_path
     corpus_dir_path="$bpe_corpus_dir_path"
-    bpe_option=("--bpe")
+    bpe_flag=("--bpe")
 fi
 
-python3 make_arrays.py --worker-number "$WORKER_NUMBER" --log "$log_path" --debug $use_existed "${bpe_option[@]}" -- "$corpus_dir_path"
-test "$?" -ne 0 && { echo "text_to_array.py failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+python3 make_arrays.py \
+    --worker-number "$WORKER_NUMBER" --log "$log_path" \
+    --debug $use_existed_flag "${bpe_flag[@]}" -- "$corpus_dir_path"
+
+if [ $? -ne 0 ]; then
+    echo "text_to_array.py failed. pipeline.sh exit." | tee -a "$log_path";
+    exit 1
+fi
 
 ######## TRAIN MODEL ########
 
 # test if NO_TRAIN is a set variables
 if [ -n "${NO_TRAIN+x}" ]; then
-    echo "No training" | tee -a "$log_path"
-    echo "pipeline.sh exit."
+    echo "No training. pipeline.sh exit." | tee -a "$log_path"
     exit 0
 fi
 
 model_dir_path="models/$(date '+%Y%m%d-%H%M%S')-"$full_config_name
 if [ -d "$model_dir_path" ]; then
-        rm -rf "$model_dir_path"
-    else
-        mkdir "$model_dir_path"
-        mkdir "${model_dir_path}/ckpt"
-        mkdir "${model_dir_path}/eval_samples"
-    fi
+    rm -rf "$model_dir_path"
+else
+    mkdir "$model_dir_path"
+    mkdir "${model_dir_path}/ckpt"
+    mkdir "${model_dir_path}/eval_samples"
+fi
 echo "Model dir: $model_dir_path"
 
-train_other_args=()
-test "$PERMUTE_MPS" == true            && train_other_args+=("--permute-mps")
-test "$PERMUTE_TRACK_NUMBER" == true   && train_other_args+=("--permute-track-number")
-test "$USE_LINEAR_ATTENTION" == true   && train_other_args+=("--use-linear-attn")
-test "$NOT_USE_MPS_NUMBER" == true     && train_other_args+=("--not-use-mps-number")
-test -n "$MAX_PIECE_PER_GPU"           && train_other_args+=("--max-pieces-per-gpu" "$MAX_PIECE_PER_GPU")
-test -n "$SEED"                        && train_other_args+=("--seed" "$SEED")
-test -n "${#train_other_args[@]}" && { echo "Appended \"${train_other_args[*]}\" to train.py's argument" | tee -a "$log_path" ; }
+train_flags=()
+test "$PERMUTE_MPS" == true          && train_flags+=("--permute-mps")
+test "$PERMUTE_TRACK_NUMBER" == true && train_flags+=("--permute-track-number")
+test "$USE_LINEAR_ATTENTION" == true && train_flags+=("--use-linear-attn")
+test "$NOT_USE_MPS_NUMBER" == true   && train_flags+=("--not-use-mps-number")
+
+if [ -n "${#train_flags[@]}" ]; then
+    echo "Added \"${train_flags[*]}\" to train.py's argument" \
+    | tee -a "$log_path"
+fi
 
 if [ "$USE_PARALLEL" == true ]; then
     NUM_CUDA_VISIBLE_DEVICE=$(echo "$CUDA_VISIBLE_DEVICES" | tr -cd , | wc -c ;)
@@ -182,30 +231,43 @@ if [ "$USE_PARALLEL" == true ]; then
         USE_PARALLEL=false
     else
         accelerate config default
-        launch_command="accelerate launch --multi_gpu --num_processes $NUM_CUDA_VISIBLE_DEVICE --num_machines 1"
-        train_other_args+=("--use-parallel")
+        launch_command="accelerate launch --multi_gpu --num_machines 1"
+        launch_command+=" --num_processes $NUM_CUDA_VISIBLE_DEVICE"
+        train_flags+=("--use-parallel")
     fi
 else
     launch_command="python3"
 fi
 $launch_command train.py \
-    --test-paths-file "$TEST_PATHS_FILE" --valid-paths-file "$VALID_PATHS_FILE" --max-seq-length "$MAX_SEQ_LENGTH" \
-    --pitch-augmentation-range "$PITCH_AUGMENTATION_RANGE" --virtual-piece-step-ratio "$VIRTUAL_PIECE_STEP_RATIO" \
+    --test-paths-file "$TEST_PATHS_FILE" --valid-paths-file "$VALID_PATHS_FILE" \
+    --max-seq-length "$MAX_SEQ_LENGTH" \
+    --pitch-augmentation-range "$PITCH_AUGMENTATION_RANGE" \
+    --virtual-piece-step-ratio "$VIRTUAL_PIECE_STEP_RATIO" \
     \
-    --layers-number "$LAYERS_NUMBER" --attn-heads-number "$ATTN_HEADS_NUMBER" --embedding-dim "$EMBEDDING_DIM" \
-    --batch-size "$BATCH_SIZE" --max-updates "$MAX_UPDATES" --validation-interval "$VALIDATION_INTERVAL"  \
-    --max-grad-norm "$MAX_GRAD_NORM" --loss-padding "$LOSS_PADDING" --early-stop "$EARLY_STOP" \
+    --layers-number "$LAYERS_NUMBER" --attn-heads-number "$ATTN_HEADS_NUMBER" \
+    --embedding-dim "$EMBEDDING_DIM" \
+    --batch-size "$BATCH_SIZE" --max-updates "$MAX_UPDATES" \
+    --validation-interval "$VALIDATION_INTERVAL" --early-stop "$EARLY_STOP" \
+    --max-grad-norm "$MAX_GRAD_NORM" --loss-padding "$LOSS_PADDING" \
     \
-    --lr-peak "$LEARNING_RATE_PEAK" --lr-warmup-updates "$LEARNING_RATE_WARMUP_UPDATES" \
-    --lr-decay-end-updates "$LEARNING_RATE_DECAY_END_UPDATES" --lr-decay-end-ratio "$LEARNING_RATE_DECAY_END_RATIO" \
+    --lr-peak "$LEARNING_RATE_PEAK" \
+    --lr-warmup-updates "$LEARNING_RATE_WARMUP_UPDATES" \
+    --lr-decay-end-updates "$LEARNING_RATE_DECAY_END_UPDATES" \
+    --lr-decay-end-ratio "$LEARNING_RATE_DECAY_END_RATIO" \
     \
-    --softmax-temperature "$SOFTMAX_TEMPERATURE" --sample-function "$SAMPLE_FUNCTION" --sample-threshold "$SAMPLE_THRESHOLD" \
-    --valid-eval-sample-number "$VALID_EVAL_SAMPLE_NUMBER" --valid-eval-worker-number "$WORKER_NUMBER" \
+    --softmax-temperature "$SOFTMAX_TEMPERATURE" \
+    --sample-function "$SAMPLE_FUNCTION" --sample-threshold "$SAMPLE_THRESHOLD" \
+    --valid-eval-sample-number "$VALID_EVAL_SAMPLE_NUMBER" \
+    --valid-eval-worker-number "$WORKER_NUMBER" \
     \
-    --use-device "$USE_DEVICE" --log "$log_path" "${train_other_args[@]}" \
+    --max-pieces-per-gpu "$MAX_PIECE_PER_GPU" --use-device "$USE_DEVICE" \
+    --seed "$SEED" --log "$log_path" "${train_flags[@]}" \
     -- "$MIDI_DIR_PATH" "$corpus_dir_path" "$model_dir_path"
 
-test "$?" -ne 0 && { echo "Training failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+if [ $? -ne 0 ]; then
+    echo "Training failed. pipeline.sh exit." | tee -a "$log_path"
+    exit 1
+fi
 
 ######## EVALUATION ########
 
@@ -217,10 +279,17 @@ if [ -n "${NO_EVAL+x}" ]; then
 fi
 
 python3 evaluate_model_wrapper.py \
-    --model-dir-path "$model_dir_path" --worker-number "$WORKER_NUMBER" --midi-to-piece-paras "$EVAL_MIDI_TO_PIECE_PARAS_FILE" \
-    --log-path "$log_path" --softmax-temperature "$SOFTMAX_TEMPERATURE" --sample-function "$SAMPLE_FUNCTION" --sample-threshold "$SAMPLE_THRESHOLD" \
-    --eval-sample-number "$EVAL_SAMPLE_NUMBER" --seed "$SEED" --only-eval-uncond "$ONLY_EVAL_UNCOND" \
+    --model-dir-path "$model_dir_path" --worker-number "$WORKER_NUMBER" \
+    --midi-to-piece-paras "$EVAL_MIDI_TO_PIECE_PARAS_FILE" \
+    --softmax-temperature "$SOFTMAX_TEMPERATURE" \
+    --sample-function "$SAMPLE_FUNCTION" --sample-threshold "$SAMPLE_THRESHOLD" \
+    --eval-sample-number "$EVAL_SAMPLE_NUMBER" --seed "$SEED" \
+    --log-path "$log_path" --only-eval-uncond "$ONLY_EVAL_UNCOND" \
     -- "$MIDI_DIR_PATH" "$TEST_PATHS_FILE" "$PRIMER_LENGTH"
 
-test "$?" -ne 0 && { echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path" ; } && exit 1
+if [ $? -ne 0 ]; then
+    echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
+    exit 1
+fi
+
 echo "All done. pipeline.sh exit." | tee -a "$log_path"

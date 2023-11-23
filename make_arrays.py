@@ -15,12 +15,19 @@ import numpy as np
 from pandas import Series
 from tqdm import tqdm
 
-import util.tokens as tokens
-from util.tokens import b36str2int
+from util.tokens import (
+    INSTRUMENT_NAMES,
+    SEP_TOKEN_STR,
+    TRACK_EVENTS_CHAR, MEASURE_EVENTS_CHAR, TEMPO_EVENTS_CHAR,
+    POSITION_EVENTS_CHAR, MULTI_NOTE_EVENTS_CHAR, NOTE_EVENTS_CHAR
+)
+from util.tokens import b36strtoi
 from util.vocabs import build_vocabs
 from util.corpus_reader import CorpusReader
-from util.corpus import (to_shape_vocab_file_path, to_vocabs_file_path, to_arrays_file_path, get_corpus_paras,
-                         text_list_to_array, get_full_array_string)
+from util.corpus import (
+    to_shape_vocab_file_path, to_vocabs_file_path, to_arrays_file_path,
+    get_corpus_paras, text_list_to_array, get_full_array_string
+)
 
 
 def parse_args():
@@ -28,7 +35,8 @@ def parse_args():
     parser.add_argument(
         '--bpe',
         action='store_true',
-        help='If set, it means that BPE was performed, and we will try to read the shape_vocab file under corpus_dir_path.'
+        help='If set, it means that BPE was performed, \
+            and we will try to read the shape_vocab file under corpus_dir_path.'
     )
     parser.add_argument(
         '--worker-number',
@@ -39,7 +47,8 @@ def parse_args():
         '--log',
         dest='log_file_path',
         default='',
-        help='Path to the log file. Default is empty, which means no logging would be performed.'
+        help='Path to the log file. Default is empty, \
+            which means no logging would be performed.'
     )
     parser.add_argument(
         '--use-existed',
@@ -61,10 +70,10 @@ def mp_handler(args_dict):
     try:
         a = text_list_to_array(**args_dict)
         return a
-    except:
+    except Exception:
         print(f'Error at piece #{i}')
         print(format_exc())
-        return np.empty(shape=(0,))
+        return np.empty(shape=(0,), dtype=np.uint16)
 
 
 def main():
@@ -95,30 +104,34 @@ def main():
     bpe_shapes_list = []
     if args.bpe:
         logging.info('Used BPE: True')
-        with open(to_shape_vocab_file_path(args.corpus_dir_path), 'r', encoding='utf8') as vocabs_file:
+        shape_vocab_file_path = to_shape_vocab_file_path(args.corpus_dir_path)
+        with open(shape_vocab_file_path, 'r', encoding='utf8') as vocabs_file:
             bpe_shapes_list = vocabs_file.read().splitlines()
 
     vocab_path = to_vocabs_file_path(args.corpus_dir_path)
     npz_path = to_arrays_file_path(args.corpus_dir_path)
     if os.path.isfile(vocab_path) and os.path.isfile(npz_path):
+        logging.info(
+            'Corpus directory: %s already has vocabs file and arrays file.',
+            args.corpus_dir_path
+        )
         if args.use_existed:
-            logging.info('Corpus directory: %s already has vocabs file and arrays file.', args.corpus_dir_path)
             logging.info('Flag --use-existed is set')
             logging.info('==== make_arrays.py exited ====')
             return 0
-        else:
-            logging.info('Corpus directory: %s already has vocabs file and arrays file. Remove? (y=remove/n=exit)', args.corpus_dir_path)
-            while True:
-                i = input()
-                if i == 'y':
-                    os.remove(vocab_path)
-                    os.remove(npz_path)
-                    logging.info('Removed %s and %s', npz_path, vocab_path)
-                    break
-                if i == 'n':
-                    logging.info('==== make_arrays.py exited ====')
-                    return 0
-                print('(y/n):')
+
+        logging.info("Remove?")
+        reply_str = ""
+        while reply_str not in ('y', 'n'):
+            reply_str = input('(y=remove/n=exit):').lower()
+
+        if reply_str == 'n':
+            logging.info('==== make_arrays.py exited ====')
+            return 0
+
+        os.remove(vocab_path)
+        os.remove(npz_path)
+        logging.info('Removed %s and %s', npz_path, vocab_path)
 
     logging.info('Begin build vocabs for %s', args.corpus_dir_path)
     corpus_paras = get_corpus_paras(args.corpus_dir_path)
@@ -148,16 +161,18 @@ def main():
             print(f'Find existing intermidiate file(s): {" ".join(existing_file_paths)}. Removed.')
 
         os.makedirs(npy_dir_path)
+        args_list = [
+            {'text_list': p.split(), 'vocabs': vocabs, 'i': i}
+            for i, p in enumerate(corpus_reader)
+        ]
         array_list = []
         with Pool(args.worker_number) as p:
-            array_list = list(
-                tqdm(
-                    p.imap(
-                        mp_handler, ({'text_list': p.split(), 'vocabs': vocabs, 'i': i} for i, p in enumerate(corpus_reader))
-                    ),
-                    total=len(corpus_reader)
-                )
+            tqdm_text_list_to_array = tqdm(
+                p.imap(mp_handler, args_list),
+                total=len(corpus_reader),
+                ncols=100
             )
+            array_list = list(tqdm_text_list_to_array)
 
         for i, array in enumerate(array_list):
             if array.size != 0:
@@ -168,7 +183,7 @@ def main():
         start_time = time()
         logging.info('Zipping npys')
         with ZipFile(npy_zip_path, 'x', compression=ZIP_DEFLATED, compresslevel=1) as npz_file:
-            for file_name in tqdm(os.listdir(npy_dir_path)):
+            for file_name in tqdm(os.listdir(npy_dir_path), ncols=100):
                 # arcname is file_name -> file should be at root
                 npz_file.write(os.path.join(npy_dir_path, file_name), file_name)
         os.rename(npy_zip_path, npz_path)
@@ -199,7 +214,6 @@ def main():
                 f.write('\n'.join(merged_lines))
 
         start_time = time()
-        logging.info('Making statistics')
         logging.getLogger('matplotlib.font_manager').disabled = True
         logging.getLogger('matplotlib.pyplot').disabled = True
         token_types = [
@@ -213,28 +227,36 @@ def main():
                 t: [] for t in token_types
             }
         }
-        for piece in tqdm(corpus_reader):
+        for piece in tqdm(corpus_reader, desc='Making statistics', ncols=100):
             if args.bpe:
-                distributions['shape']['0,0,1;'] += piece.count(' ' + tokens.NOTE_EVENTS_CHAR + ':')
-                distributions['shape']['0,0,1~;'] += piece.count(' ' + tokens.NOTE_EVENTS_CHAR + '~:')
+                distributions['shape']['0,0,1;'] += piece.count(' ' + NOTE_EVENTS_CHAR + ':')
+                distributions['shape']['0,0,1~;'] += piece.count(' ' + NOTE_EVENTS_CHAR + '~:')
                 for text in piece.split():
-                    if text[0] == tokens.MULTI_NOTE_EVENTS_CHAR:
+                    if text[0] == MULTI_NOTE_EVENTS_CHAR:
                         distributions['shape'][text[1:].split(':')[0]] += 1
 
-            head_end = piece.find(tokens.SEP_TOKEN_STR) # find separator
+            head_end = piece.find(SEP_TOKEN_STR) # find separator
             tracks_text = piece[4:head_end]
             track_tokens = tracks_text.split()
             for track_token in track_tokens:
-                instrument_id = b36str2int(track_token.split(':')[0][1:])
+                instrument_id = b36strtoi(track_token.split(':')[0][1:])
                 distributions['instrument'][instrument_id] += 1
 
-            multinote_number = piece.count(' '+tokens.NOTE_EVENTS_CHAR) + piece.count(' '+tokens.MULTI_NOTE_EVENTS_CHAR)
-            tempo_number = piece.count(' '+tokens.TEMPO_EVENTS_CHAR)
-            position_number = piece.count(' '+tokens.POSITION_EVENTS_CHAR)
-            measure_number = piece.count(' '+tokens.MEASURE_EVENTS_CHAR)
-            track_number = piece.count(' '+tokens.TRACK_EVENTS_CHAR)
+            multinote_number = piece.count(' '+NOTE_EVENTS_CHAR)
+            multinote_number += piece.count(' '+MULTI_NOTE_EVENTS_CHAR)
+            tempo_number = piece.count(' '+TEMPO_EVENTS_CHAR)
+            position_number = piece.count(' '+POSITION_EVENTS_CHAR)
+            measure_number = piece.count(' '+MEASURE_EVENTS_CHAR)
+            track_number = piece.count(' '+TRACK_EVENTS_CHAR)
             all_token_number = piece.count(' ') + 1
-            numbers = [multinote_number, tempo_number, position_number, measure_number, track_number, all_token_number]
+            numbers = [
+                multinote_number,
+                tempo_number,
+                position_number,
+                measure_number,
+                track_number,
+                all_token_number
+            ]
             for i, token_type in enumerate(token_types):
                 distributions['tokens_number'][token_type].append(numbers[i])
     # with CorpuesReader exit
@@ -259,7 +281,7 @@ def main():
     instrument_count = [0] * 129
     for program, count in distributions['instrument'].items():
         instrument_count[program] = count
-    plt.bar(tokens.INSTRUMENT_NAMES, instrument_count)
+    plt.bar(INSTRUMENT_NAMES, instrument_count)
     plt.savefig(os.path.join(stats_dir_path, 'instrument_distribution.png'))
     plt.clf()
 
@@ -292,7 +314,8 @@ def main():
         transform=plt.gcf().transFigure
     )
     plt.subplots_adjust(left=0.125)
-    plt.hist(distributions['tokens_number']['track'], bins=max(distributions['tokens_number']['track']))
+    max_track_count = max(distributions['tokens_number']['track'])
+    plt.hist(distributions['tokens_number']['track'], bins=max_track_count)
     plt.xlabel('number of tracks')
     plt.ylabel('number of pieces')
     plt.savefig(os.path.join(stats_dir_path, 'number_of_track_distribution.png'))
@@ -338,5 +361,5 @@ def main():
     return 0
 
 if __name__ == '__main__':
-    exit_code = main()
-    exit(exit_code)
+    EXIT_CODE = main()
+    exit(EXIT_CODE)

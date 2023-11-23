@@ -89,7 +89,7 @@ def get_largest_possible_position(nth: int, supported_time_signatures: set = Non
 # python support up to base=36 in int function
 TOKEN_INT2STR_BASE = 36
 
-def int2b36str(x: int) -> str:
+def itob36str(x: int) -> str:
     if 0 <= x < TOKEN_INT2STR_BASE:
         return '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[x]
     isneg = x < 0
@@ -101,7 +101,7 @@ def int2b36str(x: int) -> str:
         b = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[d] + b
     return ('-' + b) if isneg else b
 
-def b36str2int(x: str):
+def b36strtoi(x: str):
     return int(x, TOKEN_INT2STR_BASE)
 
 
@@ -127,27 +127,30 @@ def token_to_str(token: namedtuple) -> str:
         # event:pitch:duration:velocity:track:instrument(:position)
         # negative token.duration means is_cont==True
         text = NOTE_EVENTS_CHAR if token.duration > 0 else NOTE_EVENTS_CHAR + '~'
-        text += ( f':{int2b36str(token.pitch)}'
-                + f':{int2b36str(abs(token.duration))}'
-                + f':{int2b36str(token.velocity)}'
-                + f':{int2b36str(token.track_number)}')
+        text += ( f':{itob36str(token.pitch)}'
+                + f':{itob36str(abs(token.duration))}'
+                + f':{itob36str(token.velocity)}'
+                + f':{itob36str(token.track_number)}')
         if token.position != -1:
-            text += f':{int2b36str(token.position)}'
+            text += f':{itob36str(token.position)}'
         return text
 
     elif type_priority == TYPE_PRIORITY['PositionToken']:
-        return f'{POSITION_EVENTS_CHAR}{int2b36str(token.position)}'
+        return f'{POSITION_EVENTS_CHAR}{itob36str(token.position)}'
 
     elif type_priority == TYPE_PRIORITY['MeasureToken']:
-        return f'{MEASURE_EVENTS_CHAR}{int2b36str(token.time_signature[0])}/{int2b36str(token.time_signature[1])}'
+        return (
+            f'{MEASURE_EVENTS_CHAR}'
+            f'{itob36str(token.time_signature[0])}/{itob36str(token.time_signature[1])}'
+        )
 
     elif type_priority == TYPE_PRIORITY['TempoToken']:
         if token.position == -1:
-            return f'{TEMPO_EVENTS_CHAR}{int2b36str(token.bpm)}'
-        return f'{TEMPO_EVENTS_CHAR}{int2b36str(token.bpm)}:{int2b36str(token.position)}'
+            return f'{TEMPO_EVENTS_CHAR}{itob36str(token.bpm)}'
+        return f'{TEMPO_EVENTS_CHAR}{itob36str(token.bpm)}:{itob36str(token.position)}'
 
     elif type_priority == TYPE_PRIORITY['TrackToken']:
-        return f'{TRACK_EVENTS_CHAR}{int2b36str(token.instrument)}:{int2b36str(token.track_number)}'
+        return f'{TRACK_EVENTS_CHAR}{itob36str(token.instrument)}:{itob36str(token.track_number)}'
 
     elif type_priority == TYPE_PRIORITY['BeginOfScoreToken']:
         return BEGIN_TOKEN_STR

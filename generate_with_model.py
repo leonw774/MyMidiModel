@@ -15,9 +15,13 @@ from miditoolkit import MidiFile
 from util.tokens import BEGIN_TOKEN_STR, END_TOKEN_STR
 from util.midi import midi_to_piece, piece_to_midi, get_first_k_measures, get_first_k_nths
 # from util.corpus_reader import CorpusReader
-from util.corpus import text_list_to_array, to_corpus_file_path, to_paras_file_path, dump_corpus_paras, get_full_array_string
+from util.corpus import (
+    text_list_to_array, to_corpus_file_path, to_paras_file_path,
+    dump_corpus_paras, get_full_array_string
+)
 from util.model import MyMidiTransformer
 from util.generation import generate_piece, permute_track_number
+from util.type_wrappers import or_none
 
 def read_args():
     parser = ArgumentParser()
@@ -28,8 +32,8 @@ def read_args():
         default=None,
         help='A MIDI file, or a text file containing a list of MIDI file paths \
             that would be used as the primer in conditional generation. \
-            If the extension is "*.mid" or "*.midi", I will try to parse it as MIDI. \
-            Otherwise, I will try to parse it as a list of paths to midi files, separated by newlines. \
+            If the extension is "*.mid" or "*.midi", try to parse it as MIDI. \
+            Otherwise, try to parse it as list of paths to midi files, separated by newlines. \
             If this option is not set, unconditional generation will be performed.'
     )
     parser.add_argument(
@@ -45,9 +49,11 @@ def read_args():
         choices=['measure', 'nth', 'token'],
         default='measure',
         help='Specify the unit of PRIMER_LENGTH. \
-            If use "measure", primer will be the first PRIMER_LENGTH measures of the piece no matter how long it actually is. \
+            If use "measure", primer will be the first PRIMER_LENGTH measures of the piece \
+            no matter how long it actually is. \
             If use "nth", the length of a "nth"-note is the unit. \
-            The value of "nth" is determined by the setting of the dataset on which the model trained. \
+            The value of nth is determined by the setting of the corpus \
+            on which the model is trained. \
             If use "tokens", primer will be the first PRIMER_LENGTH tokens of the piece.'
     )
     parser.add_argument(
@@ -56,9 +62,12 @@ def read_args():
         default=1,
         help='How many sample will be generated. Default is %(default)s. \
             If no primer used, it simply generate SAMPLE_NUMBER samples. \
-            If primer is a midi file, it generate SAMPLE_NUMBER samples using that primer repeatly. \
-            If primer is list of midi file paths, it generate samples with the first SAMPLE_NUMBER primers. \
-            Set it to 0 to use all primers in the list.'
+            If primer is a midi file, it generate SAMPLE_NUMBER samples \
+            using that primer repeatly. \
+            If primer is list of midi file paths, it generate samples with \
+            the first SAMPLE_NUMBER primers. \
+            Set it to 0 to use all primers in the list.\
+            Default is %(default)s'
     )
     parser.add_argument(
         '--output-text', '-o',
@@ -71,8 +80,9 @@ def read_args():
     parser.add_argument(
         '--max-generation-step', '--step', '-s',
         type=int,
-        default=-1,
-        help='The maximum TOKENS in each sample would be generated. Default is the model\'s max sequence length.'
+        default=None,
+        help='The maximum TOKENS in each sample would be generated. \
+            Default is the model\'s max sequence length.'
     )
     parser.add_argument(
         '--no-prob-adjustment',
@@ -83,7 +93,8 @@ def read_args():
         type=float,
         nargs='+',
         default=[1.0],
-        help='Control the temperature of softmax before multinomial sampling. Default is %(default)s.'
+        help='Control the temperature of softmax before multinomial sampling. \
+            Default is %(default)s.'
     )
     parser.add_argument(
         '--sample-function', '-f',
@@ -92,7 +103,8 @@ def read_args():
         choices=('none', 'top-k', 'top-p', 'nucleus'),
         const='none',
         default='none',
-        help='The sample function to used. Choice "top-p" is the same as "nucleus". Default is %(default)s'
+        help='The sample function to used. Choice "top-p" is the same as "nucleus". \
+            Default is %(default)s'
     )
     parser.add_argument(
         '--sample-threshold', '--threshold', '-e',
@@ -112,6 +124,8 @@ def read_args():
     parser.add_argument(
         '--use-device',
         type=str,
+        nargs='?',
+        const='cuda',
         default='cuda',
         help='What device the model would be on.'
     )
@@ -124,7 +138,8 @@ def read_args():
     parser.add_argument(
         '--print-exception',
         action='store_true',
-        help='When model fail to generate next token that satisfy the format rule. Print out the exception message.'
+        help='When model fail to generate next token that satisfy the format rule. \
+            Print out the exception message.'
     )
     parser.add_argument(
         '--no-sample-tqdm', '--no-tqdm',
@@ -138,7 +153,7 @@ def read_args():
     )
     parser.add_argument(
         '--seed',
-        type=int,
+        type=or_none(int),
         default=None
     )
     parser.add_argument(
@@ -148,9 +163,10 @@ def read_args():
     parser.add_argument(
         'output_file_path',
         type=str,
-        help='The path of generated MIDI file(s). \
+        help='The base of the path of generated MIDI file(s). \
             If SAMPLE_NUMBER == 1 (default), the path will be "{OUTPUT_FILE_PATH}.mid". \
-            If SAMPLE_NUMBER > 1, the paths will be "{OUTPUT_FILE_PATH}_{i}.mid", where i is 1 ~ SAMPLE_NUMBER.'
+            If SAMPLE_NUMBER > 1, the paths will be "{OUTPUT_FILE_PATH}_{i}.mid", \
+            where i is 1 ~ SAMPLE_NUMBER.'
     )
 
     return parser.parse_args()
@@ -160,7 +176,7 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
     try:
         gen_text_list = generate_piece(
             model,
-            steps=args.max_generation_step,
+            max_generation_step=args.max_generation_step,
             start_seq=primer_seq,
             softmax_temperature=args.softmax_temperature,
             try_count_limit=args.try_count_limit,
@@ -178,7 +194,12 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
                     f.write(' '.join(gen_text_list))
             if args.output_array_text:
                 with open(f'{output_file_path}_array.txt', 'w+', encoding='utf8') as f:
-                    f.write(get_full_array_string(text_list_to_array(gen_text_list, model.vocabs), model.vocabs))
+                    f.write(
+                        get_full_array_string(
+                            text_list_to_array(gen_text_list, model.vocabs),
+                            model.vocabs
+                        )
+                    )
             midi = piece_to_midi(' '.join(gen_text_list), model.vocabs.paras['nth'])
             midi.dump(f'{output_file_path}.mid')
     except Exception:
@@ -205,14 +226,19 @@ def midi_file_list_to_text_list_list(
         vocabs,
         worker_number: int = 1) -> List[List[str]]:
     """
-        1. Read the midi files
-        2. cut them into primers
-        3. write them into corpus
-        4. apply BPE
-        5. return the primers in text_list form
+    1. Read the midi files
+    2. cut them into primers
+    3. write them into corpus
+    4. apply BPE
+    5. return the primers in text_list form
     """
     primer_piece_list: List[str] = []
-    for midi_path in tqdm(primer_paths, desc='Encoding midi files to text representation', ncols=0):
+    tqdm_primer_paths = tqdm(
+        primer_paths,
+        desc='Encoding midi files to text representation',
+        ncols=0
+    )
+    for midi_path in tqdm_primer_paths:
         try:
             p = midi_to_piece(MidiFile(midi_path), **vocabs.paras)
             primer_piece_list.append(p)
@@ -230,21 +256,27 @@ def midi_file_list_to_text_list_list(
         # model use BPE, then apply it
         with tempfile.TemporaryDirectory() as tmp_in_corpus_dir_path:
             # make tmp corpus
-            with open(to_corpus_file_path(tmp_in_corpus_dir_path), 'w+', encoding='utf8') as tmp_corpus_file:
+            tmp_corpus_file_path = to_corpus_file_path(tmp_in_corpus_dir_path)
+            with open(tmp_corpus_file_path, 'w+', encoding='utf8') as tmp_corpus_file:
                 tmp_corpus_file.write('\n'.join(primer_piece_list) + '\n')
-            with open(to_paras_file_path(tmp_in_corpus_dir_path), 'w+', encoding='utf8') as tmp_paras_file:
+
+            tmp_paras_file_path = to_paras_file_path(tmp_in_corpus_dir_path)
+            with open(tmp_paras_file_path, 'w+', encoding='utf8') as tmp_paras_file:
                 tmp_paras_file.write(dump_corpus_paras(vocabs.paras))
+
             # make tmp shape_vocab
             tmp_shape_vocab_file_path = os.path.join(tmp_in_corpus_dir_path, 'shape_vocab')
             with open(tmp_shape_vocab_file_path, 'w+', encoding='utf8') as shape_vocab_file:
                 shape_vocab_file.write('\n'.join(vocabs.bpe_shapes_list) + '\n')
+
             # make sure the current working directory is correct
             assert os.path.abspath(os.getcwd()) == os.path.dirname(os.path.abspath(__file__))
+
             # make sure the program is there and new
             subprocess.run(['make', '-C', './bpe'], check=True, stdout=subprocess.DEVNULL)
+
             with tempfile.TemporaryDirectory() as tmp_out_corpus_dir_path:
                 tmp_out_corpus_file_path = to_corpus_file_path(tmp_out_corpus_dir_path)
-                # ./apply_vocab [-log] [-clearLine] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath
                 apply_args = [
                     './bpe/apply_vocab',
                     # '-log',
@@ -256,12 +288,14 @@ def midi_file_list_to_text_list_list(
                 if worker_number > 1:
                     apply_args.append(str(worker_number))
                 subprocess.run(apply_args, check=True, stdout=subprocess.DEVNULL)
+
                 # get content from output
-                with open(to_corpus_file_path(tmp_out_corpus_dir_path), 'r', encoding='utf8') as tmp_out_corpus:
+                with open(tmp_out_corpus_file_path, 'r', encoding='utf8') as tmp_out_corpus:
                     merged_piece_list = [
                         line.strip()
                         for line in tmp_out_corpus.readlines()
                     ]
+
         primer_text_list_list = [
             merged_piece.split(' ')
             for merged_piece in merged_piece_list
@@ -297,8 +331,11 @@ def main():
     overhead_time_begin = time()
 
     # device
+    # if is empty string, use default: cuda
+    if args.use_device == '':
+        args.use_device = 'cuda'
     if not args.use_device.startswith('cuda') and args.use_device != 'cpu':
-        raise ValueError(f'Bad device name {args.use_device}')
+        raise ValueError(f'Bad device name: "{args.use_device}"')
     if not torch.cuda.is_available():
         print('--use-device is set to \'cuda\' but found no CUDA device. Changed to CPU.')
         args.use_device = 'cpu'
@@ -307,7 +344,7 @@ def main():
     # model
     model = torch.load(args.model_file_path, map_location=torch.device(args.use_device))
     assert isinstance(model, MyMidiTransformer)
-    if args.max_generation_step == -1:
+    if args.max_generation_step is None:
         args.max_generation_step = model.max_seq_length
 
     if args.output_file_path.endswith('.mid'):
@@ -337,7 +374,10 @@ def main():
         if args.primer.endswith('.mid') or args.primer.endswith('.midi'):
             print('From midi file:', args.primer)
             primer_path_list = [args.primer]
-            primer_text_list_list = midi_file_list_to_text_list_list(primer_path_list, **encode_args)
+            primer_text_list_list = midi_file_list_to_text_list_list(
+                primer_path_list,
+                **encode_args
+            )
             primer_text_list_list = primer_text_list_list * args.sample_number
         else: # we guess it is a list of paths to midi files
             print('From path list:', args.primer)
@@ -348,12 +388,21 @@ def main():
             if args.sample_number != 0:
                 primer_path_list = primer_path_list[:args.sample_number]
             primer_path_list = [p.strip() for p in primer_path_list]
-            assert all(p.endswith('.mid') or p.endswith('.MID') or p.endswith('.midi') for p in primer_path_list)
+            assert all(
+                p.endswith('.mid') or p.endswith('.MID') or p.endswith('.midi')
+                for p in primer_path_list
+            )
             assert all(os.path.isfile(p) for p in primer_path_list)
-            print(f'Keep first {len(primer_path_list)} lines as sample number is {args.sample_number}')
-            print('Hint: Set sample number to 0 to keep all primers in the primer list.')
+            print(
+                f'Keep first {len(primer_path_list)} lines'\
+                f'as sample number is {args.sample_number}\n'\
+                f'Hint: Set sample number to 0 to keep all primers in the primer list.'
+            )
 
-            primer_text_list_list = midi_file_list_to_text_list_list(primer_path_list, **encode_args)
+            primer_text_list_list = midi_file_list_to_text_list_list(
+                primer_path_list,
+                **encode_args
+            )
             assert len(primer_text_list_list) != 0
             print(f'Processed {len(primer_text_list_list)} files successfully.')
             if len(primer_text_list_list) < args.sample_number:

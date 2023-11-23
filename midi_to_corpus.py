@@ -8,7 +8,7 @@ from multiprocessing import Pool
 import shutil
 import sys
 from time import time, strftime
-from traceback import format_exc
+# from traceback import format_exc
 import zlib
 
 from miditoolkit import MidiFile
@@ -16,7 +16,9 @@ from psutil import cpu_count
 from tqdm import tqdm
 
 from util.midi import midi_to_piece
-from util.corpus import to_paras_file_path, to_corpus_file_path, to_pathlist_file_path, dump_corpus_paras
+from util.corpus import (
+    to_paras_file_path, to_corpus_file_path, to_pathlist_file_path, dump_corpus_paras
+)
 
 
 def parse_args():
@@ -32,8 +34,9 @@ def parse_args():
         '--max-track-number',
         type=int,
         default=24,
-        help='The maximum tracks nubmer to keep in text, if the input midi has more "instruments" than this value, \
-            some tracks would be merged or discard. Default is %(default)s.'
+        help='The maximum tracks nubmer to keep in text, if the input midi has more \
+            "instruments" than this value, some tracks would be merged or discard. \
+            Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--max-duration',
@@ -53,7 +56,8 @@ def parse_args():
         type=int,
         default=[120-6*16, 120+5*16, 16], # 24, 200, 16
         metavar=('TEMPO_MIN', 'TEMPO_MAX', 'TEMPO_STEP'),
-        help='Three integers: (min, max, step), where min and max are INCLUSIVE. Default is %(default)s.'
+        help='Three integers: (min, max, step), where min and max are INCLUSIVE. \
+            Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--use-continuing-note',
@@ -131,8 +135,8 @@ def handler(args_dict: dict):
     midi_file_path  = args_dict.pop('midi_file_path', '')
     try:
         args_dict['midi'] = MidiFile(midi_file_path)
-    except Exception as e:
-        # logging.debug('%d pid: %d file path: %s\n', n, os.getpid(), midi_file_path, format_exc())
+    except Exception:
+        # logging.debug('%d pid: %d file: %s\n', n, os.getpid(), midi_file_path, format_exc())
         return 'RuntimeError(\'miditoolkit failed to parse the file\')'
 
     try:
@@ -144,7 +148,7 @@ def handler(args_dict: dict):
     except KeyboardInterrupt as e:
         raise e
     except Exception as e:
-        # logging.debug('%d pid: %d file path: %s\n%s', n, os.getpid(), midi_file_path, format_exc())
+        # logging.debug('%d pid: %d file: %s\n%s', n, os.getpid(), midi_file_path, format_exc())
         # if not (repr(e).startswith('Assert') or repr(e).startswith('Runtime')):
         #     print(f'{n} pid: {os.getpid()} file path: {args_dict["midi_file_path"]}')
         #     print(format_exc())
@@ -159,7 +163,12 @@ def loop_func(
     token_number_list = []
     good_path_list = []
     bad_reasons_counter = Counter()
-    for n, midi_file_path in tqdm(enumerate(midi_file_path_list), total=len(midi_file_path_list)):
+    tqdm_enum_midi_file_path_list = tqdm(
+        enumerate(midi_file_path_list),
+        total=len(midi_file_path_list),
+        ncols=100
+    )
+    for n, midi_file_path in tqdm_enum_midi_file_path_list:
         n_args_dict = dict(args_dict)
         n_args_dict['n'] = n
         n_args_dict['midi_file_path'] = midi_file_path
@@ -195,9 +204,13 @@ def mp_func(
     with Pool(worker_number) as p:
         compressed_piece_list = list(tqdm(
             p.imap(handler, args_dict_list),
-            total=len(args_dict_list)
+            total=len(args_dict_list),
+            ncols=100
         ))
-    logging.info('Multi-processing end. Object size: %d bytes', sum(sys.getsizeof(cp) for cp in compressed_piece_list))
+    logging.info(
+        'Multi-processing end. Object size: %d bytes',
+        sum(sys.getsizeof(cp) for cp in compressed_piece_list)
+    )
     for i, compressed_piece in enumerate(compressed_piece_list):
         if isinstance(compressed_piece, bytes):
             piece = zlib.decompress(compressed_piece).decode()
@@ -215,7 +228,8 @@ def main():
     args = parse_args()
     corpus_paras_dict = dict(vars(args.handler_args)) # a dict() for copy
 
-    # when not verbose, only info level or higher will be printed to stdout or stderr and logged into file
+    # when not verbose, only info level or higher will be printed to stdout or stderr
+    # and also logged into file
     loglevel = logging.DEBUG if args.verbose else logging.INFO
     if args.log_file_path:
         logging.basicConfig(
@@ -246,34 +260,38 @@ def main():
         ])
     )
 
-    # check if output_dir_path is a directory
+    corpus_file_path = to_corpus_file_path(args.output_dir_path)
     if os.path.isdir(args.output_dir_path):
-        corpus_file_path = to_corpus_file_path(args.output_dir_path)
         if os.path.exists(corpus_file_path):
+            logging.info('Output corpus: %s already has file.', corpus_file_path)
             if args.use_existed:
-                logging.info('Output corpus path: %s already has file.', corpus_file_path)
                 logging.info('Flag --use-existed is set')
                 logging.info('==== midi_to_corpus.py exited ====')
                 return 0
-            else:
-                logging.info('Output corpus: %s already has files. Remove? (y=remove/n=exit)', corpus_file_path)
-                while True:
-                    i = input()
-                    if i == 'y':
-                        print('Removing...')
-                        if os.path.exists(to_corpus_file_path(args.output_dir_path)):
-                            os.remove(to_corpus_file_path(args.output_dir_path))
-                        if os.path.exists(to_paras_file_path(args.output_dir_path)):
-                            os.remove(to_paras_file_path(args.output_dir_path))
-                        if os.path.exists(to_pathlist_file_path(args.output_dir_path)):
-                            os.remove(to_pathlist_file_path(args.output_dir_path))
-                        break
-                    if i == 'n':
-                        logging.info('==== midi_to_corpus.py exited ====')
-                        return 0
-                    print('(y/n):')
+
+            logging.info('Remove?')
+            reply_str = ''
+            while reply_str not in ('y', 'n'):
+                reply_str = input('(y=remove/n=exit):').lower()
+
+            if reply_str == 'n':
+                logging.info('==== midi_to_corpus.py exited ====')
+                return 0
+
+            os.remove(to_corpus_file_path(args.output_dir_path))
+            paras_path = to_paras_file_path(args.output_dir_path)
+            if os.path.exists(paras_path):
+                os.remove(paras_path)
+            pathlist_path = to_pathlist_file_path(args.output_dir_path)
+            if os.path.exists(pathlist_path):
+                os.remove(pathlist_path)
+            print('Removed')
+
         else:
-            logging.info('Output directory: %s already existed, but no corpus files.', args.output_dir_path)
+            logging.info(
+                'Output directory: %s already existed, but no corpus files.',
+                args.output_dir_path
+            )
     elif os.path.isfile(args.output_dir_path):
         logging.info('Output directory path: %s is a file.', args.output_dir_path)
         return 1
@@ -303,29 +321,43 @@ def main():
     file_path_list.sort()
 
     # write parameter file
-    with open(to_paras_file_path(args.output_dir_path), 'w+', encoding='utf8') as out_paras_file:
+    paras_file_path = to_paras_file_path(args.output_dir_path)
+    with open(paras_file_path, 'w+', encoding='utf8') as out_paras_file:
         out_paras_file.write(dump_corpus_paras(corpus_paras_dict))
 
     # write main corpus file
-    with open(to_corpus_file_path(args.output_dir_path), 'w+', encoding='utf8') as out_corpus_file:
+    with open(corpus_file_path, 'w+', encoding='utf8') as out_corpus_file:
         handler_args_dict = vars(args.handler_args)
         if args.worker_number <= 1:
-            token_number_list, good_path_list = loop_func(file_path_list, out_corpus_file, handler_args_dict)
+            token_number_list, good_path_list = loop_func(
+                midi_file_path_list=file_path_list,
+                out_file=out_corpus_file,
+                args_dict=handler_args_dict
+            )
         else:
             worker_number = min(cpu_count(), args.worker_number)
-            token_number_list, good_path_list = mp_func(file_path_list, out_corpus_file, worker_number, handler_args_dict)
+            token_number_list, good_path_list = mp_func(
+                midi_file_path_list=file_path_list,
+                out_file=out_corpus_file,
+                worker_number=worker_number,
+                args_dict=handler_args_dict
+            )
 
     logging.info('Processed %d files', len(token_number_list))
     if len(token_number_list) > 0:
-        logging.info('Average tokens: %.3f per file', sum(token_number_list)/len(token_number_list))
+        logging.info(
+            'Avg. number tokens: %.6f per file',
+            sum(token_number_list) / len(token_number_list)
+        )
     else:
         logging.info('No midi file is processed')
         shutil.rmtree(args.output_dir_path)
         logging.info('Removed output directory: %s', args.output_dir_path)
         return 1
-    logging.info('Process time: %.3f', time()-start_time)
+    logging.info('Process time: %.6f', time()-start_time)
 
-    with open(to_pathlist_file_path(args.output_dir_path), 'w+', encoding='utf8') as good_path_list_file:
+    pathlist_file_path = to_pathlist_file_path(args.output_dir_path)
+    with open(pathlist_file_path, 'w+', encoding='utf8') as good_path_list_file:
         good_path_list_file.write('\n'.join(good_path_list))
         good_path_list_file.close()
 
@@ -334,5 +366,5 @@ def main():
 
 
 if __name__ == '__main__':
-    exit_code = main()
-    exit(exit_code)
+    EXIT_CODE = main()
+    exit(EXIT_CODE)

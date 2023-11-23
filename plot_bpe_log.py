@@ -11,7 +11,8 @@ def main(corpus_dir_path, log_file_path):
         log_texts = logfile.read()
     # raise ValueError if not found
     total_used_time_start_pos = log_texts.index('Total used time: ')
-    total_used_time_end_pos = (log_texts[total_used_time_start_pos:]).index('\n') + total_used_time_start_pos
+    total_used_time_end_pos = total_used_time_start_pos
+    total_used_time_end_pos += (log_texts[total_used_time_start_pos:]).index('\n') # first newline
     total_used_time_text = log_texts[total_used_time_start_pos:total_used_time_end_pos]
     total_used_time = float(total_used_time_text.split(': ')[1])
 
@@ -33,7 +34,8 @@ def main(corpus_dir_path, log_file_path):
         for estext in end_stats_texts
     }
 
-    iteration_log_column_name =  log_lines[2].split(', ')[1:] # start from 1 because index 0 is iter number
+    # start from 1 because index 0 is iter number
+    iteration_log_column_name =  log_lines[2].split(', ')[1:]
     iteration_log_lines = log_lines[3:-2] if end_early else log_lines[3:-1]
     iteration_log_lists = [[] for _ in range(len(iteration_log_column_name))]
     for iter_log_line in iteration_log_lines:
@@ -69,8 +71,9 @@ def main(corpus_dir_path, log_file_path):
         'total_used_time': total_used_time,
         'iteration_log_dict': iteration_log_dict
     }
-    with open(os.path.join(corpus_stats_dir_path, 'bpe_learn_stats.json'), 'w+', encoding='utf8') as statsfile:
-        json.dump(bpe_stats_dict, statsfile)
+    stats_file_path = os.path.join(corpus_stats_dir_path, 'bpe_learn_stats.json')
+    with open(stats_file_path, 'w+', encoding='utf8') as stats_file:
+        json.dump(bpe_stats_dict, stats_file)
 
     # plot iteration_log_dict
     iter_nums = list(range(len(iteration_log_lines)))
@@ -88,11 +91,6 @@ def main(corpus_dir_path, log_file_path):
                 left_texts = '\n'.join(
                     [f'{k}={float(v):.5f}' for k, v in dict(Series(col_list).describe()).items()]
                 )
-            # fit y = a * exp(b * x) --> log(y) = log(a) + b * x
-            # x = np.array(iter_nums)
-            # y = np.array(col_list)
-            # b, loga = np.polyfit(x, np.log(y), 1, w=np.sqrt(y))
-            # left_texts += '\nexponential equation fit:\n  ' + f'y = {np.exp(loga):.5f} * e ^ ({b:.5f} * x)'
 
             plt.subplots_adjust(left=0.2)
             plt.text(
@@ -103,7 +101,11 @@ def main(corpus_dir_path, log_file_path):
             )
 
             plt.plot(iter_nums, col_list, label=col_name)
-            plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}.png'))
+            output_path = os.path.join(
+                corpus_stats_dir_path,
+                f'bpe_{col_name.replace(" ", "_")}.png'
+            )
+            plt.savefig(output_path)
             plt.clf()
 
             # draw shape size distribution
@@ -111,7 +113,11 @@ def main(corpus_dir_path, log_file_path):
                 plt.figure(figsize=(16.8, 6.4))
                 plt.title(col_name+' histogram')
                 plt.hist(col_list, bins=list(range(max(col_list)+1)))
-                plt.savefig(os.path.join(corpus_stats_dir_path, f'bpe_{col_name.replace(" ", "_")}_hist.png'))
+                output_path = os.path.join(
+                    corpus_stats_dir_path,
+                    f'bpe_{col_name.replace(" ", "_")}_hist.png'
+                )
+                plt.savefig(output_path)
                 plt.clf()
 
     print('Write bpe_stats json and png done.')
