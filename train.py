@@ -528,6 +528,8 @@ def main():
     if is_main_process:
         logging.info('Making valid dataset')
     excluded_path_list_for_valid = train_dataset.included_path_list + test_path_list
+    # to prevent inconsistency, set valid dataset's virtual piece step to zero
+    args.data.virtual_piece_step_ratio = 0
     valid_dataset = MidiDataset(
         data_dir_path=args.corpus_dir_path,
         excluded_path_list=excluded_path_list_for_valid,
