@@ -866,4 +866,7 @@ if __name__ == '__main__':
         if accelerate.state.AcceleratorState.is_main_process:
             logging.info('Training stopped by KeyboardInterrupt')
             logging.info('==== train.py exit ====')
-        exit(0)
+        exit(1)
+    except Exception as e:
+        raise e
+        # exit(1)
