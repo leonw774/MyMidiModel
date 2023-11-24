@@ -177,11 +177,11 @@ def main():
             midi_dur = midomidi.length
             midi_length_list.append(midi_dur)
     logging.info(
-        '%d notes involved in evaluation. Avg. #note per piece: %f. Tot. midi playback time: %f.',
+        '%d notes involved in evaluation. Avg. #note per piece: %g.',
         np.sum(aggr_eval_features['notes_number_per_piece']),
         np.mean(aggr_eval_features['notes_number_per_piece']),
-        np.sum(midi_length_list)
     )
+    logging.info('Total midi playback time: %f.', np.sum(midi_length_list))
 
     logging.info('\t'.join([
         f'{fname}' for fname in EVAL_SCALAR_FEATURE_NAMES

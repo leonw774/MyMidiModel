@@ -213,7 +213,6 @@ def get_time_structure_tokens(
     Return measure list and tempo list. The first measure contains the
     first note and the last note ends in the last measure.
     """
-    nth_per_beat = nth // 4
     # note_token_list is sorted
     first_note_start = note_token_list[0].onset
     last_note_end = note_token_list[-1].onset + note_token_list[-1].duration

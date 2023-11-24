@@ -20,6 +20,38 @@ from .corpus import (
     get_full_array_string
 )
 
+
+def deeper_getsizeof(obj, depth = 1):
+    """sys.getsizeof but deeper"""
+    assert isinstance(depth, int) and depth >= 1
+
+    cur_stack = [obj]
+    next_stack = []
+    checked_id = set()
+    obj_size = 0
+
+    for _ in range(depth):
+        while len(cur_stack) > 0:
+            x = cur_stack.pop()
+            checked_id.add(id(x))
+
+            if isinstance(x, (tuple, list, set, frozenset)):
+                obj_size += sys.getsizeof(x)
+                next_stack.extend(elem for elem in x)
+
+            elif isinstance(x, dict):
+                obj_size += sys.getsizeof(x)
+                next_stack.extend(key for key in x.keys())
+                next_stack.extend(value for value in x.values())
+
+            elif isinstance(obj, np.ndarray):
+                obj_size += obj.nbytes
+
+        cur_stack = next_stack
+        next_stack = []
+
+    return obj_size
+
 class MidiDataset(Dataset):
 
     def __init__(
@@ -28,12 +60,11 @@ class MidiDataset(Dataset):
             max_seq_length: int,
             excluded_path_list: List[str] = None,
             virtual_piece_step_ratio: float = 0,
-            flatten_virtual_pieces: bool = True,
+            flatten_virtual_pieces: bool = False,
             permute_mps: bool = False,
             permute_track_number: bool = False,
             pitch_augmentation_range: int = 0,
-            verbose: bool = False
-        ) -> None:
+            verbose: bool = False) -> None:
         """
         Parameters:
         - `data_dir_path`: Expect path to corpus directory
@@ -43,19 +74,20 @@ class MidiDataset(Dataset):
           - If > 0, over-length pieces will have multiple virtual
             pieces. The start of a virtual pieces will be from the
             measure token that has the smallest index greater than
-            `max_seq_length * virtual_piece_step_ratio` * N, where N
+            `max_seq_length * virtual_piece_step_ratio * N`, where N
             is positive integer. Any virtual piece starting from the
             same index are merged as one.
-            If `virtual_piece_step_ratio` is `1 / max_seq_length`,
+          - If `virtual_piece_step_ratio` is `1 / max_seq_length`,
             then its the same as using all possible measures as the
             starting index.
           - If == 0, each piece has only one virtual piece, starting
             from the index 0.
         
-        - `flatten_virtual_pieces`: Default is True.
+        - `flatten_virtual_pieces`: Default is False.
             - If True, all virtual pieces has a indexing number.
-            - If False, a piece, in `__getitem__`, will be randomly
-              one of its virtual pieces.
+            - If False, virtual pieces within same real piece shares
+              the same indexing number, It will be randomly one of the
+              virtual pieces when accessed by `__getitem__`.
 
         - `excluded_path_list`: The list of relative or absolute paths
           of the files to exclude.
@@ -89,7 +121,8 @@ class MidiDataset(Dataset):
         self.pitch_augmentation_range = pitch_augmentation_range
 
         npz_path = os.path.join(data_dir_path, 'arrays.npz')
-        with open(to_pathlist_file_path(data_dir_path), 'r', encoding='utf8') as pathlist_file:
+        pathlist_file_path = to_pathlist_file_path(data_dir_path)
+        with open(pathlist_file_path, 'r', encoding='utf8') as pathlist_file:
             all_paths_list = [
                 p.strip()
                 for p in pathlist_file.readlines()
@@ -110,8 +143,8 @@ class MidiDataset(Dataset):
             ncols=0
         )
         for piece_num, midi_path in tqdm_enum_all_path_list:
-            # use endswith because the pathlist records the relative paths from project's root
-            # while excluded_path_tuple may contain relative paths from dataset's root
+            # use endswith because pathlist contain relative paths from project's root
+            # while excluded_path_list may contain relative paths from dataset's root
             if not midi_path.endswith(excluded_path_tuple):
                 self.included_path_list.append(midi_path)
                 self.included_piece_num.add(piece_num)
@@ -142,7 +175,7 @@ class MidiDataset(Dataset):
 
         self.number_of_pieces = len(self.pieces)
         # The seperators of maximal permutable subarray are:
-        # BOS, EOS, SEP, PADDING, track-instrument token, measure tokens, position tokens
+        # BOS, EOS, SEP, PADDING, track token, measure tokens, position tokens
         # we stores their index number in _mps_separators
         # _mps_separators is empty when `permute_mps` is False
         self._mps_separators = list()
@@ -155,7 +188,7 @@ class MidiDataset(Dataset):
         for text, index in self.vocabs.events.text2id.items():
             if text[0] == tokens.MEASURE_EVENTS_CHAR:
                 self._measure_ids.append(index)
-        # numpy.isin can work on set, but turn it into sorted 1d array helps search speed
+        # numpy.isin with sorted 1d array helps search speed
         self._measure_ids = np.sort(np.array(self._measure_ids))
 
         # preprocessing
@@ -238,8 +271,8 @@ class MidiDataset(Dataset):
                 self._piece_augmentable_pitches[piece_num] = augmentable_pitches
 
             if self.flatten_virtual_pieces:
-                virtual_piece_number = len(self._virtual_piece_start_indices[piece_num])
-                cur_index += virtual_piece_number * self._pitch_augmentation_factor
+                virtual_piece_count = len(self._virtual_piece_start_indices[piece_num])
+                cur_index += virtual_piece_count * self._pitch_augmentation_factor
             else:
                 cur_index += self._pitch_augmentation_factor
             self._piece_num_indices[piece_num] = cur_index
@@ -256,12 +289,12 @@ class MidiDataset(Dataset):
                     ])
                 print('Number of non-singleton mps:', len(mps_lengths))
                 print('Average mps length:', sum(mps_lengths)/len(mps_lengths))
-            self_size = sum(
-                sys.getsizeof(getattr(self, attr_name))
+            dataset_memsize = sum(
+                deeper_getsizeof(self.__getattribute__(attr_name), 2)
                 for attr_name in dir(self)
                 if not attr_name.startswith('__')
             )
-            print('Dataset object size:', self_size, 'bytes')
+            print(f'Dataset object size: {dataset_memsize} bytes')
 
     def __getitem__(self, index):
         piece_num = bisect.bisect_left(self._piece_num_indices, index)
