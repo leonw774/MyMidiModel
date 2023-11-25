@@ -276,7 +276,7 @@ class MidiDataset(Dataset):
             else:
                 cur_index += self._pitch_augmentation_factor
             self._piece_num_indices[piece_num] = cur_index
-        self._max_index = cur_index if cur_index > 0 else 0
+        self._length = cur_index + 1
 
         if verbose:
             if permute_mps:
@@ -297,6 +297,7 @@ class MidiDataset(Dataset):
             print(f'Dataset object size: {dataset_memsize} bytes')
 
     def __getitem__(self, index):
+        assert index < self._length
         piece_num = bisect.bisect_left(self._piece_num_indices, index)
         body_start_index = self._piece_body_start_indices[piece_num]
 
@@ -414,7 +415,7 @@ class MidiDataset(Dataset):
         return torch.from_numpy(sampled_array)
 
     def __len__(self):
-        return self._max_index + 1
+        return self._length
 
 
 def collate_mididataset(seq_list: List[torch.Tensor]) -> torch.Tensor:
