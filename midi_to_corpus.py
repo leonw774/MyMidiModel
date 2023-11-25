@@ -27,8 +27,8 @@ def parse_args():
         '--nth',
         type=int,
         default=32,
-        help='The time unit length would be the length of a n-th note. Must be a multiple of 4. \
-            Default is %(default)s.'
+        help='The time unit length would be the length of a n-th note. \
+            Must be a multiple of 4. Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--max-track-number',
@@ -48,7 +48,8 @@ def parse_args():
         '--velocity-step',
         type=int,
         default=16,
-        help='Snap the value of velocities to multiples of this number. Default is %(default)s.'
+        help='Snap the value of velocities to multiples of this number. \
+            Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--tempo-quantization',
@@ -79,7 +80,8 @@ def parse_args():
         '--log',
         dest='log_file_path',
         default='',
-        help='Path to the log file. Default is empty, which means no logging would be performed.'
+        help='Path to the log file. \
+            Default is empty, which means no logging would be performed.'
     )
     main_parser.add_argument(
         '--use-existed',
@@ -136,7 +138,9 @@ def handler(args_dict: dict):
     try:
         args_dict['midi'] = MidiFile(midi_file_path)
     except Exception:
-        # logging.debug('%d pid: %d file: %s\n', n, os.getpid(), midi_file_path, format_exc())
+        # logging.debug(
+        #     '%d pid: %d file: %s\n%s', n, os.getpid(), midi_file_path, format_exc()
+        # )
         return 'RuntimeError(\'miditoolkit failed to parse the file\')'
 
     try:
@@ -148,9 +152,11 @@ def handler(args_dict: dict):
     except KeyboardInterrupt as e:
         raise e
     except Exception as e:
-        # logging.debug('%d pid: %d file: %s\n%s', n, os.getpid(), midi_file_path, format_exc())
+        # logging.debug(
+        #     '%d pid: %d file: %s\n%s', n, os.getpid(), midi_file_path, format_exc()
+        # )
         # if not (repr(e).startswith('Assert') or repr(e).startswith('Runtime')):
-        #     print(f'{n} pid: {os.getpid()} file path: {args_dict["midi_file_path"]}')
+        #     print(f'{n} pid: {os.getpid()} file: {midi_file_path}')
         #     print(format_exc())
         return repr(e)
 
@@ -215,7 +221,8 @@ def mp_func(
         if isinstance(compressed_piece, bytes):
             piece = zlib.decompress(compressed_piece).decode()
             out_file.write(piece+'\n')
-            token_number_list.append(piece.count(' ')+1) # token number = space number + 1
+            # token number = space number + 1
+            token_number_list.append(piece.count(' ') + 1)
             good_path_list.append(args_dict_list[i]['midi_file_path'])
         else:
             bad_reasons[compressed_piece] += 1
@@ -228,7 +235,7 @@ def main():
     args = parse_args()
     corpus_paras_dict = dict(vars(args.handler_args)) # a dict() for copy
 
-    # when not verbose, only info level or higher will be printed to stdout or stderr
+    # when not verbose, only info level or higher will be printed to stdout
     # and also logged into file
     loglevel = logging.DEBUG if args.verbose else logging.INFO
     if args.log_file_path:

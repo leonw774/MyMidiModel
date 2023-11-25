@@ -185,7 +185,12 @@ def main():
         # zip all the npy files into one file with '.npz' extension
         start_time = time()
         logging.info('Zipping npys')
-        zipfile_cm = ZipFile(npy_zip_path, 'x', compression=ZIP_DEFLATED, compresslevel=1)
+        zipfile_cm = ZipFile(
+            npy_zip_path,
+            'x',
+            compression=ZIP_DEFLATED,
+            compresslevel=1
+        )
         with zipfile_cm as npz_file:
             for file_name in tqdm(os.listdir(npy_dir_path), ncols=100):
                 # arcname is file_name -> file should be at root

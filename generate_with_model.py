@@ -262,47 +262,52 @@ def midi_file_list_to_text_list_list(
     if len(vocabs.bpe_shapes_list) > 0 and primer_length > 0:
         print('Applying BPE')
         # model use BPE, then apply it
-        with tempfile.TemporaryDirectory() as tmp_in_corpus_dir_path:
-            # make tmp corpus
-            tmp_corpus_file_path = to_corpus_file_path(tmp_in_corpus_dir_path)
-            with open(tmp_corpus_file_path, 'w+', encoding='utf8') as tmp_corpus_file:
-                tmp_corpus_file.write('\n'.join(primer_piece_list) + '\n')
+        with tempfile.TemporaryDirectory() as in_dir_path, \
+             tempfile.TemporaryDirectory() as out_dir_path:
+            # make tmp corpus, paras, and shape_vocab files
+            in_corpus_file_path = to_corpus_file_path(in_dir_path)
+            with open(in_corpus_file_path, 'w+', encoding='utf8') as in_corpus_file:
+                in_corpus_file.write('\n'.join(primer_piece_list) + '\n')
 
-            tmp_paras_file_path = to_paras_file_path(tmp_in_corpus_dir_path)
-            with open(tmp_paras_file_path, 'w+', encoding='utf8') as tmp_paras_file:
-                tmp_paras_file.write(dump_corpus_paras(vocabs.paras))
+            in_paras_file_path = to_paras_file_path(in_dir_path)
+            with open(in_paras_file_path, 'w+', encoding='utf8') as in_paras_file:
+                in_paras_file.write(dump_corpus_paras(vocabs.paras))
 
-            # make tmp shape_vocab
-            tmp_shape_vocab_file_path = os.path.join(tmp_in_corpus_dir_path, 'shape_vocab')
-            with open(tmp_shape_vocab_file_path, 'w+', encoding='utf8') as shape_vocab_file:
-                shape_vocab_file.write('\n'.join(vocabs.bpe_shapes_list) + '\n')
+            in_shape_vocab_file_path = os.path.join(in_dir_path, 'shape_vocab')
+            with open(in_shape_vocab_file_path, 'w+', encoding='utf8') as in_shape_vocab_file:
+                in_shape_vocab_file.write('\n'.join(vocabs.bpe_shapes_list) + '\n')
 
-            # make sure the current working directory is correct
-            assert os.path.abspath(os.getcwd()) == os.path.dirname(os.path.abspath(__file__))
+            # make sure this script is runing at project's root
+            abs_cwd = os.path.abspath(os.getcwd())
+            abs_project_root = os.path.dirname(os.path.abspath(__file__))
+            assert abs_cwd == abs_project_root
 
             # make sure the program is there and new
-            subprocess.run(['make', '-C', './bpe'], check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(
+                ['make', '-C', './bpe'],
+                check=True,
+                stdout=subprocess.DEVNULL
+            )
 
-            with tempfile.TemporaryDirectory() as tmp_out_corpus_dir_path:
-                tmp_out_corpus_file_path = to_corpus_file_path(tmp_out_corpus_dir_path)
-                apply_args = [
-                    './bpe/apply_vocab',
-                    # '-log',
-                    # '-clearLine',
-                    tmp_in_corpus_dir_path,
-                    tmp_out_corpus_file_path,
-                    tmp_shape_vocab_file_path
+            out_corpus_file_path = to_corpus_file_path(out_dir_path)
+            apply_args = [
+                './bpe/apply_vocab',
+                # '-log',
+                # '-clearLine',
+                in_dir_path,
+                out_corpus_file_path,
+                in_shape_vocab_file_path
+            ]
+            if worker_number > 1:
+                apply_args.append(str(worker_number))
+            subprocess.run(apply_args, check=True, stdout=subprocess.DEVNULL)
+
+            # get content from output
+            with open(out_corpus_file_path, 'r', encoding='utf8') as out_corpus_file:
+                merged_piece_list = [
+                    line.strip()
+                    for line in out_corpus_file.readlines()
                 ]
-                if worker_number > 1:
-                    apply_args.append(str(worker_number))
-                subprocess.run(apply_args, check=True, stdout=subprocess.DEVNULL)
-
-                # get content from output
-                with open(tmp_out_corpus_file_path, 'r', encoding='utf8') as tmp_out_corpus:
-                    merged_piece_list = [
-                        line.strip()
-                        for line in tmp_out_corpus.readlines()
-                    ]
 
         primer_text_list_list = [
             merged_piece.split(' ')
@@ -345,7 +350,7 @@ def main():
     if not args.use_device.startswith('cuda') and args.use_device != 'cpu':
         raise ValueError(f'Bad device name: "{args.use_device}"')
     if not torch.cuda.is_available():
-        print('--use-device is set to \'cuda\' but found no CUDA device. Changed to CPU.')
+        print('--use-device is \'cuda\' but found no CUDA device. Changed to \'cpu\'.')
         args.use_device = 'cpu'
     assert args.sample_number > 0
 
@@ -404,7 +409,7 @@ def main():
             print(
                 f'Keep first {len(primer_path_list)} lines'\
                 f'as sample number is {args.sample_number}\n'\
-                f'Hint: Set sample number to 0 to keep all primers in the primer list.'
+                f'Hint: Set sample number to 0 to keep all primers in the list.'
             )
 
             primer_text_list_list = midi_file_list_to_text_list_list(
@@ -415,7 +420,7 @@ def main():
             print(f'Processed {len(primer_text_list_list)} files successfully.')
             if len(primer_text_list_list) < args.sample_number:
                 print(
-                    f'Primer number less than requested sample number {args.sample_number}.',
+                    f'Primer number < requested sample number {args.sample_number}.',
                     f'will only generate {len(primer_text_list_list)} pieces.'
                 )
                 args.sample_number = len(primer_text_list_list)
@@ -424,7 +429,10 @@ def main():
             # turn primer text list into array
             primer_seq = text_list_to_array(primer_text_list, vocabs=model.vocabs)
             if model.permute_track_number:
-                primer_seq = permute_track_number(primer_seq, model.vocabs.track_numbers.size)
+                primer_seq = permute_track_number(
+                    primer_seq,
+                    model.vocabs.track_numbers.size
+                )
             primer_seq = np.expand_dims(primer_seq, axis=0).astype(np.int32)
             primer_seq = torch.from_numpy(primer_seq)
             primer_seq_list.append(primer_seq)

@@ -105,8 +105,7 @@ class MyMidiTransformer(nn.Module):
         self.to_logit_linears = nn.ModuleList([
             nn.Linear(
                 in_features=embedding_dim,
-                out_features=vsize,
-                bias=False # no bias need because they are after a layer normalization
+                out_features=vsize
             )
             for vsize in self.logit_vocabs_size
         ])
@@ -138,8 +137,12 @@ class MyMidiTransformer(nn.Module):
                 'dropout': dropout_rate,
                 'feature_map': MY_ELU_FEATURE_MAP  # make the model pickle-able
             }
-            self.transformer_decoder = TransformerEncoderBuilder.from_dictionary(params).get()
-            self.transformer_decoder_inference = RecurrentEncoderBuilder.from_dictionary(params).get()
+            self.transformer_decoder = (
+                TransformerEncoderBuilder.from_dictionary(params).get()
+            )
+            self.transformer_decoder_inference = (
+                RecurrentEncoderBuilder.from_dictionary(params).get()
+            )
             make_mirror(self.transformer_decoder, self.transformer_decoder_inference)
         else:
             self.transformer_decoder = x_transformers.Decoder(
@@ -221,11 +224,14 @@ class MyMidiTransformer(nn.Module):
                     length_mask
                 )
         else:
-            # Casual mask is not needed because x_transformer.Decoder has causal=True on default
+            # Casual mask is not needed, x_transformer.Decoder has default causal=True
             # False is masked, True is keep
             length_mask = x[..., ATTR_NAME_INDEX['evt']].ne(0).to(x.device)
             # print(length_mask)
-            transformer_output = self.transformer_decoder(emb_sum_dropout, mask=length_mask)
+            transformer_output = self.transformer_decoder(
+                emb_sum_dropout,
+                mask=length_mask
+            )
 
         logits_tuple = tuple(
             to_logit(transformer_output) for to_logit in self.to_logit_linears

@@ -1,11 +1,11 @@
 from collections import Counter
 import io
+import sys
 from itertools import repeat
 from multiprocessing import Pool
-from psutil import cpu_count
-import sys
 from traceback import format_exc
 
+from psutil import cpu_count
 from tqdm import tqdm
 
 from util.midi import piece_to_midi
@@ -40,7 +40,10 @@ def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -
             o_t.numerator != t_t.numerator
             or o_t.denominator != t_t.denominator
             or o_t.time != t_t.time
-            for o_t, t_t in zip(a_midi.time_signature_changes, b_midi.time_signature_changes)
+            for o_t, t_t in zip(
+                a_midi.time_signature_changes,
+                b_midi.time_signature_changes
+            )
         ):
         print(f'time signature difference at piece#{piece_index}')
         return False
@@ -80,8 +83,8 @@ def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -
         })
         if ((a_track_note_starts != b_track_note_starts)
             or (a_track_note_ends != b_track_note_ends)):
-            # because sometimes there are two or more overlapping notes of same pitch and velocity
-            # if there is a continuing note in them, they will cause ambiguity in note merging
+            # sometimes there are multiple overlapping notes of same pitch and velocity
+            # if there is a continuing note in them, they will cause ambiguity while merging
             a_bytes_io = io.BytesIO()
             b_bytes_io = io.BytesIO()
             a_midi.dump(file=a_bytes_io)
@@ -97,13 +100,15 @@ def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -
 def compare_wrapper(args_dict) -> bool:
     return compare_two_pieces(**args_dict)
 
-def verify_corpus_equality(a_corpus_dir: str, b_corpus_dir: str, worker_number: int) -> bool:
+def verify_corpus_equality(
+        a_corpus_dir: str,
+        b_corpus_dir: str,
+        worker_number: int) -> bool:
     """
     Takes two corpus and check if they are "equal", that is, all the
     pieces at the same index are representing the same midi
     nformation, regardless of any token, shape or order differences.
     """
-
     paras = get_corpus_paras(a_corpus_dir)
     if paras != get_corpus_paras(b_corpus_dir):
         return False

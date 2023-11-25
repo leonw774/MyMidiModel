@@ -748,7 +748,6 @@ def main():
                         accelerator.backward(loss)
                     else:
                         loss.backward()
-                # end for gradient_accumulation_steps
             # end for gradient_accumulation_steps
 
             if args.train.max_grad_norm > 0:
