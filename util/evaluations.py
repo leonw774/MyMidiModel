@@ -241,8 +241,12 @@ def midi_to_features(
         if len(midi_to_piece_paras) == 0:
             midi_to_piece_paras = EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT
         else:
-            # assert all(k in midi_to_piece_paras for k in EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT)
-            if all(k in midi_to_piece_paras for k in EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT):
+            has_all_keys = all(
+                k in midi_to_piece_paras
+                for k in EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT
+            )
+            # assert has_all_keys
+            if has_all_keys:
                 return None
     nth = midi_to_piece_paras['nth']
     try:
@@ -364,9 +368,18 @@ def piece_to_features(
     max_position = max_measure_length
     present_instrument = {track.program for track in midi.instruments}
     instrument_number = len(present_instrument)
-    instrument_index_mapping = {program: idx for idx, program in enumerate(present_instrument)}
-    bar_instrumentation = np.zeros(shape=(len(measure_onsets), instrument_number), dtype=np.bool8)
-    grooving_per_bar = np.zeros(shape=(len(measure_onsets), max_position), dtype=np.bool8)
+    instrument_index_mapping = {
+        program: idx
+        for idx, program in enumerate(present_instrument)
+    }
+    bar_instrumentation = np.zeros(
+        shape=(len(measure_onsets), instrument_number),
+        dtype=np.bool8
+    )
+    grooving_per_bar = np.zeros(
+        shape=(len(measure_onsets), max_position),
+        dtype=np.bool8
+    )
     for track in midi.instruments:
         for note in track.notes:
             # find measure index so that the measure has the largest onset
@@ -374,8 +387,7 @@ def piece_to_features(
             measure_index = bisect.bisect_right(measure_onsets, note.start) - 1
             bar_instrumentation[measure_index, instrument_index_mapping[track.program]] |= True
             position = note.start - measure_onsets[measure_index]
-            assert position < max_position, \
-                   (measure_index, measure_onsets[measure_index-1:measure_index+2], note.start)
+            assert position < max_position
             grooving_per_bar[measure_index, position] |= True
 
     pairs = list(itertools.combinations(range(len(measure_onsets)), 2))
@@ -384,14 +396,16 @@ def piece_to_features(
 
     instrumentation_similarities = [
         1 - (
-            sum(np.logical_xor(bar_instrumentation[a], bar_instrumentation[b])) / instrument_number
+            sum(np.logical_xor(bar_instrumentation[a], bar_instrumentation[b]))
+            / instrument_number
         )
         for a, b in pairs
     ]
 
     grooving_similarities = [
         1 - (
-            sum(np.logical_xor(grooving_per_bar[a], grooving_per_bar[b])) / max_position
+            sum(np.logical_xor(grooving_per_bar[a], grooving_per_bar[b]))
+            / max_position
         )
         for a, b in pairs
     ]
@@ -428,8 +442,9 @@ def compare_with_ref(source_eval_features: dict, reference_eval_features: dict):
 
     # Overlapping area of estimated gaussian distribution
     for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
+        # They keys in this metric have to be number
         # pitch & velocity are intergers, duration is fraction
-        # they could be strings load from JSON
+        # just make them all floats
         source_eval_features[fname+'_OA'] = overlapping_area_of_estimated_gaussian(
             {float(Fraction(k)): v for k, v in source_eval_features[fname].items()},
             {float(Fraction(k)): v for k, v in reference_eval_features[fname].items()}

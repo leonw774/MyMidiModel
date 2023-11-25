@@ -184,7 +184,7 @@ def main():
     logging.info('Total midi playback time: %f.', np.sum(midi_length_list))
 
     logging.info('\t'.join([
-        f'{fname}' for fname in EVAL_SCALAR_FEATURE_NAMES
+        f'{fname[:-4]}' for fname in EVAL_SCALAR_FEATURE_NAMES
     ]))
     logging.info('\t'.join([
         f'{aggr_eval_features[fname]["mean"]}' for fname in EVAL_SCALAR_FEATURE_NAMES
@@ -199,6 +199,15 @@ def main():
                     logging.info('json.load(%s) failed', args.reference_file_path)
                     logging.info(format_exc())
                     return 1
+
+            # the keys in reference_eval_features are read from json
+            # so they are strings
+            # we make the keys in aggr_eval_features all strings too
+            for fname in EVAL_DISTRIBUTION_FEATURE_NAMES:
+                aggr_eval_features[fname] = {
+                    str(k): v
+                    for k, v in aggr_eval_features[fname].items()
+                }
 
             compare_with_ref(aggr_eval_features, reference_eval_features)
 

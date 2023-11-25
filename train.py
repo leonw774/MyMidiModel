@@ -1,4 +1,5 @@
 from argparse import ArgumentParser, Namespace
+from contextlib import nullcontext
 import glob
 import json
 import logging
@@ -293,7 +294,9 @@ def parse_args():
 
 
 # def vanilla_lr(step_num: int, warmup_steps: int, d_model: int) -> float:
-#     return torch.rsqrt(d_model) * min(torch.rsqrt(step_num), step_num * warmup_steps ** (-1.5))
+#     return torch.rsqrt(d_model) * min(
+#         torch.rsqrt(step_num), step_num * warmup_steps ** (-1.5)
+#     )
 
 def lr_warmup_and_linear_decay(
         step_num: int,
@@ -576,9 +579,14 @@ def main():
 
             # get valid features
             valid_file_path_list = glob.glob(f'{ckpt_dir_path}/*.mid')
+            tqdm_valid_file_path_list = tqdm(
+                valid_file_path_list,
+                desc='Reading valid set midi files',
+                ncols=0
+            )
             valid_midi_list = [
                 MidiFile(p)
-                for p in tqdm(valid_file_path_list, desc='Reading valid set midi files', ncols=0)
+                for p in tqdm_valid_file_path_list
             ]
             _, valid_eval_features = midi_list_to_features(valid_midi_list, use_tqdm=True)
             del valid_midi_list
@@ -697,40 +705,50 @@ def main():
         for _ in training_tqdm:
             train_loss_list.append(0.0)
             train_head_losses_list.append([0.0 for _ in train_output_attr_name])
-            for _ in range(gradient_accumulation_steps):
-                try:
-                    batch_seqs = next(train_dataloader_iter)
-                except StopIteration:
-                    train_dataloader_iter = iter(train_dataloader)
-                    batch_seqs = next(train_dataloader_iter)
-
-                # batch_seqs has shape: (batch_size, seq_size, complete_attr_num)
-                batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
-                batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
-                if not args.use_parallel:
-                    batch_input_seqs = batch_input_seqs.to(args.use_device)
-                    batch_target_seqs = batch_target_seqs.to(args.use_device)
-                prediction = model(batch_input_seqs)
-
-                loss, head_losses = compute_losses(
-                    prediction,
-                    batch_target_seqs,
-                    args.train.loss_padding
-                )
-                loss = loss / gradient_accumulation_steps
-
-                if is_main_process:
-                    # note that this only record the loss calculated on main process
-                    train_loss_list[-1] += loss.item()
-                    train_head_losses_list[-1] = [
-                        accu_hl + hl.item() / gradient_accumulation_steps
-                        for accu_hl, hl in zip(train_head_losses_list[-1], head_losses)
-                    ]
-
-                if args.use_parallel:
-                    accelerator.backward(loss)
+            for ga_step in range(gradient_accumulation_steps):
+                # if use parallel and gradient accumulation step is not the last
+                # then we can use no sync
+                if args.use_parallel and ga_step + 1 != gradient_accumulation_steps:
+                    parallel_no_sync_context = accelerator.no_sync(model)
                 else:
-                    loss.backward()
+                    parallel_no_sync_context = nullcontext()
+
+                with parallel_no_sync_context:
+                    try:
+                        batch_seqs = next(train_dataloader_iter)
+                    except StopIteration:
+                        train_dataloader_iter = iter(train_dataloader)
+                        batch_seqs = next(train_dataloader_iter)
+
+                    # batch_seqs has shape: (batch_size, seq_size, complete_attr_num)
+                    batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
+                    batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
+                    if not args.use_parallel:
+                        batch_input_seqs = batch_input_seqs.to(args.use_device)
+                        batch_target_seqs = batch_target_seqs.to(args.use_device)
+                    prediction = model(batch_input_seqs)
+
+                    loss, head_losses = compute_losses(
+                        prediction,
+                        batch_target_seqs,
+                        args.train.loss_padding
+                    )
+                    loss = loss / gradient_accumulation_steps
+
+                    if is_main_process:
+                        # this only record the loss calculated on main process
+                        # we assume they are close enough to "real" loss
+                        train_loss_list[-1] += loss.item()
+                        train_head_losses_list[-1] = [
+                            acc_hl + hl.item() / gradient_accumulation_steps
+                            for acc_hl, hl in zip(train_head_losses_list[-1], head_losses)
+                        ]
+
+                    if args.use_parallel:
+                        accelerator.backward(loss)
+                    else:
+                        loss.backward()
+                # end for gradient_accumulation_steps
             # end for gradient_accumulation_steps
 
             if args.train.max_grad_norm > 0:
@@ -773,14 +791,14 @@ def main():
                 )
                 if args.use_parallel:
                     # need to gather, otherwise each process see different losses
-                    gathered_loss = accelerator.gather(loss)
-                    gathered_head_losses = accelerator.gather(head_losses)
-                    # gathered_head_losses: List[tensor.Tensor]
+                    gather_loss: torch.Tensor = accelerator.gather(loss)
+                    gather_head_losses: List[torch.Tensor] = accelerator.gather(head_losses)
+                    # gather_head_losses: List[torch.Tensor]
                     # dim 0 is process dimension, dim 1 ~ last are original dimensions
-                    gathered_loss = torch.mean(gathered_loss)
-                    gathered_head_losses = torch.mean(torch.stack(gathered_head_losses), dim=1)
-                    valid_loss_list.append(gathered_loss.item())
-                    valid_head_losses_list.append([hl.item() for hl in gathered_head_losses])
+                    gather_loss = gather_loss.mean()
+                    gather_head_losses = torch.stack(gather_head_losses).mean(dim=1)
+                    valid_loss_list.append(gather_loss.item())
+                    valid_head_losses_list.append([hl.item() for hl in gather_head_losses])
                 else:
                     valid_loss_list.append(loss.item())
                     valid_head_losses_list.append([hl.item() for hl in head_losses])
@@ -809,7 +827,7 @@ def main():
         if args.use_parallel:
             accelerator.wait_for_everyone()
             unwrapped_model = accelerator.unwrap_model(model)
-            accelerator.save(unwrapped_model, ckpt_model_file_path) # don't need is_main_process
+            accelerator.save(unwrapped_model, ckpt_model_file_path)
         else:
             torch.save(model, ckpt_model_file_path)
 
@@ -865,7 +883,7 @@ if __name__ == '__main__':
         EXIT_CODE = main()
         exit(EXIT_CODE)
     except KeyboardInterrupt:
-        if accelerate.state.AcceleratorState.is_main_process:
+        if accelerate.state.AcceleratorState().is_main_process:
             logging.info('Training stopped by KeyboardInterrupt')
             logging.info('==== train.py exit ====')
         exit(1)
