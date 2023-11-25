@@ -20,7 +20,7 @@ from util.corpus import (
     dump_corpus_paras, get_full_array_string
 )
 from util.model import MyMidiTransformer
-from util.generation import generate_piece, permute_track_number
+from util.generation import generate, permute_track_number
 from util.type_wrappers import or_none
 
 def read_args():
@@ -85,7 +85,7 @@ def read_args():
             Default is the model\'s max sequence length.'
     )
     parser.add_argument(
-        '--no-prob-adjustment',
+        '--no-adjust-prob',
         action='store_true'
     )
     parser.add_argument(
@@ -178,13 +178,13 @@ def gen_handler(
         args: Namespace,
         output_file_path: str):
     try:
-        gen_text_list = generate_piece(
+        gen_text_list = generate(
             model,
             max_generation_step=args.max_generation_step,
-            start_seq=primer_seq,
+            primer_seq=primer_seq,
             softmax_temperature=args.softmax_temperature,
             try_count_limit=args.try_count_limit,
-            use_prob_adjustment=(not args.no_prob_adjustment),
+            use_adjust_prob=(not args.no_adjust_prob),
             sample_function=args.sample_function,
             sample_threshold=args.sample_threshold,
             print_exception=args.print_exception,

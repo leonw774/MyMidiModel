@@ -1,7 +1,7 @@
 import io
 import json
 import os
-from typing import Union, List
+from typing import Union, List, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -70,7 +70,8 @@ def text_list_to_array(
         text_list: List[str],
         vocabs: Vocabs,
         input_memory: Union[dict, None] = None,
-        output_memory: bool = False) -> NDArray[np.uint16]:
+        output_memory: bool = False
+    ) -> Union[NDArray[np.uint16], Tuple[NDArray[np.uint16], dict]]:
     """
     Serialize pieces into numpy array for the model input.
 
@@ -79,17 +80,17 @@ def text_list_to_array(
 
     Positional embedding of head section:
     ```
-        B = Begain-of-sequence, T = Track, S = Separator
+        B = Begain_of_sequence, T = Track, S = Separator
                 sequence: B T T T T T T S ...
-            mps number: 1 2 2 2 2 2 2 3 ...
+              mps number: 1 2 2 2 2 2 2 3 ...
             track number: 0 1 2 3 4 5 6 0 ...
     ```
 
     Positional embedding of body section:
     ```
-        M = Measure, P = Position, N = Multi-note
+        M = Measure, P = Position, N = Multi_note
                 sequence: ... M P N N N P N N P N  M  P  N  N  ...
-            mps number: ... 4 5 6 6 6 7 8 8 9 10 11 12 13 13 ...
+              mps number: ... 4 5 6 6 6 7 8 8 9 10 11 12 13 13 ...
             track number: ... 0 0 1 3 5 0 1 2 0 2  0  0  2  3  ...
     ```
     Basically, head section is treated as a special measure
@@ -347,7 +348,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
             )
 
         elif typename == tokens.NOTE_EVENTS_CHAR:
-            is_cont = (text[1] == '~')
+            is_cont = text[1] == '~'
             if is_cont:
                 note_attr = tuple(b36strtoi(x) for x in text[3:].split(':'))
             else:
@@ -420,7 +421,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
                 if prev_pitch != -1:
                     plt.plot(
                         [prev_onset_time+0.4, onset_time+0.4], [prev_pitch+0.4, pitch+0.4],
-                        color=PIANOROLL_SHAPE_LINE_COLOR, 
+                        color=PIANOROLL_SHAPE_LINE_COLOR,
                         linewidth=1.0,
                         markerfacecolor=track_colors[track_number],
                         marker='.',

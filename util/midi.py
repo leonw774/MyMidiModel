@@ -332,7 +332,7 @@ def get_time_structure_tokens(
                 cur_time = tempo.time
             cur_tempo = quantize_tempo(tempo.tempo, tempo_quantization)
             if cur_tempo != prev_tempo:
-                # if the previous tempo change is same time as current one, replace the previous
+                # if the prev tempo change is same time as current one, remove prev one
                 if prev_time == cur_time:
                     tempo_list.pop()
                 tempo_list.append(TempoChange(cur_tempo, cur_time))
@@ -365,7 +365,10 @@ def get_time_structure_tokens(
     return  measure_token_list, tempo_token_list
 
 
-def get_position_infos(note_token_list: list, measure_token_list: list, tempo_token_list: list):
+def get_position_infos(
+        note_token_list: list,
+        measure_token_list: list,
+        tempo_token_list: list) -> list:
     nmt_token_list = measure_token_list + note_token_list + tempo_token_list
     nmt_token_list.sort()
 
@@ -502,7 +505,8 @@ def handle_note_continuation(
         is_cont: bool,
         note_attrs: Tuple[int, int, int, int],
         cur_time: int,
-        pending_cont_notes: Dict[int, Dict[Tuple[int, int, int], List[int]]]) -> Union[None, Note]:
+        pending_cont_notes: Dict[int, Dict[Tuple[int, int, int], List[int]]]
+    ) -> Union[None, Note]:
     # pending_cont_notes is dict object so it is pass by reference
     pitch, duration, velocity, track_number = note_attrs
     info = (pitch, velocity, track_number)
@@ -611,21 +615,29 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
         elif typename == tokens.NOTE_EVENTS_CHAR:
             assert not is_head, 'Note token at head'
             assert cur_position >= 0, 'No position before note'
+
             if text[1] == '~':
                 is_cont = True
                 note_attrs = tuple(b36strtoi(x) for x in text[3:].split(':'))
             else:
                 is_cont = False
                 note_attrs = tuple(b36strtoi(x) for x in text[2:].split(':'))
+
             # note_attrs is (pitch, duration, velocity, track_number)
             assert note_attrs[3] in track_number_program_map, 'Note not in used track'
-            n = handle_note_continuation(is_cont, note_attrs, cur_time, pending_cont_notes)
+            n = handle_note_continuation(
+                is_cont,
+                note_attrs,
+                cur_time,
+                pending_cont_notes
+            )
             if n is not None:
                 midi.instruments[track_number_index_map[note_attrs[3]]].notes.append(n)
 
         elif typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             assert not is_head, 'Multi-note token at head'
             assert cur_position >= 0, 'No position before multi-note'
+
             shape_string, *other_attrs = text[1:].split(':')
             relnote_list = []
             for s in shape_string[:-1].split(';'):
@@ -634,8 +646,10 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
                 else:
                     relnote = [False] + [b36strtoi(a) for a in s.split(',')]
                 relnote_list.append(relnote)
+
             base_pitch, stretch_factor, velocity, track_number = map(b36strtoi, other_attrs)
             assert track_number in track_number_program_map, 'Multi-note not in used track'
+
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
                 note_attrs = (
                     base_pitch + rel_pitch,
@@ -648,7 +662,12 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
                 if not 0 <= note_attrs[0] < 128:
                     continue
                 onset_time = cur_time + rel_onset * stretch_factor
-                n = handle_note_continuation(is_cont, note_attrs, onset_time, pending_cont_notes)
+                n = handle_note_continuation(
+                    is_cont,
+                    note_attrs,
+                    onset_time,
+                    pending_cont_notes
+                )
                 if n is not None:
                     midi.instruments[track_number_index_map[track_number]].notes.append(n)
         else:

@@ -33,7 +33,7 @@ from util.evaluations import (
     EVAL_DISTRIBUTION_FEATURE_NAMES,
     EVAL_SCALAR_FEATURE_NAMES
 )
-from util.generation import generate_piece
+from util.generation import generate
 from util.model import (
     MyMidiTransformer, compute_losses,
     LOSS_PADDING_ARG_CHOICES, LOSS_PADDING_ARG_CHOICES_DEFAULT
@@ -362,10 +362,10 @@ def generate_valid_sample_and_get_eval_features(
         sample_function: str,
         sample_threshold: float) -> dict:
     generated_text_list_list = [
-        generate_piece(
+        generate(
             model=model,
             max_generation_step=model.max_seq_length,
-            start_seq=None,
+            primer_seq=None,
             softmax_temperature=softmax_temperature,
             sample_function=sample_function,
             sample_threshold=sample_threshold,

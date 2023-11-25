@@ -163,9 +163,10 @@ def adjust_probs(
     return normed_probs
 
 
+SAMPLE_FUNCTION_ARGUMENT_CHOICES = ('none', 'top-k', 'top-p', 'nucleus')
+
 def default_sampling(probs: torch.Tensor, _threshold) -> torch.Tensor:
     return torch.multinomial(probs, 1)
-
 
 def top_k_sampling(probs: torch.Tensor, threshold: float) -> torch.Tensor:
     assert 0 < threshold <= 1.0
@@ -175,7 +176,6 @@ def top_k_sampling(probs: torch.Tensor, threshold: float) -> torch.Tensor:
     sampled_topk = torch.multinomial(topk_probs, 1)
     sampled_index = sorted_indices[sampled_topk]
     return sampled_index
-
 
 def nucleus_sampling(probs: torch.Tensor, threshold: float) -> torch.Tensor:
     assert 0 < threshold <= 1.0
@@ -191,26 +191,59 @@ def nucleus_sampling(probs: torch.Tensor, threshold: float) -> torch.Tensor:
     sampled_index = sorted_indices[sampled_nuclei]
     return sampled_index
 
-SAMPLE_FUNCTION_ARGUMENT_CHOICES = ('none', 'top-k', 'top-p', 'nucleus')
+
+def check_next_token(
+        text_list: List[str],
+        next_token_str: str,
+        array_memory: dict,
+        vocabs: Vocabs,
+        use_adjust_prob: bool,
+        ignore_pending_note_error: bool,
+        print_exception: bool) -> Union[Tuple[NDArray[np.uint16], dict], None]:
+    """If `next_token` is ok to be put after `text_list`,
+    return the new array and array memory. Otherwise, return None.
+    """
+    try:
+        # format checking
+        if not use_adjust_prob:
+            # have to add EOS at the end to not raise error
+            piece_to_midi(
+                piece=' '.join(text_list + [next_token_str, END_TOKEN_STR]),
+                nth=vocabs.paras['nth'],
+                ignore_pending_note_error=ignore_pending_note_error
+            )
+        # compute full attribute array and second format checking
+        next_token_array, new_array_memory = text_list_to_array(
+            [next_token_str],
+            vocabs=vocabs,
+            input_memory=array_memory,
+            output_memory=True
+        )
+        return next_token_array, new_array_memory
+    except (ValueError, AssertionError) as e:
+        if print_exception:
+            print(repr(e))
+        return None
+
 
 @torch.no_grad()
-def generate_piece(
+def generate(
         model: MyMidiTransformer,
         max_generation_step: int,
-        start_seq: Union[torch.Tensor, None] = None,
+        primer_seq: Union[torch.Tensor, None] = None,
         softmax_temperature: Union[List[float], None] = None,
         try_count_limit: int = 1000,
-        use_prob_adjustment: bool = True,
+        use_adjust_prob: bool = True,
         sample_function: Union[str, None] = 'none',
         sample_threshold:  Union[List[float], None] = None,
         print_exception: bool = False,
         show_tqdm: bool = False,
         ignore_pending_note_error: bool = True) -> List[str]:
     """
-    Expect `start_seq` to be Tensor with shape:
+    Expect `primer_seq` to be Tensor with shape:
     `(1, seq_size, all_attr_number)` or `None`.
 
-    If `start_seq` is None, `text_list_to_array([BEGIN_TOKEN_STR])`
+    If `primer_seq` is None, `text_list_to_array([BEGIN_TOKEN_STR])`
     will be used.
 
     `ignore_pending_note_error` is defaulted True, otherwise it is
@@ -218,23 +251,32 @@ def generate_piece(
 
     Return generated result as text list.
     """
-    # check start_seq
-    if start_seq is not None:
+    # check primer_seq
+    if primer_seq is not None:
         exception_msg = (
-            f'start_seq\'s shape have to be (1, seq_length, all_attr_number). '
-            f'Get {start_seq.shape}'
+            f'Expect primer_seq\' have shape (1, seq_length, all_attr_number). '\
+            f'Get {primer_seq.shape}'
         )
-        assert len(start_seq.shape) == 3, exception_msg
-        assert (start_seq.shape[0] == 1
-            and start_seq.shape[1] >= 1
-            and start_seq.shape[2] == len(ALL_ATTR_NAMES)
+        assert len(primer_seq.shape) == 3, exception_msg
+        assert (primer_seq.shape[0] == 1
+            and primer_seq.shape[1] >= 1
+            and primer_seq.shape[2] == len(ALL_ATTR_NAMES)
         ), exception_msg
-        assert start_seq.dtype == torch.int32
+        assert primer_seq.dtype == torch.int32
     else:
-        start_seq = torch.from_numpy(
+        primer_seq = torch.from_numpy(
             text_list_to_array([BEGIN_TOKEN_STR], model.vocabs).astype('int32')
             # was uint16 to save space torch want int32
-        ).unsqueeze(0).int()
+        ).unsqueeze(0)
+
+    primer_length = primer_seq.size(1)
+    max_generation_step = min(
+        model.max_seq_length, max_generation_step + primer_length
+    ) - primer_length
+    if max_generation_step <= 0:
+        raise ValueError(
+            'primer_seq is longer than model\'s max_seq_length. No generation is performed.'
+        )
 
     # check sampling method
     if softmax_temperature is None:
@@ -279,7 +321,7 @@ def generate_piece(
     model.inference()
 
     # prepare famlity indices for probs adjustment
-    if use_prob_adjustment:
+    if use_adjust_prob:
         # event_family_indices:
         #   multinote_indices, position_indices, measure_indices, track_indices, tempo_indices
         event_family_indices = (set(), set(), set(), set(), set())
@@ -295,16 +337,9 @@ def generate_piece(
             elif t[0] == TEMPO_EVENTS_CHAR:
                 event_family_indices[4].add(i)
 
-    current_seq = start_seq
-    text_list = array_to_text_list(start_seq[0].cpu().numpy(), vocabs=model.vocabs)
-    primer_length = current_seq.shape[1]
-    max_generation_step = min(
-        model.max_seq_length, max_generation_step + primer_length
-    ) - primer_length
-    if max_generation_step <= 0:
-        raise ValueError(
-            'start_seq is longer than model\'s max_seq_length. No generation is performed.'
-        )
+    text_list = array_to_text_list(primer_seq[0].cpu().numpy(), vocabs=model.vocabs)
+    primer_length = primer_seq.shape[1]
+
     recurrent_memory = None
     _, array_memory = text_list_to_array(
         text_list,
@@ -316,86 +351,84 @@ def generate_piece(
     # build memory for primer if use linear transformer
     if model.use_linear_attn:
         for i in range(1, primer_length):
-            input_current_seq = model.to_input_attrs(current_seq[:, :i]).to(model_device)
-            _, recurrent_memory = model(input_current_seq, recurrent_memory)
+            input_primer_seq = model.to_input_attrs(primer_seq[:, :i]).to(model_device)
+            _, recurrent_memory = model(input_primer_seq, recurrent_memory)
 
     for _ in tqdm(range(max_generation_step), disable=not show_tqdm, ncols=100, leave=None):
-        input_current_seq = model.to_input_attrs(current_seq).to(model_device)
+        input_primer_seq = model.to_input_attrs(primer_seq).to(model_device)
         if model.use_linear_attn:
             # return batched_last_logits because inferencing is True
-            batched_last_logits, recurrent_memory = model(input_current_seq, recurrent_memory)
+            batched_last_logits, recurrent_memory = model(input_primer_seq, recurrent_memory)
             last_logits = [
-                l[0].to('cpu') # to cpu, if was cuda (likely)
-                for l in batched_last_logits # l has shape (1, attr_vocab_size)
+                l[0].to('cpu')
+                # to cpu, if was cuda (likely)
+                for l in batched_last_logits
+                # l has shape (1, attr_vocab_size)
             ]
         else:
-            batched_logits = model(input_current_seq)
+            batched_logits = model(input_primer_seq)
             last_logits = [
                 l[0, -1].to('cpu')
-                for l in batched_logits # l has shape (1, seq_length, attr_vocab_size)
+                for l in batched_logits
+                # l has shape (1, seq_length, attr_vocab_size)
             ]
 
         probs = [
             F.softmax(l / t, dim=0)
-            for l, t in zip(last_logits, softmax_temperature) # l has shape (attr_vocab_size,)
+            for l, t in zip(last_logits, softmax_temperature)
+            # l has shape (attr_vocab_size,)
         ]
-        if use_prob_adjustment:
+        if use_adjust_prob:
             # prevent many bad format in advance
             probs = adjust_probs(probs, text_list, model.vocabs, event_family_indices)
         # print('\n'.join([repr(p) for p in probs]))
 
         try_count = 0
-        try_token_text = ""
+        next_token_str = ""
         while try_count < try_count_limit:
             sampled_attrs = [
                 sample(probs, threshold)
                 for probs, threshold in zip(probs, sample_threshold)
             ]
             # print(sampled_attrs)
-            try_token = torch.stack(sampled_attrs, dim=1) # shape = (1, out_attr_num)
-            try_token_text = array_to_text_list(try_token.cpu().numpy(), vocabs=model.vocabs)[0]
+
+             # next_token_array shape = (1, out_attr_num)
+            next_token_array = torch.stack(sampled_attrs, dim=1).cpu().numpy()
+            next_token_str = array_to_text_list(
+                next_token_array,
+                vocabs=model.vocabs
+            )[0]
             # print(try_text_list)
-            if try_token_text == END_TOKEN_STR:
-                text_list = text_list + [try_token_text]
+            if next_token_str == END_TOKEN_STR:
+                text_list = text_list + [next_token_str]
                 # if sampled EOS, then dont check. just end
                 break
 
-            try:
-                try_text_list = text_list + [try_token_text]
-                # format checking
-                if not use_prob_adjustment:
-                    # have to append EOS at the end to not raise error
-                    piece_to_midi(
-                        piece=' '.join(try_text_list + [END_TOKEN_STR]),
-                        nth=model.vocabs.paras['nth'],
-                        ignore_pending_note_error=ignore_pending_note_error
-                    )
-                # compute full attribute array and second format checking
-                try_array, try_array_memory = text_list_to_array(
-                    [try_token_text],
-                    vocabs=model.vocabs,
-                    input_memory=array_memory,
-                    output_memory=True
-                )
-            except (AssertionError, ValueError) as e:
-                if print_exception:
-                    print(repr(e))
+            check_result = check_next_token(
+                text_list=text_list,
+                next_token_str=next_token_str,
+                array_memory=array_memory,
+                vocabs=model.vocabs,
+                use_adjust_prob=use_adjust_prob,
+                ignore_pending_note_error=ignore_pending_note_error,
+                print_exception=print_exception
+            )
+            if check_result is None:
                 try_count += 1
-                continue # keep sampling until no error
-
-            text_list = try_text_list
-            # try_array (seq_length, all_attr_num) -> current_seq (1, seq_length, all_attr_num)
-            current_seq = torch.from_numpy(try_array.astype('int32')).unsqueeze(0).int()
-            array_memory = try_array_memory
-            break
-        # end while sample and try
+                continue
+            else:
+                text_list = text_list + [next_token_str]
+                next_array, array_memory = check_result
+                primer_seq = torch.from_numpy(next_array.astype('int32')).unsqueeze(0)
+                break
+        # end while sample and check
 
         if try_count == try_count_limit:
             if print_exception:
                 print('Exceeded try count limit:', try_count_limit)
             break
 
-        if try_token_text == END_TOKEN_STR:
+        if next_token_str == END_TOKEN_STR:
             break
     # end for each step
 
