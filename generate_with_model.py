@@ -172,7 +172,11 @@ def read_args():
     return parser.parse_args()
 
 
-def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_file_path: str):
+def gen_handler(
+        model: MyMidiTransformer,
+        primer_seq,
+        args: Namespace,
+        output_file_path: str):
     try:
         gen_text_list = generate_piece(
             model,
@@ -207,7 +211,11 @@ def gen_handler(model: MyMidiTransformer, primer_seq, args: Namespace, output_fi
         print(format_exc())
 
 
-def cut_primer_piece(primer_piece: str, primer_length: int, length_unit: str, nth: int) -> str:
+def cut_primer_piece(
+        primer_piece: str,
+        primer_length: int,
+        length_unit: str,
+        nth: int) -> str:
     primer_text_list = primer_piece.split(' ')
     if length_unit == 'measure':
         primer_text_list = get_first_k_measures(primer_text_list, primer_length)
@@ -407,8 +415,8 @@ def main():
             print(f'Processed {len(primer_text_list_list)} files successfully.')
             if len(primer_text_list_list) < args.sample_number:
                 print(
-                    f'Primer number less than designated sample number {args.sample_number}:',
-                    'will only generate', len(primer_text_list_list), 'pieces.'
+                    f'Primer number less than requested sample number {args.sample_number}.',
+                    f'will only generate {len(primer_text_list_list)} pieces.'
                 )
                 args.sample_number = len(primer_text_list_list)
 
@@ -447,5 +455,5 @@ def main():
 
 
 if __name__ == '__main__':
-    exit_code = main()
-    exit(exit_code)
+    EXIT_CODE = main()
+    exit(EXIT_CODE)

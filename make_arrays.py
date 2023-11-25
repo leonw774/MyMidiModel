@@ -158,7 +158,10 @@ def main():
             existing_file_paths.append(npy_zip_path)
             os.remove(npy_zip_path)
         if len(existing_file_paths) != 0:
-            print(f'Find existing intermidiate file(s): {" ".join(existing_file_paths)}. Removed.')
+            print(
+                f'Find existing intermidiate file(s):'\
+                f'{" ".join(existing_file_paths)}. Removed.'
+            )
 
         os.makedirs(npy_dir_path)
         args_list = [
@@ -182,7 +185,8 @@ def main():
         # zip all the npy files into one file with '.npz' extension
         start_time = time()
         logging.info('Zipping npys')
-        with ZipFile(npy_zip_path, 'x', compression=ZIP_DEFLATED, compresslevel=1) as npz_file:
+        zipfile_cm = ZipFile(npy_zip_path, 'x', compression=ZIP_DEFLATED, compresslevel=1)
+        with zipfile_cm as npz_file:
             for file_name in tqdm(os.listdir(npy_dir_path), ncols=100):
                 # arcname is file_name -> file should be at root
                 npz_file.write(os.path.join(npy_dir_path, file_name), file_name)
@@ -200,7 +204,10 @@ def main():
             original_text_list = piece_0.split()
             original_text_list = ['original_text'] + original_text_list
             longest_text_length = max(map(len, original_text_list))
-            original_text_list = [text.ljust(longest_text_length) for text in original_text_list]
+            original_text_list = [
+                text.ljust(longest_text_length)
+                for text in original_text_list
+            ]
 
             array_data = text_list_to_array(piece_0.split(), vocabs)
             debug_str = get_full_array_string(array_data, vocabs)
@@ -227,10 +234,12 @@ def main():
                 t: [] for t in token_types
             }
         }
+        regular_single_note_str = ' ' + NOTE_EVENTS_CHAR + ':'
+        cont_single_note_str = ' ' + NOTE_EVENTS_CHAR + '~:'
         for piece in tqdm(corpus_reader, desc='Making statistics', ncols=100):
             if args.bpe:
-                distributions['shape']['0,0,1;'] += piece.count(' ' + NOTE_EVENTS_CHAR + ':')
-                distributions['shape']['0,0,1~;'] += piece.count(' ' + NOTE_EVENTS_CHAR + '~:')
+                distributions['shape']['0,0,1;'] += piece.count(regular_single_note_str)
+                distributions['shape']['0,0,1~;'] += piece.count(cont_single_note_str)
                 for text in piece.split():
                     if text[0] == MULTI_NOTE_EVENTS_CHAR:
                         distributions['shape'][text[1:].split(':')[0]] += 1
@@ -287,7 +296,11 @@ def main():
 
     if args.bpe:
         sorted_nondefault_shape_count = sorted(
-            [(count, shape) for shape, count in distributions['shape'].items() if len(shape) > 7],
+            [
+                (count, shape)
+                for shape, count in distributions['shape'].items()
+                if len(shape) > 7
+            ],
             # "if len(shape) > 7" is to remove single note shapes
             reverse=True
         )
@@ -298,7 +311,10 @@ def main():
         plt.ylabel('Appearance frequency in corpus')
         plt.subplots_adjust(left=0.075, right=1-0.025, bottom=0.25)
         plt.bar(
-            x=[s[:25]+'...' if len(s) > 25 else s for _, s in sorted_nondefault_shape_count],
+            x=[
+                s[:25]+'...' if len(s) > 25 else s
+                for _, s in sorted_nondefault_shape_count
+            ],
             height=[c / total_shape_num for c, _ in sorted_nondefault_shape_count],
         )
         plt.savefig(os.path.join(stats_dir_path, 'nondefault_shape_distribution.png'))
@@ -335,7 +351,7 @@ def main():
     plt.yscale('log')
     plt.xlabel('number of note/multinote tokens')
     plt.ylabel('number of pieces')
-    plt.savefig(os.path.join(stats_dir_path, 'number_of_note_multinote_tokens_distribution.png'))
+    plt.savefig(os.path.join(stats_dir_path, 'number_of_multinote_tokens_distribution.png'))
     plt.clf()
 
     plt.figure(figsize=(16.8, 6.4))
