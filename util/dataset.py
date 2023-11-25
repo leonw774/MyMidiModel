@@ -231,19 +231,18 @@ class MidiDataset(Dataset):
                 )
             )
 
-            # create more virtual pieces from overlength pieces
-            if virtual_piece_step_ratio > 0 and piece_array.shape[0] > max_seq_length:
+            # create more virtual pieces if pieces length > max_seq_length
+            if (virtual_piece_step_ratio > 0
+                and piece_array.shape[0] > self.max_seq_length):
                 cur_vp_start_index = virtual_piece_step_size
-                for measure_index in self._piece_measures_indices[piece_num]:
-                    if measure_index > cur_vp_start_index:
-                        self._virtual_piece_start_indices[piece_num].append(measure_index)
-                        # increase cur_vp_start_index until it passes m_idx
-                        increased_step = math.ceil(
-                            (measure_index - cur_vp_start_index) / virtual_piece_step_size
-                        )
-                        cur_vp_start_index += increased_step * virtual_piece_step_size
-                        # if this virtual piece is already shorter than max_seq_len
-                        if measure_index > cur_piece_lengths - self.max_seq_length:
+                for midx in self._piece_measures_indices[piece_num]:
+                    if midx > cur_vp_start_index:
+                        self._virtual_piece_start_indices[piece_num].append(midx)
+                        # increase cur_vp_start_index such that it passes m_idx
+                        number_of_steps = math.ceil(midx / virtual_piece_step_size)
+                        cur_vp_start_index = number_of_steps * virtual_piece_step_size
+                        # end if virtual piece is already shorter than max_seq_length
+                        if midx > cur_piece_lengths - self.max_seq_length:
                             break
 
             if permute_mps:
@@ -263,9 +262,10 @@ class MidiDataset(Dataset):
 
             if self.pitch_augmentation_range != 0:
                 has_pitch = (piece_array[:, ATTR_NAME_INDEX['pit']]) != 0
-                # the pitch attribute of drums / percussion instrument is not actual note pitch
+                # the pitch of drums / percussion instrument is not actual note pitch
                 # but different percussion sound
-                # assume instrument vocabulary is 0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
+                # assume instrument vocabulary is:
+                #   0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
                 not_percussion = (piece_array[:, ATTR_NAME_INDEX['ins']]) != 129
                 augmentable_pitches = np.logical_and(has_pitch, not_percussion)
                 self._piece_augmentable_pitches[piece_num] = augmentable_pitches
@@ -331,19 +331,22 @@ class MidiDataset(Dataset):
         # make sure all mps number smaller are than max_mps_number
         # and all of them are non-decreasing
         if body_start_index != self.max_seq_length:
+            attr_mps_index = ATTR_NAME_INDEX['mps']
             min_body_mps_number = np.min(
-                sampled_array[body_start_index:, ATTR_NAME_INDEX['mps']]
+                sampled_array[body_start_index:, attr_mps_index]
             )
             # magic number 4 because the first measure must have mps number 4
             if min_body_mps_number < 4:
                 raise ValueError('MPS number in body is less than 4.')
-            sampled_array[body_start_index:, ATTR_NAME_INDEX['mps']] -= (min_body_mps_number - 4)
+            sampled_array[body_start_index:, attr_mps_index] -= (min_body_mps_number-4)
 
         # pitch augmentation
         # pitch vocabulary is 0:PAD, 1:0, 2:1, ... 128:127
         pitch_augment = index_offset - self.pitch_augmentation_range
         if pitch_augment != 0 and body_start_index != self.max_seq_length:
-            augmentables = self._piece_augmentable_pitches[piece_num][body_start_index:end_index]
+            augmentables = (
+                self._piece_augmentable_pitches[piece_num][body_start_index:end_index]
+            )
             # sometimes the sampled array does not contain any pitch-augmentable token
             body_pitch_col = sampled_array[body_start_index:, ATTR_NAME_INDEX['pit']]
             if np.any(augmentables):
