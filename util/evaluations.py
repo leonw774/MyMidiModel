@@ -58,37 +58,6 @@ def _entropy(x: Union[list, dict], base: float = math_e) -> float:
         raise TypeError('x should be both list or dict')
 
 
-def histogram_intersection(pred: Union[list, dict], true: Union[list, dict]) -> float:
-    if isinstance(pred, list) and isinstance(true, list):
-        assert len(pred) == len(true) and len(true) > 0
-        sum_pred = sum(pred)
-        sum_true = sum(true)
-        if sum_pred == 0 or sum_true == 0:
-            raise ValueError()
-        norm_pred = [x / sum_pred for x in pred]
-        norm_true = [x / sum_true for x in true]
-        intersection = sum([
-            min(p, q)
-            for p, q in zip(norm_true, norm_pred)
-        ])
-        return intersection
-    elif isinstance(pred, dict) and isinstance(true, dict):
-        assert len(pred) > 0 and len(true) > 0
-        sum_pred = sum(pred.values())
-        sum_true = sum(true.values())
-        if sum_pred == 0 or sum_true == 0:
-            raise ValueError()
-        norm_pred = {k: pred[k]/sum_pred for k in pred}
-        norm_true = {k: true[k]/sum_true for k in true}
-        all_keys = set(norm_true.keys()).union(set(norm_pred.keys()))
-        intersection = sum([
-            min(norm_true.get(x, 0), norm_pred.get(x, 0))
-            for x in all_keys
-        ])
-        return intersection
-    else:
-        raise TypeError('pred and true should be both list or dict')
-
 
 def kl_divergence(
         pred: Union[list, dict],
@@ -123,10 +92,10 @@ def kl_divergence(
         sum_true = sum(_true.values())
         if sum_pred == 0 or sum_true == 0:
             raise ValueError()
-        norm_pred = {k: pred[k]/sum_pred for k in pred}
-        norm_true = {k: _true[k]/sum_true for k in _true}
+        norm_pred = {k: pred[k] / sum_pred for k in pred}
+        norm_true = {k: _true[k] / sum_true for k in _true}
         kld = sum([
-            norm_true[x] * log(norm_true[x]/norm_pred[x], base)
+            norm_true[x] * log(norm_true[x] / norm_pred[x], base)
             if x in norm_pred else
             float('inf')
             for x in norm_true
@@ -175,12 +144,46 @@ def overlapping_area_of_estimated_gaussian(
         ) / total_counts_2
         std_2 = sqrt(square_mean_2 - mean_2 * mean_2)
     else:
-        raise TypeError('pred and true should be both list or dict')
+        raise TypeError('the distributions should be both list or dict')
     if std_1 == 0 or std_2 == 0:
         return float('nan')
     nd_1 = NormalDist(mean_1, std_1)
     nd_2 = NormalDist(mean_2, std_2)
     return nd_1.overlap(nd_2)
+
+
+def histogram_intersection(
+        distribution_1: Union[list, dict],
+        distribution_2: Union[list, dict]) -> float:
+    if isinstance(distribution_1, list) and isinstance(distribution_2, list):
+        assert len(distribution_1) == len(distribution_2) and len(distribution_2) > 0
+        sum_1 = sum(distribution_1)
+        sum_2 = sum(distribution_2)
+        if sum_1 == 0 or sum_2 == 0:
+            raise ValueError()
+        norm_1 = [x / sum_1 for x in distribution_1]
+        norm_2 = [x / sum_2 for x in distribution_2]
+        intersection = sum([
+            min(p, q)
+            for p, q in zip(norm_2, norm_1)
+        ])
+        return intersection
+    elif isinstance(distribution_1, dict) and isinstance(distribution_2, dict):
+        assert len(distribution_1) > 0 and len(distribution_2) > 0
+        sum_1 = sum(distribution_1.values())
+        sum_2 = sum(distribution_2.values())
+        if sum_1 == 0 or sum_2 == 0:
+            raise ValueError()
+        norm_1 = {k: distribution_1[k] / sum_1 for k in distribution_1}
+        norm_2 = {k: distribution_2[k] / sum_2 for k in distribution_2}
+        all_keys = set(norm_1.keys()).union(set(norm_2.keys()))
+        intersection = sum([
+            min(norm_1.get(x, 0), norm_2.get(x, 0))
+            for x in all_keys
+        ])
+        return intersection
+    else:
+        raise TypeError('the distributions should be both list or dict')
 
 
 def random_sample_from_piece(piece: str, sample_measure_number: int):
@@ -197,11 +200,11 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
     if len(measure_indices) < sample_measure_number:
         raise AssertionError('piece has fewer measure than sample_measure_number')
 
-    start_measure_index = random.randint(0, len(measure_indices) - sample_measure_number)
-    if start_measure_index + sample_measure_number < len(measure_indices):
-        sampled_body = text_list[start_measure_index:start_measure_index+sample_measure_number]
+    start_index = random.randint(0, len(measure_indices) - sample_measure_number)
+    if start_index + sample_measure_number < len(measure_indices):
+        sampled_body = text_list[start_index:start_index+sample_measure_number]
     else:
-        sampled_body = text_list[start_measure_index:]
+        sampled_body = text_list[start_index:]
 
     head = text_list[:measure_indices[0]]
     return head + sampled_body

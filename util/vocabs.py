@@ -183,16 +183,16 @@ def build_vocabs(
 
     avg_token_number = sum(token_count_per_piece) / len(token_count_per_piece)
     summary_string = (
-        f'Average tokens per piece: {avg_token_number}\n'\
-        f'Event vocab size: {len(event_vocab)}\n'\
-        f'- Measure-time signature: {len(event_measure_time_sig)} '\
-        f'(Existed in corpus: {len(corpus_measure_time_sigs)})\n'\
-        f'- Position: {len(event_position)}\n'\
-        f'- Tempo: {len(event_tempo)} ({event_tempo})\n'\
-        f'- Shape: {len(event_multi_note_shapes)}\n'\
-        f'Duration vocab size: {len(duration_vocab)}\n'\
-        f'Velocity vocab size: {len(velocity_vocab)} ({velocity_vocab})\n'\
-        f'Track number vocab size: {paras["max_track_number"]}\n'\
+        f'Average tokens per piece: {avg_token_number}\n'
+        f'Event vocab size: {len(event_vocab)}\n'
+        f'- Measure-time signature: {len(event_measure_time_sig)} '
+        f'(Existed in corpus: {len(corpus_measure_time_sigs)})\n'
+        f'- Position: {len(event_position)}\n'
+        f'- Tempo: {len(event_tempo)} ({event_tempo})\n'
+        f'- Shape: {len(event_multi_note_shapes)}\n'
+        f'Duration vocab size: {len(duration_vocab)}\n'
+        f'Velocity vocab size: {len(velocity_vocab)} ({velocity_vocab})\n'
+        f'Track number vocab size: {paras["max_track_number"]}\n'
         f'Max MPS number: {max_mps_number}'
     )
 
