@@ -13,8 +13,9 @@ import torch
 from miditoolkit import MidiFile
 
 from util.tokens import BEGIN_TOKEN_STR, END_TOKEN_STR
-from util.midi import midi_to_piece, piece_to_midi, get_first_k_measures, get_first_k_nths
-# from util.corpus_reader import CorpusReader
+from util.midi import (
+    midi_to_piece, piece_to_midi, get_first_k_measures, get_first_k_ticks
+)
 from util.corpus import (
     text_list_to_array, to_corpus_file_path, to_paras_file_path,
     dump_corpus_paras, get_full_array_string
@@ -42,17 +43,17 @@ def read_args():
         default=0,
         help='How long from the start the primer music should be used. Default is %(default)s.\
             The unit of these number is controlled with "--unit" option. \
-            When --unit is "nth", the the length is counted with the token\'s start time.'
+            When --unit is "tick", the length is counted with the token\'s start time.'
     )
     parser.add_argument(
         '--unit', '-u',
-        choices=['measure', 'nth', 'token'],
+        choices=['measure', 'tick', 'token'],
         default='measure',
         help='Specify the unit of PRIMER_LENGTH. \
             If use "measure", primer will be the first PRIMER_LENGTH measures of the piece \
             no matter how long it actually is. \
-            If use "nth", the length of a "nth"-note is the unit. \
-            The value of nth is determined by the setting of the corpus \
+            If use "tick", the length of a tick is the unit. \
+            The length of tick is determined by the setting of the corpus \
             on which the model is trained. \
             If use "tokens", primer will be the first PRIMER_LENGTH tokens of the piece.'
     )
@@ -204,7 +205,7 @@ def gen_handler(
                             model.vocabs
                         )
                     )
-            midi = piece_to_midi(' '.join(gen_text_list), model.vocabs.paras['nth'])
+            midi = piece_to_midi(' '.join(gen_text_list), model.vocabs.paras['tpq'])
             midi.dump(f'{output_file_path}.mid')
     except Exception:
         print('Generation failed becuase the following exception:')
@@ -215,12 +216,12 @@ def cut_primer_piece(
         primer_piece: str,
         primer_length: int,
         length_unit: str,
-        nth: int) -> str:
+        tpq: int) -> str:
     primer_text_list = primer_piece.split(' ')
     if length_unit == 'measure':
         primer_text_list = get_first_k_measures(primer_text_list, primer_length)
-    elif length_unit == 'nth':
-        primer_text_list = get_first_k_nths(primer_text_list, nth, primer_length)
+    elif length_unit == 'tick':
+        primer_text_list = get_first_k_ticks(primer_text_list, tpq, primer_length)
     if primer_text_list[-1] != END_TOKEN_STR:
         primer_text_list.append(END_TOKEN_STR)
     processed_primer_piece = ' '.join(primer_text_list)
@@ -252,10 +253,10 @@ def midi_file_list_to_text_list_list(
             primer_piece_list.append(p)
         except Exception:
             pass
-    # apply measure and nth cut
+    # apply measure and tick cut
     partial_cut_primer_piece = partial(
         cut_primer_piece,
-        primer_length=primer_length, length_unit=length_unit, nth=vocabs.paras['nth']
+        primer_length=primer_length, length_unit=length_unit, tpq=vocabs.paras['tpq']
     )
     primer_piece_list = list(map(partial_cut_primer_piece, primer_piece_list))
 

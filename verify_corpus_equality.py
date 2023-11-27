@@ -12,9 +12,9 @@ from util.midi import piece_to_midi
 from util.corpus_reader import CorpusReader
 from util.corpus import get_corpus_paras
 
-def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -> bool:
+def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, tpq: int) -> bool:
     try:
-        a_midi = piece_to_midi(a_piece, nth)
+        a_midi = piece_to_midi(a_piece, tpq)
     except Exception:
         print(f'exception in piece_to_midi of a_piece #{piece_index}')
         print(format_exc())
@@ -22,7 +22,7 @@ def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, nth: int) -
         return False
 
     try:
-        b_midi = piece_to_midi(b_piece, nth)
+        b_midi = piece_to_midi(b_piece, tpq)
     except Exception:
         print(f'exception in piece_to_midi of b_piece #{piece_index}')
         print(format_exc())
@@ -118,21 +118,21 @@ def verify_corpus_equality(
          CorpusReader(b_corpus_dir) as b_corpus_reader:
         assert len(a_corpus_reader) == len(b_corpus_reader)
         corpus_length = len(a_corpus_reader)
-        nth = paras['nth']
+        tpq = paras['tpq']
         args_zip = zip(
             range(corpus_length),       # piece_index
             a_corpus_reader,            # a_piece
             b_corpus_reader,            # b_piece
-            repeat(nth, corpus_length)  # nth
+            repeat(tpq, corpus_length)  # tpq
         )
         args_dict_list = [
             {
                 'piece_index': i,
                 'a_piece': a,
                 'b_piece': b,
-                'nth': nth
+                'tpq': tpq
             }
-            for i, a, b, nth in args_zip
+            for i, a, b, tpq in args_zip
         ]
 
         with Pool(worker_number) as p:
@@ -151,19 +151,17 @@ def verify_corpus_equality(
 
 if __name__ == '__main__':
     if len(sys.argv) == 3:
-        a_corpus_dir = sys.argv[1]
-        b_corpus_dir = sys.argv[2]
-        worker_number = min(cpu_count(), 4)
+        _a_corpus_dir = sys.argv[1]
+        _b_corpus_dir = sys.argv[2]
+        _worker_number = min(cpu_count(), 4)
     elif len(sys.argv) == 4:
-        a_corpus_dir = sys.argv[1]
-        b_corpus_dir = sys.argv[2]
-        worker_number = int(sys.argv[3])
+        _a_corpus_dir = sys.argv[1]
+        _b_corpus_dir = sys.argv[2]
+        _worker_number = int(sys.argv[3])
     else:
         print('Bad arguments')
-        exit(1)
-    print("Begin equality verification")
-    if verify_corpus_equality(a_corpus_dir, b_corpus_dir, worker_number):
-        print("Equality verification success")
+        exit(2)
+    if verify_corpus_equality(_a_corpus_dir, _b_corpus_dir, _worker_number):
         exit(0)
     else:
         exit(1)

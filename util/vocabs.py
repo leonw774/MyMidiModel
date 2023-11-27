@@ -106,7 +106,7 @@ def build_vocabs(
 
     supported_time_signatures = get_supported_time_signatures()
     largest_possible_position = get_largest_possible_position(
-        paras['nth'], supported_time_signatures
+        paras['tpq'], supported_time_signatures
     )
 
     event_multi_note_shapes = [tokens.NOTE_EVENTS_CHAR, tokens.NOTE_EVENTS_CHAR+'~']
@@ -151,8 +151,12 @@ def build_vocabs(
         corpus_measure_time_sigs.update(
             [text for text in text_list if text[0] == tokens.MEASURE_EVENTS_CHAR]
         )
-    # remove time signatures that dont appears in target corpus?
-    # event_measure_time_sig = [t for t in event_measure_time_sig if t in corpus_measure_time_sigs]
+    # remove time signatures that dont appears in target corpus
+    event_measure_time_sig = [
+        t
+        for t in event_measure_time_sig
+        if t in corpus_measure_time_sigs
+    ]
 
     # padding token HAVE TO be at first
     event_vocab = (
@@ -165,7 +169,8 @@ def build_vocabs(
         map(itob36str, range(128))
     )
     duration_vocab      = pad_token + list(
-        map(itob36str, range(1, paras['max_duration']+1)) # add 1 because range end is exclusive
+         # add 1 because range end is exclusive
+        map(itob36str, range(1, paras['max_duration']+1))
     )
     velocity_vocab      = pad_token + list(
         map(itob36str, range(paras['velocity_step'], 128, paras['velocity_step']))

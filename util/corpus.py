@@ -273,7 +273,7 @@ PIANOROLL_MEASURELINE_COLOR = (0.8, 0.8, 0.8, 1.0)
 PIANOROLL_TRACK_COLORMAP = cm.get_cmap('terrain')
 PIANOROLL_SHAPE_LINE_COLOR = (0.88, 0.2, 0.24, 0.8)
 
-def piece_to_roll(piece: str, nth: int) -> Figure:
+def piece_to_roll(piece: str, tpq: int) -> Figure:
     plt.clf()
     text_list = piece.split(' ')
 
@@ -285,7 +285,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
         if typename == tokens.MEASURE_EVENTS_CHAR:
             numer, denom = (b36strtoi(x) for x in text[1:].split('/'))
             cur_measure_onset += cur_measure_length
-            cur_measure_length = round(nth * numer / denom)
+            cur_measure_length = 4 * tpq * numer // denom
 
     max_time = cur_measure_onset+cur_measure_length
     figure_width = min(max_time*0.1, 128)
@@ -318,7 +318,7 @@ def piece_to_roll(piece: str, nth: int) -> Figure:
             numer, denom = (b36strtoi(x) for x in text[1:].split('/'))
             cur_measure_onset += cur_measure_length
             cur_time = cur_measure_onset
-            cur_measure_length = round(nth * numer / denom)
+            cur_measure_length = 4 * tpq * numer // denom
             # if cur_time_signature != (numer, denom):
             #     cur_time_signature = (numer, denom)
             # draw measure line between itself and the next measure

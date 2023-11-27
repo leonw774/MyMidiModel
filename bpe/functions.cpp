@@ -70,7 +70,11 @@ int mergeCounters(shape_counter_t counterArray[], size_t arraySize) {
 }
 
 
-size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit) {
+size_t updateNeighbor(
+    Corpus& corpus,
+    const std::vector<Shape>& shapeDict,
+    unsigned int gapLimit
+) {
     size_t totalNeighborNumber = 0;
     // calculate the relative offset of all shapes in shapeDict
     std::vector<unsigned int> relOffsets(shapeDict.size(), 0);
@@ -86,7 +90,9 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
             for (int k = 0; k < track.size(); ++k) {
                 // printTrack(corpus.piecesMN[i][j], shapeDict, k, 1);
                 unsigned int onsetTime = track[k].onset;
-                unsigned int offsetTime = onsetTime + relOffsets[track[k].shapeIndex] * track[k].stretch;
+                unsigned int offsetTime = onsetTime + (
+                    relOffsets[track[k].shapeIndex] * track[k].stretch
+                );
                 unsigned int immdFollowOnset = -1;
                 int n = 1;
                 while (k+n < track.size() && n < MultiNote::neighborLimit) {
@@ -118,7 +124,11 @@ size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsig
     return totalNeighborNumber;
 }
 
-Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const std::vector<Shape>& shapeDict) {
+Shape getShapeOfMultiNotePair(
+    const MultiNote& lmn,
+    const MultiNote& rmn,
+    const std::vector<Shape>& shapeDict
+) {
     if (rmn.onset < lmn.onset) {
         // return getShapeOfMultiNotePair(rmn, lmn, shapeDict);
         throw std::runtime_error("right multi-note has smaller onset than left multi-note");
@@ -177,8 +187,8 @@ Shape getShapeOfMultiNotePair(const MultiNote& lmn, const MultiNote& rmn, const 
     return pairShape;
 }
 
-
-double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelcocity) { // ignoreVelcocity is default false
+// ignoreVelcocity is default false
+double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelcocity) {
     unsigned int max_thread_num = omp_get_max_threads();
     std::vector<uint8_t> multipiSizes[max_thread_num];
     #pragma omp parallel for
@@ -188,16 +198,16 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelcocity) { // ig
         for (const Track &track: corpus.mns[i]) {
             // key: 64 bits: upper 16 unused, 8 for velocity, 8 for time stretch, 32 for onset
             // value: occurence count
-            std::map<uint64_t, uint8_t> thisTrackMulpiSizes;
+            std::map<uint64_t, uint8_t> curTrackMulpiSizes;
             for (int k = 0; k < track.size(); ++k) {
                 uint64_t key = track[k].onset;
                 key |= ((uint64_t) track[k].stretch) << 32;
                 if (!ignoreVelcocity) {
                     key |= ((uint64_t) track[k].vel) << 40;
                 }
-                thisTrackMulpiSizes[key] += 1;
+                curTrackMulpiSizes[key] += 1;
             }
-            for (auto it = thisTrackMulpiSizes.cbegin(); it != thisTrackMulpiSizes.cend(); ++it) {
+            for (auto it = curTrackMulpiSizes.cbegin(); it != curTrackMulpiSizes.cend(); ++it) {
                 multipiSizes[thread_num].push_back(it->second);
             }
         }
@@ -271,13 +281,19 @@ flatten_shape_counter_t getShapeScore(
     int mergedIndex = mergeCounters(shapeScoreParallel, max_thread_num);
     flatten_shape_counter_t shapeScore;
     shapeScore.reserve(shapeScoreParallel[mergedIndex].size());
-    shapeScore.assign(shapeScoreParallel[mergedIndex].cbegin(), shapeScoreParallel[mergedIndex].cend());
+    shapeScore.assign(
+        shapeScoreParallel[mergedIndex].cbegin(),
+        shapeScoreParallel[mergedIndex].cend()
+    );
     return shapeScore;
 }
 
 
 std::pair<Shape, unsigned int> findMaxValPair(const flatten_shape_counter_t& shapeScore) {
-    #pragma omp declare reduction(maxsecond: std::pair<Shape, unsigned int> : omp_out = omp_in.second > omp_out.second ? omp_in : omp_out)
+    #pragma omp declare reduction\
+        (maxsecond: std::pair<Shape, unsigned int>:\
+            omp_out = omp_in.second > omp_out.second ? omp_in : omp_out\
+        )
     std::pair<Shape, unsigned int> maxSecondPair;
     maxSecondPair.second = 0;
     #pragma omp parallel for reduction(maxsecond: maxSecondPair)

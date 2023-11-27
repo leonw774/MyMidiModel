@@ -8,7 +8,7 @@ from multiprocessing import Pool
 import shutil
 import sys
 from time import time, strftime
-# from traceback import format_exc
+from traceback import format_exc
 import zlib
 
 from miditoolkit import MidiFile
@@ -24,11 +24,11 @@ from util.corpus import (
 def parse_args():
     handler_args_parser = ArgumentParser()
     handler_args_parser.add_argument(
-        '--nth',
+        '--tpq',
         type=int,
-        default=32,
+        default=12,
         help='The time unit length would be the length of a n-th note. \
-            Must be a multiple of 4. Default is %(default)s.'
+            Must be a even number. Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--max-track-number',
@@ -41,8 +41,8 @@ def parse_args():
     handler_args_parser.add_argument(
         '--max-duration',
         type=int,
-        default=32,
-        help='Max length of duration in unit of nth note. Default is %(default)s.'
+        default=48,
+        help='Max length of duration in unit of ticks. Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--velocity-step',
@@ -121,43 +121,31 @@ def parse_args():
     return Namespace(**args)
 
 
-def detect_long_silence(piece):
-    consecutive_measure_token_count = 0
-    for t in piece.split(' '):
-        if t[0] == 'M':
-            consecutive_measure_token_count += 1
-        elif t[0] == 'N':
-            consecutive_measure_token_count = 0
-        if consecutive_measure_token_count >= 32:
-            raise AssertionError('Very long silence detected, likely corrupted')
-
-
 def handler(args_dict: dict):
     n = args_dict.pop('n', 0)
     midi_file_path  = args_dict.pop('midi_file_path', '')
     try:
         args_dict['midi'] = MidiFile(midi_file_path)
     except Exception:
-        # logging.debug(
-        #     '%d pid: %d file: %s\n%s', n, os.getpid(), midi_file_path, format_exc()
-        # )
+        logging.debug(
+            '\n%d pid: %d file: %s\n%s',
+            n, os.getpid(), midi_file_path, format_exc()
+        )
         return 'RuntimeError(\'miditoolkit failed to parse the file\')'
 
     try:
         piece = midi_to_piece(**args_dict)
-        detect_long_silence(piece)
         piece_bytes = piece.encode()
         # return compressed text because memory issue
         return zlib.compress(piece_bytes)
     except KeyboardInterrupt as e:
         raise e
     except Exception as e:
-        # logging.debug(
-        #     '%d pid: %d file: %s\n%s', n, os.getpid(), midi_file_path, format_exc()
-        # )
         # if not (repr(e).startswith('Assert') or repr(e).startswith('Runtime')):
-        #     print(f'{n} pid: {os.getpid()} file: {midi_file_path}')
-        #     print(format_exc())
+        logging.debug(
+            '\n%d pid: %d file: %s\n%s',
+            n, os.getpid(), midi_file_path, format_exc()
+        )
         return repr(e)
 
 
@@ -308,6 +296,7 @@ def main():
     start_time = time()
     file_path_list = list()
     for input_path in args.input_path_list:
+        logging.info('Globbing %s', input_path)
         if args.recursive:
             if not os.path.isdir(input_path):
                 print(f'Input path {input_path} is not a directory or doesn\'t exist.')

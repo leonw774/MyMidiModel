@@ -8,20 +8,22 @@ Optional variables:
 softmax_temperature sample_function sample_threshold seed
 "
 # check required variables
-if [ -z "$midi_dir_path" ] || [ -z "$test_paths_file" ] || [ -z "$primer_measure_length" ] ; then
+if [ -z "$midi_dir_path" ] \
+    || [ -z "$test_paths_file" ] \
+    || [ -z "$primer_measure_length" ] ; then
     printf "%s" "$help_text"
     exit 1
 fi
 
 if [ ! -d "$midi_dir_path" ]; then
-    echo "midi_dir_path: $midi_dir_path is not a directory. " | tee -a "$log_path"
-    echo "evaluate_model.py exit." | tee -a "$log_path"
+    echo "midi_dir_path: $midi_dir_path is not a directory." \
+        "evaluate_model.py exit." | tee -a "$log_path"
     exit 1
 fi
 
 if [ ! -f "$test_paths_file" ]; then
-    echo "test_paths_file: $test_paths_file is not a file. " | tee -a "$log_path"
-    echo "evaluate_model.py exit." | tee -a "$log_path"
+    echo "test_paths_file: $test_paths_file is not a file." \
+        "evaluate_model.py exit." | tee -a "$log_path"
     exit 1
 fi
 
@@ -31,6 +33,13 @@ test -z "$worker_number"       && worker_number=1
 test -z "$softmax_temperature" && softmax_temperature=1.0
 test -z "$sample_function"     && sample_function=none
 test -z "$sample_threshold"    && sample_threshold=1.0
+
+# set to empty string if unset
+model_dir_path="${model_dir_path:=}"
+midi_to_piece_paras="${midi_to_piece_paras:=}"
+seed="${seed:=}"
+use_device="${use_device:=}"
+only_eval_uncond="${only_eval_uncond:=}"
 
 echo "evaluated_model.sh start." | tee -a "$log_path"
 echo "midi_dir_path=${midi_dir_path}
@@ -74,8 +83,10 @@ if [ "$test_file_number" -gt 0 ]; then
 
     # Get features of dataset if no result file
 
-    if [ -f "$test_eval_features_path" ] && [ -f "$test_eval_features_primer_path" ]; then
-        echo "Midi dataset $midi_dir_path already has eval features file." | tee -a "$log_path"
+    if [ -f "$test_eval_features_path" ] \
+        && [ -f "$test_eval_features_primer_path" ]; then
+        echo "Midi dataset ${midi_dir_path}"\
+            "already has eval features file." | tee -a "$log_path"
     else
         # Copy test files into test_files_copy_dir_path
         test -d "$test_files_copy_dir_path" && rm -r "$test_files_copy_dir_path"
@@ -88,12 +99,12 @@ if [ "$test_file_number" -gt 0 ]; then
         python3 get_eval_features_of_midis.py \
             --seed "$seed" --midi-to-piece-paras "$midi_to_piece_paras" \
             --log "$log_path" --worker-number "$worker_number"\
-            -- "$test_files_copy_dir_path"
+            -- "$test_files_copy_dir_path" \
+            || {
+                echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
+                exit 1;
+            }
 
-        if [ $? -ne 0 ]; then
-            echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
-            exit 1
-        fi
         mv "${test_files_copy_dir_path}/eval_features.json" "$test_eval_features_path"
 
         echo "Get evaluation features of $midi_dir_path"\
@@ -102,12 +113,12 @@ if [ "$test_file_number" -gt 0 ]; then
             --seed "$seed" --midi-to-piece-paras "$midi_to_piece_paras" \
             --log "$log_path" --worker-number "$worker_number" \
             --primer-measure-length "$primer_measure_length"\
-            -- "$test_files_copy_dir_path"
+            -- "$test_files_copy_dir_path" \
+            || {
+                echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
+                exit 1;
+            }
 
-        if [ $? -ne 0 ]; then
-            echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
-            exit 1
-        fi
         mv "${test_files_copy_dir_path}/eval_features.json" "$test_eval_features_primer_path"
 
         # delete test_files_copy_dir_path
@@ -156,28 +167,27 @@ python3 get_eval_features_of_midis.py \
     --seed "$seed" --midi-to-piece-paras "$midi_to_piece_paras" \
     --log "$log_path" --worker-number "$worker_number" \
     --reference-file-path "$test_eval_features_path" \
-    -- "${eval_samples_dir}/uncond"
-
-if [ $? -ne 0 ]; then
-    echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
-    exit 1
-fi
+    -- "${eval_samples_dir}/uncond" \
+    || {
+        echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
+        exit 1;
+    }
 
 ### Check if stop here
 
 if [ "$test_file_number" == 0 ]; then
     echo "no test files given, "\
         "instrument-conditioned and primer-continuation are omitted." \
+        "evaluate_model.py exit." \
         | tee -a "$log_path"
-    echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 0
 fi
 
 if [ "$only_eval_uncond" == true ]; then
     echo "only_eval_uncond is set and true, "\
         "instrument-conditioned and primer-continuation are omitted." \
+        "evaluate_model.py exit." \
         | tee -a "$log_path"
-    echo "evaluate_model.py exit." | tee -a "$log_path"
     exit 0
 fi
 
@@ -209,12 +219,11 @@ python3 get_eval_features_of_midis.py \
     --seed "$seed" --midi-to-piece-paras "$midi_to_piece_paras" \
     --log "$log_path" --worker-number "$worker_number" \
     --reference-file-path "$test_eval_features_path" \
-    -- "${eval_samples_dir}/instr_cond"
-
-if [ $? -ne 0 ]; then
-    echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
-    exit 1
-fi
+    -- "${eval_samples_dir}/instr_cond" \
+    || {
+        echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
+        exit 1;
+    }
 
 ### Evaluate model prime continuation
 
@@ -245,11 +254,10 @@ python3 get_eval_features_of_midis.py \
     --log "$log_path" --worker-number "$worker_number" \
     --primer-measure-length "$primer_measure_length" \
     --reference-file-path "$test_eval_features_primer_path" \
-    -- "${eval_samples_dir}/primer_cont"
-
-if [ $? -ne 0 ]; then
-    echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
-    exit 1
-fi
+    -- "${eval_samples_dir}/primer_cont" \
+    || {
+        echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
+        exit 1;
+    }
 
 echo "evaluated_model.sh exit." | tee -a "$log_path" 

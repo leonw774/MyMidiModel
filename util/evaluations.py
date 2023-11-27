@@ -211,12 +211,12 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
 
 
 EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT = {
-    'nth': 48 * 4, # 48 is default ticks-per-beat
+    'tpq': 48, # 48 is default ticks-per-beat
     'max_track_number': 255, # limit of the multi-note bpe program
-    'max_duration': 48 * 4,
+    'max_duration': 48 * 4, # four beats
     'velocity_step': 1,
-    'use_cont_note': True,
     'tempo_quantization': (1, 512, 1),
+    'use_cont_note': True,
     'use_merge_drums': False
 }
 
@@ -251,7 +251,7 @@ def midi_to_features(
             # assert has_all_keys
             if has_all_keys:
                 return None
-    nth = midi_to_piece_paras['nth']
+    tpq = midi_to_piece_paras['tpq']
     try:
         temp_piece = midi_to_piece(
             midi=midi,
@@ -261,7 +261,7 @@ def midi_to_features(
         return None
     return piece_to_features(
         piece=temp_piece,
-        nth=nth,
+        tpq=tpq,
         primer_measure_length=primer_measure_length,
         max_pairs_number=max_pairs_number,
         max_token_number=max_token_number
@@ -270,7 +270,7 @@ def midi_to_features(
 
 def piece_to_features(
         piece: str,
-        nth: int,
+        tpq: int,
         primer_measure_length: int = 0,
         max_pairs_number: int = int(1e6),
         max_token_number: int = int(1e4)) -> Union[dict, None]:
@@ -295,7 +295,7 @@ def piece_to_features(
         piece = ' '.join(text_list)
 
     try:
-        midi = piece_to_midi(piece, nth, ignore_pending_note_error=True)
+        midi = piece_to_midi(piece, tpq, ignore_pending_note_error=True)
     except AssertionError:
         return None
     pitchs = []
@@ -306,7 +306,7 @@ def piece_to_features(
         for note in track.notes:
             pitchs.append(note.pitch)
             # use quarter note as unit for duration
-            durations.append(Fraction((note.end - note.start) * 4, nth))
+            durations.append(Fraction((note.end - note.start), tpq))
             velocities.append(note.velocity)
 
     pitch_histogram = {p: 0 for p in range(128)}
@@ -355,7 +355,7 @@ def piece_to_features(
         if text[0] == MEASURE_EVENTS_CHAR:
             measure_onsets.append(measure_onsets[-1] + cur_measure_length)
             numer, denom = (b36strtoi(x) for x in text[1:].split('/'))
-            cur_measure_length = round(nth * numer / denom)
+            cur_measure_length = 4 * tpq * numer // denom
             max_measure_length = max(max_measure_length, cur_measure_length)
 
     # because multi-note representation
@@ -548,7 +548,7 @@ def midi_list_to_features(
 
 def piece_list_to_features(
         piece_list: List[str],
-        nth: int,
+        tpq: int,
         primer_measure_length: int = 0,
         max_pairs_number: int = int(1e6),
         worker_number: int = 1,
@@ -556,7 +556,7 @@ def piece_list_to_features(
     """Given a list of pieces, returns their aggregated features"""
     piece_to_features_partial = functools.partial(
         piece_to_features,
-        nth=nth,
+        tpq=tpq,
         primer_measure_length=primer_measure_length,
         max_pairs_number=max_pairs_number
     )

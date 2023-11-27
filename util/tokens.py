@@ -54,7 +54,7 @@ EndOfScoreToken = namedtuple(
 )
 
 SUPPORT_TIME_SIGNATURE_N_MAX = 24
-SUPPORT_TIME_SIGNATURE_D_LOG2_MAX = 4
+SUPPORT_TIME_SIGNATURE_D_LOG2_MAX = 3
 SUPPORT_TIME_SIGNATURE_ND_RATIO = 3.0
 
 # determined with parameters to cover almost all reasonable usages
@@ -64,8 +64,10 @@ def get_supported_time_signatures(
         nd_raio_max: float = SUPPORT_TIME_SIGNATURE_ND_RATIO) -> set:
     return {
         (numerator, denominator)
-        for denominator in [int(2 ** (log2d+1)) for log2d in range(denominator_log2_max)]
-        for numerator in range(1, min(numerator_max+1, denominator*nd_raio_max+1))
+        for denominator in [
+            int(2 ** (log2d+1)) for log2d in range(denominator_log2_max)]
+        for numerator in range(
+            1, min(numerator_max, int(denominator * nd_raio_max)) + 1)
     }
 
 # determined with hand-picked items based on occurence in datasets
@@ -78,14 +80,14 @@ def get_supported_time_signatures(
 #     return supported_time_signatures
 
 
-def get_largest_possible_position(nth: int, supported_time_signatures: set = None) -> int:
+def get_largest_possible_position(tpq: int, supported_time_signatures: set = None) -> int:
     if supported_time_signatures is None:
         return max(
-            s[0] * (nth // s[1])
+            4 * tpq * s[0] // s[1]
             for s in get_supported_time_signatures() # use default
         )
     return max(
-        s[0] * (nth // s[1])
+        4 * tpq * s[0] // s[1]
         for s in supported_time_signatures
     )
 

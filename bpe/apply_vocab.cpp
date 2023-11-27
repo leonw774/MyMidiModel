@@ -10,7 +10,8 @@ int main(int argc, char *argv[]) {
     int cmd_opt = 0;
     bool doLog = false;
     int nonOptStartIndex = 1;
-    std::string cmdLineUsage = "./apply_vocab [-log] inCorpusDirPath outCorpusFilePath shapeVocabularyFilePath [workerNum]";
+    std::string cmdLineUsage =
+        "./apply_vocab [-log] inCorpusDirPath outCorpusFilePath shapeVocabFilePath [workerNum]";
     while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
         switch (cmd_opt) {
@@ -28,12 +29,13 @@ int main(int argc, char *argv[]) {
                 exit(1);
         }
     }
-    if (argc - nonOptStartIndex != 3 && argc - nonOptStartIndex != 4) {
-        std::cout << "Bad number of non-optional arguments: should be 3 or 4. Get " << argc - nonOptStartIndex << "\n";
+    if ((argc - nonOptStartIndex != 3) && (argc - nonOptStartIndex != 4)) {
+        std::cout << "Bad number of non-optional arguments: should be 3 or 4. Get "
+            << argc - nonOptStartIndex << "\n";
         for (int i = 0; i < argc; ++i) {
             std::cout << argv[i] << " ";
         }
-        std::cout << cmdLineUsage << std::endl;
+        std::cout << "\n" << cmdLineUsage << std::endl;
         return 1;
     }
     std::string inCorpusDirPath(argv[nonOptStartIndex]);
@@ -77,20 +79,22 @@ int main(int argc, char *argv[]) {
     std::cout << "Output merged corpus file: " << outCorpusFilePath << '\n'
         << "Reading input files" << std::endl;
 
-    std::chrono::duration<double> oneSencondDur = std::chrono::duration<double>(1);
-    std::chrono::time_point<std::chrono::system_clock> programStartTime = std::chrono::system_clock::now();
-    std::chrono::time_point<std::chrono::system_clock> ioStartTime = std::chrono::system_clock::now();
+    std::chrono::duration<double> oneSecondDur = std::chrono::duration<double>(1);
+    std::chrono::time_point<std::chrono::system_clock>
+        programStartTime = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::system_clock>
+        ioStartTime = std::chrono::system_clock::now();
 
     // read parameters
     std::map<std::string, std::string> paras = readParasFile(parasFile);
-    int nth, maxDur, maxTrackNum;
+    int tpq, maxDur, maxTrackNum;
     // stoi: c++11 thing
-    nth = stoi(paras[std::string("nth")]);
+    tpq = stoi(paras[std::string("tpq")]);
     maxDur = stoi(paras[std::string("max_duration")]);
     maxTrackNum = stoi(paras[std::string("max_track_number")]);
-    if (nth <= 0 || maxDur <= 0 || maxDur > 255 || maxTrackNum <= 0) {
+    if (tpq <= 0 || maxDur <= 0 || maxDur > 255 || maxTrackNum <= 0) {
         std::cout << "Corpus parameter error" << '\n'
-                << "nth: " << nth << '\n'
+                << "tpq: " << tpq << '\n'
                 << "maxDuration: " << maxDur << '\n'
                 << "maxTrackNum: " << maxTrackNum << std::endl;
         return 1;
@@ -136,12 +140,13 @@ int main(int argc, char *argv[]) {
     std::cout << "Shape vocab size: " << shapeDict.size() - 2 << "(+2)" << std::endl;
 
     // read notes from corpus
-    Corpus corpus = readCorpusFile(inCorpusFile, nth);
+    Corpus corpus = readCorpusFile(inCorpusFile, tpq);
     int numTracks = 0;
     for (auto p: corpus.trackInstrMap) {
         numTracks += p.size();
     }
-    std::cout << "Reading done. There are " << corpus.trackInstrMap.size() << " pieces and "  << numTracks << " tracks." << std::endl;
+    std::cout << "Reading done. There are " << corpus.trackInstrMap.size()
+        << " pieces and "  << numTracks << " tracks." << std::endl;
 
     // sort and count notes
     corpus.sortAllTracks();
@@ -151,29 +156,31 @@ int main(int argc, char *argv[]) {
     double avgMulpi = startAvgMulpi;
 
     std::cout << "Start multinote count: " << multinoteCount
-            << ", Start average mulpi: " << avgMulpi
-            << ", Reading used time: " <<  (std::chrono::system_clock::now() - ioStartTime) / oneSencondDur << std::endl;
+        << ", Start average mulpi: " << avgMulpi
+        << ", Reading used time: "
+        <<  (std::chrono::system_clock::now() - ioStartTime) / oneSecondDur << std::endl;
 
     if (multinoteCount == 0) {
         std::cout << "No notes to merge. Exited." << std::endl;
         return 1;
     }
 
-    std::chrono::time_point<std::chrono::system_clock>iterStartTime;
-    std::chrono::time_point<std::chrono::system_clock>partStartTime;
+    std::chrono::time_point<std::chrono::system_clock> iterStartTime;
+    std::chrono::time_point<std::chrono::system_clock> partStartTime;
     double iterTime, mergeTime, metricsTime = 0.0;
     if (doLog) {
         std::cout << "Index, Avg neighbor number, Shape, "
-                << "Multinote count, Iteration time, Merge time" << std::endl;
+            "Multinote count, Iteration time, Merge time" << std::endl;
     }
     // start from 2 because index 0, 1 are default shapes
     for (int shapeIndex = 2; shapeIndex < shapeDict.size(); ++shapeIndex) {
         iterStartTime = std::chrono::system_clock::now();
-        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, nth);
+        size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, tpq);
         Shape mergingShape = shapeDict[shapeIndex];
         if (doLog){
-            std::cout << shapeIndex << ", " << (double) totalNeighborNumber / multinoteCount << ", "
-                      << "\"" << shape2str(mergingShape) << "\", ";
+            std::cout << shapeIndex
+                << ", " << (double) totalNeighborNumber / multinoteCount
+                << ", \"" << shape2str(mergingShape) << "\", ";
         }
 
         partStartTime = std::chrono::system_clock::now();
@@ -184,49 +191,58 @@ int main(int argc, char *argv[]) {
             // for each track
             #pragma omp parallel for
             for (int j = 0; j < corpus.mns[i].size(); ++j) {
-                Track &curTrack = corpus.mns[i][j];
+                Track &track = corpus.mns[i][j];
                 // for each multinote
-                for (int k = 0; k < curTrack.size(); ++k) {
+                for (int k = 0; k < track.size(); ++k) {
                     // for each neighbor
-                    for (int n = 1; n < curTrack[k].neighbor; ++n) {
-                        if (k + n >= curTrack.size()) {
+                    for (int n = 1; n < track[k].neighbor; ++n) {
+                        if (k + n >= track.size()) {
                             continue;
                         }
-                        if (curTrack[k].vel == 0 || curTrack[k+n].vel == 0 || curTrack[k].vel != curTrack[k+n].vel) {
+                        if (track[k].vel == 0
+                            || track[k+n].vel == 0
+                            || track[k].vel != track[k+n].vel) {
                             continue;
                         }
-                        Shape s = getShapeOfMultiNotePair(curTrack[k], curTrack[k+n], shapeDict);
+                        Shape s = getShapeOfMultiNotePair(track[k], track[k+n], shapeDict);
                         if (s == mergingShape) {
                             // change left multinote to merged multinote
                             // because the relnotes are sorted in same way as multinotes,
-                            // the first relnote in the new shape is correspond to the first relnote in left multinote's original shape
-                            uint8_t newStretch = shapeDict[curTrack[k].shapeIndex][0].relDur * curTrack[k].stretch / mergingShape[0].relDur;
+                            // the first relnote in the new shape is correspond to
+                            // the first relnote in left multinote's original shape
+                            uint8_t newStretch =
+                                shapeDict[track[k].shapeIndex][0].relDur
+                                * track[k].stretch / mergingShape[0].relDur;
                             // unit cannot be greater than max_duration
-                            if (newStretch > maxDur) break;
-                            curTrack[k].stretch = newStretch;
-                            curTrack[k].shapeIndex = shapeIndex;
+                            if (newStretch > maxDur) continue;
+                            track[k].stretch = newStretch;
+                            track[k].shapeIndex = shapeIndex;
 
                             // mark right multinote to be removed by have vel set to 0
-                            curTrack[k+n].vel = 0;
+                            track[k+n].vel = 0;
                             break;
                         }
                     }
                 }
                 // remove multinotes with vel == 0
-                curTrack.erase(
-                    std::remove_if(curTrack.begin(), curTrack.end(), [] (const MultiNote& m) {return m.vel == 0;}),
-                    curTrack.end()
+                track.erase(
+                    std::remove_if(track.begin(), track.end(), [] (const MultiNote& m) {
+                        return m.vel == 0;
+                    }),
+                    track.end()
                 );
             }
         }
-        mergeTime = (std::chrono::system_clock::now() - partStartTime) / oneSencondDur;
-        iterTime = (std::chrono::system_clock::now() - iterStartTime) / oneSencondDur;
+        mergeTime = (std::chrono::system_clock::now() - partStartTime) / oneSecondDur;
+        iterTime = (std::chrono::system_clock::now() - iterStartTime) / oneSecondDur;
         if (doLog) {
             partStartTime = std::chrono::system_clock::now();
             multinoteCount = corpus.getMultiNoteCount();
             // To exclude the time used on calculating metrics
-            metricsTime += (std::chrono::system_clock::now() - partStartTime) / oneSencondDur;
-            std::cout << multinoteCount << ", " << iterTime << ", " << mergeTime;
+            metricsTime += (std::chrono::system_clock::now() - partStartTime) / oneSecondDur;
+            std::cout << multinoteCount
+                << ", " << iterTime
+                << ", " << mergeTime;
             std::cout << std::endl;
         }
     }
@@ -241,14 +257,18 @@ int main(int argc, char *argv[]) {
     // Write files
     std::ofstream outCorpusFile(outCorpusFilePath, std::ios::out | std::ios::trunc);
     if (!outCorpusFile.is_open()) {
-        std::cout << "Failed to open merged corpus output file: " << outCorpusFilePath << std::endl;
+        std::cout << "Failed to open merged corpus output file: "
+            << outCorpusFilePath << std::endl;
         return 1;
     }
 
     ioStartTime = std::chrono::system_clock::now();
     std::cout << "Writing merged corpus file" << std::endl;
     writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum);
-    std::cout << "Writing done. Writing used time: " << (std::chrono::system_clock::now() - ioStartTime) / oneSencondDur << '\n'
-        << "Total used time: " << (std::chrono::system_clock::now() - programStartTime) / oneSencondDur - metricsTime << std::endl;
+    std::cout << "Writing done. Writing used time: "
+        << (std::chrono::system_clock::now() - ioStartTime) / oneSecondDur << '\n'
+        << "Total used time: "
+        << (std::chrono::system_clock::now() - programStartTime) / oneSecondDur - metricsTime
+        << std::endl;
     return 0;
 }

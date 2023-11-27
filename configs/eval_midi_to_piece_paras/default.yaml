@@ -1,6 +1,6 @@
 max_duration: 192
 max_track_number: 255
-nth: 192
+tpq: 48
 tempo_quantization:
 - 1
 - 512

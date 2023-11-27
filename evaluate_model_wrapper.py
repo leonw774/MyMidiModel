@@ -71,7 +71,8 @@ def parse_args():
         type=str,
         default='',
         choices=('', 'true', 'false'),
-        help='Set it to "true" to omit instr-cond and primer-cont genetation evaluation'
+        help='Set it to "true" to omit instr-cond and primer-cont \
+            genetation evaluation'
     )
 
     # required

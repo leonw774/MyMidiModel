@@ -29,9 +29,9 @@ config_file_paths+=("configs/model/${3}.sh")
 for config_file_path in "${config_file_paths[@]}"; do
     if [ -f "$config_file_path" ]; then
         if source "$config_file_path"; then
-            echo "source ${config_file_path}: success"
+            echo "${config_file_path}: success"
         else
-            echo "source ${config_file_path}: fail"
+            echo "${config_file_path}: fail"
             exit 1
         fi
     else
@@ -46,11 +46,12 @@ touch "$log_path"
 
 ######## MAKE CORPUS ########
 
-test "$CONTINUING_NOTE" != true && NO_CONTIN="[no_contin]"
-test "$USE_MERGE_DRUMS" != true && NO_CONTIN="[no_merge_drums]"
+corpus_path_flags=""
+test "$CONTINUING_NOTE" != true && corpus_path_flags+="[no_contin]"
+test "$USE_MERGE_DRUMS" == true && corpus_path_flags+="[merge_drums]"
 
-corpus_dir_path="data/corpus/${DATA_NAME}"
-corpus_dir_path+="${NO_CONTIN}_nth${NTH}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}"
+corpus_dir_path="data/corpus/${DATA_NAME}${corpus_path_flags}"
+corpus_dir_path+="_tpq${TPQ}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}"
 corpus_dir_path+="_v${VELOCITY_STEP}_t${TEMPO_MIN}_${TEMPO_MAX}_${TEMPO_STEP}"
 
 do_midi_to_corpus=true
@@ -104,7 +105,7 @@ if [ "$do_midi_to_corpus" == true ]; then
     test "$MIDI_TO_CORPUS_VERBOSE" == true && \
         midi_to_corpus_flags+=("--verbose")
 
-    if [ -n "${#midi_to_corpus_flags[@]}" ]; then
+    if [ "${#midi_to_corpus_flags[@]}" -ne 0 ]; then
         echo "Added '${midi_to_corpus_flags[*]}' to midi_to_corpus argument" \
             | tee -a "$log_path"
     fi
@@ -112,28 +113,27 @@ if [ "$do_midi_to_corpus" == true ]; then
     echo "Corpus dir: ${corpus_dir_path}"
 
     python3 midi_to_corpus.py \
-        --nth "$NTH" --max-track-number "$MAX_TRACK_NUMBER" \
+        --tpq "$TPQ" --max-track-number "$MAX_TRACK_NUMBER" \
         --max-duration "$MAX_DURATION" --velocity-step "$VELOCITY_STEP" \
         --tempo-quantization "$TEMPO_MIN" "$TEMPO_MAX" "$TEMPO_STEP" \
         --log "$log_path" -w "$WORKER_NUMBER" -o "$corpus_dir_path" \
         --recursive $use_existed_flag "${midi_to_corpus_flags[@]}" \
-        -- "$MIDI_DIR_PATH"
-
-    if [ $? -ne 0 ]; then
-        echo "midi_to_text.py failed. pipeline.sh exit." | tee -a "$log_path"
-        exit 1
-    fi
+        -- "$MIDI_DIR_PATH" \
+        || {
+            echo "midi_to_corpus.py failed. pipeline.sh exit." \
+                | tee -a "$log_path"
+            exit 1;
+        }
 fi
 
 if [ "$do_bpe" == true ]; then
     echo "Start learn bpe vocab" | tee -a "$log_path"
     
     # compile
-    make -C ./bpe
-    if [ $? -ne 0 ]; then
-        echo "Compile error. pipeline.sh exit." | tee -a "$log_path"
-        exit 1
-    fi
+    make -C ./bpe || {
+        echo "BPE program compile error. pipeline.sh exit." | tee -a "$log_path"
+        exit 1;
+    }
 
     # create new dir 
     if [ -d "$bpe_corpus_dir_path" ]; then
@@ -148,31 +148,32 @@ if [ "$do_bpe" == true ]; then
 
     # run learn_vocab
     bpe/learn_vocab \
-        "$BPE_DOLOG" "$corpus_dir_path" "$bpe_corpus_dir_path" \
-        "$BPE_ITER_NUM" "$ADJACENCY" "$SAMPLE_RATE" "$MIN_SCORE_LIMIT" \
-        "$BPE_WORKER" \
+        "$BPE_LOG" "$corpus_dir_path" "$bpe_corpus_dir_path" "$BPE_ITER_NUM" \
+        "$ADJACENCY" "$SAMPLE_RATE" "$MIN_SCORE_LIMIT" "$BPE_WORKER" \
         | tee -a "$log_path"
     
     bpe_exit_code=${PIPESTATUS[0]}
     if [ "$bpe_exit_code" -ne 0 ]; then
         echo "learn_vocab failed. pipeline.sh exit." | tee -a "$log_path"
-        echo "Args: $BPE_DOLOG $corpus_dir_path $bpe_corpus_dir_path" \
-            "$BPE_ITER_NUM $ADJACENCY $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER"
+        echo "Args: $BPE_LOG $corpus_dir_path $bpe_corpus_dir_path $BPE_ITER_NUM" \
+            "$ADJACENCY $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER"
         rm -r "$bpe_corpus_dir_path"
-        exit 1
+        exit 1;
     fi
 
     # process bpe log
     python3 plot_bpe_log.py "$bpe_corpus_dir_path" "$log_path"
 
     # check if tokenized corpus is equal to original corpus
+    echo "Begin equality verification"
     python3 verify_corpus_equality.py \
-        "$corpus_dir_path" "$bpe_corpus_dir_path" "$WORKER_NUMBER" | tee -a "$log_path"
-    verify_exit_code=${PIPESTATUS[0]}
-    if [ "$verify_exit_code" -ne 0 ]; then
-        echo "Equality verification failed. pipeline.sh exit." | tee -a "$log_path";
-        exit 1
-    fi
+        "$corpus_dir_path" "$bpe_corpus_dir_path" "$WORKER_NUMBER" \
+        || {
+            echo "Equality verification failed. pipeline.sh exit." \
+                | tee -a "$log_path";
+            exit 1;
+        }
+    echo "Equality verification success"
 fi
 
 if [ -n "${BPE_ITER_NUM+x}" ] && [ "$BPE_ITER_NUM" -ne 0 ]; then
@@ -183,12 +184,11 @@ fi
 
 python3 make_arrays.py \
     --worker-number "$WORKER_NUMBER" --log "$log_path" \
-    --debug $use_existed_flag "${bpe_flag[@]}" -- "$corpus_dir_path"
-
-if [ $? -ne 0 ]; then
-    echo "text_to_array.py failed. pipeline.sh exit." | tee -a "$log_path";
-    exit 1
-fi
+    --debug $use_existed_flag "${bpe_flag[@]}" -- "$corpus_dir_path" \
+    || {
+        echo "text_to_array.py failed. pipeline.sh exit." | tee -a "$log_path";
+        exit 1;
+    }
 
 ######## TRAIN MODEL ########
 
@@ -214,9 +214,9 @@ test "$PERMUTE_TRACK_NUMBER" == true && train_flags+=("--permute-track-number")
 test "$USE_LINEAR_ATTENTION" == true && train_flags+=("--use-linear-attn")
 test "$NOT_USE_MPS_NUMBER" == true   && train_flags+=("--not-use-mps-number")
 
-if [ -n "${#train_flags[@]}" ]; then
-    echo "Added \"${train_flags[*]}\" to train.py's argument" \
-    | tee -a "$log_path"
+if [ "${#train_flags[@]}" -ne 0 ]; then
+    echo "Added '${train_flags[*]}' to train.py's argument" \
+        | tee -a "$log_path"
 fi
 
 if [ "$USE_PARALLEL" == true ]; then
@@ -238,6 +238,7 @@ if [ "$USE_PARALLEL" == true ]; then
 else
     launch_command="python3"
 fi
+
 $launch_command train.py \
     --test-paths-file "$TEST_PATHS_FILE" --valid-paths-file "$VALID_PATHS_FILE" \
     --max-seq-length "$MAX_SEQ_LENGTH" \
@@ -262,12 +263,11 @@ $launch_command train.py \
     \
     --max-pieces-per-gpu "$MAX_PIECE_PER_GPU" --use-device "$USE_DEVICE" \
     --seed "$SEED" --log "$log_path" "${train_flags[@]}" \
-    -- "$MIDI_DIR_PATH" "$corpus_dir_path" "$model_dir_path"
-
-if [ $? -ne 0 ]; then
-    echo "Training failed. pipeline.sh exit." | tee -a "$log_path"
-    exit 1
-fi
+    -- "$MIDI_DIR_PATH" "$corpus_dir_path" "$model_dir_path" \
+    || {
+        echo "Training failed. pipeline.sh exit." | tee -a "$log_path"
+        exit 1;
+    }
 
 ######## EVALUATION ########
 
@@ -285,11 +285,10 @@ python3 evaluate_model_wrapper.py \
     --sample-function "$SAMPLE_FUNCTION" --sample-threshold "$SAMPLE_THRESHOLD" \
     --eval-sample-number "$EVAL_SAMPLE_NUMBER" --seed "$SEED" \
     --log-path "$log_path" --only-eval-uncond "$ONLY_EVAL_UNCOND" \
-    -- "$MIDI_DIR_PATH" "$TEST_PATHS_FILE" "$PRIMER_LENGTH"
-
-if [ $? -ne 0 ]; then
-    echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
-    exit 1
-fi
+    -- "$MIDI_DIR_PATH" "$TEST_PATHS_FILE" "$PRIMER_LENGTH" \
+    || {
+        echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
+        exit 1;
+    }
 
 echo "All done. pipeline.sh exit." | tee -a "$log_path"

@@ -99,4 +99,4 @@ for i, s in enumerate(batched_samples):
     if args.output_midi:
         if not piece.endswith('EOS'):
             piece += ' EOS'
-        piece_to_midi(piece, vocabs.paras['nth']).dump(f'print_dataset_batch{i}.mid')
+        piece_to_midi(piece, vocabs.paras['tpq']).dump(f'print_dataset_batch{i}.mid')

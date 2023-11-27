@@ -67,10 +67,10 @@ std::vector<Shape> getDefaultShapeDict();
 typedef std::map<Shape, unsigned int> shape_counter_t;
 
 struct MultiNote {
-    // onset:       When nth is 32, 0xffffffff of 32th notes is 4,473,924 minutes in
-    //              the tempo of 120 quarter note per minute,
     uint32_t onset;
-    static const uint32_t onsetLimit = 0xffffffff;
+    // onsetLimit:  When tpq is 12, 0x7ffffff ticks is 1,491,308 minutes in
+    //              the tempo of 120 quarter note per minute,
+    static const uint32_t onsetLimit = 0x7fffffff;
     // shapeIndex:  The index of shape in the shapeDict.
     //              0: DEFAULT_SHAPE_REGULAR, 1: DEFAULT_SHAPE_CONT
     //              This mean iterNum cannot be greater than 0xffff - 2 = 65534
@@ -80,10 +80,9 @@ struct MultiNote {
     uint8_t stretch;// time stretch
     uint8_t vel;
 
-    // `neighbor` store relative index from this multinote to others
-    // if neighbor > 0, any multinote in index (i+1) ~ (i+neighbor) where i is the index of current multinote
-    // is this multinote's neighbor
-    // because we only search toward greater index, it should only be positive integer or zero
+    // This `neighbor` store relative index from this multinote to others.
+    // If neighbor > 0, any multinote in index (i+1) ~ (i+neighbor) 
+    // is the i-th multinote's neighbor.
     uint8_t neighbor;
     static const uint8_t neighborLimit = 0x7f;
 
@@ -96,7 +95,12 @@ struct MultiNote {
 
 typedef std::vector<MultiNote> Track;
 
-void printTrack(const Track& track, const std::vector<Shape>& shapeDict, const size_t begin, const size_t length);
+void printTrack(
+    const Track& track,
+    const std::vector<Shape>& shapeDict,
+    const size_t begin,
+    const size_t length
+);
 
 
 struct TimeStructToken {
@@ -106,7 +110,8 @@ struct TimeStructToken {
     // MSB ---------> LSB
     // T DDD NNNNNNNNNNNN
     // When T is 1, this is a tempo token, the tempo value is N. D is 0
-    // When T is 0, this is a measure token, the denominator is 2 to the power of D and the numerator is N
+    // When T is 0, this is a measure token,
+    // the denominator is 2 to the power of D and the numerator is N
     uint16_t data;
 
     TimeStructToken(uint32_t o, bool t, uint16_t n, uint16_t d);
@@ -131,7 +136,7 @@ struct Corpus {
 
 std::map<std::string, std::string> readParasFile(std::ifstream& paraFile);
 
-Corpus readCorpusFile(std::ifstream& corpusFile, int nth);
+Corpus readCorpusFile(std::ifstream& corpusFile, int tpq);
 
 void writeShapeVocabFile(std::ostream& vocabOutfile, const std::vector<Shape>& shapeDict);
 

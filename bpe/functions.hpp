@@ -2,7 +2,11 @@
 #define FUNCS_H
 
 // return sum of all note's neighbor number
-size_t updateNeighbor(Corpus& corpus, const std::vector<Shape>& shapeDict, unsigned int gapLimit);
+size_t updateNeighbor(
+    Corpus& corpus,
+    const std::vector<Shape>& shapeDict,
+    unsigned int gapLimit
+);
 
 Shape getShapeOfMultiNotePair(
     const MultiNote& lmn,
@@ -10,6 +14,7 @@ Shape getShapeOfMultiNotePair(
     const std::vector<Shape>& shapeDict
 );
 
+// ignoreVelcocity is default false
 double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelocity=false);
 
 typedef std::vector<std::pair<Shape, unsigned int>> flatten_shape_counter_t;

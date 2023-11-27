@@ -209,7 +209,7 @@ def check_next_token(
             # have to add EOS at the end to not raise error
             piece_to_midi(
                 piece=' '.join(text_list + [next_token_str, END_TOKEN_STR]),
-                nth=vocabs.paras['nth'],
+                tpq=vocabs.paras['tpq'],
                 ignore_pending_note_error=ignore_pending_note_error
             )
         # compute full attribute array and second format checking

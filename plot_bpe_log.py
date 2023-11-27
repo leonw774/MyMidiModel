@@ -12,7 +12,8 @@ def main(corpus_dir_path, log_file_path):
     # raise ValueError if not found
     total_used_time_start_pos = log_texts.index('Total used time: ')
     total_used_time_end_pos = total_used_time_start_pos
-    total_used_time_end_pos += (log_texts[total_used_time_start_pos:]).index('\n') # first newline
+    # find first newline after total_used_time_start_pos
+    total_used_time_end_pos += (log_texts[total_used_time_start_pos:]).index('\n')
     total_used_time_text = log_texts[total_used_time_start_pos:total_used_time_end_pos]
     total_used_time = float(total_used_time_text.split(': ')[1])
 
@@ -88,9 +89,10 @@ def main(corpus_dir_path, log_file_path):
                     + f'total_used_time\n  ={total_used_time}'
                 )
             else:
-                left_texts = '\n'.join(
-                    [f'{k}={float(v):.5f}' for k, v in dict(Series(col_list).describe()).items()]
-                )
+                left_texts = '\n'.join([
+                    f'{k}={float(v):.5f}'
+                    for k, v in dict(Series(col_list).describe()).items()
+                ])
 
             plt.subplots_adjust(left=0.2)
             plt.text(
@@ -123,6 +125,4 @@ def main(corpus_dir_path, log_file_path):
     print('Write bpe_stats json and png done.')
 
 if __name__ == '__main__':
-    corpus_dir_path = sys.argv[1]
-    log_file_path = sys.argv[2]
-    main(corpus_dir_path, log_file_path)
+    main(sys.argv[1], sys.argv[2])

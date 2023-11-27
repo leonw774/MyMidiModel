@@ -376,7 +376,7 @@ def generate_valid_sample_and_get_eval_features(
     generated_piece_list = [' '.join(t) for t in generated_text_list_list]
     generated_aggr_eval_features = piece_list_to_features(
         generated_piece_list,
-        model.vocabs.paras['nth']
+        model.vocabs.paras['tpq']
     )
     compare_with_ref(generated_aggr_eval_features, valid_eval_features)
     return generated_aggr_eval_features

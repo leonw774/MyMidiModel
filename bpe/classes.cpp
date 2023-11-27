@@ -15,7 +15,7 @@ RelNote::RelNote(uint8_t o, uint8_t p, uint8_t d, uint8_t c) {
 
 // Compoare on relOnset first and then relPitch, relDur, isCont
 // Decide how shape set should be represented sequentially on shape_vocab and vocab.json
-// This order allows for faster computation because we can access zero-point rel-note at O(1) time
+// This order allows for faster computation since we can access zero-point rel-note at O(1) time
 bool RelNote::operator<(const RelNote& rhs) const {
     // if (relOnset != rhs.relOnset) return relOnset < rhs.relOnset; 
     // if (relPitch != rhs.relPitch) return relPitch < rhs.relPitch;
@@ -77,7 +77,7 @@ std::string itob36str(int x) {
 std::string shape2str(const Shape& s) {
     std::stringstream ss;
     for (const RelNote& r: s) {
-        ss <<        itob36str(r.relOnset)
+        ss << itob36str(r.relOnset)
            << "," << itob36str(r.relPitch)
            << "," << itob36str(r.relDur) << (r.isCont ? "~" : "") << ";";
     }
@@ -124,10 +124,19 @@ bool MultiNote::operator<(const MultiNote& rhs) const {
 }
 
 bool MultiNote::operator==(const MultiNote& rhs) const {
-    return shapeIndex == rhs.shapeIndex && onset == rhs.onset && pitch == rhs.pitch && stretch == rhs.stretch && vel == rhs.vel;
+    return shapeIndex == rhs.shapeIndex 
+        && onset == rhs.onset
+        && pitch == rhs.pitch
+        && stretch == rhs.stretch
+        && vel == rhs.vel;
 }
 
-void printTrack(const Track& track, const std::vector<Shape>& shapeDict, const size_t begin, const size_t length) {
+void printTrack(
+    const Track& track,
+    const std::vector<Shape>& shapeDict,
+    const size_t begin,
+    const size_t length
+) {
     for (int i = begin; i < begin + length; ++i) {
         std::cout << i << " - Shape=" << shape2str(shapeDict[track[i].shapeIndex]);
         std::cout << " onset=" << (int) track[i].onset
@@ -251,7 +260,7 @@ std::map<std::string, std::string> readParasFile(std::ifstream& parasFile) {
     return resultMap;
 }
 
-Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth) {
+Corpus readCorpusFile(std::ifstream& inCorpusFile, int tpq) {
     inCorpusFile.clear();
     inCorpusFile.seekg(0, std::ios::beg);
 
@@ -295,13 +304,17 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int nth) {
                 numer = b36strtoi(a);
                 inCorpusFile.getline(a, 8, ' ');
                 denom = b36strtoi(a);
-                curMeasureLength = numer * nth / denom;
-                corpus.timeStructs.back().push_back(TimeStructToken(curMeasureStart, false, numer, denom));
+                curMeasureLength = 4 * tpq * numer / denom;
+                corpus.timeStructs.back().push_back(
+                    TimeStructToken(curMeasureStart, false, numer, denom)
+                );
                 break;
 
             case TEMPO_EVENTS_CHAR:
                 inCorpusFile.getline(a, 8, ' ');
-                corpus.timeStructs.back().push_back(TimeStructToken(curTime, true, b36strtoi(a), 0));
+                corpus.timeStructs.back().push_back(
+                    TimeStructToken(curTime, true, b36strtoi(a), 0)
+                );
                 break;
 
             case POSITION_EVENTS_CHAR:
@@ -384,7 +397,7 @@ void writeOutputCorpusFile(
         memset(trackEnd, 0, sizeof(trackEnd));
         tsEnd = false;
         tsCurIdx = endedTrackCount = 0;
-        // something gone wrong if there is a track with no notes
+        // should there is be some tracks with no notes
         // should have eliminated them in pre-processing
         // but just keep it here for safety
         for (int j = 0; j < corpus.mns[i].size(); ++j) {
@@ -404,20 +417,24 @@ void writeOutputCorpusFile(
             }
             // if ts's onset <= mn's onset, ts first
             if (!tsEnd && corpus.timeStructs[i][tsCurIdx].onset <= minTrackOnset) {
-                // std::cout << "TimeStruct " << i << "," << tsCurIdx << ", onset=" << corpus.times[i][tsCurIdx].onset << std::endl;
-                if (corpus.timeStructs[i][tsCurIdx].getT()) {
-                    if (prevPosEventOnset < (int) corpus.timeStructs[i][tsCurIdx].onset) {
+                const TimeStructToken& curTS = corpus.timeStructs[i][tsCurIdx];
+                // std::cout << "TS " << i << "," << tsCurIdx
+                //     << ", onset=" << corpus.times[i][tsCurIdx].onset << std::endl;
+                if (curTS.getT()) {
+                    if (prevPosEventOnset < (int) curTS.onset) {
                         outCorpusFile << POSITION_EVENTS_CHAR
-                            << itob36str(corpus.timeStructs[i][tsCurIdx].onset - curMeasureStart) << " ";
-                        prevPosEventOnset = corpus.timeStructs[i][tsCurIdx].onset;
+                            << itob36str(curTS.onset - curMeasureStart)
+                            << " ";
+                        prevPosEventOnset = curTS.onset;
                     }
-                    outCorpusFile << TEMPO_EVENTS_CHAR << itob36str(corpus.timeStructs[i][tsCurIdx].getN()) << " ";
+                    outCorpusFile << TEMPO_EVENTS_CHAR
+                        << itob36str(curTS.getN()) << " ";
                 }
                 else {
                     outCorpusFile << MEASURE_EVENTS_CHAR
-                        << itob36str(corpus.timeStructs[i][tsCurIdx].getN()) << "/"
-                        << itob36str(corpus.timeStructs[i][tsCurIdx].getD()) << " ";
-                    curMeasureStart = corpus.timeStructs[i][tsCurIdx].onset;
+                        << itob36str(curTS.getN()) << "/"
+                        << itob36str(curTS.getD()) << " ";
+                    curMeasureStart = curTS.onset;
                 }
                 tsCurIdx++;
                 if (tsCurIdx == corpus.timeStructs[i].size()) {
@@ -426,9 +443,12 @@ void writeOutputCorpusFile(
             }
             else {
                 const MultiNote& curMN = corpus.mns[i][minTrackIdx][trackCurIdx[minTrackIdx]];
-                // std::cout << "MN " << i << "," << minTrackIdx << "," << trackCurIdx[minTrackIdx] << ", onset=" << curMN.onset << std::endl;
+                // std::cout << "MN " << i << "," << minTrackIdx
+                //     << "," << trackCurIdx[minTrackIdx]
+                //     << ", onset=" << curMN.onset << std::endl;
                 if (prevPosEventOnset < (int) minTrackOnset) {
-                    outCorpusFile << POSITION_EVENTS_CHAR << itob36str(minTrackOnset - curMeasureStart) << " ";
+                    outCorpusFile << POSITION_EVENTS_CHAR
+                        << itob36str(minTrackOnset - curMeasureStart) << " ";
                     prevPosEventOnset = minTrackOnset;
                 }
                 std::string shapeStr;

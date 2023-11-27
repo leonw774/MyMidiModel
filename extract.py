@@ -116,7 +116,7 @@ def main():
             if args.extract_midi:
                 midi = piece_to_midi(
                     piece,
-                    corpus_paras['nth'],
+                    corpus_paras['tpq'],
                     ignore_pending_note_error=False
                 )
                 midi.dump(f'{args.output_path}_{i}.mid')
@@ -126,7 +126,7 @@ def main():
                     f.write(piece+'\n')
 
             if args.extract_img:
-                figure = piece_to_roll(piece, corpus_paras['nth'])
+                figure = piece_to_roll(piece, corpus_paras['tpq'])
                 figure.savefig(f'{args.output_path}_{i}.png')
 
             print(f'extracted {args.output_path}_{i}')

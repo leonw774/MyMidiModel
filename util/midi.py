@@ -1,4 +1,4 @@
-import random
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Tuple, List, Dict, Union
 # from time import time
 
@@ -13,28 +13,29 @@ from .tokens import (
 )
 
 
-def merge_drums(midi: MidiFile) -> None:
-    # merge all drum tracks into one
-    merged_perc_notes = []
-    for track in midi.instruments:
-        if len(track.notes) > 0 and track.is_drum:
-            merged_perc_notes.extend(track.notes)
-    if len(merged_perc_notes) > 0:
-        # remove duplicate
-        merged_perc_notes = list(set(merged_perc_notes))
-        merged_perc_notes.sort(key=lambda x: (x.start, x.end))
-        merged_perc_inst = Instrument(program=128, is_drum=True, name='merged_drums')
-        merged_perc_inst.notes = merged_perc_notes
-        not_perc_inst_list = [track for track in midi.instruments if not track.is_drum]
-        midi.instruments = not_perc_inst_list + [merged_perc_inst]
+# def merge_drums(midi: MidiFile) -> None:
+#     # merge all drum tracks into one
+#     merged_perc_notes = []
+#     for track in midi.instruments:
+#         if len(track.notes) > 0 and track.is_drum:
+#             merged_perc_notes.extend(track.notes)
+#     if len(merged_perc_notes) > 0:
+#         # remove duplicate
+#         merged_perc_notes = list(set(merged_perc_notes))
+#         merged_perc_notes.sort(key=lambda x: (x.start, x.end))
+#         merged_perc_inst = Instrument(program=128, is_drum=True, name='merged_drums')
+#         merged_perc_inst.notes = merged_perc_notes
+#         not_perc_inst_list = [track for track in midi.instruments if not track.is_drum]
+#         midi.instruments = not_perc_inst_list + [merged_perc_inst]
+
 
 def merge_tracks(
         midi: MidiFile,
         max_track_number: int,
         use_merge_drums: bool) -> None:
 
-    if use_merge_drums:
-        merge_drums(midi)
+    # if use_merge_drums:
+    #     merge_drums(midi)
 
     # remove tracks with no notes
     midi.instruments = [
@@ -47,17 +48,17 @@ def merge_tracks(
         tracks = list(midi.instruments) # shallow copy
         # sort tracks with decreasing note number
         tracks.sort(key=lambda x: -len(x.notes))
-        good_tracks_mapping = dict()
-        bad_tracks_mapping = dict()
+        good_tracks_mapping: Dict[int, List[Instrument]] = dict()
+        bad_tracks_mapping: Dict[int, List[Instrument]] = dict()
 
         for track in tracks[:max_track_number]:
-            track_program = track.program if not track.is_drum else 128
+            track_program = 128 if track.is_drum else track.program
             if track_program in good_tracks_mapping:
                 good_tracks_mapping[track_program].append(track)
             else:
                 good_tracks_mapping[track_program] = [track]
         for track in tracks[max_track_number:]:
-            track_program = track.program if not track.is_drum else 128
+            track_program = 128 if track.is_drum else track.program
             if track_program in bad_tracks_mapping:
                 bad_tracks_mapping[track_program].append(track)
             else:
@@ -67,66 +68,91 @@ def merge_tracks(
         for bad_track_program, bad_track_list in bad_tracks_mapping.items():
             if bad_track_program in good_tracks_mapping:
                 for bad_track in bad_track_list:
-                    # find one track to merge
-                    rand_good_track = random.choice(good_tracks_mapping[bad_track_program])
-                    rand_good_track.notes.extend(bad_track.notes)
+                    # merge with track with fewest note
+                    last_good_track = good_tracks_mapping[bad_track_program][-1]
+                    last_good_track.notes.extend(bad_track.notes)
+                    # re-sort the good track
+                    good_tracks_mapping[bad_track_program].sort(
+                        key=lambda x: -len(x.notes)
+                    )
+            elif len(bad_track_list) > 1:
+                # merge all into one
+                for other_bad_track in bad_track_list[1:]:
+                    bad_track_list[0].notes.extend(other_bad_track.notes)
             else:
-                # discard all tracks in bad_tracks_mapping
+                # cannot do anything
                 pass
 
-        good_tracks_mapping = [
+        merged_tracks = [
             track
             for track_list in good_tracks_mapping.values()
             for track in track_list
         ]
-        assert len(good_tracks_mapping) <= max_track_number, \
-            f'Track number exceed max_track_number after merge: {len(good_tracks_mapping)}'
-        midi.instruments = good_tracks_mapping
+        merged_tracks += [
+            track
+            for track_list in bad_tracks_mapping.values()
+            for track in track_list
+        ]
+
+        assert len(merged_tracks) <= max_track_number, \
+            'Track number exceed limit after merge'
+            # f'Track number exceed limit after merge: {len(merged_tracks)}'
+
+        midi.instruments = merged_tracks
 
 
-def tick_to_nth(tick: int, ticks_per_nth: Union[float, int]) -> int:
-    return round(tick/ticks_per_nth)
+def quantize_tick(tick: int, source_tqb: int, target_tpb: int) -> int:
+    return int(
+        (Decimal(tick) / source_tqb * target_tpb).quantize(0, ROUND_HALF_UP)
+    )
 
 
-def quantize_to_nth(midi: MidiFile, nth: int):
+def change_tpq(midi: MidiFile, new_tpq: int):
     # midi = copy.deepcopy(midi)
-    ticks_per_nth = midi.ticks_per_beat / (nth // 4)
+    source_tqb = midi.ticks_per_beat
     for track in midi.instruments:
         for n in track.notes:
-            n.start = tick_to_nth(n.start, ticks_per_nth)
-            n.end = tick_to_nth(n.end, ticks_per_nth)
+            n.start = quantize_tick(n.start, source_tqb, new_tpq)
+            n.end = quantize_tick(n.end, source_tqb, new_tpq)
             if n.end == n.start: # to prevent note perishment
                 n.end = n.start + 1
     for tempo in midi.tempo_changes:
-        tempo.time = tick_to_nth(tempo.time, ticks_per_nth)
+        tempo.time = quantize_tick(tempo.time, source_tqb, new_tpq)
     for time_sig in midi.time_signature_changes:
-        time_sig.time = tick_to_nth(time_sig.time, ticks_per_nth)
+        time_sig.time = quantize_tick(time_sig.time, source_tqb, new_tpq)
     # return midi
 
 
-def quantize_tempo(tempo: int, tempo_quantization: Tuple[int, int, int]) -> int:
-    tq = tempo_quantization
+def quantize_tempo(
+        tempo: Union[float, int],
+        tempo_quantization: Tuple[int, int, int]) -> int:
+    begin, end, step = tempo_quantization
+    tempo = Decimal(tempo)
+    dec_step = Decimal(step)
     # snap
-    t = round(tq[0] + tq[2] * round((tempo - tq[0]) / tq[2]))
+    t = int((tempo / dec_step).quantize(0, rounding=ROUND_HALF_UP)) * step
     # clamp
-    t = min(tq[1], max(tq[0], t))
+    t = max(begin, min(end, t))
     return t
 
 
-def quantize_velocity(velocty: int, velocity_step: int) -> int:
+def quantize_velocity(velocty: int, step: int) -> int:
     # snap
-    v = round(velocty / velocity_step) * velocity_step
+    dec_step = Decimal(step)
+    v = int((velocty / dec_step).quantize(0, rounding=ROUND_HALF_UP)) * step
     # clamp
-    min_v = velocity_step
-    max_v = int(127 / velocity_step) * velocity_step # use int() to round down
-    v = min(max_v, max(min_v, v))
+    min_v = step
+    max_v = (127 // step) * step # use // to round down
+    v = max(min_v, min(max_v, v))
     return v
 
 
-NOTE_TIME_LIMIT = 0x3FFFF # 2^18 - 1
-# when tick/nth is 32, in tempo of bpm 120, 2^18 - 1 ticks are about 68 minutes
+# when tpq is 12, in tempo of bpm 120, 2^18 - 1 ticks are about 182 minutes
+# we ignore any event happening after this
+EVENT_TIME_LIMIT = 0x3FFFF # 2^18 - 1
+
+# if a note have duration > 11 minutes, we think the file is likely corrupted
 NOTE_DURATION_LIMIT = 0x3FFF # 2^14 - 1
-# if a note may have duration > 17 minutes, we think the file is likely corrupted
 
 def get_note_tokens(
         midi: MidiFile,
@@ -140,11 +166,6 @@ def get_note_tokens(
     """
     for track in midi.instruments:
         for i, note in enumerate(track.notes):
-            # sometimes mido/miditoolkit gives weird value to note.start and note.end that
-            # some extra 1s appear in significant bits
-            # sometimes the file itself is corrupted already
-            assert note.start <= NOTE_TIME_LIMIT and note.end <= NOTE_TIME_LIMIT, \
-                'Note start/end too large, likely corrupted'
             assert note.end - note.start <= NOTE_DURATION_LIMIT, \
                 'Note duration too large, likely corrupted'
 
@@ -159,6 +180,8 @@ def get_note_tokens(
         for track_number, track in enumerate(midi.instruments)
         for note in track.notes
         if (note.start < note.end and note.start >= 0
+            and note.start <= EVENT_TIME_LIMIT
+            and note.end <= EVENT_TIME_LIMIT
             and (not track.is_drum or 35 <= note.pitch <= 81))
         # remove negtives and remove percussion notes not in the Genral MIDI percussion map
     ]
@@ -206,7 +229,7 @@ def get_note_tokens(
 def get_time_structure_tokens(
         midi: MidiFile,
         note_token_list: list,
-        nth: int,
+        tpq: int,
         tempo_quantization: Tuple[int, int, int],
         supported_time_signatures: set) -> Tuple[list, list]:
     """
@@ -227,6 +250,8 @@ def get_time_structure_tokens(
         # remove duplicated time_signatures
         prev_nd = (None, None)
         for i, time_sig in enumerate(midi.time_signature_changes):
+            if time_sig.time > last_note_end:
+                break
             if prev_nd != (time_sig.numerator, time_sig.denominator):
                 time_sig_list.append(time_sig)
             prev_nd = (time_sig.numerator, time_sig.denominator)
@@ -237,10 +262,11 @@ def get_time_structure_tokens(
         if len(time_sig_list) > 0:
             if time_sig_list[0].time == 1:
                 if len(time_sig_list) > 1:
-                    nth_per_measure = round(
-                        nth * time_sig_list[0].numerator / time_sig_list[0].denominator
+                    ticks_per_measure = (
+                        4 * tpq * time_sig_list[0].numerator
+                        // time_sig_list[0].denominator
                     )
-                    if time_sig_list[1].time % nth_per_measure == 0:
+                    if time_sig_list[1].time % ticks_per_measure == 0:
                         time_sig_list[0].time = 0
                 else:
                     time_sig_list[0].time = 0
@@ -259,9 +285,9 @@ def get_time_structure_tokens(
         assert (time_sig.numerator, time_sig.denominator) in supported_time_signatures, \
             'Unsupported time signature'
             # f'Unsupported time signature {(time_sig.numerator, time_sig.denominator)}'
-        # print(f'TimeSig {i}:', cur_timesig_start, next_timesig_start, nth_per_measure)
+        # print(f'TimeSig {i}:', cur_timesig_start, next_timesig_start, ticks_per_measure)
 
-        nth_per_measure = round(nth * time_sig.numerator / time_sig.denominator)
+        ticks_per_measure = 4 * tpq * time_sig.numerator // time_sig.denominator
         cur_timesig_start = time_sig.time
 
         # if note already end
@@ -274,25 +300,26 @@ def get_time_structure_tokens(
         else:
             # measure should end when no notes are ending any more
             time_to_last_note_end = last_note_end - cur_timesig_start
-            num_of_measures = (time_to_last_note_end // nth_per_measure) + 1
-            next_timesig_start = cur_timesig_start + num_of_measures * nth_per_measure
+            measure_number = (time_to_last_note_end // ticks_per_measure) + 1
+            next_timesig_start = cur_timesig_start + measure_number * ticks_per_measure
 
         # if note not started yet
         if next_timesig_start <= first_note_start:
             continue
 
-        # check if the difference of starting time between current and next time signature
-        # are multiple of current measure's length
-        assert (next_timesig_start - cur_timesig_start) % nth_per_measure == 0, \
+        # check if the difference of starting time between current and next
+        # time signature are multiple of current measure's length
+        assert (next_timesig_start - cur_timesig_start) % ticks_per_measure == 0, \
             'Bad starting time of a time signature'
-            # f'({next_timesig_start}-{cur_timesig_start})%{nth_per_measure}'
+            # f'({next_timesig_start}-{cur_timesig_start})%{ticks_per_measure}'
 
         # find the first measure that at least contain the first note
-        while cur_timesig_start + nth_per_measure <= first_note_start:
-            cur_timesig_start += nth_per_measure
+        while cur_timesig_start + ticks_per_measure <= first_note_start:
+            cur_timesig_start += ticks_per_measure
         # now cur_measure_start is the REAL first measure
 
-        for cur_measure_start in range(cur_timesig_start, next_timesig_start, nth_per_measure):
+        for cur_measure_start in range(
+            cur_timesig_start, next_timesig_start, ticks_per_measure):
             if cur_measure_start > last_note_end:
                 break
             measure_token_list.append(
@@ -307,8 +334,8 @@ def get_time_structure_tokens(
     # check if last measure contain last note
     last_measure = measure_token_list[-1]
     last_measure_onset = last_measure.onset
-    last_measure_length = round(
-        nth * last_measure.time_signature[0] / last_measure.time_signature[1]
+    last_measure_length = (
+        4 * tpq * last_measure.time_signature[0] // last_measure.time_signature[1]
     )
     assert last_measure_onset <= last_note_end < last_measure_onset + last_measure_length, \
         "Last note did not ends in last measure"
@@ -345,8 +372,11 @@ def get_time_structure_tokens(
     # but tempo can appear in any place so this is all we can do
     if tempo_list[0].time == 1 and measure_token_list[0].onset == 0:
         tempo_list[0].time = 0
-    # assert tempo_list[0].time == measure_token_list[0].onset, 'Tempo not start at time 0'
-    # if the tempo change starts after the first measure, use the default 120 at first measure
+    # assert tempo_list[0].time == measure_token_list[0].onset, \
+    #     'Tempo not start at time 0'
+
+    # if the tempo change starts after the first measure,
+    # use the default 120 at first measure
     if tempo_list[0].time > measure_token_list[0].onset:
         tempo_list = [TempoChange(120, measure_token_list[0].onset)] + tempo_list
 
@@ -413,9 +443,22 @@ def get_head_tokens(midi: MidiFile) -> list:
     return track_token_list
 
 
+def detect_long_empty_measures(token_list: List[str]):
+    consecutive_measure_token_count = 0
+    for t in token_list:
+        if t[0] == 'M':
+            consecutive_measure_token_count += 1
+        elif t[0] == 'N':
+            consecutive_measure_token_count = 0
+        if consecutive_measure_token_count >= 24:
+            raise AssertionError(
+                'Very long empty measures detected, likely corrupted'
+            )
+
+
 def midi_to_token_list(
         midi: MidiFile,
-        nth: int,
+        tpq: int,
         max_duration: int,
         velocity_step: int,
         use_cont_note: bool,
@@ -425,7 +468,7 @@ def midi_to_token_list(
     note_token_list = get_note_tokens(midi, max_duration, velocity_step, use_cont_note)
     assert len(note_token_list) > 0, 'No notes in midi'
     measure_token_list, tempo_token_list = get_time_structure_tokens(
-        midi, note_token_list, nth, tempo_quantization, supported_time_signatures
+        midi, note_token_list, tpq, tempo_quantization, supported_time_signatures
     )
     assert measure_token_list[0].onset <= note_token_list[0].onset, \
         'First measure is after first note'
@@ -440,12 +483,13 @@ def midi_to_token_list(
         + body_token_list + [EndOfScoreToken()]
     )
 
+    detect_long_empty_measures(full_token_list)
     return full_token_list
 
 
 def midi_to_piece(
         midi: MidiFile,
-        nth: int,
+        tpq: int,
         max_track_number: int,
         max_duration: int,
         velocity_step: int,
@@ -455,30 +499,34 @@ def midi_to_piece(
     """
     Parameters:
     - `midi`: A miditoolkit MidiFile object
-    - `nth`: Quantize onset and duration to multiples of the length of
-      nth note. Have to ve multiple of 4. (Common: 32, 48, or 96)
+    - `tpq`: Quantize onset and duration to multiples of the length of
+      `1/tpq` of quarter note. Have to be even number.
     - `max_track_number`: The maximum tracks nubmer to keep in text,
       if the input midi has more 'instruments' than this value, some
       tracks would be merged or discarded.
-    - `max_duration`: The max length of duration in unit of nth note.
+    - `max_duration`: The max length of duration in tick.
     - `velocity_step`: Quantize velocity to multiples of velocity_step.
-    - `use_cont_note`: Use contiuing notes or not. If not, cut off the
-      over-length notes.
+    - `use_cont_note`: Use contiuing notes or not. If not, cut short
+      the over-length notes.
     - `tempo_quantization`: Three values are (min, max, step). where
       min and max are INCLUSIVE.
-    - `use_merge_drums`: Merge drums tracks or not
+    - `use_merge_drums`: Force merge all drums tracks or not.
     """
 
-    assert nth > 4 and nth % 4 == 0, 'nth is not multiple of 4'
-    assert max_track_number <= 255, f'max_track_number is greater than 255: {max_track_number}'
-    assert tempo_quantization[0] <= tempo_quantization[1] and tempo_quantization[2] > 0, \
-        'Bad tempo_quantization'
+    assert isinstance(tpq, int) and tpq > 2 and tpq % 2 == 0, \
+        'tpq is not even number'
+    assert max_track_number <= 255, \
+        f'max_track_number is greater than 255: {max_track_number}'
+    assert isinstance(velocity_step, int), 'Bad velocity_step'
+    assert (all(isinstance(q, int) for q in tempo_quantization)
+            and tempo_quantization[0] <= tempo_quantization[1]
+            and tempo_quantization[2] > 0), 'Bad tempo_quantization'
 
     assert len(midi.instruments) > 0, 'No tracks in MidiFile'
     for inst in midi.instruments:
         inst.remove_invalid_notes(verbose=False)
     # print('original ticks per beat:', midi.ticks_per_beat)
-    quantize_to_nth(midi, nth)
+    change_tpq(midi, tpq)
 
     merge_tracks(midi, max_track_number, use_merge_drums)
 
@@ -489,7 +537,7 @@ def midi_to_piece(
             midi.instruments[i].program = 128
     token_list = midi_to_token_list(
         midi,
-        nth,
+        tpq,
         max_duration,
         velocity_step,
         use_cont_note,
@@ -548,13 +596,17 @@ def handle_note_continuation(
     return None
 
 
-def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) -> MidiFile:
-    # tick time == nth time
-    midi = MidiFile(ticks_per_beat=nth//4)
+def piece_to_midi(
+        piece: str,
+        tpq: int,
+        ignore_pending_note_error: bool = True) -> MidiFile:
+    # tick time == tpq time
+    midi = MidiFile(ticks_per_beat=tpq)
 
     text_list = piece.split(' ')
-    assert text_list[0] == tokens.BEGIN_TOKEN_STR and text_list[-1] == tokens.END_TOKEN_STR, \
-        f'No BOS and EOS at start and end, instead: {text_list[0]} and {text_list[-1]}'
+    assert (text_list[0] == tokens.BEGIN_TOKEN_STR
+            and text_list[-1] == tokens.END_TOKEN_STR), \
+        f'No BOS and EOS at start and end. Get: {text_list[0]} and {text_list[-1]}'
 
     cur_time = 0
     cur_position = -1
@@ -595,7 +647,7 @@ def piece_to_midi(piece: str, nth: int, ignore_pending_note_error: bool = True) 
             cur_measure_onset += cur_measure_length
             cur_time = cur_measure_onset
 
-            cur_measure_length = round(nth * numer / denom)
+            cur_measure_length = 4 * tpq * numer // denom
             if cur_time_signature != (numer, denom):
                 cur_time_signature = (numer, denom)
                 midi.time_signature_changes.append(
@@ -769,7 +821,7 @@ def get_after_k_measures(text_list: str, k: int) -> List[str]:
     return text_list[:head_end_index] + text_list[begin_index:]
 
 
-def get_first_k_nths(text_list: str, nth, k) -> List[str]:
+def get_first_k_ticks(text_list: str, tpq, k) -> List[str]:
     cur_time = 0
     cur_measure_onset = 0
     cur_measure_length = 0
@@ -780,7 +832,7 @@ def get_first_k_nths(text_list: str, nth, k) -> List[str]:
             numer, denom = (b36strtoi(x) for x in text[1:].split('/'))
             cur_measure_onset += cur_measure_length
             cur_time = cur_measure_onset
-            cur_measure_length = round(nth * numer / denom)
+            cur_measure_length = 4 * tpq * numer // denom
 
         elif typename == tokens.POSITION_EVENTS_CHAR:
             position = b36strtoi(text[1:])
