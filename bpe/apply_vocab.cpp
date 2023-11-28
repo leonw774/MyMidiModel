@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Output merged corpus file: " << outCorpusFilePath << '\n'
         << "Reading input files" << std::endl;
 
-    std::chrono::duration<double> oneSecondDur = std::chrono::duration<double>(1);
+    std::chrono::duration<double> oneSecond = std::chrono::duration<double>(1);
     std::chrono::time_point<std::chrono::system_clock>
         programStartTime = std::chrono::system_clock::now();
     std::chrono::time_point<std::chrono::system_clock>
@@ -158,7 +158,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Start multinote count: " << multinoteCount
         << ", Start average mulpi: " << avgMulpi
         << ", Reading used time: "
-        <<  (std::chrono::system_clock::now() - ioStartTime) / oneSecondDur << std::endl;
+        <<  (std::chrono::system_clock::now() - ioStartTime) / oneSecond << std::endl;
 
     if (multinoteCount == 0) {
         std::cout << "No notes to merge. Exited." << std::endl;
@@ -168,6 +168,7 @@ int main(int argc, char *argv[]) {
     std::chrono::time_point<std::chrono::system_clock> iterStartTime;
     std::chrono::time_point<std::chrono::system_clock> partStartTime;
     double iterTime, mergeTime, metricsTime = 0.0;
+    double totalMergeTime = 0.0;
     if (doLog) {
         std::cout << "Index, Avg neighbor number, Shape, "
             "Multinote count, Iteration time, Merge time" << std::endl;
@@ -233,13 +234,14 @@ int main(int argc, char *argv[]) {
                 );
             }
         }
-        mergeTime = (std::chrono::system_clock::now() - partStartTime) / oneSecondDur;
-        iterTime = (std::chrono::system_clock::now() - iterStartTime) / oneSecondDur;
+        mergeTime = (std::chrono::system_clock::now() - partStartTime) / oneSecond;
+        totalMergeTime += mergeTime;
+        iterTime = (std::chrono::system_clock::now() - iterStartTime) / oneSecond;
         if (doLog) {
             partStartTime = std::chrono::system_clock::now();
             multinoteCount = corpus.getMultiNoteCount();
             // To exclude the time used on calculating metrics
-            metricsTime += (std::chrono::system_clock::now() - partStartTime) / oneSecondDur;
+            metricsTime += (std::chrono::system_clock::now() - partStartTime) / oneSecond;
             std::cout << multinoteCount
                 << ", " << iterTime
                 << ", " << mergeTime;
@@ -252,7 +254,9 @@ int main(int argc, char *argv[]) {
     }
     avgMulpi = calculateAvgMulpiSize(corpus);
     std::cout << "Ending multinote count: " << multinoteCount
-        << ", Ending average mulpi: " << avgMulpi << '\n';
+        << ", Ending average mulpi: " << avgMulpi
+        << ", Total merge time: " << totalMergeTime
+        << std::endl;
 
     // Write files
     std::ofstream outCorpusFile(outCorpusFilePath, std::ios::out | std::ios::trunc);
@@ -266,9 +270,9 @@ int main(int argc, char *argv[]) {
     std::cout << "Writing merged corpus file" << std::endl;
     writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum);
     std::cout << "Writing done. Writing used time: "
-        << (std::chrono::system_clock::now() - ioStartTime) / oneSecondDur << '\n'
-        << "Total used time: "
-        << (std::chrono::system_clock::now() - programStartTime) / oneSecondDur - metricsTime
+        << (std::chrono::system_clock::now() - ioStartTime) / oneSecond << '\n'
+        << "Program used time: "
+        << (std::chrono::system_clock::now() - programStartTime) / oneSecond - metricsTime
         << std::endl;
     return 0;
 }

@@ -128,7 +128,7 @@ Shell scripts
    3. Get evaluation features of the unconditional, instrument-informed, and prime continution generation result of the model using the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`.
 - `experiment_script/`: Pre-programmed experiment execution script
   - `apply_learned_shapes_to_other.sh`
-  - `bpe_parameters.sh`
+  - `data_preproc_and_bpes.sh`
   - `full_model_and_ablation.sh`
 - `pipeline.sh`:
   1. Pre-process midi files into a corpus with `midi_to_corpus.py`.

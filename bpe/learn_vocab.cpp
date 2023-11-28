@@ -56,7 +56,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     if (adjacency != "ours" && adjacency != "mulpi") {
-        std::cout << "Error: adjacency is not \"ours\" or \"mulpi\": " << adjacency << std::endl;
+        std::cout << "Error: adjacency is not \"ours\" or \"mulpi\": " << adjacency
+            << std::endl;
         return 1;
     }
     std::cout << "inCorpusDirPath: " << inCorpusDirPath << '\n'
@@ -91,7 +92,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Output merged corpus file: " << outCorpusFilePath << '\n'
         << "Reading input files" << std::endl;
 
-    std::chrono::duration<double> oneSecondDur = std::chrono::duration<double>(1.0);
+    std::chrono::duration<double> oneSecond = std::chrono::duration<double>(1.0);
     std::chrono::time_point<std::chrono::system_clock>
         programStartTime = std::chrono::system_clock::now();
     std::chrono::time_point<std::chrono::system_clock>
@@ -134,7 +135,8 @@ int main(int argc, char *argv[]) {
     std::cout << "Start Multinote count: " << multinoteCount
         << ", Start average mulpi: " << avgMulpi
         << ", Reading used time: "
-        << (std::chrono::system_clock::now() - ioStartTime) / oneSecondDur << std::endl;
+        << (std::chrono::system_clock::now() - ioStartTime) / oneSecond
+        << std::endl;
 
     if (multinoteCount == 0) {
         std::cout << "No notes to merge. Exited." << std::endl;
@@ -144,9 +146,11 @@ int main(int argc, char *argv[]) {
     std::chrono::time_point<std::chrono::system_clock> iterStartTime;
     std::chrono::time_point<std::chrono::system_clock> partStartTime;
     double iterTime, findBestShapeTime, mergeTime, metricsTime = 0.0;
+    double totalFindBestShapeTime = 0.0, totalMergeTime = 0.0;
     if (doLog) {
         std::cout << "Iter, Avg neighbor number, Found shapes count, Shape, Score, "
-            "Multinote count, Iteration time, Find best shape time, Merge time" << std::endl;
+            << "Multinote count, Iteration time, Find best shape time, Merge time"
+            << std::endl;
     }
     for (int iterCount = 0; iterCount < iterNum; ++iterCount) {
         iterStartTime = std::chrono::system_clock::now();
@@ -158,7 +162,7 @@ int main(int argc, char *argv[]) {
             getShapeScore(corpus, shapeDict, adjacency, samplingRate);
         const std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScore);
         if (maxValPair.second <= minScoreLimit) {
-            std::cout << "End iterations early because found best score <= minScoreLimit";
+            std::cout << "End early because found best score <= minScoreLimit";
             break;
         }
         Shape maxScoreShape = maxValPair.first;
@@ -169,11 +173,11 @@ int main(int argc, char *argv[]) {
                 << ", \"" << shape2str(maxScoreShape) << "\", "
                 << maxValPair.second << ", ";
         }
-        findBestShapeTime = (std::chrono::system_clock::now() - partStartTime) / oneSecondDur;
-
         unsigned int newShapeIndex = shapeDict.size();
         shapeDict.push_back(maxScoreShape);
 
+        findBestShapeTime = (std::chrono::system_clock::now() - partStartTime) / oneSecond;
+        totalFindBestShapeTime += findBestShapeTime;
         partStartTime = std::chrono::system_clock::now();
         // merge MultiNotes with newly added shape
         // for each piece
@@ -224,13 +228,14 @@ int main(int argc, char *argv[]) {
                 );
             }
         }
-        mergeTime = (std::chrono::system_clock::now() - partStartTime) / oneSecondDur;
-        iterTime = (std::chrono::system_clock::now() - iterStartTime) / oneSecondDur;
+        mergeTime = (std::chrono::system_clock::now() - partStartTime) / oneSecond;
+        totalMergeTime += mergeTime;
+        iterTime = (std::chrono::system_clock::now() - iterStartTime) / oneSecond;
         if (doLog) {
+            // exclude the time used on calculating metrics
             partStartTime = std::chrono::system_clock::now();
             multinoteCount = corpus.getMultiNoteCount();
-            // To exclude the time used on calculating metrics
-            metricsTime += (std::chrono::system_clock::now() - partStartTime) / oneSecondDur;
+            metricsTime += (std::chrono::system_clock::now() - partStartTime) / oneSecond;
             std::cout << multinoteCount
                 << ", " << iterTime
                 << ", " << findBestShapeTime
@@ -244,7 +249,10 @@ int main(int argc, char *argv[]) {
     }
     avgMulpi = calculateAvgMulpiSize(corpus);
     std::cout << "End multinote count: " << multinoteCount
-        << ", End average mulpi: " << avgMulpi << '\n';
+        << ", End average mulpi: " << avgMulpi
+        << ", Total find bset shape time: " << totalFindBestShapeTime
+        << ", Total merge time: " << totalMergeTime
+        << std::endl;
 
 
     // Write files
@@ -266,9 +274,9 @@ int main(int argc, char *argv[]) {
     std::cout << "Writing merged corpus file" << std::endl;
     writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum);
     std::cout << "Writing done. Writing used time: "
-        << (std::chrono::system_clock::now() - ioStartTime) / oneSecondDur << '\n'
-        << "Total used time: "
-        << (std::chrono::system_clock::now() - programStartTime) / oneSecondDur - metricsTime
+        << (std::chrono::system_clock::now() - ioStartTime) / oneSecond << '\n'
+        << "Program used time: "
+        << (std::chrono::system_clock::now() - programStartTime) / oneSecond - metricsTime
         << std::endl;
     return 0;
 }
