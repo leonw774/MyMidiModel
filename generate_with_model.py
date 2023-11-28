@@ -60,14 +60,15 @@ def read_args():
     parser.add_argument(
         '--sample-number', '-n',
         type=int,
-        default=1,
+        default=0,
         help='How many sample will be generated. Default is %(default)s. \
             If no primer used, it simply generate SAMPLE_NUMBER samples. \
             If primer is a midi file, it generate SAMPLE_NUMBER samples \
             using that primer repeatly. \
             If primer is list of midi file paths, it generate samples with \
             the first SAMPLE_NUMBER primers. \
-            Set it to 0 to use all primers in the list.\
+            If no primer ised, 0 means 1. \
+            If primer is set, 0 is to use all primers in the list. \
             Default is %(default)s'
     )
     parser.add_argument(
@@ -353,7 +354,7 @@ def main():
     if not torch.cuda.is_available():
         print('--use-device is \'cuda\' but found no CUDA device. Changed to \'cpu\'.')
         args.use_device = 'cpu'
-    assert args.sample_number > 0
+    assert args.sample_number >= 0
 
     # model
     model = torch.load(args.model_file_path, map_location=torch.device(args.use_device))
@@ -370,7 +371,8 @@ def main():
     # primer
     primer_seq_list = []
     if args.primer is  None:
-        assert args.sample_number > 0
+        if args.sample_number == 0:
+            args.sample_number = 1
         primer_seq_list = [None] * args.sample_number
     else:
         print('Processing primer')
@@ -399,31 +401,41 @@ def main():
             primer_path_list = open(args.primer, 'r', encoding='utf8').readlines()
             print(f'Read {len(primer_path_list)} lines')
 
+            # keep first n line if n > 0
             if args.sample_number != 0:
-                primer_path_list = primer_path_list[:args.sample_number]
+                if len(primer_path_list) > args.sample_number:
+                    print(
+                        f'Only keep first {len(primer_path_list)} lines',
+                        f'as sample number is {args.sample_number}'
+                    )
+                    print('(Set sample number to 0 to keep all primers in list.)')
+                    primer_path_list = primer_path_list[:args.sample_number]
+            else:
+                args.sample_number = len(primer_path_list)
+
+            # check if file exists and have MIDI extension 
             primer_path_list = [p.strip() for p in primer_path_list]
             assert all(
                 p.endswith('.mid') or p.endswith('.MID') or p.endswith('.midi')
                 for p in primer_path_list
             )
             assert all(os.path.isfile(p) for p in primer_path_list)
-            print(
-                f'Keep first {len(primer_path_list)} lines'\
-                f'as sample number is {args.sample_number}\n'\
-                f'Hint: Set sample number to 0 to keep all primers in the list.'
-            )
 
             primer_text_list_list = midi_file_list_to_text_list_list(
                 primer_path_list,
                 **encode_args
             )
-            assert len(primer_text_list_list) != 0
+            if len(primer_text_list_list) == 0:
+                print('No file successfully processed. Generation end.')
+                return 0
+
             print(f'Processed {len(primer_text_list_list)} files successfully.')
             if len(primer_text_list_list) < args.sample_number:
                 print(
-                    f'Primer number < requested sample number {args.sample_number}.',
-                    f'will only generate {len(primer_text_list_list)} pieces.'
+                    'Processed primer number is less than requested sample number',
+                    f'{args.sample_number}.'
                 )
+                print(f'Will only generate {len(primer_text_list_list)} pieces.')
                 args.sample_number = len(primer_text_list_list)
 
         for primer_text_list in primer_text_list_list:
