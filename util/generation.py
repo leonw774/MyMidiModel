@@ -282,6 +282,9 @@ def generate(
     if softmax_temperature is None:
         softmax_temperature = [1.0] * len(model.output_attrs_indices)
     elif isinstance(softmax_temperature, list):
+        assert all(t >= 0 for t in softmax_temperature), \
+            'Temperatures should not be less than zero'
+        softmax_temperature = [t if t != 0 else 1e-6 for t in softmax_temperature]
         if len(softmax_temperature) == 1:
             softmax_temperature = softmax_temperature * len(model.output_attrs_indices)
         elif len(softmax_temperature) != len(model.output_attrs_indices):

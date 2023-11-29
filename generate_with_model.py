@@ -413,7 +413,7 @@ def main():
             else:
                 args.sample_number = len(primer_path_list)
 
-            # check if file exists and have MIDI extension 
+            # check if file exists and have MIDI extension
             primer_path_list = [p.strip() for p in primer_path_list]
             assert all(
                 p.endswith('.mid') or p.endswith('.MID') or p.endswith('.midi')
