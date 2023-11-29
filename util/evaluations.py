@@ -277,8 +277,8 @@ def piece_to_features(
     """
     Return a dict that contains:
     - pitch class histogram and entropy
-    - duration distribution, means and variant
-    - velocity histogram, means and variant
+    - duration distribution
+    - velocity histogram
     - instrumentation self-similarity
     - grooving self-similarity
 
@@ -321,12 +321,14 @@ def piece_to_features(
     # pitchs_mean = np.mean(pitchs) if len(pitchs) > 0 else float('nan')
     # pitchs_var = np.var(pitchs) if len(pitchs) > 0 else float('nan')
 
-    duration_distribution = Counter([f'{d.numerator}/{d.denominator}' for d in durations])
-    # durations_as_float = [float(d) for d in durations]
-    # durations_mean = np.mean(durations_as_float) if len(durations) > 0 else float('nan')
-    # durations_var = np.var(durations_as_float) if len(durations) > 0 else float('nan')
+    duration_distribution = dict(
+        Counter([f'{d.numerator}/{d.denominator}' for d in durations])
+    )
+    # durations_float = [float(d) for d in durations]
+    # durations_mean = np.mean(durations_float) if len(durations) > 0 else float('nan')
+    # durations_var = np.var(durations_float) if len(durations) > 0 else float('nan')
 
-    velocity_histogram = {v:0 for v in range(128)}
+    velocity_histogram = {v: 0 for v in range(128)}
     for v in velocities:
         velocity_histogram[v] += 1
     # velocities_mean = np.mean(velocities) if len(velocities) > 0 else float('nan')
