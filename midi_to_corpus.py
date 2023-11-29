@@ -65,10 +65,6 @@ def parse_args():
         dest='use_cont_note',
         action='store_true'
     )
-    handler_args_parser.add_argument(
-        '--use-merge-drums',
-        action='store_true'
-    )
 
     main_parser = ArgumentParser()
     main_parser.add_argument(

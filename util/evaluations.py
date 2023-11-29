@@ -217,7 +217,6 @@ EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT = {
     'velocity_step': 1,
     'tempo_quantization': (1, 512, 1),
     'use_cont_note': True,
-    'use_merge_drums': False
 }
 
 

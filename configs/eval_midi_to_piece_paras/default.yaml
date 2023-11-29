@@ -6,5 +6,4 @@ tempo_quantization:
 - 512
 - 1
 use_cont_note: true
-use_merge_drums: false
 velocity_step: 1

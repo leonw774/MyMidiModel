@@ -29,10 +29,7 @@ from .tokens import (
 #         midi.instruments = not_perc_inst_list + [merged_perc_inst]
 
 
-def merge_tracks(
-        midi: MidiFile,
-        max_track_number: int,
-        use_merge_drums: bool) -> None:
+def merge_tracks(midi: MidiFile, max_track_number: int) -> None:
 
     # if use_merge_drums:
     #     merge_drums(midi)
@@ -161,7 +158,7 @@ def get_note_tokens(
         midi: MidiFile,
         max_duration: int,
         velocity_step: int,
-        use_cont_note: bool) -> list:
+        use_cont_note: bool) -> List[NoteToken]:
     """
     Return all note token in the midi as a list sorted in the
     ascending orders of onset time, track number, pitch, duration,
@@ -236,8 +233,8 @@ def get_time_structure_tokens(
         midi: MidiFile,
         note_token_list: list,
         tpq: int,
-        tempo_quantization: Tuple[int, int, int],
-        supported_time_signatures: set) -> Tuple[list, list]:
+        tempo_quantization: Tuple[int, int, int]
+    ) -> Tuple[List[MeasureToken], List[TempoToken]]:
     """
     Return measure list and tempo list. The first measure contains the
     first note and the last note ends in the last measure.
@@ -246,6 +243,8 @@ def get_time_structure_tokens(
     first_note_start = note_token_list[0].onset
     last_note_end = note_token_list[-1].onset + note_token_list[-1].duration
     # print('first, last:', first_note_start, last_note_end)
+
+    supported_time_signatures = get_supported_time_signatures()
 
     if len(midi.time_signature_changes) == 0:
         # default is 4/4
@@ -401,10 +400,10 @@ def get_time_structure_tokens(
     return  measure_token_list, tempo_token_list
 
 
-def get_position_infos(
-        note_token_list: list,
-        measure_token_list: list,
-        tempo_token_list: list) -> list:
+def get_position_tokens(
+        note_token_list: List[NoteToken],
+        measure_token_list: List[MeasureToken],
+        tempo_token_list: List[TempoToken]) -> List[PositionToken]:
     nmt_token_list = measure_token_list + note_token_list + tempo_token_list
     nmt_token_list.sort()
 
@@ -438,7 +437,7 @@ def get_position_infos(
     return position_token_list
 
 
-def get_head_tokens(midi: MidiFile) -> list:
+def get_head_tokens(midi: MidiFile) -> List[TrackToken]:
     track_token_list = [
         TrackToken(
             track_number=i,
@@ -449,7 +448,7 @@ def get_head_tokens(midi: MidiFile) -> list:
     return track_token_list
 
 
-def detect_long_empty_measures(token_list: list):
+def detect_long_empty_measures(token_list: list) -> None:
     consecutive_measure_token_count = 0
     for token in token_list:
         if token.type_priority == TYPE_PRIORITY['MeasureToken']:
@@ -466,17 +465,16 @@ def midi_to_token_list(
         max_duration: int,
         velocity_step: int,
         use_cont_note: bool,
-        tempo_quantization: Tuple[int, int, int],
-        supported_time_signatures: set) -> list:
+        tempo_quantization: Tuple[int, int, int]) -> List[Tuple]:
 
     note_token_list = get_note_tokens(midi, max_duration, velocity_step, use_cont_note)
     assert len(note_token_list) > 0, 'No notes in midi'
     measure_token_list, tempo_token_list = get_time_structure_tokens(
-        midi, note_token_list, tpq, tempo_quantization, supported_time_signatures
+        midi, note_token_list, tpq, tempo_quantization
     )
     assert measure_token_list[0].onset <= note_token_list[0].onset, \
         'First measure is after first note'
-    pos_token_list = get_position_infos(note_token_list, measure_token_list, tempo_token_list)
+    pos_token_list = get_position_tokens(note_token_list, measure_token_list, tempo_token_list)
     body_token_list = pos_token_list + note_token_list + measure_token_list + tempo_token_list
     body_token_list.sort()
 
@@ -498,8 +496,7 @@ def midi_to_piece(
         max_duration: int,
         velocity_step: int,
         use_cont_note: bool,
-        tempo_quantization: Tuple[int, int, int],
-        use_merge_drums: bool) -> str:
+        tempo_quantization: Tuple[int, int, int]) -> str:
     """
     Parameters:
     - `midi`: A miditoolkit MidiFile object
@@ -514,7 +511,6 @@ def midi_to_piece(
       the over-length notes.
     - `tempo_quantization`: Three values are (min, max, step). where
       min and max are INCLUSIVE.
-    - `use_merge_drums`: Force merge all drums tracks or not.
     """
 
     assert isinstance(tpq, int) and tpq > 2 and tpq % 2 == 0, \
@@ -532,9 +528,7 @@ def midi_to_piece(
     # print('original ticks per beat:', midi.ticks_per_beat)
     change_tpq(midi, tpq)
 
-    merge_tracks(midi, max_track_number, use_merge_drums)
-
-    supported_time_signatures = get_supported_time_signatures()
+    merge_tracks(midi, max_track_number)
 
     for i, track in enumerate(midi.instruments):
         if track.is_drum:
@@ -545,8 +539,7 @@ def midi_to_piece(
         max_duration,
         velocity_step,
         use_cont_note,
-        tempo_quantization,
-        supported_time_signatures
+        tempo_quantization
     )
 
     text_list = list(map(token_to_str, token_list))

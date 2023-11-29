@@ -48,7 +48,7 @@ touch "$log_path"
 
 corpus_path_flags=""
 test "$CONTINUING_NOTE" != true && corpus_path_flags+="[no_contin]"
-test "$USE_MERGE_DRUMS" == true && corpus_path_flags+="[merge_drums]"
+# test "$USE_MERGE_DRUMS" == true && corpus_path_flags+="[merge_drums]"
 
 corpus_dir_path="data/corpus/${DATA_NAME}${corpus_path_flags}"
 corpus_dir_path+="_tpq${TPQ}_r${MAX_TRACK_NUMBER}_d${MAX_DURATION}"
@@ -99,8 +99,8 @@ if [ "$do_midi_to_corpus" == true ]; then
     test "$CONTINUING_NOTE" == true && \
         midi_to_corpus_flags+=("--use-continuing-note")
 
-    test "$USE_MERGE_DRUMS" == true && \
-        midi_to_corpus_flags+=("--use-merge-drums")
+    # test "$USE_MERGE_DRUMS" == true && \
+    #     midi_to_corpus_flags+=("--use-merge-drums")
 
     test "$MIDI_TO_CORPUS_VERBOSE" == true && \
         midi_to_corpus_flags+=("--verbose")
