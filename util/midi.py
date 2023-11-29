@@ -148,11 +148,14 @@ def quantize_velocity(velocty: int, step: int) -> int:
 
 
 # when tpq is 12, in tempo of bpm 120, 2^18 - 1 ticks are about 182 minutes
-# we ignore any event happening after this
-EVENT_TIME_LIMIT = 0x3FFFF # 2^18 - 1
+# if a note have start or end after this, we think the file is likely corrupted
+NOTE_TIME_CORRUPTION_LIMIT = 0x3FFFF# 18 bits
 
 # if a note have duration > 11 minutes, we think the file is likely corrupted
-NOTE_DURATION_LIMIT = 0x3FFF # 2^14 - 1
+NOTE_DURATION_CORRUPTION_LIMIT = 0x3FFF # 14 bits
+
+# we ignore any event happening after this (about 91 minutes)
+EVENT_TIME_LIMIT = 0x1FFFF # 17 bits
 
 def get_note_tokens(
         midi: MidiFile,
@@ -166,7 +169,10 @@ def get_note_tokens(
     """
     for track in midi.instruments:
         for i, note in enumerate(track.notes):
-            assert note.end - note.start <= NOTE_DURATION_LIMIT, \
+            assert (note.start <= NOTE_TIME_CORRUPTION_LIMIT
+                    or note.end <= NOTE_TIME_CORRUPTION_LIMIT), \
+                'Note event time too large, likely corrupted'
+            assert note.end - note.start <= NOTE_DURATION_CORRUPTION_LIMIT, \
                 'Note duration too large, likely corrupted'
 
     note_token_list = [
