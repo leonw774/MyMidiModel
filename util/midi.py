@@ -443,17 +443,15 @@ def get_head_tokens(midi: MidiFile) -> list:
     return track_token_list
 
 
-def detect_long_empty_measures(token_list: List[str]):
+def detect_long_empty_measures(token_list: list):
     consecutive_measure_token_count = 0
-    for t in token_list:
-        if t[0] == 'M':
+    for token in token_list:
+        if token.type_priority == TYPE_PRIORITY['MeasureToken']:
             consecutive_measure_token_count += 1
-        elif t[0] == 'N':
+        elif token.type_priority == TYPE_PRIORITY['NoteToken']:
             consecutive_measure_token_count = 0
-        if consecutive_measure_token_count >= 24:
-            raise AssertionError(
-                'Very long empty measures detected, likely corrupted'
-            )
+        assert consecutive_measure_token_count < 20, \
+            'Very long empty measures detected, likely corrupted'
 
 
 def midi_to_token_list(

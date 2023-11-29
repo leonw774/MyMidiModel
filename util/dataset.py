@@ -173,7 +173,6 @@ class MidiDataset(Dataset):
                 if int(piece_num_str) in self.included_piece_num
             ]
 
-        self.number_of_pieces = len(self.pieces)
         # The seperators of maximal permutable subarray are:
         # BOS, EOS, SEP, PADDING, track token, measure tokens, position tokens
         # we stores their index number in _mps_separators
@@ -192,21 +191,23 @@ class MidiDataset(Dataset):
         self._measure_ids = np.sort(np.array(self._measure_ids))
 
         # preprocessing
-        self._piece_num_indices = [0] * self.number_of_pieces
-        self._piece_lengths = [0] * self.number_of_pieces
-        self._piece_body_start_indices = [0] * self.number_of_pieces
-        self._piece_measures_indices = [0] * self.number_of_pieces
+        self._piece_range_end = [0] * len(self.pieces)
+        self._piece_lengths = [0] * len(self.pieces)
+        self._body_start_indices = [0] * len(self.pieces)
+        self._measures_indices = [0] * len(self.pieces)
+        self._getitem_vp_cur_index = [0] * len(self.pieces)
 
         virtual_piece_step_size = max(1, int(max_seq_length * virtual_piece_step_ratio))
         # zeros will be replaced by body start index
-        self._virtual_piece_start_indices = [[0] for _ in range(self.number_of_pieces)]
-        self._piece_mps_sep_indices = [[] for _ in range(self.number_of_pieces)]
-        self._piece_augmentable_pitches = [
+        self._virtual_piece_start_indices = [[0] for _ in range(len(self.pieces))]
+        self._mps_sep_indices = [[] for _ in range(len(self.pieces))]
+        self._augmentable_pitches = [
             np.empty((0,), dtype=np.bool8)
-            for _ in range(self.number_of_pieces)
+            for _ in range(len(self.pieces))
         ]
         # length of (-pa, ..., -1, 0, 1, ..., pa)
         self._pitch_augmentation_factor = self.pitch_augmentation_range * 2 + 1
+
 
         cur_index = -1 # <-- !!! because the first element we add should become index 0
         tqdm_enum_pieces = tqdm(
@@ -223,9 +224,9 @@ class MidiDataset(Dataset):
             j = 2 # because first token is BOS and second token must be track token
             while piece_array[j][ATTR_NAME_INDEX['evt']] != self._sep_id:
                 j += 1
-            self._piece_body_start_indices[piece_num] = j + 1
+            self._body_start_indices[piece_num] = j + 1
             self._virtual_piece_start_indices[piece_num][0] = j + 1
-            self._piece_measures_indices[piece_num] = list(
+            self._measures_indices[piece_num] = list(
                 np.flatnonzero(
                     np.isin(piece_array[:, ATTR_NAME_INDEX['evt']], self._measure_ids)
                 )
@@ -235,7 +236,7 @@ class MidiDataset(Dataset):
             if (virtual_piece_step_ratio > 0
                 and piece_array.shape[0] > self.max_seq_length):
                 cur_vp_start_index = virtual_piece_step_size
-                for midx in self._piece_measures_indices[piece_num]:
+                for midx in self._measures_indices[piece_num]:
                     if midx > cur_vp_start_index:
                         self._virtual_piece_start_indices[piece_num].append(midx)
                         # increase cur_vp_start_index such that it passes m_idx
@@ -258,7 +259,7 @@ class MidiDataset(Dataset):
                     body_mps_sep_indices,
                     np.array([piece_array.shape[0]]) # the EOS
                 ])
-                self._piece_mps_sep_indices[piece_num] = mps_sep_indices
+                self._mps_sep_indices[piece_num] = mps_sep_indices
 
             if self.pitch_augmentation_range != 0:
                 has_pitch = (piece_array[:, ATTR_NAME_INDEX['pit']]) != 0
@@ -268,20 +269,20 @@ class MidiDataset(Dataset):
                 #   0:PAD, 1:0, 2:1, ... 128:127, 129:128(drums)
                 not_percussion = (piece_array[:, ATTR_NAME_INDEX['ins']]) != 129
                 augmentable_pitches = np.logical_and(has_pitch, not_percussion)
-                self._piece_augmentable_pitches[piece_num] = augmentable_pitches
+                self._augmentable_pitches[piece_num] = augmentable_pitches
 
             if self.flatten_virtual_pieces:
                 virtual_piece_count = len(self._virtual_piece_start_indices[piece_num])
                 cur_index += virtual_piece_count * self._pitch_augmentation_factor
             else:
                 cur_index += self._pitch_augmentation_factor
-            self._piece_num_indices[piece_num] = cur_index
+            self._piece_range_end[piece_num] = cur_index
         self._length = cur_index + 1
 
         if verbose:
             if permute_mps:
                 mps_lengths = []
-                for mps_sep_indices in self._piece_mps_sep_indices:
+                for mps_sep_indices in self._mps_sep_indices:
                     mps_lengths.extend([
                         j2 - j1
                         for j1, j2 in zip(mps_sep_indices[:-1], mps_sep_indices[1:])
@@ -298,20 +299,25 @@ class MidiDataset(Dataset):
 
     def __getitem__(self, index):
         assert index < self._length
-        piece_num = bisect.bisect_left(self._piece_num_indices, index)
-        body_start_index = self._piece_body_start_indices[piece_num]
+        piece_num = bisect.bisect_left(self._piece_range_end, index)
+        body_start_index = self._body_start_indices[piece_num]
 
         index_offset = (
             index
             if piece_num == 0 else
-            index - self._piece_num_indices[piece_num-1] - 1
+            index - self._piece_range_end[piece_num-1] - 1
         )
         if self.flatten_virtual_pieces:
             virtual_piece_num = index_offset // self._pitch_augmentation_factor
             start_index = self._virtual_piece_start_indices[piece_num][virtual_piece_num]
             index_offset -= virtual_piece_num * self._pitch_augmentation_factor
         else:
-            start_index = np.random.choice(self._virtual_piece_start_indices[piece_num])
+            start_index = self._virtual_piece_start_indices[piece_num][(
+                self._getitem_vp_cur_index[piece_num]
+            )]
+            self._getitem_vp_cur_index[piece_num] = (
+                self._getitem_vp_cur_index[piece_num] + 1
+            ) % len(self._virtual_piece_start_indices[piece_num])
 
         # preserve space for head
         end_index = start_index + self.max_seq_length - body_start_index
@@ -345,7 +351,7 @@ class MidiDataset(Dataset):
         pitch_augment = index_offset - self.pitch_augmentation_range
         if pitch_augment != 0 and body_start_index != self.max_seq_length:
             augmentables = (
-                self._piece_augmentable_pitches[piece_num][body_start_index:end_index]
+                self._augmentable_pitches[piece_num][body_start_index:end_index]
             )
             # sometimes the sampled array does not contain any pitch-augmentable token
             body_pitch_col = sampled_array[body_start_index:, ATTR_NAME_INDEX['pit']]
@@ -376,7 +382,7 @@ class MidiDataset(Dataset):
             mps_sep_indices_list_head = [0, 1, body_start_index - 1]
             mps_sep_indices_list_body = [
                 i - start_index + body_start_index
-                for i in self._piece_mps_sep_indices[piece_num]
+                for i in self._mps_sep_indices[piece_num]
                 if start_index <= i < end_index
             ]
             mps_sep_indices_list = mps_sep_indices_list_head + mps_sep_indices_list_body
