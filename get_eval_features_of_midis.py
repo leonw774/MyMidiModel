@@ -125,7 +125,7 @@ def main():
 
     dataset_size = len(midi_path_list)
     assert dataset_size > 0, f'No midi files found in {args.midi_dir_path}'
-    logging.info('Found total (%d) midis in %s', dataset_size, args.midi_dir_path)
+    logging.info('Found %d midis files in %s', dataset_size, args.midi_dir_path)
 
     if args.midi_to_piece_paras != '':
         assert os.path.isfile(args.midi_to_piece_paras), \
