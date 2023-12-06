@@ -275,7 +275,7 @@ int main(int argc, char *argv[]) {
     writeOutputCorpusFile(outCorpusFile, corpus, shapeDict, maxTrackNum);
     std::cout << "Writing done. Writing used time: "
         << (std::chrono::system_clock::now() - ioStartTime) / oneSecond << '\n'
-        << "Program used time: "
+        << "Total used time: "
         << (std::chrono::system_clock::now() - programStartTime) / oneSecond - metricsTime
         << std::endl;
     return 0;
