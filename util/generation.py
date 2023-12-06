@@ -37,7 +37,7 @@ def adjust_probs(
         probs: List[torch.Tensor],
         text_list: List[str],
         vocabs: Vocabs,
-        event_family_indices: Tuple[set]) -> List[torch.Tensor]:
+        event_family_ids: Tuple[set]) -> List[torch.Tensor]:
     """
     Set to zero to the prob of the attribute values that would
     definitily raise exception if the next token use them.
@@ -49,12 +49,12 @@ def adjust_probs(
 
     bos_index = vocabs.events.text2id[BEGIN_TOKEN_STR]
     sep_index = vocabs.events.text2id[SEP_TOKEN_STR]
-    (multinote_indices,
-     position_indices,
-     measure_indices,
-     track_indices,
-     tempo_indices
-    ) = event_family_indices
+    (multinote_ids,
+     position_ids,
+     measure_ids,
+     track_ids,
+     tempo_ids
+    ) = event_family_ids
 
     # BOS token is redundent, will not be used in generation
     probs[ATTR_NAME_INDEX['evt']][bos_index] = 0
@@ -70,20 +70,20 @@ def adjust_probs(
     if is_head: # if the section is head and not sep
         if len(text_list) == 1:
             # only track-instrument allowed
-            not_track_indices = [
+            not_track_ids = [
                 index
                 for index in range(vocabs.events.size)
-                if index not in track_indices
+                if index not in track_ids
             ]
-            probs[ATTR_NAME_INDEX['evt']][not_track_indices] = 0
+            probs[ATTR_NAME_INDEX['evt']][not_track_ids] = 0
         elif 1 < len(text_list) < vocabs.track_numbers.size:
             # only track-instrument and separater allowed
-            not_track_or_sep_indices = [
+            not_track_or_sep_ids = [
                 index
                 for index in range(vocabs.events.size)
-                if index not in track_indices and index != sep_index
+                if index not in track_ids and index != sep_index
             ]
-            probs[ATTR_NAME_INDEX['evt']][not_track_or_sep_indices] = 0
+            probs[ATTR_NAME_INDEX['evt']][not_track_or_sep_ids] = 0
             # prevent generating repeating track number
             used_track_number =  [
                 # the index:value of track number is 0:padding, 1:0, 2:1, ...
@@ -100,29 +100,29 @@ def adjust_probs(
 
     elif is_sep: # if is separater, then only measure tokens are allowed
         for i in range(vocabs.events.size):
-            if i not in measure_indices:
+            if i not in measure_ids:
                 probs[ATTR_NAME_INDEX['evt']][i] = 0
 
     else: # if the section is body
         # the next token's event can not be track-instrument or sep
-        probs[ATTR_NAME_INDEX['evt']][list(track_indices)] = 0
+        probs[ATTR_NAME_INDEX['evt']][list(track_ids)] = 0
         probs[ATTR_NAME_INDEX['evt']][sep_index] = 0
 
         # if the last token in text_list is measure
         # then the next token's event can not be multi-note or tempo
         if text_list[-1][0] == MEASURE_EVENTS_CHAR:
-            multinote_and_tempo_indices = multinote_indices.union(tempo_indices)
-            probs[ATTR_NAME_INDEX['evt']][list(multinote_and_tempo_indices)] = 0
+            multinote_and_tempo_ids = multinote_ids.union(tempo_ids)
+            probs[ATTR_NAME_INDEX['evt']][list(multinote_and_tempo_ids)] = 0
 
         # if the last token in text_list is position
         # then the next token's event can not be measure
         elif text_list[-1][0] == POSITION_EVENTS_CHAR:
-            probs[ATTR_NAME_INDEX['evt']][list(position_indices)] = 0
+            probs[ATTR_NAME_INDEX['evt']][list(position_ids)] = 0
 
         # if the last token in text_list is note or multinote
         # the next token's event can not be tempo
         elif text_list[-1][0] in (NOTE_EVENTS_CHAR, MULTI_NOTE_EVENTS_CHAR):
-            probs[ATTR_NAME_INDEX['evt']][list(tempo_indices)] = 0
+            probs[ATTR_NAME_INDEX['evt']][list(tempo_ids)] = 0
 
         # this prohibits position tokens that is "behind" the current position
         k = len(text_list) - 1
@@ -130,7 +130,7 @@ def adjust_probs(
             k -= 1
         if text_list[k][0] == POSITION_EVENTS_CHAR:
             cur_position = b36strtoi(text_list[k][1:])
-            for i in position_indices:
+            for i in position_ids:
                 if b36strtoi(vocabs.events.id2text[i][1:]) <= cur_position:
                     probs[ATTR_NAME_INDEX['evt']][i] = 0
 
@@ -139,21 +139,21 @@ def adjust_probs(
         while text_list[k][0] not in (POSITION_EVENTS_CHAR, TEMPO_EVENTS_CHAR) and k > 0:
             k -= 1
         if text_list[k][0] == TEMPO_EVENTS_CHAR:
-            probs[ATTR_NAME_INDEX['evt']][list(tempo_indices)] = 0
+            probs[ATTR_NAME_INDEX['evt']][list(tempo_ids)] = 0
 
         # only allow defined track number
         sep_position_in_text_list = text_list.index(SEP_TOKEN_STR)
-        used_track_number_indices = {
+        used_track_number_ids = {
             b36strtoi(t.split(':')[1]) + 1
             for t in text_list[1:sep_position_in_text_list]
             if t[0] == TRACK_EVENTS_CHAR
         }
-        unused_track_number_indices = [
+        unused_track_number_ids = [
             index
             for index in range(vocabs.track_numbers.size)
-            if index not in used_track_number_indices
+            if index not in used_track_number_ids
         ]
-        probs[ATTR_NAME_INDEX['trn']][unused_track_number_indices] = 0
+        probs[ATTR_NAME_INDEX['trn']][unused_track_number_ids] = 0
 
     # re-normalized probs
     normed_probs = [p / p.sum() for p in probs]
@@ -325,20 +325,20 @@ def generate(
 
     # prepare famlity indices for probs adjustment
     if use_adjust_prob:
-        # event_family_indices:
-        #   multinote_indices, position_indices, measure_indices, track_indices, tempo_indices
-        event_family_indices = (set(), set(), set(), set(), set())
+        # event_family_ids:
+        #   multinote_ids, position_ids, measure_ids, track_ids, tempo_ids
+        event_family_ids = (set(), set(), set(), set(), set())
         for t, i in model.vocabs.events.text2id.items():
             if t[0] == NOTE_EVENTS_CHAR or t[0] == MULTI_NOTE_EVENTS_CHAR:
-                event_family_indices[0].add(i)
+                event_family_ids[0].add(i)
             elif t[0] == POSITION_EVENTS_CHAR:
-                event_family_indices[1].add(i)
+                event_family_ids[1].add(i)
             elif t[0] == MEASURE_EVENTS_CHAR:
-                event_family_indices[2].add(i)
+                event_family_ids[2].add(i)
             elif t[0] == TRACK_EVENTS_CHAR:
-                event_family_indices[3].add(i)
+                event_family_ids[3].add(i)
             elif t[0] == TEMPO_EVENTS_CHAR:
-                event_family_indices[4].add(i)
+                event_family_ids[4].add(i)
 
     text_list = array_to_text_list(primer_seq[0].cpu().numpy(), vocabs=model.vocabs)
     primer_length = primer_seq.shape[1]
@@ -383,7 +383,7 @@ def generate(
         ]
         if use_adjust_prob:
             # prevent many bad format in advance
-            probs = adjust_probs(probs, text_list, model.vocabs, event_family_indices)
+            probs = adjust_probs(probs, text_list, model.vocabs, event_family_ids)
         # print('\n'.join([repr(p) for p in probs]))
 
         try_count = 0
