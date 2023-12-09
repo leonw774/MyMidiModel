@@ -19,7 +19,7 @@ BeginOfScoreToken = namedtuple(
 )
 TrackToken = namedtuple(
     'TrackToken',
-    _COMMON_FIELD_NAMES+['track_number', 'instrument'],
+    _COMMON_FIELD_NAMES + ['track_number', 'instrument'],
     defaults=[-1, TYPE_PRIORITY['TrackToken'], -1, -1]
 )
 SectionSeperatorToken = namedtuple(
@@ -29,22 +29,24 @@ SectionSeperatorToken = namedtuple(
 )
 MeasureToken = namedtuple(
     'MeasureToken',
-    _COMMON_FIELD_NAMES+['time_signature'],
+    _COMMON_FIELD_NAMES + ['time_signature'],
     defaults=[-1, TYPE_PRIORITY['MeasureToken'], -1]
 )
 PositionToken = namedtuple(
     'PositionToken',
-    _COMMON_FIELD_NAMES+['position'],
+    _COMMON_FIELD_NAMES + ['position'],
     defaults=[-1, TYPE_PRIORITY['PositionToken'], -1]
 )
 TempoToken = namedtuple(
     'TempoToken',
-    _COMMON_FIELD_NAMES+['bpm', 'position'],
+    _COMMON_FIELD_NAMES + ['bpm', 'position'],
     defaults=[-1, TYPE_PRIORITY['TempoToken'], -1, -1]
 )
 NoteToken = namedtuple(
     'NoteToken',
-    _COMMON_FIELD_NAMES+['track_number', 'pitch', 'duration', 'velocity', 'position'],
+    _COMMON_FIELD_NAMES + [
+        'track_number', 'pitch', 'duration', 'velocity', 'position'
+    ],
     defaults=[-1, TYPE_PRIORITY['NoteToken'], -1, -1, -1, -1, -1]
 )
 EndOfScoreToken = namedtuple(
@@ -80,7 +82,9 @@ def get_supported_time_signatures(
 #     return supported_time_signatures
 
 
-def get_largest_possible_position(tpq: int, supported_time_signatures: set = None) -> int:
+def get_largest_possible_position(
+        tpq: int,
+        supported_time_signatures: set = None) -> int:
     if supported_time_signatures is None:
         return max(
             4 * tpq * s[0] // s[1]
@@ -115,7 +119,12 @@ PADDING_TOKEN_STR   = 'PAD'
 BEGIN_TOKEN_STR     = 'BOS'
 END_TOKEN_STR       = 'EOS'
 SEP_TOKEN_STR       = 'SEP'
-SPECIAL_TOKENS_STR = [PADDING_TOKEN_STR, BEGIN_TOKEN_STR, END_TOKEN_STR, SEP_TOKEN_STR]
+SPECIAL_TOKENS_STR = [
+    PADDING_TOKEN_STR,
+    BEGIN_TOKEN_STR,
+    END_TOKEN_STR,
+    SEP_TOKEN_STR
+]
 
 TRACK_EVENTS_CHAR       = 'R'
 MEASURE_EVENTS_CHAR     = 'M'
@@ -131,7 +140,9 @@ def token_to_str(token: namedtuple) -> str:
     if type_priority == TYPE_PRIORITY['NoteToken']:
         # event:pitch:duration:velocity:track:instrument(:position)
         # negative token.duration means is_cont==True
-        text = NOTE_EVENTS_CHAR if token.duration > 0 else NOTE_EVENTS_CHAR + '~'
+        text = NOTE_EVENTS_CHAR
+        if token.duration > 0:
+            text += '~'
         text += ( f':{itob36str(token.pitch)}'
                 + f':{itob36str(abs(token.duration))}'
                 + f':{itob36str(token.velocity)}'
@@ -146,13 +157,19 @@ def token_to_str(token: namedtuple) -> str:
     elif type_priority == TYPE_PRIORITY['MeasureToken']:
         return (
             f'{MEASURE_EVENTS_CHAR}'
-            f'{itob36str(token.time_signature[0])}/{itob36str(token.time_signature[1])}'
+            f'{itob36str(token.time_signature[0])}'
+            f'/'
+            f'{itob36str(token.time_signature[1])}'
         )
 
     elif type_priority == TYPE_PRIORITY['TempoToken']:
         if token.position == -1:
             return f'{TEMPO_EVENTS_CHAR}{itob36str(token.bpm)}'
-        return f'{TEMPO_EVENTS_CHAR}{itob36str(token.bpm)}:{itob36str(token.position)}'
+        return (
+            f'{TEMPO_EVENTS_CHAR}{itob36str(token.bpm)}'
+            f':'
+            f'{itob36str(token.position)}'
+        )
 
     elif type_priority == TYPE_PRIORITY['TrackToken']:
         return (

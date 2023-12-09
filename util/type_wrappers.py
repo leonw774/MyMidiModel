@@ -1,7 +1,9 @@
 from typing import Callable, TypeVar, Union
 
 T = TypeVar('T')
-def or_none(type_constructor: Callable[[str], T]) -> Callable[[str], Union[T, None]]:
+def or_none(
+        type_constructor: Callable[[str], T]
+    ) -> Callable[[str], Union[T, None]]:
     """
     Wrapper of type_constructor that accept string. If the input
     string makes the type_constructor raise exception, return None.
@@ -14,7 +16,10 @@ def or_none(type_constructor: Callable[[str], T]) -> Callable[[str], Union[T, No
     return wrapper
 
 T = TypeVar('T')
-def or_default(type_constructor: Callable[[str], T], default: T) -> Callable[[str], T]:
+def or_default(
+        type_constructor: Callable[[str], T],
+        default: T
+    ) -> Callable[[str], T]:
     """
     Wrapper of type_constructor that accept string. If the input
     string makes the type_constructor raise exception, return default.

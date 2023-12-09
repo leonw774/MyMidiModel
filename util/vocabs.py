@@ -22,7 +22,9 @@ class Vocabs:
                 self.text2id = {t:i for i, t in enumerate(init_obj)}
             elif isinstance(init_obj, dict):
                 self.size = init_obj['size']
-                self.id2text = {int(k): v for k, v in init_obj['id2text'].items()}
+                self.id2text = {
+                    int(k): v for k, v in init_obj['id2text'].items()
+                }
                 self.text2id = init_obj['text2id']
             else:
                 raise TypeError(
@@ -65,8 +67,9 @@ class Vocabs:
     def from_dict(cls, d):
         return cls(
             d['paras'], d['bpe_shapes_list'], d['padding_token'],
-            d['events'], d['pitchs'], d['durations'], d['velocities'], d['track_numbers'],
-            d['instruments'], d['max_mps_number'], d['tempos'], d['time_signatures']
+            d['events'], d['pitchs'], d['durations'], d['velocities'],
+            d['track_numbers'], d['instruments'], d['max_mps_number'],
+            d['tempos'], d['time_signatures']
         )
 
     def to_dict(self) -> dict:
@@ -109,7 +112,9 @@ def build_vocabs(
         paras['tpq'], supported_time_signatures
     )
 
-    event_multi_note_shapes = [tokens.NOTE_EVENTS_CHAR, tokens.NOTE_EVENTS_CHAR+'~']
+    event_multi_note_shapes = [
+        tokens.NOTE_EVENTS_CHAR, tokens.NOTE_EVENTS_CHAR+'~'
+    ]
     event_multi_note_shapes += [
         tokens.MULTI_NOTE_EVENTS_CHAR + shape
         for shape in bpe_shapes_list
@@ -143,14 +148,18 @@ def build_vocabs(
         position_number = piece.count(position_substr)
         tempo_number = piece.count(tempo_substr)
         # +4 because head (3) and eos (1)
-        piece_max_mps_number = 2 * (measure_number + position_number) + tempo_number + 4
+        piece_max_mps_number = (
+            2 * (measure_number + position_number) + tempo_number + 4
+        )
         max_mps_number = max(max_mps_number, piece_max_mps_number)
 
         text_list = piece.split(' ')
         token_count_per_piece.append(len(text_list))
-        corpus_measure_time_sigs.update(
-            [text for text in text_list if text[0] == tokens.MEASURE_EVENTS_CHAR]
-        )
+        corpus_measure_time_sigs.update([
+            text
+            for text in text_list
+            if text[0] == tokens.MEASURE_EVENTS_CHAR
+        ])
     # remove time signatures that dont appears in target corpus
     event_measure_time_sig = [
         t
@@ -160,8 +169,12 @@ def build_vocabs(
 
     # padding token HAVE TO be at first
     event_vocab = (
-        tokens.SPECIAL_TOKENS_STR + event_multi_note_shapes + event_track_instrument
-        + event_position + event_measure_time_sig + event_tempo
+        tokens.SPECIAL_TOKENS_STR
+        + event_multi_note_shapes
+        + event_track_instrument
+        + event_position
+        + event_measure_time_sig
+        + event_tempo
     )
 
     pad_token = [tokens.PADDING_TOKEN_STR]
