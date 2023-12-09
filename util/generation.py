@@ -58,9 +58,8 @@ def adjust_probs(
 
     # BOS token is redundent, will not be used in generation
     probs[ATTR_NAME_INDEX['evt']][bos_index] = 0
-    # predict PAD is not allowed in generation time
-    for attr_probs in probs:
-        attr_probs[0] = 0
+    # predict PAD is not allowed at event attibute
+    probs[ATTR_NAME_INDEX['evt']][0] = 0
 
     is_head = (
         text_list[-1] == BEGIN_TOKEN_STR

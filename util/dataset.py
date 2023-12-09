@@ -10,6 +10,7 @@ import psutil
 import torch
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
+from torch.nn.functional import pad
 from tqdm import tqdm
 
 from . import tokens
@@ -426,9 +427,29 @@ class MidiDataset(Dataset):
     def __len__(self):
         return self._length
 
+def collate_left(piece_list: List[torch.Tensor]) -> torch.Tensor:
+    """Stack pieces batch-first to a 3-d array and left-pad them"""
+    # print('\n'.join(map(str, piece_list)))
+    batched_pieces = pad_sequence(piece_list, batch_first=True, padding_value=0)
+    return batched_pieces
 
-def collate_mididataset(seq_list: List[torch.Tensor]) -> torch.Tensor:
-    """Stack batched sequences batch-first to a 3-d array and pad them"""
+def collate_right(piece_list: List[torch.Tensor]) -> torch.Tensor:
+    """Stack pieces batch-first to a 3-d array and right-pad them"""
     # print('\n'.join(map(str, seq_list)))
-    batched_seqs = pad_sequence(seq_list, batch_first=True, padding_value=0)
-    return batched_seqs
+    # Find the maximum length among all tensors
+    max_length = max(tensor.size(0) for tensor in piece_list)
+
+    # Pad tensors to the right with zeros and stack them
+    padded_piece_list = [
+        pad(
+            input=piece,
+            pad=(max_length - piece.size(0), 0),
+            mode='constant',
+            value=0
+        )
+        for piece in piece_list
+    ]
+    batched_pieces = torch.stack(padded_piece_list)
+    return batched_pieces
+
+collate_mididataset = collate_left
