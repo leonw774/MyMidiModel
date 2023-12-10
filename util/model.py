@@ -265,10 +265,9 @@ class MyMidiTransformer(nn.Module):
 
 # end class MyMidiTransformer
 
-LOSS_PADDING_ARG_CHOICES = ['ignore', 'wildcard', 'normal']
+LOSS_PADDING_ARG_CHOICES = ['ignore', 'normal']
 """
 - ignore:   PADDING = IGNORE, no exception
-- wildcard: its loss is ignored, but its presence is not ignored
 - normal:   the model have to correctly predict it to be padding
 """
 LOSS_PADDING_ARG_CHOICES_DEFAULT = 'ignore'
@@ -293,6 +292,12 @@ def compute_losses(
         raise ValueError(
             f'`padding` argument in compute_losses should be in {LOSS_PADDING_ARG_CHOICES}.'
         )
+    
+    ignore_index = 0
+    if padding == 'normal':
+        ignore_index = -100
+        ignore_mask = target_labels[..., ATTR_NAME_INDEX['evt']].eq(0)
+        target_labels[ignore_mask] = -100
 
     # target_labels have to be long int
     target_labels = target_labels.long()
@@ -302,22 +307,10 @@ def compute_losses(
             # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
             # because input shape should be (batch, category, dimensions... )
             target=target_labels[..., k], # (batch_size, seq_size)
-            ignore_index=(0 if padding != 'normal' else -100), # padding is index 0
-            reduction=(
-                'none' # return tensor size (batch_size, seq_size)
-                if padding != 'ignore' else
-                'mean' # return scalar tensor
-            )
+            ignore_index=ignore_index, # padding is index 0
+            reduction='mean' # return scalar tensor
         )
         for k, logits in enumerate(pred_logits)
     ]
-
-    if padding != 'ignore':
-        length_mask = target_labels[..., ATTR_NAME_INDEX['evt']].ne(0)
-        head_losses = [
-            (head_loss * length_mask).sum() / length_mask.sum()
-            for head_loss in head_losses
-        ]
     loss = torch.stack(head_losses).mean()
-
     return loss, head_losses

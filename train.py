@@ -727,10 +727,9 @@ def main():
                     if not args.use_parallel:
                         batch_input_seqs = batch_input_seqs.to(args.use_device)
                         batch_target_seqs = batch_target_seqs.to(args.use_device)
-                    prediction = model(batch_input_seqs)
-
+                    batched_logit_list = model(batch_input_seqs)
                     loss, head_losses = compute_losses(
-                        prediction,
+                        batched_logit_list,
                         batch_target_seqs,
                         args.train.loss_padding
                     )
@@ -782,10 +781,9 @@ def main():
                 if not args.use_parallel:
                     batch_input_seqs = batch_input_seqs.to(args.use_device)
                     batch_target_seqs = batch_target_seqs.to(args.use_device)
-                prediction = model(batch_input_seqs)
-
+                batched_logit_list = model(batch_input_seqs)
                 loss, head_losses = compute_losses(
-                    prediction,
+                    batched_logit_list,
                     batch_target_seqs,
                     args.train.loss_padding
                 )
