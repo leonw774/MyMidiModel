@@ -60,26 +60,12 @@ def _entropy(x: Union[list, dict], base: float = math_e) -> float:
 
 
 def kl_divergence(
-        pred: Union[list, dict],
-        true: Union[list, dict],
+        pred: dict,
+        true: dict,
         base: float = math_e,
         ignore_pred_zero: bool = False) -> float:
     """Calculate KL(true || pred)"""
-    if isinstance(pred, list) and isinstance(true, list):
-        assert len(pred) == len(true) and len(true) > 0
-        sum_pred = sum(pred)
-        sum_true = sum(true)
-        if sum_pred == 0 or sum_true == 0:
-            raise ValueError()
-        norm_pred = [x / sum_pred for x in pred]
-        norm_true = [x / sum_true for x in true]
-        kld = sum([
-            p * log(p/q)
-            for p, q in zip(norm_true, norm_pred)
-            if p != 0 and q != 0
-        ])
-        return kld
-    elif isinstance(pred, dict) and isinstance(true, dict):
+    if isinstance(pred, dict) and isinstance(true, dict):
         assert len(pred) > 0 and len(true) > 0
         if ignore_pred_zero:
             _true = {k: true[k] for k in true if k in pred}
@@ -102,19 +88,13 @@ def kl_divergence(
         ])
         return kld
     else:
-        raise TypeError('pred and true should be both list or dict')
+        raise TypeError('pred and true should be both dict')
 
 
 def overlapping_area_of_estimated_gaussian(
-        distribution_1: Union[list, dict],
-        distribution_2: Union[list, dict]) -> float:
-    if isinstance(distribution_1, list) and isinstance(distribution_2, list):
-        assert len(distribution_1) == len(distribution_2) and len(distribution_2) > 0
-        mean_1 = np.mean(np.array(distribution_1))
-        std_1 = np.std(np.array(distribution_1))
-        mean_2 = np.mean(np.array(distribution_1))
-        std_2 = np.std(np.array(distribution_1))
-    elif isinstance(distribution_1, dict) and isinstance(distribution_2, dict):
+        distribution_1: dict,
+        distribution_2: dict) -> float:
+    if isinstance(distribution_1, dict) and isinstance(distribution_2, dict):
         assert len(distribution_1) > 0 and len(distribution_2) > 0
         total_counts_1 = sum(
             count
@@ -144,7 +124,7 @@ def overlapping_area_of_estimated_gaussian(
         ) / total_counts_2
         std_2 = sqrt(square_mean_2 - mean_2 * mean_2)
     else:
-        raise TypeError('the distributions should be both list or dict')
+        raise TypeError('the distributions should be both dict')
     if std_1 == 0 or std_2 == 0:
         return float('nan')
     nd_1 = NormalDist(mean_1, std_1)
@@ -153,22 +133,9 @@ def overlapping_area_of_estimated_gaussian(
 
 
 def histogram_intersection(
-        distribution_1: Union[list, dict],
-        distribution_2: Union[list, dict]) -> float:
-    if isinstance(distribution_1, list) and isinstance(distribution_2, list):
-        assert len(distribution_1) == len(distribution_2) and len(distribution_2) > 0
-        sum_1 = sum(distribution_1)
-        sum_2 = sum(distribution_2)
-        if sum_1 == 0 or sum_2 == 0:
-            raise ValueError()
-        norm_1 = [x / sum_1 for x in distribution_1]
-        norm_2 = [x / sum_2 for x in distribution_2]
-        intersection = sum([
-            min(p, q)
-            for p, q in zip(norm_2, norm_1)
-        ])
-        return intersection
-    elif isinstance(distribution_1, dict) and isinstance(distribution_2, dict):
+        distribution_1: dict,
+        distribution_2: dict) -> float:
+    if isinstance(distribution_1, dict) and isinstance(distribution_2, dict):
         assert len(distribution_1) > 0 and len(distribution_2) > 0
         sum_1 = sum(distribution_1.values())
         sum_2 = sum(distribution_2.values())
@@ -183,7 +150,7 @@ def histogram_intersection(
         ])
         return intersection
     else:
-        raise TypeError('the distributions should be both list or dict')
+        raise TypeError('the distributions should be both dict')
 
 
 def random_sample_from_piece(piece: str, sample_measure_number: int):

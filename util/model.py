@@ -62,10 +62,14 @@ class MyMidiTransformer(nn.Module):
         self.input_attr_names = list(ALL_ATTR_NAMES) # make copy
         if not_use_mps_number:
             self.input_attr_names.remove('mps_numbers')
-        self.input_attrs_indices = [ATTR_NAME_INDEX[fname] for fname in self.input_attr_names]
+        self.input_attrs_indices = [
+            ATTR_NAME_INDEX[fname]
+            for fname in self.input_attr_names
+        ]
 
         self.embedding_vocabs_size = [
-            min(self.max_seq_length, self.vocabs.max_mps_number) + 1 # plus one for padding
+            # plus one for padding
+            min(self.max_seq_length, self.vocabs.max_mps_number) + 1
             if ALL_ATTR_NAMES[idx] == 'mps_numbers' else
             getattr(self.vocabs, ALL_ATTR_NAMES[idx]).size
             for idx in self.input_attrs_indices
@@ -75,9 +79,8 @@ class MyMidiTransformer(nn.Module):
             nn.Embedding(
                 num_embeddings=vsize,
                 embedding_dim=embedding_dim,
-                # padding_idx=self.vocabs.events.text2id[tokens.PADDING_TOKEN_STR]
-                padding_idx=0 # should be zero
-                # [...] the embedding vector of padding_idx will default to all zeros [...]
+                padding_idx=0
+                # the embedding vector of padding_idx will default to all zeros
             )
             for vsize in self.embedding_vocabs_size
         ])
@@ -116,8 +119,8 @@ class MyMidiTransformer(nn.Module):
 
         # False is masked, True is keep
         if use_linear_attn:
-            # this causal (lower trianglur) mask is passed but not actually used,
-            # because the "causal-ness" is already implemented in fast_transformers
+            # this causal (lower trianglur) mask is given but not used,
+            # because the "causal-ness" is implemented in fast_transformers
             self.causal_mask = torch.tril(
                 torch.ones(max_seq_length, max_seq_length),
                 diagonal=0
@@ -127,15 +130,15 @@ class MyMidiTransformer(nn.Module):
         if use_linear_attn:
             # https://linear-transformers.com/
             params = {
-                'activation': 'gelu', # same as SymphonyNet
+                'activation': 'gelu',
                 'n_layers': layers_number,
                 'n_heads': attn_heads_number,
                 'query_dimensions': embedding_dim // attn_heads_number,
                 'value_dimensions': embedding_dim // attn_heads_number,
-                'feed_forward_dimensions': 4 * embedding_dim, # same as SymphonyNet
+                'feed_forward_dimensions': 4 * embedding_dim,
                 'attention_type': 'causal-linear',
                 'dropout': dropout_rate,
-                'feature_map': MY_ELU_FEATURE_MAP  # make the model pickle-able
+                'feature_map': MY_ELU_FEATURE_MAP  # make it pickle-able
             }
             self.transformer_decoder = (
                 TransformerEncoderBuilder.from_dictionary(params).get()
@@ -143,7 +146,10 @@ class MyMidiTransformer(nn.Module):
             self.transformer_decoder_inference = (
                 RecurrentEncoderBuilder.from_dictionary(params).get()
             )
-            make_mirror(self.transformer_decoder, self.transformer_decoder_inference)
+            make_mirror(
+                self.transformer_decoder,
+                self.transformer_decoder_inference
+            )
         else:
             self.transformer_decoder = x_transformers.Decoder(
                 depth=layers_number,
@@ -165,24 +171,23 @@ class MyMidiTransformer(nn.Module):
             #     num_layers=layers_number
             # )
 
-        # set padding vectors to zeros because the _init_weights set it to something else
-        with torch.no_grad():
-            for emb_layer in self.embedding_layers:
-                emb_layer.weight.data[0].zero_()
-
 
     def to_input_attrs(self, batch_input_seqs: Tensor) -> Tensor:
-        # expect batch_input_seqs has shape: (batch_size, seq_size, all_attr_num)
+        """expect batch_input_seqs has shape:
+            (batch_size, seq_len, all_attr_num)
+        """
         return batch_input_seqs[..., self.input_attrs_indices]
 
     def to_output_attrs(self, batch_input_seqs: Tensor) -> Tensor:
-        # expect batch_input_seqs has shape: (batch_size, seq_size, all_attr_num)
+        """expect batch_input_seqs has shape:
+            (batch_size, seq_size, all_attr_num)
+        """
         return batch_input_seqs[..., self.output_attrs_indices]
 
     def forward(self, x, memory=None):
         # x has shape: (batch_size, seq_size, in_attr_number)
         if self.use_linear_attn and self.inferencing:
-            # The recurrent linear transformer only need to receive the last element
+            # recurrent linear transformer only need to receive the last token
             # with shape of (batch_size, embed_size)
             x = x[:, -1:] # become (batch_size, 1, embed_size)
         embs = [emb(x[..., i]) for i, emb in enumerate(self.embedding_layers)]
@@ -207,11 +212,12 @@ class MyMidiTransformer(nn.Module):
         if self.use_linear_attn:
             if self.inferencing:
                 # no mask is needed when using recurrent for inference
-                emb_sum_dropout = emb_sum_dropout[:, 0] # become (batch_size, embed_size)
-                linear_tf_memory = None if memory is None else memory[0]
-                transformer_output, linear_tf_memory = self.transformer_decoder_inference(
+                # become (batch_size, embed_size)
+                emb_sum_dropout = emb_sum_dropout[:, 0]
+                lt_memory = None if memory is None else memory[0]
+                transformer_output, lt_memory = self.transformer_decoder_inference(
                     emb_sum_dropout,
-                    linear_tf_memory
+                    lt_memory
                 )
             else:
                 # in fast_transformer's FullMask class, 0 is masked, 1 is keep
@@ -238,7 +244,7 @@ class MyMidiTransformer(nn.Module):
         )
 
         if self.use_linear_attn and self.inferencing:
-            return logits_tuple, (linear_tf_memory, position_memory)
+            return logits_tuple, (lt_memory, position_memory)
         else:
             return logits_tuple
 
