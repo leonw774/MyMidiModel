@@ -273,8 +273,8 @@ class MyMidiTransformer(nn.Module):
 
 LOSS_PADDING_ARG_CHOICES = ['ignore', 'normal']
 """
-- ignore:   PADDING = IGNORE, no exception
-- normal:   the model have to correctly predict it to be padding
+- ignore: PADDING = IGNORE, no exception
+- normal: the model have to correctly predict it to be padding
 """
 LOSS_PADDING_ARG_CHOICES_DEFAULT = 'ignore'
 
