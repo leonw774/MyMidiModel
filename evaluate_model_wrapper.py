@@ -47,6 +47,13 @@ def parse_args():
         default=[1.0]
     )
     parser.add_argument(
+        '--sample-threshold-head-multiplier',
+        type=float,
+        default=1.0,
+        help='The multiplier of probability threshold when in head section. \
+            Default is %(default)s.'
+    )
+    parser.add_argument(
         '--eval-sample-number',
         type=str,
         default='0',
@@ -113,5 +120,5 @@ def main():
     return 0
 
 if __name__ == '__main__':
-    exit_code = main()
-    exit(exit_code)
+    EXIT_CODE = main()
+    exit(EXIT_CODE)

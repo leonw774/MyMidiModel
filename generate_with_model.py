@@ -89,7 +89,7 @@ def read_args():
             Default is the model\'s max sequence length.'
     )
     parser.add_argument(
-        '--no-adjust-logits',
+        '--no-adjust-logit',
         action='store_true',
         help='Trun off the logit adjustment that helps generate \
             next token that satisfy the format rule.'

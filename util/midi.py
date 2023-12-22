@@ -795,7 +795,7 @@ def piece_to_midi(
                 break
         iter_count += 1
 
-    assert len(pending_cont_notes) == 0 and (not ignore_pending_note_error), \
+    assert ignore_pending_note_error or len(pending_cont_notes) == 0, \
         f'There are unclosed continuing notes: {pending_cont_notes}'
 
     # handle unclosed continuing notes by treating them as regular notes

@@ -198,7 +198,8 @@ def midi_to_features(
         midi_to_piece_paras: Union[dict, None] = None,
         primer_measure_length: int = 0,
         max_pairs_number: int = int(1e6),
-        max_token_number: int = int(1e4)) -> Union[Dict[str, float], None]:
+        max_token_number: int = int(1e4)
+    ) -> Union[Dict[str, float], Exception]:
     """
     Return the feature the piece of the midi processed with given
     `midi_to_piece_paras`.
@@ -212,7 +213,7 @@ def midi_to_features(
     else:
         # assert isinstance(midi_to_piece_paras, dict)
         if not isinstance(midi_to_piece_paras, dict):
-            return None
+            return ValueError('midi_to_piece_paras is not dict')
         if len(midi_to_piece_paras) == 0:
             midi_to_piece_paras = EVALUATION_MIDI_TO_PIECE_PARAS_DEFAULT
         else:
@@ -222,15 +223,15 @@ def midi_to_features(
             )
             # assert has_all_keys
             if has_all_keys:
-                return None
+                return ValueError('midi_to_piece_paras is not complete')
     tpq = midi_to_piece_paras['tpq']
     try:
         temp_piece = midi_to_piece(
             midi=midi,
             **midi_to_piece_paras
         )
-    except AssertionError:
-        return None
+    except AssertionError as e:
+        return e
     return piece_to_features(
         piece=temp_piece,
         tpq=tpq,
@@ -245,7 +246,7 @@ def piece_to_features(
         tpq: int,
         primer_measure_length: int = 0,
         max_pairs_number: int = int(1e6),
-        max_token_number: int = int(1e4)) -> Union[dict, None]:
+        max_token_number: int = int(1e4)) -> Union[dict, Exception]:
     """
     Return a dict that contains:
     - pitch class histogram and entropy
@@ -272,8 +273,8 @@ def piece_to_features(
 
     try:
         midi = piece_to_midi(piece, tpq, ignore_pending_note_error=True)
-    except AssertionError:
-        return None
+    except AssertionError as e:
+        return e
     pitchs = []
     durations = []
     velocities = []
@@ -522,7 +523,7 @@ def midi_list_to_features(
         primer_measure_length=primer_measure_length,
         max_pairs_number=max_pairs_number
     )
-    eval_features_list: List[ Dict[str, float] ] = []
+    eval_features_list: List[ Union[Dict[str, float], Exception] ] = []
     if worker_number > 1:
         with Pool(worker_number) as p:
             eval_features_list = list(tqdm(
@@ -541,12 +542,20 @@ def midi_list_to_features(
             disable=not use_tqdm
         ))
 
+    # for e in eval_features_list:
+    #     if isinstance(e, Exception):
+    #         print(repr(e))
+
     uncorrupt_midi_indices_list = [
         i
         for i, _ in enumerate(midi_list)
-        if eval_features_list[i] is not None
+        if not isinstance(eval_features_list[i], Exception)
     ]
-    eval_features_list = [f for f in eval_features_list if f is not None]
+    eval_features_list = [
+        f
+        for f in eval_features_list
+        if not isinstance(f, Exception)
+    ]
     aggr_eval_features = aggregate_features(eval_features_list)
     return uncorrupt_midi_indices_list, aggr_eval_features
 

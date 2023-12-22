@@ -1,4 +1,5 @@
 #!/bin/bash
+# midi preprocessing
 TPQ=12
 MAX_TRACK_NUMBER=40
 MAX_DURATION=48

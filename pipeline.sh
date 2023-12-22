@@ -172,7 +172,7 @@ if [ "$do_bpe" == true ]; then
     # check if tokenized corpus is equal to original corpus
     echo "Begin equality verification"
     python3 verify_corpus_equality.py \
-        "$corpus_dir_path" "$bpe_corpus_dir_path" "$WORKER_NUMBER" \
+        "$corpus_dir_path" "$bpe_corpus_dir_path" "$MIDI_WORKER_NUMBER" \
         || {
             echo "Equality verification failed. pipeline.sh exit." \
                 | tee -a "$log_path";
@@ -188,8 +188,8 @@ if [ -n "${BPE_ITER_NUM+x}" ] && [ "$BPE_ITER_NUM" -ne 0 ]; then
 fi
 
 python3 make_arrays.py \
-    --worker-number "$WORKER_NUMBER" --log "$log_path" \
-    --debug $use_existed_flag "${bpe_flag[@]}" -- "$corpus_dir_path" \
+    "${bpe_flag[@]}" --debug $use_existed_flag --log "$log_path" \
+    --worker-number "$MIDI_WORKER_NUMBER" -- "$corpus_dir_path" \
     || {
         echo "text_to_array.py failed. pipeline.sh exit." \
             | tee -a "$log_path";
