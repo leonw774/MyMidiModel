@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if ! { [ $# == 6 ] || [ $# == 5 ]; }; then
+if ! { [ $# == 3 ] || [ $# == 4 ]; }; then
     echo "Expect arguments to be:"
     echo "- A configuration file name under configs/model"
     echo "- Two paths to the model directory and the log file"
