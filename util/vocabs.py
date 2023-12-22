@@ -143,7 +143,7 @@ def build_vocabs(
     max_mps_number = 0
     corpus_measure_time_sigs = set()
     token_count_per_piece = []
-    for piece in tqdm(corpus_reader, desc='Find max mps number', ncols=100):
+    for piece in tqdm(corpus_reader, desc='Find max mps number', ncols=80):
         measure_number = piece.count(measure_substr)
         position_number = piece.count(position_substr)
         tempo_number = piece.count(tempo_substr)
@@ -186,7 +186,9 @@ def build_vocabs(
         map(itob36str, range(1, paras['max_duration']+1))
     )
     velocity_vocab      = pad_token + list(
-        map(itob36str, range(paras['velocity_step'], 128, paras['velocity_step']))
+        map(itob36str, range(
+            paras['velocity_step'], 128, paras['velocity_step']
+        ))
     )
     track_number_vocab  = pad_token + list(
         map(itob36str, range(paras['max_track_number']))

@@ -23,9 +23,15 @@ from .tokens import (
 #         # remove duplicate
 #         merged_perc_notes = list(set(merged_perc_notes))
 #         merged_perc_notes.sort(key=lambda x: (x.start, x.end))
-#         merged_perc_inst = Instrument(program=128, is_drum=True, name='merged_drums')
+#         merged_perc_inst = Instrument(
+#             program=128, is_drum=True, name='merged_drums'
+#         )
 #         merged_perc_inst.notes = merged_perc_notes
-#         not_perc_inst_list = [track for track in midi.instruments if not track.is_drum]
+#         not_perc_inst_list = [
+#             track
+#             for track in midi.instruments
+#             if not track.is_drum
+#         ]
 #         midi.instruments = not_perc_inst_list + [merged_perc_inst]
 
 
@@ -186,7 +192,8 @@ def get_note_tokens(
             and note.start <= EVENT_TIME_LIMIT
             and note.end <= EVENT_TIME_LIMIT
             and (not track.is_drum or 35 <= note.pitch <= 81))
-        # remove negtives and remove percussion notes not in the Genral MIDI percussion map
+            # remove negtives and percussion notes that
+            # is not in the Genral MIDI percussion map
     ]
 
     # handle too long duration
@@ -279,7 +286,7 @@ def get_time_structure_tokens(
     # print(time_sig_list)
 
     # assert time_sig_list[0].time <= first_note_start, \
-    #        'Time signature undefined before first note'
+    #     'Time signature undefined before first note'
 
     # if the time signature starts after the first note, try 4/4 start at time 0
     if time_sig_list[0].time > first_note_start:
@@ -287,10 +294,10 @@ def get_time_structure_tokens(
 
     measure_token_list = []
     for i, time_sig in enumerate(time_sig_list):
-        assert (time_sig.numerator, time_sig.denominator) in supported_time_signatures, \
+        time_sig_tuple = (time_sig.numerator, time_sig.denominator)
+        assert time_sig_tuple in supported_time_signatures, \
             'Unsupported time signature'
-            # f'Unsupported time signature {(time_sig.numerator, time_sig.denominator)}'
-        # print(f'TimeSig {i}:', cur_timesig_start, next_timesig_start, ticks_per_measure)
+            # f'Unsupported time signature {time_sig_tuple}'
 
         ticks_per_measure = 4 * tpq * time_sig.numerator // time_sig.denominator
         cur_timesig_start = time_sig.time
@@ -306,7 +313,9 @@ def get_time_structure_tokens(
             # measure should end when no notes are ending any more
             time_to_last_note_end = last_note_end - cur_timesig_start
             measure_number = (time_to_last_note_end // ticks_per_measure) + 1
-            next_timesig_start = cur_timesig_start + measure_number * ticks_per_measure
+            next_timesig_start = (
+                cur_timesig_start + measure_number * ticks_per_measure
+            )
 
         # if note not started yet
         if next_timesig_start <= first_note_start:
@@ -314,9 +323,9 @@ def get_time_structure_tokens(
 
         # check if the difference of starting time between current and next
         # time signature are multiple of current measure's length
-        assert (next_timesig_start - cur_timesig_start) % ticks_per_measure == 0, \
-            'Bad starting time of a time signature'
-            # f'({next_timesig_start}-{cur_timesig_start})%{ticks_per_measure}'
+        assert (
+            (next_timesig_start - cur_timesig_start) % ticks_per_measure == 0
+        ), 'Bad starting time of a time signature'
 
         # find the first measure that at least contain the first note
         while cur_timesig_start + ticks_per_measure <= first_note_start:
@@ -338,11 +347,13 @@ def get_time_structure_tokens(
 
     # check if last measure contain last note
     last_measure = measure_token_list[-1]
-    last_measure_onset = last_measure.onset
+    last_measure_start = last_measure.onset
     last_measure_length = (
-        4 * tpq * last_measure.time_signature[0] // last_measure.time_signature[1]
+        4 * tpq * last_measure.time_signature[0]
+        // last_measure.time_signature[1]
     )
-    assert last_measure_onset <= last_note_end < last_measure_onset + last_measure_length, \
+    last_measure_end = last_measure_start + last_measure_length
+    assert last_measure_start <= last_note_end < last_measure_end, \
         "Last note did not ends in last measure"
 
     tempo_token_list = []
@@ -364,14 +375,16 @@ def get_time_structure_tokens(
                 cur_time = tempo.time
             cur_tempo = quantize_tempo(tempo.tempo, tempo_quantization)
             if cur_tempo != prev_tempo:
-                # if the prev tempo change is same time as current one, remove prev one
+                # if previous tempo change is on the same time as current one
+                # remove the previous one
                 if prev_time == cur_time:
                     tempo_list.pop()
                 tempo_list.append(TempoChange(cur_tempo, cur_time))
             prev_tempo = cur_tempo
             prev_time = cur_time
     assert len(tempo_list) > 0, 'No tempo information retrieved'
-    tempo_list.sort(key=lambda t: t.time) # sometime it is not sorted, dunno why
+    # sometime it is not sorted, dunno why
+    tempo_list.sort(key=lambda t: t.time)
 
     # same weird issue as time signature
     # but tempo can appear in any place so this is all we can do
@@ -383,7 +396,9 @@ def get_time_structure_tokens(
     # if the tempo change starts after the first measure,
     # use the default 120 at first measure
     if tempo_list[0].time > measure_token_list[0].onset:
-        tempo_list = [TempoChange(120, measure_token_list[0].onset)] + tempo_list
+        tempo_list = [
+            TempoChange(120, measure_token_list[0].onset)
+        ] + tempo_list
 
     tempo_token_list = [
         TempoToken(
@@ -466,16 +481,26 @@ def midi_to_token_list(
         velocity_step: int,
         use_cont_note: bool,
         tempo_quantization: Tuple[int, int, int]) -> List[Tuple]:
-
-    note_token_list = get_note_tokens(midi, max_duration, velocity_step, use_cont_note)
+    note_token_list = get_note_tokens(
+        midi, max_duration, velocity_step, use_cont_note
+    )
     assert len(note_token_list) > 0, 'No notes in midi'
+
     measure_token_list, tempo_token_list = get_time_structure_tokens(
         midi, note_token_list, tpq, tempo_quantization
     )
     assert measure_token_list[0].onset <= note_token_list[0].onset, \
         'First measure is after first note'
-    pos_token_list = get_position_tokens(note_token_list, measure_token_list, tempo_token_list)
-    body_token_list = pos_token_list + note_token_list + measure_token_list + tempo_token_list
+
+    pos_token_list = get_position_tokens(
+        note_token_list, measure_token_list, tempo_token_list
+    )
+    body_token_list = (
+        pos_token_list
+        + note_token_list
+        + measure_token_list
+        + tempo_token_list
+    )
     body_token_list.sort()
 
     head_token_list = get_head_tokens(midi)
@@ -603,7 +628,8 @@ def piece_to_midi(
     text_list = piece.split(' ')
     assert (text_list[0] == tokens.BEGIN_TOKEN_STR
             and text_list[-1] == tokens.END_TOKEN_STR), \
-        f'No BOS and EOS at start and end. Get: {text_list[0]} and {text_list[-1]}'
+        (f'No BOS and EOS at start and end.'
+         f'Get: {text_list[0]} and {text_list[-1]}')
 
     cur_time = 0
     cur_position = -1
@@ -611,23 +637,26 @@ def piece_to_midi(
     cur_measure_length = 0
     cur_measure_onset = 0
     cur_time_signature = None
+    pending_cont_notes: Dict[int, Dict[Tuple[int, int, int], List[int]]]
     pending_cont_notes = dict()
-    track_number_program_map = dict()
-    track_number_index_map = dict() # track number don't have to be the track index in file
+    track_number_program_mapping = dict()
+    # from track number to the track index in file
+    track_number_index_mapping = dict()
     for text in text_list[1:-1]:
         typename = text[0]
         if typename == tokens.TRACK_EVENTS_CHAR:
             assert is_head, 'Track token at body'
-            instrument, track_number = (b36strtoi(x) for x in text[1:].split(':'))
-            assert track_number not in track_number_program_map, 'Repeated track number'
-            track_number_program_map[track_number] = instrument
+            instrument, track_number = map(b36strtoi, text[1:].split(':'))
+            assert track_number not in track_number_program_mapping, \
+                'Repeated track number'
+            track_number_program_mapping[track_number] = instrument
 
         elif typename == tokens.SEP_TOKEN_STR[0]:
             assert is_head, 'Seperator token in body'
             is_head = False
-            assert len(track_number_program_map) > 0, 'No track in head'
-            for index, (track_number, program) in enumerate(track_number_program_map.items()):
-                track_number_index_map[track_number] = index
+            assert len(track_number_program_mapping) > 0, 'No track in head'
+            for track_number, program in track_number_program_mapping.items():
+                track_number_index_mapping[track_number] = len(midi.instruments)
                 midi.instruments.append(
                     Instrument(
                         program=(program%128),
@@ -648,7 +677,11 @@ def piece_to_midi(
             if cur_time_signature != (numer, denom):
                 cur_time_signature = (numer, denom)
                 midi.time_signature_changes.append(
-                    TimeSignature(numerator=numer, denominator=denom, time=cur_time)
+                    TimeSignature(
+                        numerator=numer,
+                        denominator=denom,
+                        time=cur_time
+                    )
                 )
 
         elif typename == tokens.POSITION_EVENTS_CHAR:
@@ -659,7 +692,9 @@ def piece_to_midi(
         elif typename == tokens.TEMPO_EVENTS_CHAR:
             assert not is_head, 'Tempo token at head'
             assert cur_position >= 0, 'No position before tempo'
-            midi.tempo_changes.append(TempoChange(tempo=b36strtoi(text[1:]), time=cur_time))
+            midi.tempo_changes.append(
+                TempoChange(tempo=b36strtoi(text[1:]), time=cur_time)
+            )
 
         elif typename == tokens.NOTE_EVENTS_CHAR:
             assert not is_head, 'Note token at head'
@@ -667,13 +702,14 @@ def piece_to_midi(
 
             if text[1] == '~':
                 is_cont = True
-                note_attrs = tuple(b36strtoi(x) for x in text[3:].split(':'))
+                note_attrs = tuple(map(b36strtoi, text[3:].split(':')))
             else:
                 is_cont = False
-                note_attrs = tuple(b36strtoi(x) for x in text[2:].split(':'))
+                note_attrs = tuple(map(b36strtoi, text[2:].split(':')))
 
             # note_attrs is (pitch, duration, velocity, track_number)
-            assert note_attrs[3] in track_number_program_map, 'Note not in used track'
+            assert note_attrs[3] in track_number_program_mapping, \
+                'Note not in used track'
             n = handle_note_continuation(
                 is_cont,
                 note_attrs,
@@ -681,7 +717,8 @@ def piece_to_midi(
                 pending_cont_notes
             )
             if n is not None:
-                midi.instruments[track_number_index_map[note_attrs[3]]].notes.append(n)
+                cur_track_index = track_number_index_mapping[note_attrs[3]]
+                midi.instruments[cur_track_index].notes.append(n)
 
         elif typename == tokens.MULTI_NOTE_EVENTS_CHAR:
             assert not is_head, 'Multi-note token at head'
@@ -696,9 +733,13 @@ def piece_to_midi(
                     relnote = [False] + [b36strtoi(a) for a in s.split(',')]
                 relnote_list.append(relnote)
 
-            base_pitch, stretch_factor, velocity, track_number = map(b36strtoi, other_attrs)
-            assert track_number in track_number_program_map, 'Multi-note not in used track'
+            base_pitch, stretch_factor, velocity, track_number = (
+                map(b36strtoi, other_attrs)
+            )
+            assert track_number in track_number_program_mapping, \
+                'Multi-note not in used track'
 
+            cur_track_index = track_number_index_mapping[track_number]
             for is_cont, rel_onset, rel_pitch, rel_dur in relnote_list:
                 note_attrs = (
                     base_pitch + rel_pitch,
@@ -706,8 +747,9 @@ def piece_to_midi(
                     velocity,
                     track_number
                 )
-                # when using BPE, sometimes model will generated the combination that
-                # the relative_pitch + base_pitch exceeds limit
+                # when using BPE, sometimes model will generated values
+                # such that (relative_pitch + base_pitch) outside of limit
+                # just ignore it
                 if not 0 <= note_attrs[0] < 128:
                     continue
                 onset_time = cur_time + rel_onset * stretch_factor
@@ -718,12 +760,12 @@ def piece_to_midi(
                     pending_cont_notes
                 )
                 if n is not None:
-                    midi.instruments[track_number_index_map[track_number]].notes.append(n)
+                    midi.instruments[cur_track_index].notes.append(n)
         else:
             raise ValueError(f'Bad token string: {text}')
 
-    try_count = 0
-    while len(pending_cont_notes) > 0 and try_count < 4:
+    iter_count = 0
+    while len(pending_cont_notes) > 0 and iter_count <= 3:
         # with multinote, sometimes a note will appears earlier than
         # the continuing note it is going to be appending to
         while True:
@@ -732,16 +774,18 @@ def piece_to_midi(
                 notes_to_remove = []
                 notes_to_add = []
                 for n in inst.notes:
-                    if n.start in pending_cont_notes:
-                        info = (n.pitch, n.velocity, track_index)
-                        if info in pending_cont_notes[n.start]:
-                            notes_to_remove.append(n)
-                            new_note = handle_note_continuation(
-                                False,
-                                (n.pitch, n.end-n.start, n.velocity, track_index),
-                                n.start,
-                                pending_cont_notes)
-                            notes_to_add.append(new_note)
+                    if n.start not in pending_cont_notes:
+                        continue
+                    info = (n.pitch, n.velocity, track_index)
+                    if info not in pending_cont_notes[n.start]:
+                        continue
+                    notes_to_remove.append(n)
+                    new_note = handle_note_continuation(
+                        False,
+                        (n.pitch, n.end-n.start, n.velocity, track_index),
+                        n.start,
+                        pending_cont_notes)
+                    notes_to_add.append(new_note)
                 adding_note_count += len(notes_to_add)
                 for n in notes_to_remove:
                     inst.notes.remove(n)
@@ -749,20 +793,25 @@ def piece_to_midi(
                     inst.notes.append(n)
             if adding_note_count == 0:
                 break
-        try_count += 1
+        iter_count += 1
 
-    if not ignore_pending_note_error:
-        assert len(pending_cont_notes) == 0, \
-            f'There are unclosed continuing notes: {pending_cont_notes}'
-    else:
-        # handle unclosed continuing notes by treating them as regular notes that
-        # end at their current pending time
-        for pending_time, info_onsets_dict in pending_cont_notes.items():
-            for info, onset_list in info_onsets_dict.items():
-                pitch, velocity, track_number = info
-                for onset in onset_list:
-                    n = Note(velocity=velocity, pitch=pitch, start=onset, end=pending_time)
-                    midi.instruments[track_number_index_map[track_number]].notes.append(n)
+    assert len(pending_cont_notes) == 0 and (not ignore_pending_note_error), \
+        f'There are unclosed continuing notes: {pending_cont_notes}'
+
+    # handle unclosed continuing notes by treating them as regular notes
+    # that end at their current pending time
+    for pending_time, info_onsets_dict in pending_cont_notes.items():
+        for info, onset_list in info_onsets_dict.items():
+            pitch, velocity, track_number = info
+            for onset in onset_list:
+                n = Note(
+                    velocity=velocity,
+                    pitch=pitch,
+                    start=onset,
+                    end=pending_time
+                )
+                cur_track_index = track_number_index_mapping[track_number]
+                midi.instruments[cur_track_index].notes.append(n)
     return midi
 
 
@@ -777,11 +826,12 @@ def get_first_k_measures(text_list: str, k: int) -> List[str]:
 
     If k = 0, return just the head section.
     """
-    assert isinstance(k, int) and k >= 0, f'k must be positive integer or zero, get {k}'
+    assert isinstance(k, int) and k >= 0, \
+        f'k must be positive integer or zero, get {k}'
     m_count = 0
     end_index = 0
     for i, text in enumerate(text_list):
-        if text[0] == tokens.MEASURE_EVENTS_CHAR or text == tokens.END_TOKEN_STR:
+        if text[0] in (tokens.MEASURE_EVENTS_CHAR, tokens.END_TOKEN_STR):
             m_count += 1
         if m_count > k:
             end_index = i

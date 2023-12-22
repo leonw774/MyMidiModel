@@ -90,8 +90,13 @@ def adjust_probs(
                 b36strtoi(text_list[i].split(':')[1]) + 1
                 for i in range(1, len(text_list))
             ]
-            # assert all(t < vocabs.track_numbers.size for t in used_track_number), \
-            #     f'text_list: {text_list}\nused_track_number: {used_track_number}'
+            # assert all(
+            #     t < vocabs.track_numbers.size
+            #     for t in used_track_number
+            # ), (
+            #     f'text_list: {text_list}\n'
+            #     f'used_track_number: {used_track_number}'
+            # )
             probs[ATTR_NAME_INDEX['trn']][used_track_number] = 0
         else:
             # only separater allowed
@@ -124,9 +129,10 @@ def adjust_probs(
         elif text_list[-1][0] in (NOTE_EVENTS_CHAR, MULTI_NOTE_EVENTS_CHAR):
             probs[ATTR_NAME_INDEX['evt']][list(tempo_ids)] = 0
 
-        # this prohibits position tokens that is "behind" the current position
+        # prohibits position tokens that is "behind" the current position
         k = len(text_list) - 1
-        while text_list[k][0] not in (POSITION_EVENTS_CHAR, MEASURE_EVENTS_CHAR) and k > 0:
+        before_position_chars = (POSITION_EVENTS_CHAR, MEASURE_EVENTS_CHAR)
+        while (text_list[k][0] not in before_position_chars) and (k > 0):
             k -= 1
         if text_list[k][0] == POSITION_EVENTS_CHAR:
             cur_position = b36strtoi(text_list[k][1:])
@@ -134,9 +140,10 @@ def adjust_probs(
                 if b36strtoi(vocabs.events.id2text[i][1:]) <= cur_position:
                     probs[ATTR_NAME_INDEX['evt']][i] = 0
 
-        # this prohibit tempo tokens if there is already a tempo token in current position
+        # prohibit tempo tokens if there is already a tempo token
         k = len(text_list) - 1
-        while text_list[k][0] not in (POSITION_EVENTS_CHAR, TEMPO_EVENTS_CHAR) and k > 0:
+        before_tempo_chars = (POSITION_EVENTS_CHAR, TEMPO_EVENTS_CHAR)
+        while (text_list[k][0] not in before_tempo_chars) and (k > 0):
             k -= 1
         if text_list[k][0] == TEMPO_EVENTS_CHAR:
             probs[ATTR_NAME_INDEX['evt']][list(tempo_ids)] = 0
@@ -158,8 +165,11 @@ def adjust_probs(
     # re-normalized probs
     normed_probs = [p / p.sum() for p in probs]
     # if in some attribute all events are fill with zero, something is wrong
-    assert not any([torch.isnan(p).any() for p in normed_probs]), \
-        f'Text List: {text_list}\nAdjusted: {probs}\nRe-normalized: {normed_probs}'
+    assert not any([torch.isnan(p).any() for p in normed_probs]), (
+        f'Text List: {text_list}\n'
+        f'Adjusted: {probs}\n'
+        f'Re-normalized: {normed_probs}'
+    )
     return normed_probs
 
 
@@ -185,7 +195,8 @@ def nucleus_sampling(probs: torch.Tensor, threshold: float) -> torch.Tensor:
     cumsum_probs = torch.cumsum(sorted_probs, dim=-1)
     nucleus_number = torch.sum(cumsum_probs < threshold)
     if nucleus_number == 0:
-        return torch.unsqueeze(sorted_indices[0], dim=0) # returned dimension have to be 1
+        # returned dimension have to be 1
+        return torch.unsqueeze(sorted_indices[0], dim=0)
     nucleus_probs = sorted_probs[:nucleus_number]
     sampled_nuclei = torch.multinomial(nucleus_probs, 1)
     sampled_index = sorted_indices[sampled_nuclei]
@@ -254,7 +265,8 @@ def generate(
     # check primer_seq
     if primer_seq is not None:
         exception_msg = (
-            f'Expect primer_seq\' have shape (1, seq_length, all_attr_number). '\
+            f'Expect primer_seq to have shape '
+            f'(1, seq_length, all_attr_number). '
             f'Get {primer_seq.shape}'
         )
         assert len(primer_seq.shape) == 3, exception_msg
@@ -275,19 +287,25 @@ def generate(
     ) - primer_length
     if max_generation_step <= 0:
         raise ValueError(
-            'primer_seq is longer than model\'s max_seq_length. No generation is performed.'
+            f'primer_seq is longer than model\'s max_seq_length. '
+            f'({primer_length} > {model.max_seq_length})'
+            f'No generation is performed.'
         )
 
     # check sampling method
+    output_attrs_number = len(model.output_attrs_indices)
     if softmax_temperature is None:
-        softmax_temperature = [1.0] * len(model.output_attrs_indices)
+        softmax_temperature = [1.0] * output_attrs_number
     elif isinstance(softmax_temperature, list):
         assert all(t >= 0 for t in softmax_temperature), \
             'Temperatures should not be less than zero'
-        softmax_temperature = [t if t != 0 else 1e-6 for t in softmax_temperature]
+        softmax_temperature = [
+            t if t != 0 else 1e-6
+            for t in softmax_temperature
+        ]
         if len(softmax_temperature) == 1:
-            softmax_temperature = softmax_temperature * len(model.output_attrs_indices)
-        elif len(softmax_temperature) != len(model.output_attrs_indices):
+            softmax_temperature = softmax_temperature * output_attrs_number
+        elif len(softmax_temperature) != output_attrs_number:
             raise ValueError(
                 f'Length of softmax_temperature can only be 1 or out_attr_num. '
                 f'Get {softmax_temperature}'
@@ -296,10 +314,11 @@ def generate(
     sample = None
     if sample_function is None:
         sample_threshold = 'none'
-    assert sample_function in SAMPLE_FUNCTION_ARGUMENT_CHOICES, \
-        (f'Value of sample_function should be one of {SAMPLE_FUNCTION_ARGUMENT_CHOICES}. '
-         f'Get {sample_function}'
-        )
+    assert sample_function in SAMPLE_FUNCTION_ARGUMENT_CHOICES, (
+        f'Value of sample_function should be one of '
+        f'{SAMPLE_FUNCTION_ARGUMENT_CHOICES}. '
+        f'Get {sample_function}'
+    )
     if sample_function == 'none':
         sample = default_sampling
     elif sample_function == 'top-k':
@@ -308,11 +327,11 @@ def generate(
         sample = nucleus_sampling
 
     if sample_threshold is None:
-        sample_threshold = [1.0] * len(model.output_attrs_indices)
+        sample_threshold = [1.0] * output_attrs_number
     elif isinstance(sample_threshold, list):
         if len(sample_threshold) == 1:
-            sample_threshold = sample_threshold * len(model.output_attrs_indices)
-        elif len(sample_threshold) != len(model.output_attrs_indices):
+            sample_threshold = sample_threshold * output_attrs_number
+        elif len(sample_threshold) != output_attrs_number:
             raise ValueError(
                 f'Length of sample_threshold can only be 1 or out_attr_num.'
                 f'Get {sample_threshold}'
@@ -340,7 +359,10 @@ def generate(
             elif t[0] == TEMPO_EVENTS_CHAR:
                 event_family_ids[4].add(i)
 
-    text_list = array_to_text_list(primer_seq[0].cpu().numpy(), vocabs=model.vocabs)
+    text_list = array_to_text_list(
+        array=primer_seq[0].cpu().numpy(),
+        vocabs=model.vocabs
+    )
     primer_length = primer_seq.shape[1]
 
     recurrent_memory = None
@@ -354,14 +376,23 @@ def generate(
     # build memory for primer if use linear transformer
     if model.use_linear_attn:
         for i in range(1, primer_length):
-            input_primer_seq = model.to_input_attrs(primer_seq[:, :i]).to(model_device)
+            input_primer_seq = model.to_input_attrs(primer_seq[:, :i])
+            input_primer_seq = input_primer_seq.to(model_device)
             _, recurrent_memory = model(input_primer_seq, recurrent_memory)
 
-    for _ in tqdm(range(max_generation_step), disable=not show_tqdm, ncols=100, leave=None):
+    generate_range_tqdm = tqdm(
+        range(max_generation_step),
+        disable=not show_tqdm,
+        ncols=80,
+        leave=None
+    )
+    for _ in generate_range_tqdm:
         input_primer_seq = model.to_input_attrs(primer_seq).to(model_device)
         if model.use_linear_attn:
             # return batched_last_logits because inferencing is True
-            batched_last_logits, recurrent_memory = model(input_primer_seq, recurrent_memory)
+            batched_last_logits, recurrent_memory = (
+                model(input_primer_seq, recurrent_memory)
+            )
             last_logits = [
                 l[0].to('cpu')
                 # to cpu, if was cuda (likely)
@@ -383,8 +414,12 @@ def generate(
         ]
         if use_adjust_prob:
             # prevent many bad format in advance
-            probs = adjust_probs(probs, text_list, model.vocabs, event_family_ids)
-        # print('\n'.join([repr(p) for p in probs]))
+            probs = adjust_probs(
+                probs=probs,
+                text_list=text_list,
+                vocabs=model.vocabs,
+                event_family_ids=event_family_ids
+            )
 
         try_count = 0
         next_token_str = ""
@@ -393,15 +428,12 @@ def generate(
                 sample(probs, threshold)
                 for probs, threshold in zip(probs, sample_threshold)
             ]
-            # print(sampled_attrs)
-
-             # next_token_array shape = (1, out_attr_num)
+            # next_token_array shape = (1, out_attr_num)
             next_token_array = torch.stack(sampled_attrs, dim=1).cpu().numpy()
             next_token_str = array_to_text_list(
                 next_token_array,
                 vocabs=model.vocabs
             )[0]
-            # print(try_text_list)
             if next_token_str == END_TOKEN_STR:
                 text_list = text_list + [next_token_str]
                 # if sampled EOS, then dont check. just end
@@ -422,7 +454,9 @@ def generate(
             else:
                 text_list = text_list + [next_token_str]
                 next_array, array_memory = check_result
-                primer_seq = torch.from_numpy(next_array.astype('int32')).unsqueeze(0)
+                primer_seq = torch.from_numpy(
+                    next_array.astype('int32')
+                ).unsqueeze(0)
                 break
         # end while sample and check
 

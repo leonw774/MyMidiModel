@@ -12,7 +12,11 @@ from util.midi import piece_to_midi
 from util.corpus_reader import CorpusReader
 from util.corpus import get_corpus_paras
 
-def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, tpq: int) -> bool:
+def compare_two_pieces(
+        piece_index: int,
+        a_piece: str,
+        b_piece: str,
+        tpq: int) -> bool:
     try:
         a_midi = piece_to_midi(a_piece, tpq)
     except Exception:
@@ -83,8 +87,9 @@ def compare_two_pieces(piece_index: int, a_piece: str, b_piece: str, tpq: int) -
         })
         if ((a_track_note_starts != b_track_note_starts)
             or (a_track_note_ends != b_track_note_ends)):
-            # sometimes there are multiple overlapping notes of same pitch and velocity
-            # if there is a continuing note in them, they will cause ambiguity while merging
+            # sometimes there are multiple overlapping notes of
+            # same pitch and velocity. if there is a continuing note in them,
+            # they will cause ambiguity while merging
             a_bytes_io = io.BytesIO()
             b_bytes_io = io.BytesIO()
             a_midi.dump(file=a_bytes_io)
@@ -139,7 +144,7 @@ def verify_corpus_equality(
             tqdm_compare = tqdm(
                 p.imap_unordered(compare_wrapper, args_dict_list),
                 total=corpus_length,
-                ncols=100
+                ncols=80
             )
             for result in tqdm_compare:
                 if not result:

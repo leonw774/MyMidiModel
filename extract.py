@@ -24,12 +24,13 @@ def read_args():
         required=True,
         help="""Required at least one indexing string.
 An indexing string is in the form of "INDEX" or "BEGIN:END".
-Multiple indexing strings are seperated by commas, surrounded by double-quotes.
-The former form: extract piece at INDEX is to be .
-The latter form: extract pieces from indices BEGIN (inclusive) to END (exclusive).
+Former: extract piece at INDEX.
+Latter: extract pieces from BEGIN (inclusive) to END (exclusive).
 If any number A < 0, it will be replaced to CORPUS_LENGTH - A.
-If BEGIN is empty, 0 will be used. If END is empty, CORPUS_LENGTH will be used.
+If BEGIN is empty, 0 will be used.
+If END is empty, CORPUS_LENGTH will be used.
 BEGIN and END can not be empty at the same time.
+Multiple indexing strings are seperated by commas.
 Example: --indexing ":2, 3:5, 7, -7, -5:-3, -2:"
 """
     )
@@ -104,7 +105,10 @@ def main():
             print('Error: no piece in input file')
             return 1
 
-        indices_to_extract = parse_index_string(args.indexing.split(','), len(corpus_reader))
+        indices_to_extract = parse_index_string(
+            index_str_list=args.indexing.split(','),
+            corpus_length=len(corpus_reader)
+        )
         print("extracting indices:", list(indices_to_extract))
 
         # extract
@@ -122,7 +126,8 @@ def main():
                 midi.dump(f'{args.output_path}_{i}.mid')
 
             if args.extract_txt:
-                with open(f'{args.output_path}_{i}.txt', 'w+', encoding='utf8') as f:
+                output_file_path = f'{args.output_path}_{i}.txt'
+                with open(output_file_path, 'w+', encoding='utf8') as f:
                     f.write(piece+'\n')
 
             if args.extract_img:
@@ -132,5 +137,5 @@ def main():
             print(f'extracted {args.output_path}_{i}')
 
 if __name__ == '__main__':
-    exit_code = main()
-    exit(exit_code)
+    EXIT_CODE = main()
+    exit(EXIT_CODE)

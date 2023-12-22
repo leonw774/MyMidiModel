@@ -173,7 +173,7 @@ def main():
             tqdm_text_list_to_array = tqdm(
                 p.imap(mp_handler, args_list),
                 total=len(corpus_reader),
-                ncols=100
+                ncols=80
             )
             array_list = list(tqdm_text_list_to_array)
 
@@ -192,7 +192,7 @@ def main():
             compresslevel=1
         )
         with zipfile_cm as npz_file:
-            for file_name in tqdm(os.listdir(npy_dir_path), ncols=100):
+            for file_name in tqdm(os.listdir(npy_dir_path), ncols=80):
                 # arcname is file_name -> file should be at root
                 npz_file.write(os.path.join(npy_dir_path, file_name), file_name)
         os.rename(npy_zip_path, npz_path)
@@ -241,7 +241,7 @@ def main():
         }
         regular_single_note_str = ' ' + NOTE_EVENTS_CHAR + ':'
         cont_single_note_str = ' ' + NOTE_EVENTS_CHAR + '~:'
-        for piece in tqdm(corpus_reader, desc='Making statistics', ncols=100):
+        for piece in tqdm(corpus_reader, desc='Making statistics', ncols=80):
             if args.bpe:
                 distributions['shape']['0,0,1;'] += piece.count(regular_single_note_str)
                 distributions['shape']['0,0,1~;'] += piece.count(cont_single_note_str)

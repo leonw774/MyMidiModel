@@ -37,28 +37,32 @@ def dump_corpus_paras(paras_dict: dict) -> str:
     return yaml.dump(paras_dict)
 
 def get_corpus_paras(corpus_dir_path: str) -> dict:
-    with open(to_paras_file_path(corpus_dir_path), 'r', encoding='utf8') as paras_file:
+    paras_path = to_paras_file_path(corpus_dir_path)
+    with open(paras_path, 'r', encoding='utf8') as paras_file:
         corpus_paras_dict = yaml.safe_load(paras_file)
     return corpus_paras_dict
 
 def get_corpus_vocabs(corpus_dir_path: str) -> Vocabs:
-    with open(to_vocabs_file_path(corpus_dir_path), 'r', encoding='utf8') as vocabs_file:
+    vocab_path = to_vocabs_file_path(corpus_dir_path)
+    with open(vocab_path, 'r', encoding='utf8') as vocabs_file:
         corpus_vocabs_dict = json.load(vocabs_file)
     corpus_vocabs = Vocabs.from_dict(corpus_vocabs_dict)
     return corpus_vocabs
 
 
 ATTR_NAME_INDEX = {
+    # short   long
     'evt': 0, 'events': 0,
     'pit': 1, 'pitchs': 1,
     'dur': 2, 'durations': 2,
     'vel': 3, 'velocities': 3,
     'trn': 4, 'track_numbers': 4,
-    'mps': 5, 'mps_numbers': 5, # position number
+    'mps': 5, 'mps_numbers': 5,
 }
 
 ALL_ATTR_NAMES = [
-    'events', 'pitchs', 'durations', 'velocities', 'track_numbers', 'mps_numbers'
+    'events', 'pitchs', 'durations', 'velocities', 'track_numbers',
+    'mps_numbers'
 ]
 
 OUTPUT_ATTR_NAMES = [
@@ -102,6 +106,12 @@ def text_list_to_array(
     """
     # in build_vocabs, padding token is made to be the 0th element
     padding = 0
+    evt_index = ATTR_NAME_INDEX['evt']
+    pit_index = ATTR_NAME_INDEX['pit']
+    dur_index = ATTR_NAME_INDEX['dur']
+    vel_index = ATTR_NAME_INDEX['vel']
+    trn_index = ATTR_NAME_INDEX['trn']
+    mps_index = ATTR_NAME_INDEX['mps']
 
     if input_memory is None:
         last_array_len = 0
@@ -110,7 +120,7 @@ def text_list_to_array(
             fill_value=padding,
             dtype=np.uint16
         )
-        track_program_mapping = dict()
+        used_tracks = set()
         cur_mps_number = 0
     elif isinstance(input_memory, dict):
         last_array_len = input_memory['last_array'].shape[0]
@@ -120,7 +130,7 @@ def text_list_to_array(
             dtype=np.uint16
         )
         x[:last_array_len] = input_memory['last_array']
-        track_program_mapping = input_memory['track_program_mapping']
+        used_tracks = input_memory['used_tracks']
         cur_mps_number = input_memory['cur_mps_number']
     else:
         raise ValueError('input_memory is not None nor a dictionary')
@@ -134,55 +144,57 @@ def text_list_to_array(
 
         if text in tokens.SPECIAL_TOKENS_STR:
             cur_mps_number += 1
-            x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
-            x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
+            x[i][evt_index] = vocabs.events.text2id[text]
+            x[i][mps_index] = cur_mps_number
             if text == tokens.BEGIN_TOKEN_STR:
                 cur_mps_number += 1
 
         elif typename == tokens.TRACK_EVENTS_CHAR:
             event_text, track_number = text.split(':')
-            instrument = event_text[1:]
-            assert track_number not in track_program_mapping, 'Repeating track number in head'
-            track_program_mapping[track_number] = vocabs.instruments.text2id[instrument]
-            x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
-            x[i][ATTR_NAME_INDEX['trn']] = vocabs.track_numbers.text2id[track_number]
-            x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
+            # instrument = event_text[1:]
+            assert track_number not in used_tracks, \
+                'Repeating track number in head'
+            used_tracks.add(track_number)
+            x[i][evt_index] = vocabs.events.text2id[event_text]
+            x[i][trn_index] = vocabs.track_numbers.text2id[track_number]
+            x[i][mps_index] = cur_mps_number
 
         elif typename == tokens.MEASURE_EVENTS_CHAR:
             cur_mps_number += 1
-            x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
-            x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
+            x[i][evt_index] = vocabs.events.text2id[text]
+            x[i][mps_index] = cur_mps_number
 
         elif typename == tokens.TEMPO_EVENTS_CHAR:
             event_text, *attr = text = text.split(':')
             cur_mps_number += 1
-            x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
-            x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
+            x[i][evt_index] = vocabs.events.text2id[event_text]
+            x[i][mps_index] = cur_mps_number
 
         elif typename == tokens.POSITION_EVENTS_CHAR:
             cur_mps_number += 1
             # cur_position_cursor = i
-            x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[text]
-            x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
+            x[i][evt_index] = vocabs.events.text2id[text]
+            x[i][mps_index] = cur_mps_number
 
-        elif typename == tokens.NOTE_EVENTS_CHAR or typename == tokens.MULTI_NOTE_EVENTS_CHAR:
+        elif (typename == tokens.NOTE_EVENTS_CHAR
+              or typename == tokens.MULTI_NOTE_EVENTS_CHAR):
             event_text, *attr = text.split(':')
-            x[i][ATTR_NAME_INDEX['evt']] = vocabs.events.text2id[event_text]
-            x[i][ATTR_NAME_INDEX['pit']] = vocabs.pitchs.text2id[attr[0]]
-            x[i][ATTR_NAME_INDEX['dur']] = vocabs.durations.text2id[attr[1]]
-            x[i][ATTR_NAME_INDEX['vel']] = vocabs.velocities.text2id[attr[2]]
-            x[i][ATTR_NAME_INDEX['trn']] = vocabs.track_numbers.text2id[attr[3]]
-            assert attr[3] in track_program_mapping, 'Invalid track number'
-            if x[i-1][ATTR_NAME_INDEX['trn']] == 0:
+            assert attr[3] in used_tracks, 'Invalid track number'
+            x[i][evt_index] = vocabs.events.text2id[event_text]
+            x[i][pit_index] = vocabs.pitchs.text2id[attr[0]]
+            x[i][dur_index] = vocabs.durations.text2id[attr[1]]
+            x[i][vel_index] = vocabs.velocities.text2id[attr[2]]
+            x[i][trn_index] = vocabs.track_numbers.text2id[attr[3]]
+            if x[i-1][trn_index] == 0: # if prev is not note/multi-note
                 cur_mps_number += 1
-            x[i][ATTR_NAME_INDEX['mps']] = cur_mps_number
+            x[i][mps_index] = cur_mps_number
 
         else:
             raise ValueError('unknown typename: ' + typename)
     if output_memory:
         return x, {
                 'last_array': x,
-                'track_program_mapping': track_program_mapping,
+                'used_tracks': used_tracks,
                 # 'cur_position_cursor': cur_position_cursor,
                 'cur_mps_number': cur_mps_number,
             }
@@ -193,18 +205,17 @@ def text_list_to_array(
 def array_to_text_list(array, vocabs: Vocabs) -> List[str]:
     """
         Inverse of text_list_to_array.
-        Expect array to be numpy-like.
+        Expect array to be numpy ndarray or pytorch tensor.
     """
-    assert len(array.shape) == 2 and array.shape[0] > 0, \
-           f'Bad numpy array shape: {array.shape}'
-    assert array.shape[1] == len(OUTPUT_ATTR_NAMES) or array.shape[1] == len(ALL_ATTR_NAMES), \
+    assert len(array.shape) == 2, f'Bad numpy array shape: {array.shape}'
+    assert (array.shape[1] == len(OUTPUT_ATTR_NAMES)
+            or array.shape[1] == len(ALL_ATTR_NAMES)), \
             f'Bad numpy array shape: {array.shape}'
 
-
     text_list = []
-    for i in range(array.shape[0]):
+    for x in array:
         # in json, key can only be string
-        event_text = vocabs.events.id2text[array[i][ATTR_NAME_INDEX['evt']]]
+        event_text = vocabs.events.id2text[x[ATTR_NAME_INDEX['evt']]]
         typename = event_text[0]
 
         if event_text in tokens.SPECIAL_TOKENS_STR:
@@ -218,7 +229,7 @@ def array_to_text_list(array, vocabs: Vocabs) -> List[str]:
             token_text = (
                 event_text
                 + ':'
-                + vocabs.track_numbers.id2text[array[i][ATTR_NAME_INDEX['trn']]]
+                + vocabs.track_numbers.id2text[x[ATTR_NAME_INDEX['trn']]]
             )
             text_list.append(token_text)
 
@@ -231,14 +242,18 @@ def array_to_text_list(array, vocabs: Vocabs) -> List[str]:
         elif typename == tokens.POSITION_EVENTS_CHAR:
             text_list.append(event_text)
 
-        elif typename == tokens.NOTE_EVENTS_CHAR or typename == tokens.MULTI_NOTE_EVENTS_CHAR:
-            # subtract one because there is padding token at the beginning of the vocab
-            track_number = array[i][ATTR_NAME_INDEX['trn']] - 1
+        elif (typename == tokens.NOTE_EVENTS_CHAR
+              or typename == tokens.MULTI_NOTE_EVENTS_CHAR):
+            # subtract one because there is padding token at index 0
+            track_number = x[ATTR_NAME_INDEX['trn']] - 1
+            pit_text = vocabs.pitchs.id2text[x[ATTR_NAME_INDEX['pit']]]
+            dur_text = vocabs.durations.id2text[x[ATTR_NAME_INDEX['dur']]]
+            vel_text = vocabs.velocities.id2text[x[ATTR_NAME_INDEX['vel']]]
             token_text = (
                 event_text + ':'
-                + vocabs.pitchs.id2text[array[i][ATTR_NAME_INDEX['pit']]] + ':'
-                + vocabs.durations.id2text[array[i][ATTR_NAME_INDEX['dur']]] + ':'
-                + vocabs.velocities.id2text[array[i][ATTR_NAME_INDEX['vel']]] + ':'
+                + pit_text + ':'
+                + dur_text + ':'
+                + vel_text + ':'
                 + itob36str(track_number)
             )
             text_list.append(token_text)
@@ -255,15 +270,23 @@ def get_full_array_string(input_array: np.ndarray, vocabs: Vocabs):
     np.savetxt(array_text_byteio, input_array, fmt='%d')
     array_savetxt_list = array_text_byteio.getvalue().decode().split('\n')
     reconstructed_text_list = array_to_text_list(input_array, vocabs=vocabs)
-    three_letter_names = [attr_name for attr_name in ATTR_NAME_INDEX if len(attr_name) == 3]
-    ordered_three_letter_names = sorted(three_letter_names, key=ATTR_NAME_INDEX.get)
-    debug_str_head = ' '.join([f'{attr_name:>4}' for attr_name in ordered_three_letter_names])
+    short_attr_names = [
+        attr_name
+        for attr_name in ATTR_NAME_INDEX
+        if len(attr_name) == 3
+    ]
+    sorted_attr_names = sorted(
+        short_attr_names, key=ATTR_NAME_INDEX.get)
+    debug_str_head = ' '.join([
+        f'{attr_name:>4}'
+        for attr_name in sorted_attr_names
+    ])
     debug_str_head += '  reconstructed_text\n'
     debug_str = debug_str_head + (
         '\n'.join([
             ' '.join([f'{s:>4}' for s in a.split()])
             + f'  {z}'
-            for i, (a, z) in enumerate(zip(array_savetxt_list, reconstructed_text_list))
+            for a, z in zip(array_savetxt_list, reconstructed_text_list)
         ])
     )
     return debug_str
@@ -304,7 +327,10 @@ def piece_to_roll(piece: str, tpq: int) -> Figure:
         typename = text[0]
         if typename == tokens.TRACK_EVENTS_CHAR:
             total_track_number += 1
-            instrument, track_number = (b36strtoi(x) for x in text[1:].split(':'))
+            instrument, track_number = (
+                b36strtoi(x)
+                for x in text[1:].split(':')
+            )
             if instrument == 128:
                 drum_tracks.add(track_number)
 
@@ -360,7 +386,9 @@ def piece_to_roll(piece: str, tpq: int) -> Figure:
             if track_number in drum_tracks:
                 current_axis.add_patch(
                     Ellipse(
-                        (cur_time+0.5, pitch+0.5), max_time / 256 * 0.25, 0.5,
+                        xy=(onset_time+0.5, pitch+0.5),
+                        width=max_time / 256 * 0.25,
+                        height=0.5,
                         edgecolor='grey',
                         linewidth=0.75,
                         facecolor=track_colors[track_number],
@@ -370,7 +398,9 @@ def piece_to_roll(piece: str, tpq: int) -> Figure:
             else:
                 current_axis.add_patch(
                     Rectangle(
-                        (cur_time, pitch), duration-0.25, 0.75,
+                        xy=(cur_time, pitch),
+                        width=duration-0.25,
+                        height=0.75,
                         edgecolor='grey',
                         linewidth=0.75,
                         facecolor=track_colors[track_number],
@@ -388,7 +418,10 @@ def piece_to_roll(piece: str, tpq: int) -> Figure:
                     relnote = [b36strtoi(a) for a in s.split(',')]
                 relnote = [is_cont] + relnote
                 relnote_list.append(relnote)
-            base_pitch, stretch_factor, _velocity, track_number = map(b36strtoi, other_attrs)
+            base_pitch, stretch_factor, _velocity, track_number = map(
+                b36strtoi,
+                other_attrs
+            )
             if len(position) == 1:
                 cur_time = position[0] + cur_measure_onset
             prev_pitch = -1
@@ -400,7 +433,9 @@ def piece_to_roll(piece: str, tpq: int) -> Figure:
                 if track_number in drum_tracks:
                     current_axis.add_patch(
                         Ellipse(
-                            (onset_time+0.5, pitch+0.5), max_time / 256 * 0.25, 0.5,
+                            xy=(onset_time+0.5, pitch+0.5),
+                            width=max_time / 256 * 0.25,
+                            height=0.5,
                             edgecolor='grey',
                             linewidth=0.75,
                             facecolor=track_colors[track_number],
@@ -411,7 +446,9 @@ def piece_to_roll(piece: str, tpq: int) -> Figure:
                 else:
                     current_axis.add_patch(
                         Rectangle(
-                            (cur_time, pitch), duration-0.25, 0.75,
+                            xy=(cur_time, pitch),
+                            width=duration-0.25,
+                            height=0.75,
                             edgecolor='grey',
                             linewidth=0.75,
                             facecolor=track_colors[track_number],
@@ -420,7 +457,8 @@ def piece_to_roll(piece: str, tpq: int) -> Figure:
                     )
                 if prev_pitch != -1:
                     plt.plot(
-                        [prev_onset_time+0.4, onset_time+0.4], [prev_pitch+0.4, pitch+0.4],
+                        scalex=[prev_onset_time+0.4, onset_time+0.4],
+                        scaley=[prev_pitch+0.4, pitch+0.4],
                         color=PIANOROLL_SHAPE_LINE_COLOR,
                         linewidth=1.0,
                         markerfacecolor=track_colors[track_number],

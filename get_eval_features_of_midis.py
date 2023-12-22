@@ -45,9 +45,10 @@ def parse_args():
         type=int,
         default=0,
         metavar='k',
-        help='If this option is not set, the features are computed from the whole piece.\
-            If this option is set to %(metavar)s, which should be a positive integer,\
-            the features are computed from the number %(metavar)s+1 to the last measure.'
+        help='If this option is not set, the features are computed from \
+            the whole piece. If this option is set to %(metavar)s, \
+            which should be positive integer, the features are computed \
+            from the number %(metavar)s+1 to the last measure.'
     )
     parser.add_argument(
         '--log',
@@ -59,8 +60,8 @@ def parse_args():
         '--max-pairs-number',
         type=int,
         default=int(1e6),
-        help='Maximal limit of measure pairs for calculating the self-similarities. \
-            Default is %(default)s.'
+        help='Maximal limit of measure pairs for calculating the \
+            self-similarities. Default is %(default)s.'
     )
     parser.add_argument(
         '--reference-file-path',
@@ -76,8 +77,9 @@ def parse_args():
     parser.add_argument(
         'midi_dir_path',
         type=str,
-        help='Find all midi files under this directory recursively,\
-            and output the result JSON file (\"eval_features.json\") at this path.'
+        help='Find all midi files under this directory recursively, \
+            and output the result JSON file (\"eval_features.json\") \
+            under this path.'
     )
     return parser.parse_args()
 
@@ -113,7 +115,11 @@ def main():
             format='%(message)s'
         )
 
-    logging.info(strftime('==== get_eval_features_of_midis.py start at %Y%m%d-%H%M%S ===='))
+    logging.info(
+        strftime(
+            '==== get_eval_features_of_midis.py start at %Y%m%d-%H%M%S ===='
+        )
+    )
 
     if not os.path.isdir(args.midi_dir_path):
         logging.info('Invalid dir path: %s', args.midi_dir_path)
@@ -165,7 +171,12 @@ def main():
 
     # compute midi durations
     midi_length_list = []
-    for i in tqdm(uncorrupt_midi_indices_list, desc='Getting MIDI durations', ncols=100):
+    tqdm_uncorrupt_midi_indices_list = tqdm(
+        uncorrupt_midi_indices_list,
+        desc='Getting MIDI durations',
+        ncols=80
+    )
+    for i in tqdm_uncorrupt_midi_indices_list:
         midi_path = midi_path_list[i]
         midomidi = mido_MidiFile(midi_path)
         try:
@@ -184,21 +195,20 @@ def main():
     logging.info('Total midi playback time: %f.', np.sum(midi_length_list))
 
     logging.info('\t'.join([
-        f'{fname[:-4]}' for fname in EVAL_SCALAR_FEATURE_NAMES
+        f'{fname[:-4]}'
+        for fname in EVAL_SCALAR_FEATURE_NAMES
     ]))
     logging.info('\t'.join([
-        f'{aggr_eval_features[fname]["mean"]}' for fname in EVAL_SCALAR_FEATURE_NAMES
+        f'{aggr_eval_features[fname]["mean"]}'
+        for fname in EVAL_SCALAR_FEATURE_NAMES
     ]))
 
     if args.reference_file_path != '':
         if os.path.isfile(args.reference_file_path):
-            with open(args.reference_file_path, 'r', encoding='utf8') as reference_file:
-                try:
-                    reference_eval_features = json.load(reference_file)
-                except Exception:
-                    logging.info('json.load(%s) failed', args.reference_file_path)
-                    logging.info(format_exc())
-                    return 1
+            with open(
+                    args.reference_file_path, 'r', encoding='utf8'
+                ) as reference_file:
+                reference_eval_features = json.load(reference_file)
 
             # the keys in reference_eval_features are read from json
             # so they are strings
@@ -229,10 +239,15 @@ def main():
                 args.reference_file_path
             )
 
-    eval_feat_file_path = os.path.join(args.midi_dir_path, 'eval_features.json')
+    eval_feat_file_path = os.path.join(
+        args.midi_dir_path, 'eval_features.json'
+    )
     with open(eval_feat_file_path, 'w+', encoding='utf8') as eval_feat_file:
         json.dump(aggr_eval_features, eval_feat_file)
-    logging.info('Outputed evaluation features JSON at %s', eval_feat_file_path)
+    logging.info(
+        'Outputed evaluation features JSON at %s',
+        eval_feat_file_path
+    )
 
     logging.info(strftime('==== get_eval_features_of_midis.py exit ===='))
     return 0

@@ -50,14 +50,14 @@ def parse_args():
         dest='test_paths_file_path',
         type=str,
         default='',
-        help='The path to the text file recording the testing files of the dataset'
+        help='The path to the file recording the paths of testing files'
     )
     data_group.add_argument(
         '--valid-paths-file',
         dest='valid_paths_file_path',
         type=str,
         default='',
-        help='The path to the text file recording the testing files of the dataset'
+        help='The path to the file recording the paths of validation files'
     )
     data_group.add_argument(
         '--max-seq-length',
@@ -175,8 +175,8 @@ def parse_args():
         choices=('none', 'top-k', 'top-p', 'nucleus'),
         const='none',
         default='none',
-        help='The sample function to used. Choice "top-p" is the same as "nucleus". \
-            Default is %(default)s'
+        help='The sample function to used. \
+            Choice "top-p" is the same as "nucleus". Default is %(default)s'
     )
     eval_group.add_argument(
         '--sample-threshold',
@@ -228,7 +228,8 @@ def parse_args():
         nargs='?',
         const=None,
         default=None,
-        help='Set this to reasonable value to prevent OOM. If not set, assume no limit.'
+        help='Set this to reasonable value to prevent OOM. \
+            If not set, assume no limit.'
     )
     global_group.add_argument(
         '--log',
@@ -417,16 +418,20 @@ def main():
 
     parallel_devices_count = 1
     if args.use_parallel:
-        parallel_devices_count = len(os.getenv('CUDA_VISIBLE_DEVICES').split(','))
+        parallel_devices_count = len(
+            os.getenv('CUDA_VISIBLE_DEVICES').split(',')
+        )
     if args.use_parallel and parallel_devices_count == 1:
         args.use_parallel = False
 
     gradient_accumulation_steps = 1
     if args.use_device != 'cpu':
         if args.max_pieces_per_gpu is not None: # if gpu memory is limited
-            # effective batch size = gradient_accumulation_steps * batch_size * device_count
+            # effective batch size = 
+            #     gradient_accumulation_steps * batch_size * device_count
             gradient_accumulation_steps = int(
-                args.train.batch_size / (args.max_pieces_per_gpu * parallel_devices_count)
+                args.train.batch_size
+                / (args.max_pieces_per_gpu * parallel_devices_count)
             )
             if gradient_accumulation_steps > 1:
                 args.train.batch_size = args.max_pieces_per_gpu
@@ -462,25 +467,48 @@ def main():
     ckpt_dir_path = os.path.join(args.model_dir_path, 'ckpt')
     if is_main_process:
         logging.info(strftime('==== train.py start at %Y%m%d-%H%M%S ===='))
-        data_args_str  = '\n'.join([f'{k}:{v}' for k, v in vars(args.data).items()])
-        model_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.model).items()])
-        eval_args_str  = '\n'.join([f'{k}:{v}' for k, v in vars(args.eval).items()])
-        train_args_str = '\n'.join([f'{k}:{v}' for k, v in vars(args.train).items()])
+        data_args_str  = '\n'.join([
+            f'{k}:{v}'
+            for k, v in vars(args.data).items()
+        ])
+        model_args_str = '\n'.join([
+            f'{k}:{v}'
+            for k, v in vars(args.model).items()
+        ])
+        eval_args_str  = '\n'.join([
+            f'{k}:{v}'
+            for k, v in vars(args.eval).items()
+        ])
+        train_args_str = '\n'.join([
+            f'{k}:{v}'
+            for k, v in vars(args.train).items()
+        ])
         other_args_str = '\n'.join([
-            f'{k}:{v}' for k, v in vars(args).items() if not isinstance(v, Namespace)
+            f'{k}:{v}'
+            for k, v in vars(args).items()
+            if not isinstance(v, Namespace)
         ])
         logging.info(data_args_str)
         logging.info(model_args_str)
         logging.info(eval_args_str)
         logging.info(train_args_str)
-        logging.info('gradient_accumulation_steps:%d', gradient_accumulation_steps)
+        logging.info(
+            'gradient_accumulation_steps:%d',
+            gradient_accumulation_steps
+        )
         logging.info(other_args_str)
 
         if not os.path.isdir(args.model_dir_path):
-            logging.info('Invalid model dir path: %s', args.model_dir_path)
+            logging.info(
+                'Invalid model dir path: %s',
+                args.model_dir_path
+            )
             return 1
         if not os.path.isdir(ckpt_dir_path):
-            logging.info('Invalid model ckpt dir path: %s', ckpt_dir_path)
+            logging.info(
+                'Invalid model ckpt dir path: %s',
+                ckpt_dir_path
+            )
             return 1
 
     ######## Prepare loss.csv
@@ -510,9 +538,13 @@ def main():
 
     ######## Make dataset
 
-    with open(args.data.test_paths_file_path, 'r', encoding='utf8') as test_paths_file:
+    with open(
+            args.data.test_paths_file_path, 'r', encoding='utf8'
+        ) as test_paths_file:
         test_path_list = [p.strip() for p in test_paths_file.readlines()]
-    with open(args.data.valid_paths_file_path, 'r', encoding='utf8') as valid_paths_file:
+    with open(
+            args.data.valid_paths_file_path, 'r', encoding='utf8'
+        ) as valid_paths_file:
         valid_path_list = [p.strip() for p in valid_paths_file.readlines()]
     del args.data.test_paths_file_path
     del args.data.valid_paths_file_path
@@ -530,7 +562,9 @@ def main():
 
     if is_main_process:
         logging.info('Making valid dataset')
-    excluded_path_list_for_valid = train_dataset.included_path_list + test_path_list
+    excluded_path_list_for_valid = (
+        train_dataset.included_path_list + test_path_list
+    )
     # to prevent inconsistency, set valid dataset's virtual piece step to zero
     args.data.virtual_piece_step_ratio = 0
     valid_dataset = MidiDataset(
@@ -548,35 +582,41 @@ def main():
     # if we want to generate and eval samples at each validation
     valid_eval_features = dict()
     if is_main_process and args.eval.valid_eval_sample_number > 0:
-        valid_eval_features_json_path = os.path.join(
+        valid_eval_features_path = os.path.join(
             args.midi_dir_path,
             'valid_eval_features.json'
         )
-        if os.path.isfile(valid_eval_features_json_path):
+        if os.path.isfile(valid_eval_features_path):
             logging.info(
                 'Getting valid set eval features from %s',
-                valid_eval_features_json_path
+                valid_eval_features_path
             )
-            with open(valid_eval_features_json_path, 'r', encoding='utf8') as f:
+            with open(valid_eval_features_path, 'r', encoding='utf8') as f:
                 valid_eval_features = json.load(f)
         else:
             logging.info('Computing valid set eval features')
             # copy validation midi files into model_dir
             pathlist_file_path = to_pathlist_file_path(args.corpus_dir_path)
-            with open(pathlist_file_path, 'r', encoding='utf8') as pathlist_file:
+            with open(
+                    pathlist_file_path, 'r', encoding='utf8'
+                ) as pathlist_file:
                 all_paths_list = [
                     p.strip()
                     for p in pathlist_file.readlines()
                 ]
-            valid_file_path_tuple = tuple(valid_path_list) # relative to dataset root
-            valid_file_path_list = [ # relative to project root
+            # relative to dataset root
+            valid_file_path_tuple = tuple(valid_path_list)
+            # relative to project root
+            # this also filter out the un-processsable ones
+            valid_file_path_list = [
                 p
-                for p in all_paths_list # this also filter out the un-processsable ones
+                for p in all_paths_list
                 if p.endswith(valid_file_path_tuple)
             ]
             del valid_file_path_tuple
             for valid_path in valid_file_path_list:
-                shutil.copy(valid_path, ckpt_dir_path) # use ckpt as temporary dir
+                # use ckpt as temporary dir
+                shutil.copy(valid_path, ckpt_dir_path)
 
             # get valid features
             valid_file_path_list = glob.glob(f'{ckpt_dir_path}/*.mid')
@@ -589,11 +629,14 @@ def main():
                 MidiFile(p)
                 for p in tqdm_valid_file_path_list
             ]
-            _, valid_eval_features = midi_list_to_features(valid_midi_list, use_tqdm=True)
+            _, valid_eval_features = midi_list_to_features(
+                valid_midi_list,
+                use_tqdm=True
+            )
             del valid_midi_list
 
             # save json for reuse
-            with open(valid_eval_features_json_path, 'w+', encoding='utf8') as f:
+            with open(valid_eval_features_path, 'w+', encoding='utf8') as f:
                 json.dump(valid_eval_features, f)
 
             # delete the temporary validation midi files
@@ -646,7 +689,10 @@ def main():
         summary_str = str(torchinfo.summary(
             model,
             input_size=[
-                (args.train.batch_size, args.data.max_seq_length, len(ALL_ATTR_NAMES))
+                (args.train.batch_size,
+                 args.data.max_seq_length,
+                 len(ALL_ATTR_NAMES)
+                )
             ],
             dtypes=[torch.long],
             device=args.use_device,
@@ -676,8 +722,10 @@ def main():
     ######## Move model to devices
 
     if args.use_parallel:
-        model, optimizer, train_dataloader, valid_dataloader = accelerator.prepare(
-            model, optimizer, train_dataloader, valid_dataloader
+        model, optimizer, train_dataloader, valid_dataloader = (
+            accelerator.prepare(
+                model, optimizer, train_dataloader, valid_dataloader
+            )
         )
     else:
         model = model.to(args.use_device)
@@ -693,44 +741,48 @@ def main():
 
     start_time = time()
     valid_interval = args.train.validation_interval
-    for start_num_updates in range(0, args.train.max_updates, valid_interval):
+    for start_update in range(0, args.train.max_updates, valid_interval):
         model.train()
         train_loss_list: List[float] = []
         train_head_losses_list: List[List[float]] = []
         training_tqdm = tqdm(
             range(valid_interval),
             disable=not is_main_process,
-            desc=f'Training:{start_num_updates}~{start_num_updates+valid_interval}',
-            ncols=100
+            desc=f'Training:{start_update}~{start_update+valid_interval}',
+            ncols=80
         )
         for _ in training_tqdm:
             train_loss_list.append(0.0)
-            train_head_losses_list.append([0.0 for _ in train_output_attr_name])
+            train_head_losses_list.append([
+                0.0
+                for _ in train_output_attr_name
+            ])
             for ga_step in range(gradient_accumulation_steps):
-                # if use parallel and gradient accumulation step is not the last
+                # if use parallel and gradient accumulation step isnt the last
                 # then we can use no sync
-                if args.use_parallel and ga_step + 1 != gradient_accumulation_steps:
+                if (args.use_parallel
+                    and ga_step + 1 != gradient_accumulation_steps):
                     parallel_no_sync_context = accelerator.no_sync(model)
                 else:
                     parallel_no_sync_context = nullcontext()
 
                 with parallel_no_sync_context:
                     try:
-                        batch_seqs = next(train_dataloader_iter)
+                        seqs = next(train_dataloader_iter)
                     except StopIteration:
                         train_dataloader_iter = iter(train_dataloader)
-                        batch_seqs = next(train_dataloader_iter)
+                        seqs = next(train_dataloader_iter)
 
-                    # batch_seqs has shape: (batch_size, seq_size, complete_attr_num)
-                    batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
-                    batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
+                    # seqs has shape (batch_size, seq_size, all_attr_num)
+                    input_seqs = to_input_attrs(seqs[:, :-1])
+                    target_seqs = to_output_attrs(seqs[:, 1:])
                     if not args.use_parallel:
-                        batch_input_seqs = batch_input_seqs.to(args.use_device)
-                        batch_target_seqs = batch_target_seqs.to(args.use_device)
-                    batched_logit_list = model(batch_input_seqs)
+                        input_seqs = input_seqs.to(args.use_device)
+                        target_seqs = target_seqs.to(args.use_device)
+                    batched_logit_list = model(input_seqs)
                     loss, head_losses = compute_losses(
                         batched_logit_list,
-                        batch_target_seqs,
+                        target_seqs,
                         args.train.loss_padding
                     )
                     loss = loss / gradient_accumulation_steps
@@ -741,7 +793,9 @@ def main():
                         train_loss_list[-1] += loss.item()
                         train_head_losses_list[-1] = [
                             acc_hl + hl.item() / gradient_accumulation_steps
-                            for acc_hl, hl in zip(train_head_losses_list[-1], head_losses)
+                            for acc_hl, hl in zip(
+                                train_head_losses_list[-1], head_losses
+                            )
                         ]
 
                     if args.use_parallel:
@@ -758,7 +812,10 @@ def main():
                             args.train.max_grad_norm
                         )
                 else:
-                    clip_grad_norm_(model.parameters(), args.train.max_grad_norm)
+                    clip_grad_norm_(
+                        model.parameters(),
+                        args.train.max_grad_norm
+                    )
 
             optimizer.step()
             scheduler.step()
@@ -773,35 +830,44 @@ def main():
                 valid_dataloader,
                 disable=not is_main_process,
                 desc='Validation',
-                ncols=100
+                ncols=80
             )
-            for batch_seqs in validation_tqdm:
-                batch_input_seqs = to_input_attrs(batch_seqs[:, :-1])
-                batch_target_seqs = to_output_attrs(batch_seqs[:, 1:])
+            for seqs in validation_tqdm:
+                input_seqs = to_input_attrs(seqs[:, :-1])
+                target_seqs = to_output_attrs(seqs[:, 1:])
                 if not args.use_parallel:
-                    batch_input_seqs = batch_input_seqs.to(args.use_device)
-                    batch_target_seqs = batch_target_seqs.to(args.use_device)
-                batched_logit_list = model(batch_input_seqs)
+                    input_seqs = input_seqs.to(args.use_device)
+                    target_seqs = target_seqs.to(args.use_device)
+                batched_logit_list = model(input_seqs)
                 loss, head_losses = compute_losses(
                     batched_logit_list,
-                    batch_target_seqs,
+                    target_seqs,
                     args.train.loss_padding
                 )
                 if args.use_parallel:
-                    # need to gather, otherwise each process see different losses
+                    # need to gather, since each process see different losses
                     gather_loss: torch.Tensor = accelerator.gather(loss)
-                    gather_head_losses: List[torch.Tensor] = accelerator.gather(head_losses)
-                    # gather_head_losses: List[torch.Tensor]
-                    # dim 0 is process dimension, dim 1 ~ last are original dimensions
+                    gather_head_losses: List[torch.Tensor]
+                    gather_head_losses = accelerator.gather(head_losses)
+                    # dim 0 is process dimension
+                    # dim 1 ~ last are original dimensions
                     gather_loss = gather_loss.mean()
-                    gather_head_losses = torch.stack(gather_head_losses).mean(dim=1)
+                    gather_head_losses = torch.stack(
+                        gather_head_losses
+                    ).mean(dim=1)
                     valid_loss_list.append(gather_loss.item())
-                    valid_head_losses_list.append([hl.item() for hl in gather_head_losses])
+                    valid_head_losses_list.append([
+                        hl.item()
+                        for hl in gather_head_losses
+                    ])
                 else:
                     valid_loss_list.append(loss.item())
-                    valid_head_losses_list.append([hl.item() for hl in head_losses])
+                    valid_head_losses_list.append([
+                        hl.item()
+                        for hl in head_losses
+                    ])
 
-        cur_num_updates = start_num_updates + args.train.validation_interval
+        cur_num_updates = start_update + args.train.validation_interval
 
         if is_main_process:
             logging.info(
@@ -820,7 +886,10 @@ def main():
                 loss_file_path
             )
 
-        ckpt_model_file_path = os.path.join(ckpt_dir_path, f'{cur_num_updates}.pt')
+        ckpt_model_file_path = os.path.join(
+            ckpt_dir_path,
+            f'{cur_num_updates}.pt'
+        )
         unwrapped_model = None
         if args.use_parallel:
             accelerator.wait_for_everyone()
@@ -830,20 +899,27 @@ def main():
             torch.save(model, ckpt_model_file_path)
 
         if is_main_process and args.eval.valid_eval_sample_number > 0:
-            generated_aggr_eval_features = generate_valid_sample_and_get_eval_features(
-                model=torch.load(ckpt_model_file_path, map_location=args.use_device),
-                sample_number=args.eval.valid_eval_sample_number,
-                valid_eval_features=valid_eval_features,
-                softmax_temperature=args.eval.softmax_temperature,
-                sample_function=args.eval.sample_function,
-                sample_threshold=args.eval.sample_threshold
+            ckpt_model = torch.load(
+                ckpt_model_file_path,
+                map_location=args.use_device
+            )
+            generated_aggr_eval_features = (
+                generate_valid_sample_and_get_eval_features(
+                    model=ckpt_model,
+                    sample_number=args.eval.valid_eval_sample_number,
+                    valid_eval_features=valid_eval_features,
+                    softmax_temperature=args.eval.softmax_temperature,
+                    sample_function=args.eval.sample_function,
+                    sample_threshold=args.eval.sample_threshold
+                )
             )
             log_generated_aggr_eval_features(generated_aggr_eval_features)
 
         avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
         if avg_valid_loss >= min_avg_valid_loss:
             early_stop_counter += 1
-            if args.train.early_stop >= 0 and early_stop_counter >= args.train.early_stop:
+            if (args.train.early_stop >= 0
+                and early_stop_counter >= args.train.early_stop):
                 if is_main_process:
                     logging.info(
                         'Early stopped: No improvement for %d validations.',
@@ -869,7 +945,10 @@ def main():
     ######## Remove all checkpoints
 
     if is_main_process:
-        ckpt_file_paths = glob.glob(os.path.join(ckpt_dir_path, '*.pt'), recursive=True)
+        ckpt_file_paths = glob.glob(
+            os.path.join(ckpt_dir_path, '*.pt'),
+            recursive=True
+        )
         for ckpt_file_path in ckpt_file_paths:
             os.remove(ckpt_file_path)
         logging.info('==== train.py exit ====')

@@ -131,7 +131,8 @@ if [ "$do_bpe" == true ]; then
     
     # compile
     make -C ./bpe || {
-        echo "BPE program compile error. pipeline.sh exit." | tee -a "$log_path"
+        echo "BPE program compile error. pipeline.sh exit." \
+            | tee -a "$log_path"
         exit 1;
     }
 
@@ -155,7 +156,8 @@ if [ "$do_bpe" == true ]; then
     bpe_exit_code=${PIPESTATUS[0]}
     if [ "$bpe_exit_code" -ne 0 ]; then
         echo "learn_vocab failed. pipeline.sh exit." | tee -a "$log_path"
-        echo "Args: $BPE_LOG $corpus_dir_path $bpe_corpus_dir_path $BPE_ITER_NUM" \
+        echo "Args:"
+        echo "$BPE_LOG $corpus_dir_path $bpe_corpus_dir_path $BPE_ITER_NUM" \
             "$ADJACENCY $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER"
         rm -r "$bpe_corpus_dir_path"
         exit 1;
@@ -186,7 +188,8 @@ python3 make_arrays.py \
     --worker-number "$WORKER_NUMBER" --log "$log_path" \
     --debug $use_existed_flag "${bpe_flag[@]}" -- "$corpus_dir_path" \
     || {
-        echo "text_to_array.py failed. pipeline.sh exit." | tee -a "$log_path";
+        echo "text_to_array.py failed. pipeline.sh exit." \
+            | tee -a "$log_path";
         exit 1;
     }
 
@@ -220,19 +223,19 @@ if [ "${#train_flags[@]}" -ne 0 ]; then
 fi
 
 if [ "$USE_PARALLEL" == true ]; then
-    NUM_CUDA_VISIBLE_DEVICE=$(echo "$CUDA_VISIBLE_DEVICES" | tr -cd , | wc -c ;)
-    NUM_CUDA_VISIBLE_DEVICE=$(( NUM_CUDA_VISIBLE_DEVICE + 1 ))
-    NUM_CUDA_DEVICE=$(nvidia-smi --list-gpus | wc -l)
-    if [ "$NUM_CUDA_DEVICE" -lt $NUM_CUDA_VISIBLE_DEVICE ]; then
-        NUM_CUDA_VISIBLE_DEVICE=$NUM_CUDA_DEVICE
+    NUM_DEVICES=$(echo "$CUDA_VISIBLE_DEVICES" | tr "," " " | wc -w;)
+    NUM_DEVICES=$(( NUM_DEVICES + 1 ))
+    NUM_TOTAL_DEVICE=$(nvidia-smi --list-gpus | wc -l)
+    if [ "$NUM_TOTAL_DEVICE" -lt $NUM_DEVICES ]; then
+        NUM_DEVICES=$NUM_CUDA_DEVICE
     fi
-    if [ "$NUM_CUDA_VISIBLE_DEVICE" == "1" ]; then
+    if [ "$NUM_DEVICES" == "1" ]; then
         launch_command="python3"
         USE_PARALLEL=false
     else
         accelerate config default
         launch_command="accelerate launch --multi_gpu --num_machines 1"
-        launch_command+=" --num_processes $NUM_CUDA_VISIBLE_DEVICE"
+        launch_command+=" --num_processes $NUM_DEVICES"
         train_flags+=("--use-parallel")
     fi
 else
@@ -240,7 +243,8 @@ else
 fi
 
 $launch_command train.py \
-    --test-paths-file "$TEST_PATHS_FILE" --valid-paths-file "$VALID_PATHS_FILE" \
+    --test-paths-file "$TEST_PATHS_FILE" \
+    --valid-paths-file "$VALID_PATHS_FILE" \
     --max-seq-length "$MAX_SEQ_LENGTH" \
     --pitch-augmentation-range "$PITCH_AUGMENTATION_RANGE" \
     --virtual-piece-step-ratio "$VIRTUAL_PIECE_STEP_RATIO" \
@@ -257,7 +261,8 @@ $launch_command train.py \
     --lr-decay-end-ratio "$LEARNING_RATE_DECAY_END_RATIO" \
     \
     --softmax-temperature "$SOFTMAX_TEMPERATURE" \
-    --sample-function "$SAMPLE_FUNCTION" --sample-threshold "$SAMPLE_THRESHOLD" \
+    --sample-function "$SAMPLE_FUNCTION" \
+    --sample-threshold "$SAMPLE_THRESHOLD" \
     --valid-eval-sample-number "$VALID_EVAL_SAMPLE_NUMBER" \
     --valid-eval-worker-number "$WORKER_NUMBER" \
     \
@@ -282,7 +287,8 @@ python3 evaluate_model_wrapper.py \
     --model-dir-path "$model_dir_path" --worker-number "$WORKER_NUMBER" \
     --midi-to-piece-paras "$EVAL_MIDI_TO_PIECE_PARAS_FILE" \
     --softmax-temperature "$SOFTMAX_TEMPERATURE" \
-    --sample-function "$SAMPLE_FUNCTION" --sample-threshold "$SAMPLE_THRESHOLD" \
+    --sample-function "$SAMPLE_FUNCTION" \
+    --sample-threshold "$SAMPLE_THRESHOLD" \
     --eval-sample-number "$EVAL_SAMPLE_NUMBER" --seed "$SEED" \
     --log-path "$log_path" --only-eval-uncond "$ONLY_EVAL_UNCOND" \
     -- "$MIDI_DIR_PATH" "$TEST_PATHS_FILE" "$PRIMER_LENGTH" \

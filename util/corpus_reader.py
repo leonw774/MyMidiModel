@@ -41,7 +41,12 @@ class CorpusReader:
             tmp_line_pos = [0]
             tmp_length = 0
             offset = 0
-            for line in tqdm(self.file, desc=f'CorpusReader reading {self.file_path}', ncols=0):
+            tqdm_read_file_line = tqdm(
+                self.file,
+                desc=f'CorpusReader reading {self.file_path}',
+                ncols=0
+            )
+            for line in tqdm_read_file_line:
                 offset += len(line)
                 if len(self.line_pos) == 0:
                     tmp_line_pos.append(offset)
@@ -61,12 +66,18 @@ class CorpusReader:
                 if i == index:
                     result = line
             if result == '':
-                raise IndexError(f'line index out of range: {index} > {self.length}')
+                raise IndexError(
+                    f'line index out of range: {index} > {self.length}'
+                )
             return result
         else:
             if index >= self.length:
-                raise IndexError(f'line index out of range: {index} > {self.length}')
+                raise IndexError(
+                    f'line index out of range: {index} > {self.length}'
+                )
             self.file.seek(self.line_pos[index])
             # minus one to remove \n at the end
-            result = self.file.read(self.line_pos[index+1]-self.line_pos[index]-1)
+            result = self.file.read(
+                self.line_pos[index+1] - self.line_pos[index] - 1
+            )
             return result

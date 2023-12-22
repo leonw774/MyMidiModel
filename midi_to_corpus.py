@@ -156,7 +156,7 @@ def loop_func(
     tqdm_enum_midi_file_path_list = tqdm(
         enumerate(midi_file_path_list),
         total=len(midi_file_path_list),
-        ncols=100
+        ncols=80
     )
     for n, midi_file_path in tqdm_enum_midi_file_path_list:
         n_args_dict = dict(args_dict)
@@ -195,7 +195,7 @@ def mp_func(
         compressed_piece_list = list(tqdm(
             p.imap(handler, args_dict_list),
             total=len(args_dict_list),
-            ncols=100
+            ncols=80
         ))
     logging.info(
         'Multi-processing end. Object size: %d bytes',

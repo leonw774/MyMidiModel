@@ -7,7 +7,9 @@ import torch.nn.functional as F
 import x_transformers
 
 try:
-    from fast_transformers.builders import TransformerEncoderBuilder, RecurrentEncoderBuilder
+    from fast_transformers.builders import (
+        TransformerEncoderBuilder, RecurrentEncoderBuilder
+    )
     from fast_transformers.masking import FullMask
     from fast_transformers.feature_maps import ActivationFunctionFeatureMap
     from fast_transformers.utils import make_mirror
@@ -15,7 +17,7 @@ try:
     def my_elu_function(x):
         return F.elu(x) + 1
 
-    # becasuse the elu feature map implemented in fast_transformers use lambda function
+    # becasuse the elu feature map in fast_transformers use lambda function
     # have to rewrite it to be pickle-able
     MY_ELU_FEATURE_MAP = ActivationFunctionFeatureMap.factory(my_elu_function)
 
@@ -80,7 +82,7 @@ class MyMidiTransformer(nn.Module):
                 num_embeddings=vsize,
                 embedding_dim=embedding_dim,
                 padding_idx=0
-                # the embedding vector of padding_idx will default to all zeros
+                # the embedding vector of padding_idx will be all zeros
             )
             for vsize in self.embedding_vocabs_size
         ])
@@ -172,17 +174,17 @@ class MyMidiTransformer(nn.Module):
             # )
 
 
-    def to_input_attrs(self, batch_input_seqs: Tensor) -> Tensor:
+    def to_input_attrs(self, input_seqs: Tensor) -> Tensor:
         """expect batch_input_seqs has shape:
             (batch_size, seq_len, all_attr_num)
         """
-        return batch_input_seqs[..., self.input_attrs_indices]
+        return input_seqs[..., self.input_attrs_indices]
 
-    def to_output_attrs(self, batch_input_seqs: Tensor) -> Tensor:
+    def to_output_attrs(self, input_seqs: Tensor) -> Tensor:
         """expect batch_input_seqs has shape:
             (batch_size, seq_size, all_attr_num)
         """
-        return batch_input_seqs[..., self.output_attrs_indices]
+        return input_seqs[..., self.output_attrs_indices]
 
     def forward(self, x, memory=None):
         # x has shape: (batch_size, seq_size, in_attr_number)
@@ -197,11 +199,17 @@ class MyMidiTransformer(nn.Module):
         position_memory = None
         if self.not_use_mps_number:
             if memory is None:
-                bs, ss, _ = x.size
-                potision_number = torch.arange(ss).repeat((bs, 1)).to(x.device)
+                batch_size, seq_size, _ = x.size
+                potision_number = (
+                    torch.arange(seq_size).repeat((batch_size, 1))
+                )
+                potision_number = potision_number.to(x.device)
                 position_memory = 0
             else:
-                potision_number = torch.tensor([memory[1]]).repeat((bs, 1)).to(x.device)
+                potision_number = (
+                    torch.tensor([memory[1]]).repeat((batch_size, 1))
+                )
+                potision_number = potision_number.to(x.device)
                 position_memory = memory[1] + 1
             # potision_number has shape (batch_size, seq_size)
             pos_emb = self.positional_embedding_layer(potision_number)
@@ -214,15 +222,18 @@ class MyMidiTransformer(nn.Module):
                 # no mask is needed when using recurrent for inference
                 # become (batch_size, embed_size)
                 emb_sum_dropout = emb_sum_dropout[:, 0]
-                lt_memory = None if memory is None else memory[0]
-                transformer_output, lt_memory = self.transformer_decoder_inference(
-                    emb_sum_dropout,
-                    lt_memory
+                linear_tf_memory = None if memory is None else memory[0]
+                transformer_output, linear_tf_memory = (
+                    self.transformer_decoder_inference(
+                        emb_sum_dropout,
+                        linear_tf_memory
+                    )
                 )
             else:
                 # in fast_transformer's FullMask class, 0 is masked, 1 is keep
                 causal_mask = self.causal_mask
-                length_mask = x[..., ATTR_NAME_INDEX['evt']].ne(0).bool().to(x.device)
+                length_mask = x[..., ATTR_NAME_INDEX['evt']].ne(0).bool()
+                length_mask = length_mask.to(x.device)
                 length_mask = FullMask(mask=length_mask)
                 transformer_output = self.transformer_decoder(
                     emb_sum_dropout,
@@ -230,9 +241,11 @@ class MyMidiTransformer(nn.Module):
                     length_mask
                 )
         else:
-            # Casual mask is not needed, x_transformer.Decoder has default causal=True
+            # Casual mask is not needed
+            # x_transformer.Decoder has default causal=True
             # False is masked, True is keep
-            length_mask = x[..., ATTR_NAME_INDEX['evt']].ne(0).to(x.device)
+            length_mask = x[..., ATTR_NAME_INDEX['evt']].ne(0)
+            length_mask = length_mask.to(x.device)
             # print(length_mask)
             transformer_output = self.transformer_decoder(
                 emb_sum_dropout,
@@ -244,11 +257,11 @@ class MyMidiTransformer(nn.Module):
         )
 
         if self.use_linear_attn and self.inferencing:
-            return logits_tuple, (lt_memory, position_memory)
+            return logits_tuple, (linear_tf_memory, position_memory)
         else:
             return logits_tuple
 
-    # Override the eval() and train() method to integrate the self.inferencing flag
+    # Override eval() and train() method to integrate self.inferencing flag
     # Also added self.inference()
     def eval(self) -> None:
         super().eval()
@@ -281,7 +294,8 @@ LOSS_PADDING_ARG_CHOICES_DEFAULT = 'ignore'
 def compute_losses(
         pred_logits: List[Tensor],
         target_labels: Tensor,
-        padding: str = LOSS_PADDING_ARG_CHOICES_DEFAULT) -> Tuple[Tensor, List[Tensor]]:
+        padding: str = LOSS_PADDING_ARG_CHOICES_DEFAULT
+    ) -> Tuple[Tensor, List[Tensor]]:
     """
     Parameters:
     - `pred_logits` is a list:
@@ -296,7 +310,8 @@ def compute_losses(
     """
     if padding not in LOSS_PADDING_ARG_CHOICES:
         raise ValueError(
-            f'`padding` argument in compute_losses should be in {LOSS_PADDING_ARG_CHOICES}.'
+            f'`padding` argument in compute_losses should be '
+            f'one of {LOSS_PADDING_ARG_CHOICES}.'
         )
     
     ignore_index = 0
@@ -310,7 +325,7 @@ def compute_losses(
     head_losses = [
         F.cross_entropy(
             input=logits.transpose(1, 2),
-            # transpose(1, 2) to become (batch_size, attr_vocab_size, seq_size)
+            # become (batch_size, attr_vocab_size, seq_size)
             # because input shape should be (batch, category, dimensions... )
             target=target_labels[..., k], # (batch_size, seq_size)
             ignore_index=ignore_index, # padding is index 0

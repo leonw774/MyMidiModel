@@ -76,11 +76,11 @@ vocabs = dataset.vocabs
 print('len(dataset):', len(dataset))
 # print('included_path_list:', dataset.included_path_list)
 # print('included_piece_num:', dataset.included_piece_num)
-print('_piece_lengths:', dataset._piece_lengths)
-print('_piece_mps_sep_indices:', dataset._piece_mps_sep_indices)
-print('_piece_measures_indices:', dataset._piece_measures_indices)
-print('_piece_body_start_indices:', dataset._piece_body_start_indices)
-print('_virtual_piece_start_indices:', dataset._virtual_piece_start_indices)
+# print('_piece_lengths:', dataset._piece_lengths)
+# print('_piece_mps_sep_indices:', dataset._piece_mps_sep_indices)
+# print('_piece_measures_indices:', dataset._piece_measures_indices)
+# print('_piece_body_start_indices:', dataset._piece_body_start_indices)
+# print('_virtual_piece_start_indices:', dataset._virtual_piece_start_indices)
 
 
 print('FIRST BATCH OF DATALOADER')
@@ -99,4 +99,6 @@ for i, s in enumerate(batched_samples):
     if args.output_midi:
         if not piece.endswith('EOS'):
             piece += ' EOS'
-        piece_to_midi(piece, vocabs.paras['tpq']).dump(f'print_dataset_batch{i}.mid')
+        piece_to_midi(piece, vocabs.paras['tpq']).dump(
+            f'print_dataset_batch{i}.mid'
+        )

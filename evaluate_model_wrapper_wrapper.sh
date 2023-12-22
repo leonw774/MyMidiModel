@@ -2,7 +2,7 @@
 
 if ! { [ $# == 6 ] || [ $# == 5 ]; }; then
     echo "Expect arguments to be:"
-    echo "- Three configuration file name for midi preprocessing, bpe, and model setting"
+    echo "- Three configuration file name for midi preproc, bpe, and model"
     echo "- Two paths to the model directory and the log file"
     echo "- A optional torch device specification"
     exit 1
@@ -40,9 +40,9 @@ python3 evaluate_model_wrapper.py \
     --eval-sample-number "$EVAL_SAMPLE_NUMBER" --seed "$SEED" \
     --log-path "$log_path" --only-eval-uncond "$ONLY_EVAL_UNCOND" \
     --use-device "$use_device" \
-    -- "$MIDI_DIR_PATH" "$TEST_PATHS_FILE" "$PRIMER_LENGTH"
-
-if [ $? -ne 0 ]; then
-    echo "Evaluation failed. evaluate_model_wrapper_wrapper.sh exit." | tee -a "$log_path"
-    exit 1
-fi
+    -- "$MIDI_DIR_PATH" "$TEST_PATHS_FILE" "$PRIMER_LENGTH" \
+    || {
+        echo "Evaluation failed. evaluate_model_wrapper_wrapper.sh exit." \
+            | tee -a "$log_path"
+        exit 1
+    }

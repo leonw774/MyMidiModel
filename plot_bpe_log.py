@@ -13,8 +13,12 @@ def main(corpus_dir_path, log_file_path):
     total_used_time_start_pos = log_texts.index('Total used time: ')
     total_used_time_end_pos = total_used_time_start_pos
     # find first newline after total_used_time_start_pos
-    total_used_time_end_pos += (log_texts[total_used_time_start_pos:]).index('\n')
-    total_used_time_text = log_texts[total_used_time_start_pos:total_used_time_end_pos]
+    total_used_time_end_pos += (
+        (log_texts[total_used_time_start_pos:]).index('\n')
+    )
+    total_used_time_text = (
+        log_texts[total_used_time_start_pos:total_used_time_end_pos]
+    )
     total_used_time = float(total_used_time_text.split(': ')[1])
 
     end_early = 'End iterations early' in log_texts
@@ -52,13 +56,14 @@ def main(corpus_dir_path, log_file_path):
             iteration_log_lists[i].append(row_element)
     iteration_log_dict = {
         col_name: col_list
-        for col_name, col_list in zip(iteration_log_column_name, iteration_log_lists)
+        for col_name, col_list in zip(
+            iteration_log_column_name, iteration_log_lists
+        )
     }
     iteration_log_dict['Shape size'] = [
         shape_str.count(';')
         for shape_str in iteration_log_dict['Shape']
     ]
-
 
     corpus_stats_dir_path = os.path.join(corpus_dir_path, 'stats')
     if not os.path.exists(corpus_stats_dir_path):
@@ -72,7 +77,10 @@ def main(corpus_dir_path, log_file_path):
         'total_used_time': total_used_time,
         'iteration_log_dict': iteration_log_dict
     }
-    stats_file_path = os.path.join(corpus_stats_dir_path, 'bpe_learn_stats.json')
+    stats_file_path = os.path.join(
+        corpus_stats_dir_path,
+        'bpe_learn_stats.json'
+    )
     with open(stats_file_path, 'w+', encoding='utf8') as stats_file:
         json.dump(bpe_stats_dict, stats_file)
 
@@ -83,10 +91,12 @@ def main(corpus_dir_path, log_file_path):
             plt.figure(figsize=(16.8, 6.4))
             plt.title(col_name)
             if col_name == 'Multinote count':
-                left_texts = (f'total_piece_number\n  ={piece_number}\n'
-                    + '\n'.join(f'{k}\n  ={v}' for k, v in start_stats.items()) + '\n'
-                    + '\n'.join(f'{k}\n  ={v}' for k, v in end_stats.items()) + '\n'
-                    + f'total_used_time\n  ={total_used_time}'
+                left_texts = (f'total_piece_number\n ={piece_number}\n'
+                    + '\n'.join(f'{k}\n ={v}' for k, v in start_stats.items())
+                    + '\n'
+                    + '\n'.join(f'{k}\n ={v}' for k, v in end_stats.items())
+                    + '\n'
+                    + f'total_used_time\n ={total_used_time}'
                 )
             else:
                 left_texts = '\n'.join([

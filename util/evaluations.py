@@ -91,7 +91,7 @@ def kl_divergence(
         raise TypeError('pred and true should be both dict')
 
 
-def overlapping_area_of_estimated_gaussian(
+def estimated_normal_overlapping_area(
         distribution_1: dict,
         distribution_2: dict) -> float:
     if isinstance(distribution_1, dict) and isinstance(distribution_2, dict):
@@ -165,11 +165,17 @@ def random_sample_from_piece(piece: str, sample_measure_number: int):
         if t[0] == MEASURE_EVENTS_CHAR
     ]
     if len(measure_indices) < sample_measure_number:
-        raise AssertionError('piece has fewer measure than sample_measure_number')
+        raise AssertionError(
+            'piece has fewer measure than sample_measure_number'
+        )
 
-    start_index = random.randint(0, len(measure_indices) - sample_measure_number)
+    start_index = random.randint(
+        0,
+        len(measure_indices) - sample_measure_number
+    )
     if start_index + sample_measure_number < len(measure_indices):
-        sampled_body = text_list[start_index:start_index+sample_measure_number]
+        end_index = start_index + sample_measure_number
+        sampled_body = text_list[start_index:end_index]
     else:
         sampled_body = text_list[start_index:]
 
@@ -252,7 +258,11 @@ def piece_to_features(
     """
 
     if primer_measure_length > 0:
-        piece = ' '.join(get_after_k_measures(piece.split(' '), primer_measure_length))
+        cut_piece = get_after_k_measures(
+            piece.split(' '),
+            primer_measure_length
+        )
+        piece = ' '.join(cut_piece)
 
     if max_token_number > 0:
         text_list = piece.split(' ')[:max_token_number]
@@ -291,14 +301,30 @@ def piece_to_features(
         Counter([f'{d.numerator}/{d.denominator}' for d in durations])
     )
     # durations_float = [float(d) for d in durations]
-    # durations_mean = np.mean(durations_float) if len(durations) > 0 else float('nan')
-    # durations_var = np.var(durations_float) if len(durations) > 0 else float('nan')
+    # durations_mean = (
+    #     np.mean(durations_float)
+    #     if len(durations) > 0 else
+    #     float('nan')
+    # )
+    # durations_var = (
+    #     np.var(durations_float)
+    #     if len(durations) > 0 else
+    #     float('nan')
+    # )
 
     velocity_histogram = {v: 0 for v in range(128)}
     for v in velocities:
         velocity_histogram[v] += 1
-    # velocities_mean = np.mean(velocities) if len(velocities) > 0 else float('nan')
-    # velocities_var = np.var(velocities) if len(velocities) > 0 else float('nan')
+    # velocities_mean = (
+    #     np.mean(velocities)
+    #     if len(velocities) > 0 else
+    #     float('nan')
+    # )
+    # velocities_var = (
+    #     np.var(velocities)
+    #     if len(velocities) > 0 else
+    #     float('nan')
+    # )
 
     if isnan(pitch_class_entropy):
         return {
@@ -327,7 +353,8 @@ def piece_to_features(
             max_measure_length = max(max_measure_length, cur_measure_length)
 
     # because multi-note representation
-    # some note events in a multi-note in a measure but does not really start at that measure
+    # some note events in a multi-note in a measure
+    # but does not really start at that measure
     end_note_onset = max(
         note.start
         for track in midi.instruments
@@ -356,7 +383,8 @@ def piece_to_features(
             # find measure index so that the measure has the largest onset
             # while smaller than note.start
             measure_index = bisect.bisect_right(measure_onsets, note.start) - 1
-            bar_instrumentation[measure_index, instrument_index_mapping[track.program]] |= True
+            program_number = instrument_index_mapping[track.program]
+            bar_instrumentation[measure_index, program_number] |= True
             position = note.start - measure_onsets[measure_index]
             assert position < max_position
             grooving_per_bar[measure_index, position] |= True
@@ -416,9 +444,15 @@ def compare_with_ref(source_eval_features: dict, reference_eval_features: dict):
         # They keys in this metric have to be number
         # pitch & velocity are intergers, duration is fraction
         # just make them all floats
-        source_eval_features[fname+'_OA'] = overlapping_area_of_estimated_gaussian(
-            {float(Fraction(k)): v for k, v in source_eval_features[fname].items()},
-            {float(Fraction(k)): v for k, v in reference_eval_features[fname].items()}
+        source_eval_features[fname+'_OA'] = estimated_normal_overlapping_area(
+            {
+                float(Fraction(k)): v
+                for k, v in source_eval_features[fname].items()
+            },
+            {
+                float(Fraction(k)): v
+                for k, v in reference_eval_features[fname].items()
+            }
         )
 
     # (Normalized) Histogram intersection
@@ -441,7 +475,10 @@ def aggregate_features(features_list: List[Dict[str, float]]) -> dict:
         for fname in EVAL_SCALAR_FEATURE_NAMES
     }
     for fname in EVAL_SCALAR_FEATURE_NAMES:
-        f64_pandas_series = Series(aggr_scalar_eval_features[fname], dtype='float64')
+        f64_pandas_series = Series(
+            aggr_scalar_eval_features[fname],
+            dtype='float64'
+        )
         fname_description = dict(
             f64_pandas_series.dropna().describe()
         )
@@ -491,7 +528,7 @@ def midi_list_to_features(
             eval_features_list = list(tqdm(
                 p.imap(midi_to_features_partial, midi_list),
                 total=len(midi_list),
-                ncols=100,
+                ncols=80,
                 desc='Calculating features',
                 disable=not use_tqdm
             ))
@@ -499,7 +536,7 @@ def midi_list_to_features(
         eval_features_list = list(tqdm(
             map(midi_to_features_partial, midi_list),
             total=len(midi_list),
-            ncols=100,
+            ncols=80,
             desc='Calculating features',
             disable=not use_tqdm
         ))
@@ -534,14 +571,14 @@ def piece_list_to_features(
             eval_features_list = list(tqdm(
                 p.imap(piece_to_features_partial, piece_list),
                 total=len(piece_list),
-                ncols=100,
+                ncols=80,
                 disable=not use_tqdm
             ))
     else:
         eval_features_list = list(tqdm(
             map(piece_to_features_partial, piece_list),
             total=len(piece_list),
-            ncols=100,
+            ncols=80,
             disable=not use_tqdm
         ))
     eval_features_list = [f for f in eval_features_list if f is not None]

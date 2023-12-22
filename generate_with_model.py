@@ -31,31 +31,33 @@ def read_args():
         '--primer', '-p',
         type=str,
         default=None,
-        help='A MIDI file, or a text file containing a list of MIDI file paths \
-            that would be used as the primer in conditional generation. \
+        help='A path to MIDI file, or a file containing list of paths of MIDI \
+            files that would be used as the primer in conditional generation. \
             If the extension is "*.mid" or "*.midi", try to parse it as MIDI. \
-            Otherwise, try to parse it as list of paths to midi files, separated by newlines. \
-            If this option is not set, unconditional generation will be performed.'
+            Otherwise, try to parse it as list of paths to midi files, \
+            separated by newlines. If this option is not set, unconditional \
+            generation will be performed.'
     )
     parser.add_argument(
         '--primer-length', '-l',
         type=int,
         default=0,
-        help='How long from the start the primer music should be used. Default is %(default)s.\
-            The unit of these number is controlled with "--unit" option. \
-            When --unit is "tick", the length is counted with the token\'s start time.'
+        help='How long from the start the primer music should be used. \
+            Default is %(default)s. The unit of these number is controlled \
+            with "--unit" option.'
     )
     parser.add_argument(
         '--unit', '-u',
         choices=['measure', 'tick', 'token'],
         default='measure',
         help='Specify the unit of PRIMER_LENGTH. \
-            If use "measure", primer will be the first PRIMER_LENGTH measures of the piece \
-            no matter how long it actually is. \
-            If use "tick", the length of a tick is the unit. \
+            "measure": will use the first PRIMER_LENGTH measures \
+            of the piece no matter how long it actually is. \
+            "tick": the length of a tick is the unit. \
             The length of tick is determined by the setting of the corpus \
             on which the model is trained. \
-            If use "tokens", primer will be the first PRIMER_LENGTH tokens of the piece.'
+            "token": will use the first PRIMER_LENGTH tokens of the piece. \
+            Default is %(default)s'
     )
     parser.add_argument(
         '--sample-number', '-n',
@@ -88,14 +90,16 @@ def read_args():
     )
     parser.add_argument(
         '--no-adjust-prob',
-        action='store_true'
+        action='store_true',
+        help='Trun off the probability adjustment that helps generate \
+            next token that satisfy the format rule.'
     )
     parser.add_argument(
         '--softmax-temperature', '-t',
         type=float,
         nargs='+',
         default=[1.0],
-        help='Control the temperature of softmax before multinomial sampling. \
+        help='Control the temperature of softmax before sampling. \
             Default is %(default)s.'
     )
     parser.add_argument(
@@ -105,7 +109,8 @@ def read_args():
         choices=('none', 'top-k', 'top-p', 'nucleus'),
         const='none',
         default='none',
-        help='The sample function to used. Choice "top-p" is the same as "nucleus". \
+        help='The sample function to used. \
+            Choice "nucleus" is the same as "top-p". \
             Default is %(default)s'
     )
     parser.add_argument(
@@ -113,14 +118,16 @@ def read_args():
         type=float,
         nargs='+',
         default=[1.0],
-        help='The probability threshold of nucleus sampling. Default is %(default)s.'
+        help='The probability threshold of nucleus sampling. \
+            Default is %(default)s.'
     )
     parser.add_argument(
         '--try-count-limit',
         type=int,
         default=100,
-        help='The model may fail to generate next token that satisfy the format rule.\
-            The generation ends when its trying times pass this limit.\
+        help='The model may fail to generate next token that satisfy \
+            the format rule if --no-adjust-prob is set. \
+            The generation ends when its trying times pass this limit. \
             Default is %(default)s.'
     )
     parser.add_argument(
@@ -140,8 +147,8 @@ def read_args():
     parser.add_argument(
         '--print-exception',
         action='store_true',
-        help='When model fail to generate next token that satisfy the format rule. \
-            Print out the exception message.'
+        help='When model fail to generate next token that satisfy \
+            the format rule. Print out the exception message.'
     )
     parser.add_argument(
         '--no-sample-tqdm', '--no-tqdm',
@@ -166,8 +173,8 @@ def read_args():
         'output_file_path',
         type=str,
         help='The base of the path of generated MIDI file(s). \
-            If SAMPLE_NUMBER == 1 (default), the path will be "{OUTPUT_FILE_PATH}.mid". \
-            If SAMPLE_NUMBER > 1, the paths will be "{OUTPUT_FILE_PATH}_{i}.mid", \
+            If SAMPLE_NUMBER == 1, the path is "{OUTPUT_FILE_PATH}.mid". \
+            Otherwise, the paths are "{OUTPUT_FILE_PATH}_{i}.mid", \
             where i is 1 ~ SAMPLE_NUMBER.'
     )
 
@@ -193,20 +200,28 @@ def gen_handler(
             show_tqdm=(not args.no_sample_tqdm)
         )
         if gen_text_list == BEGIN_TOKEN_STR + ' ' + END_TOKEN_STR:
-            print(f'{output_file_path}: generated empty piece. will not output file.')
+            print(
+                f'{output_file_path}: generated empty piece. '
+                f'Will not output file.'
+            )
         else:
             if args.output_text:
-                with open(f'{output_file_path}.txt', 'w+', encoding='utf8') as f:
+                out_path = f'{output_file_path}.txt'
+                with open(out_path, 'w+', encoding='utf8') as f:
                     f.write(' '.join(gen_text_list))
             if args.output_array_text:
-                with open(f'{output_file_path}_array.txt', 'w+', encoding='utf8') as f:
+                out_path = f'{output_file_path}_array.txt'
+                with open(out_path, 'w+', encoding='utf8') as f:
                     f.write(
                         get_full_array_string(
                             text_list_to_array(gen_text_list, model.vocabs),
                             model.vocabs
                         )
                     )
-            midi = piece_to_midi(' '.join(gen_text_list), model.vocabs.paras['tpq'])
+            midi = piece_to_midi(
+                piece=' '.join(gen_text_list),
+                tpq=model.vocabs.paras['tpq']
+            )
             midi.dump(f'{output_file_path}.mid')
     except Exception:
         print('Generation failed becuase the following exception:')
@@ -220,9 +235,16 @@ def cut_primer_piece(
         tpq: int) -> str:
     primer_text_list = primer_piece.split(' ')
     if length_unit == 'measure':
-        primer_text_list = get_first_k_measures(primer_text_list, primer_length)
+        primer_text_list = get_first_k_measures(
+            text_list=primer_text_list,
+            k=primer_length
+        )
     elif length_unit == 'tick':
-        primer_text_list = get_first_k_ticks(primer_text_list, tpq, primer_length)
+        primer_text_list = get_first_k_ticks(
+            text_list=primer_text_list,
+            tpq=tpq,
+            k=primer_length
+        )
     if primer_text_list[-1] != END_TOKEN_STR:
         primer_text_list.append(END_TOKEN_STR)
     processed_primer_piece = ' '.join(primer_text_list)
@@ -257,7 +279,9 @@ def midi_file_list_to_text_list_list(
     # apply measure and tick cut
     partial_cut_primer_piece = partial(
         cut_primer_piece,
-        primer_length=primer_length, length_unit=length_unit, tpq=vocabs.paras['tpq']
+        primer_length=primer_length,
+        length_unit=length_unit,
+        tpq=vocabs.paras['tpq']
     )
     primer_piece_list = list(map(partial_cut_primer_piece, primer_piece_list))
 
@@ -267,17 +291,17 @@ def midi_file_list_to_text_list_list(
         with tempfile.TemporaryDirectory() as in_dir_path, \
              tempfile.TemporaryDirectory() as out_dir_path:
             # make tmp corpus, paras, and shape_vocab files
-            in_corpus_file_path = to_corpus_file_path(in_dir_path)
-            with open(in_corpus_file_path, 'w+', encoding='utf8') as in_corpus_file:
+            in_corpus_path = to_corpus_file_path(in_dir_path)
+            with open(in_corpus_path, 'w+', encoding='utf8') as in_corpus_file:
                 in_corpus_file.write('\n'.join(primer_piece_list) + '\n')
 
-            in_paras_file_path = to_paras_file_path(in_dir_path)
-            with open(in_paras_file_path, 'w+', encoding='utf8') as in_paras_file:
+            in_paras_path = to_paras_file_path(in_dir_path)
+            with open(in_paras_path, 'w+', encoding='utf8') as in_paras_file:
                 in_paras_file.write(dump_corpus_paras(vocabs.paras))
 
-            in_shape_vocab_file_path = os.path.join(in_dir_path, 'shape_vocab')
-            with open(in_shape_vocab_file_path, 'w+', encoding='utf8') as in_shape_vocab_file:
-                in_shape_vocab_file.write('\n'.join(vocabs.bpe_shapes_list) + '\n')
+            in_sv_path = os.path.join(in_dir_path, 'shape_vocab')
+            with open(in_sv_path, 'w+', encoding='utf8') as in_sv_file:
+                in_sv_file.write('\n'.join(vocabs.bpe_shapes_list) + '\n')
 
             # make sure this script is runing at project's root
             abs_cwd = os.path.abspath(os.getcwd())
@@ -291,21 +315,21 @@ def midi_file_list_to_text_list_list(
                 stdout=subprocess.DEVNULL
             )
 
-            out_corpus_file_path = to_corpus_file_path(out_dir_path)
+            out_corpus_path = to_corpus_file_path(out_dir_path)
             apply_args = [
                 './bpe/apply_vocab',
                 # '-log',
                 # '-clearLine',
                 in_dir_path,
-                out_corpus_file_path,
-                in_shape_vocab_file_path
+                out_corpus_path,
+                in_sv_path
             ]
             if worker_number > 1:
                 apply_args.append(str(worker_number))
             subprocess.run(apply_args, check=True, stdout=subprocess.DEVNULL)
 
             # get content from output
-            with open(out_corpus_file_path, 'r', encoding='utf8') as out_corpus_file:
+            with open(out_corpus_path, 'r', encoding='utf8') as out_corpus_file:
                 merged_piece_list = [
                     line.strip()
                     for line in out_corpus_file.readlines()
@@ -352,12 +376,18 @@ def main():
     if not args.use_device.startswith('cuda') and args.use_device != 'cpu':
         raise ValueError(f'Bad device name: "{args.use_device}"')
     if not torch.cuda.is_available():
-        print('--use-device is \'cuda\' but found no CUDA device. Changed to \'cpu\'.')
+        print(
+            '--use-device is \'cuda\' but found no CUDA device.',
+            'Changed to \'cpu\'.'
+        )
         args.use_device = 'cpu'
     assert args.sample_number >= 0
 
     # model
-    model = torch.load(args.model_file_path, map_location=torch.device(args.use_device))
+    model = torch.load(
+        args.model_file_path,
+        map_location=torch.device(args.use_device)
+    )
     assert isinstance(model, MyMidiTransformer)
     if args.max_generation_step is None:
         args.max_generation_step = model.max_seq_length
@@ -398,7 +428,8 @@ def main():
         else: # we guess it is a list of paths to midi files
             print('From path list:', args.primer)
 
-            primer_path_list = open(args.primer, 'r', encoding='utf8').readlines()
+            with open(args.primer, 'r', encoding='utf8') as primer_file:
+                primer_path_list = primer_file.readlines()
             print(f'Read {len(primer_path_list)} lines')
 
             # keep first n line if n > 0
@@ -408,7 +439,7 @@ def main():
                         f'Only keep first {len(primer_path_list)} lines',
                         f'as sample number is {args.sample_number}'
                     )
-                    print('(Set sample number to 0 to keep all primers in list.)')
+                    print('(Set sample number to 0 to keep all primers)')
                     primer_path_list = primer_path_list[:args.sample_number]
             else:
                 args.sample_number = len(primer_path_list)
@@ -426,21 +457,24 @@ def main():
                 **encode_args
             )
             if len(primer_text_list_list) == 0:
-                print('No file successfully processed. Generation end.')
+                print('No file processed. Generation end.')
                 return 0
 
-            print(f'Processed {len(primer_text_list_list)} files successfully.')
+            print(f'Processed {len(primer_text_list_list)} files.')
             if len(primer_text_list_list) < args.sample_number:
                 print(
-                    'Processed primer number is less than requested sample number',
+                    'Processed primer number is less than required',
                     f'{args.sample_number}.'
                 )
-                print(f'Will only generate {len(primer_text_list_list)} pieces.')
+                print(f'Will generate {len(primer_text_list_list)} pieces.')
                 args.sample_number = len(primer_text_list_list)
 
         for primer_text_list in primer_text_list_list:
             # turn primer text list into array
-            primer_seq = text_list_to_array(primer_text_list, vocabs=model.vocabs)
+            primer_seq = text_list_to_array(
+                text_list=primer_text_list,
+                vocabs=model.vocabs
+            )
             if model.permute_track_number:
                 primer_seq = permute_track_number(
                     primer_seq,
@@ -457,12 +491,21 @@ def main():
     if args.sample_number == 1:
         gen_handler(model, primer_seq_list[0], args, args.output_file_path)
     else:
-        pbar = tqdm(desc='Total samples', total=len(primer_seq_list), ncols=0)
+        tqdm_primer_seq_list = tqdm(
+            desc='Total samples',
+            total=len(primer_seq_list),
+            ncols=0
+        )
         for i, primer_seq in enumerate(primer_seq_list):
-            gen_handler(model, primer_seq, args, f'{args.output_file_path}_{i+1}')
+            gen_handler(
+                model,
+                primer_seq,
+                args,
+                f'{args.output_file_path}_{i+1}'
+            )
             # print(f'generated {args.output_file_path}_{i+1}')
-            pbar.update()
-        pbar.close()
+            tqdm_primer_seq_list.update()
+        tqdm_primer_seq_list.close()
 
     generation_time = time() - generation_time_begin
     total_time = overhead_time + primer_process_time + generation_time
