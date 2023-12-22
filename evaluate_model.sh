@@ -81,7 +81,8 @@ if [ "$test_file_number" -gt 0 ]; then
     test_copy_dir_path="${midi_dir_path}/test_files_copy"
     test_eval_features_path="${midi_dir_path}/test_eval_features.json"
     test_eval_features_primer_path="${midi_dir_path}/"
-    test_eval_features_primer_path+="test_eval_features_primer.json"
+    test_eval_features_primer_path+="test_eval_features_primer"
+    test_eval_features_primer_path+="${primer_measure_length}.json"
 
     # Get features of dataset if no result file
 
