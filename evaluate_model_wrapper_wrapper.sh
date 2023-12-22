@@ -34,7 +34,6 @@ python3 evaluate_model_wrapper.py \
     --softmax-temperature "$SOFTMAX_TEMPERATURE" \
     --sample-function "$SAMPLE_FUNCTION" \
     --sample-threshold "$SAMPLE_THRESHOLD" \
-    --sample-threshold-head-multiplier "$SAMPLE_THRESHOLD_HEAD_MULTIPLIER" \
     --eval-sample-number "$EVAL_SAMPLE_NUMBER" \
     --worker-number "$EVAL_WORKER_NUMBER" \
     --seed "$SEED" --log-path "$log_path" \

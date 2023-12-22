@@ -249,7 +249,6 @@ def generate(
         use_adjust_logit: bool = True,
         sample_function: Union[str, None] = 'none',
         sample_threshold: Union[List[float], None] = None,
-        sample_threshold_head_multiplier: float = 1.0,
         print_exception: bool = False,
         show_tqdm: bool = False,
         ignore_pending_note_error: bool = True) -> List[str]:
@@ -367,7 +366,6 @@ def generate(
         vocabs=model.vocabs
     )
     primer_length = primer_seq.shape[1]
-    is_head = SEP_TOKEN_STR not in text_list
 
     recurrent_memory = None
     _, array_memory = text_list_to_array(
@@ -426,15 +424,11 @@ def generate(
             # l has shape (attr_vocab_size,)
         ]
 
-        cur_threshold_multiplier = 1.0
-        if is_head:
-            cur_threshold_multiplier = sample_threshold_head_multiplier
-
         try_count = 0
         next_token_str = ""
         while try_count < try_count_limit:
             sampled_attrs = [
-                sample(probs, threshold * cur_threshold_multiplier)
+                sample(probs, threshold)
                 for probs, threshold in zip(probs, sample_threshold)
             ]
             # next_token_array shape = (1, out_attr_num)
@@ -473,9 +467,6 @@ def generate(
             if print_exception:
                 print('Exceeded try count limit:', try_count_limit)
             break
-
-        if is_head and next_token_str == SEP_TOKEN_STR:
-            is_head = False
 
         if next_token_str == END_TOKEN_STR:
             break

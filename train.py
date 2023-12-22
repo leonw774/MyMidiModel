@@ -187,13 +187,6 @@ def parse_args():
             Default is %(default)s.'
     )
     eval_group.add_argument(
-        '--sample-threshold-head-multiplier',
-        type=float,
-        default=1.0,
-        help='The multiplier of probability threshold when in head section. \
-            Default is %(default)s.'
-    )
-    eval_group.add_argument(
         '--valid-eval-sample-number',
         type=int,
         nargs='?',

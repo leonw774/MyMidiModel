@@ -5,8 +5,7 @@ Required variables:
   midi_dir_path test_paths_file primer_measure_length
 Optional variables:
   model_dir_path worker_number log_path midi_to_piece_paras\
-  softmax_temperature sample_function sample_threshold\
-  sample_threshold_head_multiplier seed
+  softmax_temperature sample_function sample_threshold seed
 "
 # check required variables
 if [ -z "$midi_dir_path" ] \
@@ -34,8 +33,6 @@ test -z "$worker_number"       && worker_number=1
 test -z "$softmax_temperature" && softmax_temperature=1.0
 test -z "$sample_function"     && sample_function=none
 test -z "$sample_threshold"    && sample_threshold=1.0
-test -z "$sample_threshold_head_multiplier" \
-    && sample_threshold_head_multiplier=1.0
 
 # set to empty string if unset
 model_dir_path="${model_dir_path:=}"
@@ -55,7 +52,6 @@ midi_to_piece_paras=${midi_to_piece_paras}
 softmax_temperature=${softmax_temperature}
 sample_function=${sample_function}
 sample_threshold=${sample_threshold}
-sample_threshold_head_multiplier=${sample_threshold_head_multiplier}
 seed=${seed}
 use_device=${use_device}
 log_path=${log_path}" | tee -a "$log_path"
@@ -168,7 +164,6 @@ else
         --softmax-temperature "$softmax_temperature" \
         --sample-function "$sample_function" \
         --sample-threshold "$sample_threshold" \
-        --sample-threshold-head-multiplier "$sample_threshold_head_multiplier" \
         -- "$model_file_path" "${eval_samples_dir}/uncond/uncond"
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
@@ -225,7 +220,6 @@ else
         --softmax-temperature "$softmax_temperature" \
         --sample-function "$sample_function" \
         --sample-threshold "$sample_threshold" \
-        --sample-threshold-head-multiplier "$sample_threshold_head_multiplier" \
         -- "$model_file_path" "${eval_samples_dir}/instr_cond/instr_cond"
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
@@ -264,7 +258,6 @@ else
         --softmax-temperature "$softmax_temperature" \
         --sample-function "$sample_function" \
         --sample-threshold "$sample_threshold" \
-        --sample-threshold-head-multiplier "$sample_threshold_head_multiplier" \
         -- "$model_file_path" "${eval_samples_dir}/primer_cont/primer_cont"
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
