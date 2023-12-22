@@ -393,12 +393,10 @@ class MidiDataset(Dataset):
         if self.permute_track_number:
             max_track_number = self.vocabs.track_numbers.size - 1
             # add one because there is a padding token at index 0
-            perm = np.concatenate(
-                arrays=(
-                    [0],
-                    np.random.permutation(max_track_number) + 1
-                )
-            )
+            perm = np.concatenate((
+                [0],
+                np.random.permutation(max_track_number) + 1
+            ))
             # view track number col
             trn_column = sampled_array[:, ATTR_NAME_INDEX['trn']]
             for i, trn in enumerate(trn_column):
