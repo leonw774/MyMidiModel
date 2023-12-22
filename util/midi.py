@@ -254,8 +254,7 @@ def get_time_structure_tokens(
     supported_time_signatures = get_supported_time_signatures()
 
     if len(midi.time_signature_changes) == 0:
-        # time_sig_list = [TimeSignature(4, 4, 0)] # default 4/4
-        assert False, 'No time signature information retrieved'
+        raise AssertionError('No time signature information retrieved')
     else:
         time_sig_list = []
         # remove duplicated time_signatures
