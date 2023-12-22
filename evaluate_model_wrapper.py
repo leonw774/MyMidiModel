@@ -113,11 +113,8 @@ def main():
             os.environ[k] = ' '.join(map(str, v))
         else:
             os.environ[k] = str(v)
-    subprocess.run(
-        ['./evaluate_model.sh'],
-        check=True
-    )
-    return 0
+    complete_status = subprocess.run(['./evaluate_model.sh'], check=False)
+    return complete_status.returncode
 
 if __name__ == '__main__':
     EXIT_CODE = main()

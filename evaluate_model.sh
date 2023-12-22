@@ -2,10 +2,11 @@
 
 help_text="var1=value1 var2=value2 [...] varN=valueN ./evaluate_model.sh
 Required variables:
-\tmidi_dir_path test_paths_file primer_measure_length
+  midi_dir_path test_paths_file primer_measure_length
 Optional variables:
-\tmodel_dir_path worker_number log_path midi_to_piece_paras\
-softmax_temperature sample_function sample_threshold seed
+  model_dir_path worker_number log_path midi_to_piece_paras\
+  softmax_temperature sample_function sample_threshold\
+  sample_threshold_head_multiplier seed
 "
 # check required variables
 if [ -z "$midi_dir_path" ] \

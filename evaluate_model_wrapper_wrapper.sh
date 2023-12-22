@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if ! { [ $# == 3 ] || [ $# == 4 ]; }; then
+if ! { [ $# == 4 ] || [ $# == 5 ]; }; then
     echo "Expect arguments to be:"
     echo "- A configuration file name under configs/model"
     echo "- Two paths to the model directory and the log file"
@@ -8,23 +8,26 @@ if ! { [ $# == 3 ] || [ $# == 4 ]; }; then
     exit 1
 fi
 
-model_config_file_paths="configs/model/${1}.sh"
-model_dir_path=$2
-log_path=$3
-use_device=$4
+config_file_paths=()
+config_file_paths+=("configs/corpus/${1}.sh")
+config_file_paths+=("configs/model/${2}.sh")
+model_dir_path=$3
+log_path=$4
+use_device=$5
 
-if [ -f "$model_config_file_paths" ]; then
-    if source "$model_config_file_paths"; then
-        echo "source ${model_config_file_paths}: success"
+for config_file_path in "${config_file_paths[@]}"; do
+    if [ -f "$config_file_path" ]; then
+        if source "$config_file_path"; then
+            echo "${config_file_path}: success"
+        else
+            echo "${config_file_path}: fail"
+            exit 1
+        fi
     else
-        echo "source ${model_config_file_paths}: fail"
+        echo "'${config_file_path}' file not exists"
         exit 1
     fi
-else
-    echo "'${model_config_file_paths}' file not exists"
-    exit 1
-fi
-
+done
 python3 evaluate_model_wrapper.py \
     --model-dir-path "$model_dir_path" \
     --midi-to-piece-paras "$EVAL_MIDI_TO_PIECE_PARAS_FILE" \
