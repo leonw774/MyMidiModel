@@ -17,7 +17,8 @@ from tqdm import tqdm
 
 from util.midi import midi_to_piece
 from util.corpus import (
-    to_paras_file_path, to_corpus_file_path, to_pathlist_file_path, dump_corpus_paras
+    to_paras_file_path, to_corpus_file_path, to_pathlist_file_path,
+    dump_corpus_paras
 )
 
 
@@ -34,15 +35,16 @@ def parse_args():
         '--max-track-number',
         type=int,
         default=24,
-        help='The maximum tracks nubmer to keep in text, if the input midi has more \
-            "instruments" than this value, some tracks would be merged or discard. \
+        help='The maximum tracks nubmer to keep in text, \
+            if the input midi has more "instruments" than this value, \
+            some tracks would be merged or discard. \
             Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--max-duration',
         type=int,
         default=48,
-        help='Max length of duration in unit of ticks. Default is %(default)s.'
+        help='Max duration value in unit of ticks. Default is %(default)s.'
     )
     handler_args_parser.add_argument(
         '--velocity-step',
@@ -57,7 +59,8 @@ def parse_args():
         type=int,
         default=[120-6*16, 120+5*16, 16], # 24, 200, 16
         metavar=('TEMPO_MIN', 'TEMPO_MAX', 'TEMPO_STEP'),
-        help='Three integers: (min, max, step), where min and max are INCLUSIVE. \
+        help='Three integers: (min, max, step). \
+            The min and max are INCLUSIVE. \
             Default is %(default)s.'
     )
     handler_args_parser.add_argument(
@@ -91,10 +94,11 @@ def parse_args():
             And all ".mid" files under them will be processed recursively.'
     )
     main_parser.add_argument(
-        '--worker_number', '-w',
+        '--worker-number', '-w',
         type=int,
         default=1,
-        help='The number of worker for multiprocessing. Default is %(default)s. \
+        help='The number of worker for multiprocessing. \
+            Default is %(default)s. \
             If this number is 1 or below, multiprocessing would not be used.'
     )
     main_parser.add_argument(
@@ -137,7 +141,9 @@ def handler(args_dict: dict):
     except KeyboardInterrupt as e:
         raise e
     except Exception as e:
-        # if not (repr(e).startswith('Assert') or repr(e).startswith('Runtime')):
+        # if not (
+        #         repr(e).startswith('Assert') or repr(e).startswith('Runtime')
+        #     ):
         logging.debug(
             '\n%d pid: %d file: %s\n%s',
             n, os.getpid(), midi_file_path, format_exc()
@@ -237,7 +243,9 @@ def main():
             level=loglevel,
             format='%(message)s'
         )
-    logging.info(strftime('==== midi_to_corpus.py start at %Y%m%d-%H%M%SS ===='))
+    logging.info(
+        strftime('==== midi_to_corpus.py start at %Y%m%d-%H%M%SS ====')
+    )
 
     logging.info(
         '\n'.join([
@@ -254,7 +262,7 @@ def main():
     corpus_file_path = to_corpus_file_path(args.output_dir_path)
     if os.path.isdir(args.output_dir_path):
         if os.path.exists(corpus_file_path):
-            logging.info('Output corpus: %s already has file.', corpus_file_path)
+            logging.info('Output corpus: %s already exist.', corpus_file_path)
             if args.use_existed:
                 logging.info('Flag --use-existed is set')
                 logging.info('==== midi_to_corpus.py exited ====')
@@ -284,7 +292,10 @@ def main():
                 args.output_dir_path
             )
     elif os.path.isfile(args.output_dir_path):
-        logging.info('Output directory path: %s is a file.', args.output_dir_path)
+        logging.info(
+            'Output directory path: %s is a file.',
+            args.output_dir_path
+        )
         return 1
     else:
         os.makedirs(args.output_dir_path)
@@ -295,13 +306,21 @@ def main():
         logging.info('Globbing %s', input_path)
         if args.recursive:
             if not os.path.isdir(input_path):
-                print(f'Input path {input_path} is not a directory or doesn\'t exist.')
-            file_path_list = glob.glob(input_path+'/**/*.mid', recursive=True)
-            file_path_list += glob.glob(input_path+'/**/*.midi', recursive=True)
-            file_path_list += glob.glob(input_path+'/**/*.MID', recursive=True)
+                print(
+                    f'Input path {input_path} is not a directory'
+                    f' or does not exist.'
+                )
+            file_path_list = (
+                glob.glob(input_path+'/**/*.mid', recursive=True)
+                + glob.glob(input_path+'/**/*.midi', recursive=True)
+                + glob.glob(input_path+'/**/*.MID', recursive=True)
+            )
         else:
             if not os.path.isfile(input_path):
-                print(f'Input path {input_path} is not a file or doesn\'t exist.')
+                print(
+                    f'Input path {input_path} is not a file'
+                    f' or does not exist.'
+                )
             file_path_list.append(input_path)
 
     if len(file_path_list) == 0:

@@ -36,6 +36,7 @@ USE_DEVICE="cpu"
 # eval
 EVAL_MIDI_TO_PIECE_PARAS_FILE=""
 EVAL_SAMPLE_NUMBER=10 # if not set, will used the number of test files
+EVAL_WORKER_NUMBER=32
 ONLY_EVAL_UNCOND=true
 PRIMER_LENGTH=4
 SAMPLE_FUNCTION="none"

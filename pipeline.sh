@@ -113,10 +113,13 @@ if [ "$do_midi_to_corpus" == true ]; then
     echo "Corpus dir: ${corpus_dir_path}"
 
     python3 midi_to_corpus.py \
-        --tpq "$TPQ" --max-track-number "$MAX_TRACK_NUMBER" \
-        --max-duration "$MAX_DURATION" --velocity-step "$VELOCITY_STEP" \
+        --tpq "$TPQ" \
+        --max-track-number "$MAX_TRACK_NUMBER" \
+        --max-duration "$MAX_DURATION" \
+        --velocity-step "$VELOCITY_STEP" \
         --tempo-quantization "$TEMPO_MIN" "$TEMPO_MAX" "$TEMPO_STEP" \
-        --log "$log_path" -w "$WORKER_NUMBER" -o "$corpus_dir_path" \
+        --log "$log_path" --worker-number "$MIDI_WORKER_NUMBER" \
+        --output-dir-path "$corpus_dir_path" \
         --recursive $use_existed_flag "${midi_to_corpus_flags[@]}" \
         -- "$MIDI_DIR_PATH" \
         || {
@@ -150,7 +153,7 @@ if [ "$do_bpe" == true ]; then
     # run learn_vocab
     bpe/learn_vocab \
         "$BPE_LOG" "$corpus_dir_path" "$bpe_corpus_dir_path" "$BPE_ITER_NUM" \
-        "$ADJACENCY" "$SAMPLE_RATE" "$MIN_SCORE_LIMIT" "$BPE_WORKER" \
+        "$ADJACENCY" "$SAMPLE_RATE" "$MIN_SCORE_LIMIT" "$BPE_WORKER_NUMBER" \
         | tee -a "$log_path"
     
     bpe_exit_code=${PIPESTATUS[0]}
@@ -158,7 +161,7 @@ if [ "$do_bpe" == true ]; then
         echo "learn_vocab failed. pipeline.sh exit." | tee -a "$log_path"
         echo "Args:"
         echo "$BPE_LOG $corpus_dir_path $bpe_corpus_dir_path $BPE_ITER_NUM" \
-            "$ADJACENCY $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER"
+            "$ADJACENCY $SAMPLE_RATE $MIN_SCORE_LIMIT $BPE_WORKER_NUMBER"
         rm -r "$bpe_corpus_dir_path"
         exit 1;
     fi
@@ -265,7 +268,7 @@ $launch_command train.py \
     --sample-threshold "$SAMPLE_THRESHOLD" \
     --sample-threshold-head-multiplier "$SAMPLE_THRESHOLD_HEAD_MULTIPLIER" \
     --valid-eval-sample-number "$VALID_EVAL_SAMPLE_NUMBER" \
-    --valid-eval-worker-number "$WORKER_NUMBER" \
+    --valid-eval-worker-number "$EVAL_WORKER_NUMBER" \
     \
     --max-pieces-per-gpu "$MAX_PIECE_PER_GPU" --use-device "$USE_DEVICE" \
     --seed "$SEED" --log "$log_path" "${train_flags[@]}" \
@@ -285,14 +288,16 @@ if [ -n "${NO_EVAL+x}" ]; then
 fi
 
 python3 evaluate_model_wrapper.py \
-    --model-dir-path "$model_dir_path" --worker-number "$WORKER_NUMBER" \
+    --model-dir-path "$model_dir_path" \
     --midi-to-piece-paras "$EVAL_MIDI_TO_PIECE_PARAS_FILE" \
     --softmax-temperature "$SOFTMAX_TEMPERATURE" \
     --sample-function "$SAMPLE_FUNCTION" \
     --sample-threshold "$SAMPLE_THRESHOLD" \
     --sample-threshold-head-multiplier "$SAMPLE_THRESHOLD_HEAD_MULTIPLIER" \
-    --eval-sample-number "$EVAL_SAMPLE_NUMBER" --seed "$SEED" \
-    --log-path "$log_path" --only-eval-uncond "$ONLY_EVAL_UNCOND" \
+    --eval-sample-number "$EVAL_SAMPLE_NUMBER" \
+    --worker-number "$EVAL_WORKER_NUMBER" \
+    --seed "$SEED" --log-path "$log_path" \
+    --only-eval-uncond "$ONLY_EVAL_UNCOND" \
     -- "$MIDI_DIR_PATH" "$TEST_PATHS_FILE" "$PRIMER_LENGTH" \
     || {
         echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
