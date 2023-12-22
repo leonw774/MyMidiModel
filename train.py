@@ -187,6 +187,13 @@ def parse_args():
             Default is %(default)s.'
     )
     eval_group.add_argument(
+        '--sample-threshold-head-multiplier',
+        type=float,
+        default=1.0,
+        help='The multiplier of probability threshold when in head section. \
+            Default is %(default)s.'
+    )
+    eval_group.add_argument(
         '--valid-eval-sample-number',
         type=int,
         nargs='?',
@@ -427,7 +434,7 @@ def main():
     gradient_accumulation_steps = 1
     if args.use_device != 'cpu':
         if args.max_pieces_per_gpu is not None: # if gpu memory is limited
-            # effective batch size = 
+            # effective batch size =
             #     gradient_accumulation_steps * batch_size * device_count
             gradient_accumulation_steps = int(
                 args.train.batch_size

@@ -33,19 +33,21 @@ def permute_track_number(array: np.ndarray, track_number_size: int) -> NDArray:
     return new_array
 
 
-def adjust_probs(
-        probs: List[torch.Tensor],
+def adjust_logits(
+        logits: List[torch.Tensor],
         text_list: List[str],
         vocabs: Vocabs,
         event_family_ids: Tuple[set]) -> List[torch.Tensor]:
     """
-    Set to zero to the prob of the attribute values that would
+    Set to -INF to the logits of the attribute values that would
     definitily raise exception if the next token use them.
 
     Also force the position tokens to be ordered increasingly.
     """
     assert len(text_list) > 0, 'Empty text_list'
-    assert len(probs) == len(OUTPUT_ATTR_NAMES), 'Bad probs'
+    assert len(logits) == len(OUTPUT_ATTR_NAMES), 'Bad probs'
+
+    neg_inf = float('-inf')
 
     bos_index = vocabs.events.text2id[BEGIN_TOKEN_STR]
     sep_index = vocabs.events.text2id[SEP_TOKEN_STR]
@@ -57,10 +59,10 @@ def adjust_probs(
     ) = event_family_ids
 
     # BOS token is redundent, will not be used in generation
-    probs[ATTR_NAME_INDEX['evt']][bos_index] = 0
+    logits[ATTR_NAME_INDEX['evt']][bos_index] = neg_inf
     # predict PAD is not allowed in generation time
-    for attr_probs in probs:
-        attr_probs[0] = 0
+    for attr_logits in logits:
+        attr_logits[0] = neg_inf
 
     is_head = (
         text_list[-1] == BEGIN_TOKEN_STR
@@ -75,7 +77,7 @@ def adjust_probs(
                 for index in range(vocabs.events.size)
                 if index not in track_ids
             ]
-            probs[ATTR_NAME_INDEX['evt']][not_track_ids] = 0
+            logits[ATTR_NAME_INDEX['evt']][not_track_ids] = neg_inf
         elif 1 < len(text_list) < vocabs.track_numbers.size:
             # only track-instrument and separater allowed
             not_track_or_sep_ids = [
@@ -83,7 +85,7 @@ def adjust_probs(
                 for index in range(vocabs.events.size)
                 if index not in track_ids and index != sep_index
             ]
-            probs[ATTR_NAME_INDEX['evt']][not_track_or_sep_ids] = 0
+            logits[ATTR_NAME_INDEX['evt']][not_track_or_sep_ids] = neg_inf
             # prevent generating repeating track number
             used_track_number =  [
                 # the index:value of track number is 0:padding, 1:0, 2:1, ...
@@ -97,37 +99,37 @@ def adjust_probs(
             #     f'text_list: {text_list}\n'
             #     f'used_track_number: {used_track_number}'
             # )
-            probs[ATTR_NAME_INDEX['trn']][used_track_number] = 0
+            logits[ATTR_NAME_INDEX['trn']][used_track_number] = neg_inf
         else:
             # only separater allowed
-            probs[ATTR_NAME_INDEX['evt']][:sep_index] = 0
-            probs[ATTR_NAME_INDEX['evt']][sep_index+1:] = 0
+            logits[ATTR_NAME_INDEX['evt']][:sep_index] = neg_inf
+            logits[ATTR_NAME_INDEX['evt']][sep_index+1:] = neg_inf
 
     elif is_sep: # if is separater, then only measure tokens are allowed
         for i in range(vocabs.events.size):
             if i not in measure_ids:
-                probs[ATTR_NAME_INDEX['evt']][i] = 0
+                logits[ATTR_NAME_INDEX['evt']][i] = neg_inf
 
     else: # if the section is body
         # the next token's event can not be track-instrument or sep
-        probs[ATTR_NAME_INDEX['evt']][list(track_ids)] = 0
-        probs[ATTR_NAME_INDEX['evt']][sep_index] = 0
+        logits[ATTR_NAME_INDEX['evt']][list(track_ids)] = neg_inf
+        logits[ATTR_NAME_INDEX['evt']][sep_index] = neg_inf
 
         # if the last token in text_list is measure
         # then the next token's event can not be multi-note or tempo
         if text_list[-1][0] == MEASURE_EVENTS_CHAR:
-            multinote_and_tempo_ids = multinote_ids.union(tempo_ids)
-            probs[ATTR_NAME_INDEX['evt']][list(multinote_and_tempo_ids)] = 0
+            mn_and_tempo_ids = multinote_ids.union(tempo_ids)
+            logits[ATTR_NAME_INDEX['evt']][list(mn_and_tempo_ids)] = neg_inf
 
         # if the last token in text_list is position
         # then the next token's event can not be measure
         elif text_list[-1][0] == POSITION_EVENTS_CHAR:
-            probs[ATTR_NAME_INDEX['evt']][list(position_ids)] = 0
+            logits[ATTR_NAME_INDEX['evt']][list(position_ids)] = neg_inf
 
         # if the last token in text_list is note or multinote
         # the next token's event can not be tempo
         elif text_list[-1][0] in (NOTE_EVENTS_CHAR, MULTI_NOTE_EVENTS_CHAR):
-            probs[ATTR_NAME_INDEX['evt']][list(tempo_ids)] = 0
+            logits[ATTR_NAME_INDEX['evt']][list(tempo_ids)] = neg_inf
 
         # prohibits position tokens that is "behind" the current position
         k = len(text_list) - 1
@@ -138,7 +140,7 @@ def adjust_probs(
             cur_position = b36strtoi(text_list[k][1:])
             for i in position_ids:
                 if b36strtoi(vocabs.events.id2text[i][1:]) <= cur_position:
-                    probs[ATTR_NAME_INDEX['evt']][i] = 0
+                    logits[ATTR_NAME_INDEX['evt']][i] = neg_inf
 
         # prohibit tempo tokens if there is already a tempo token
         k = len(text_list) - 1
@@ -146,7 +148,7 @@ def adjust_probs(
         while (text_list[k][0] not in before_tempo_chars) and (k > 0):
             k -= 1
         if text_list[k][0] == TEMPO_EVENTS_CHAR:
-            probs[ATTR_NAME_INDEX['evt']][list(tempo_ids)] = 0
+            logits[ATTR_NAME_INDEX['evt']][list(tempo_ids)] = neg_inf
 
         # only allow defined track number
         sep_position_in_text_list = text_list.index(SEP_TOKEN_STR)
@@ -160,17 +162,17 @@ def adjust_probs(
             for index in range(vocabs.track_numbers.size)
             if index not in used_track_number_ids
         ]
-        probs[ATTR_NAME_INDEX['trn']][unused_track_number_ids] = 0
+        logits[ATTR_NAME_INDEX['trn']][unused_track_number_ids] = neg_inf
 
-    # re-normalized probs
-    normed_probs = [p / p.sum() for p in probs]
-    # if in some attribute all events are fill with zero, something is wrong
-    assert not any([torch.isnan(p).any() for p in normed_probs]), (
-        f'Text List: {text_list}\n'
-        f'Adjusted: {probs}\n'
-        f'Re-normalized: {normed_probs}'
-    )
-    return normed_probs
+    # # re-normalized probs
+    # normed_probs = [p / p.sum() for p in probs]
+    # # if in some attribute all events are fill with zero, something is wrong
+    # assert not any([torch.isnan(p).any() for p in normed_probs]), (
+    #     f'Text List: {text_list}\n'
+    #     f'Adjusted: {probs}\n'
+    #     f'Re-normalized: {normed_probs}'
+    # )
+    return logits
 
 
 SAMPLE_FUNCTION_ARGUMENT_CHOICES = ('none', 'top-k', 'top-p', 'nucleus')
@@ -208,7 +210,7 @@ def check_next_token(
         next_token_str: str,
         array_memory: dict,
         vocabs: Vocabs,
-        use_adjust_prob: bool,
+        use_adjust_logit: bool,
         ignore_pending_note_error: bool,
         print_exception: bool) -> Union[Tuple[NDArray[np.uint16], dict], None]:
     """If `next_token` is ok to be put after `text_list`,
@@ -216,7 +218,7 @@ def check_next_token(
     """
     try:
         # format checking
-        if not use_adjust_prob:
+        if not use_adjust_logit:
             # have to add EOS at the end to not raise error
             piece_to_midi(
                 piece=' '.join(text_list + [next_token_str, END_TOKEN_STR]),
@@ -244,9 +246,10 @@ def generate(
         primer_seq: Union[torch.Tensor, None] = None,
         softmax_temperature: Union[List[float], None] = None,
         try_count_limit: int = 1000,
-        use_adjust_prob: bool = True,
+        use_adjust_logit: bool = True,
         sample_function: Union[str, None] = 'none',
-        sample_threshold:  Union[List[float], None] = None,
+        sample_threshold: Union[List[float], None] = None,
+        sample_threshold_head_multiplier: float = 1.0,
         print_exception: bool = False,
         show_tqdm: bool = False,
         ignore_pending_note_error: bool = True) -> List[str]:
@@ -307,7 +310,7 @@ def generate(
             softmax_temperature = softmax_temperature * output_attrs_number
         elif len(softmax_temperature) != output_attrs_number:
             raise ValueError(
-                f'Length of softmax_temperature can only be 1 or out_attr_num. '
+                f'len(softmax_temperature) can only be 1 or out_attr_num. '
                 f'Get {softmax_temperature}'
             )
 
@@ -343,7 +346,7 @@ def generate(
     model.inference()
 
     # prepare famlity indices for probs adjustment
-    if use_adjust_prob:
+    if use_adjust_logit:
         # event_family_ids:
         #   multinote_ids, position_ids, measure_ids, track_ids, tempo_ids
         event_family_ids = (set(), set(), set(), set(), set())
@@ -364,6 +367,7 @@ def generate(
         vocabs=model.vocabs
     )
     primer_length = primer_seq.shape[1]
+    is_head = SEP_TOKEN_STR not in text_list
 
     recurrent_memory = None
     _, array_memory = text_list_to_array(
@@ -407,25 +411,30 @@ def generate(
                 # l has shape (1, seq_length, attr_vocab_size)
             ]
 
-        probs = [
-            F.softmax(l / t, dim=0)
-            for l, t in zip(last_logits, softmax_temperature)
-            # l has shape (attr_vocab_size,)
-        ]
-        if use_adjust_prob:
+        if use_adjust_logit:
             # prevent many bad format in advance
-            probs = adjust_probs(
-                probs=probs,
+            last_logits = adjust_logits(
+                logits=last_logits,
                 text_list=text_list,
                 vocabs=model.vocabs,
                 event_family_ids=event_family_ids
             )
 
+        probs = [
+            F.softmax(l / t, dim=0)
+            for l, t in zip(last_logits, softmax_temperature)
+            # l has shape (attr_vocab_size,)
+        ]
+
+        cur_threshold_multiplier = 1.0
+        if is_head:
+            cur_threshold_multiplier = sample_threshold_head_multiplier
+
         try_count = 0
         next_token_str = ""
         while try_count < try_count_limit:
             sampled_attrs = [
-                sample(probs, threshold)
+                sample(probs, threshold * cur_threshold_multiplier)
                 for probs, threshold in zip(probs, sample_threshold)
             ]
             # next_token_array shape = (1, out_attr_num)
@@ -444,7 +453,7 @@ def generate(
                 next_token_str=next_token_str,
                 array_memory=array_memory,
                 vocabs=model.vocabs,
-                use_adjust_prob=use_adjust_prob,
+                use_adjust_logit=use_adjust_logit,
                 ignore_pending_note_error=ignore_pending_note_error,
                 print_exception=print_exception
             )
@@ -464,6 +473,9 @@ def generate(
             if print_exception:
                 print('Exceeded try count limit:', try_count_limit)
             break
+
+        if is_head and next_token_str == SEP_TOKEN_STR:
+            is_head = False
 
         if next_token_str == END_TOKEN_STR:
             break

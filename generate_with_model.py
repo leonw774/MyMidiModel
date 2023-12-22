@@ -89,9 +89,9 @@ def read_args():
             Default is the model\'s max sequence length.'
     )
     parser.add_argument(
-        '--no-adjust-prob',
+        '--no-adjust-logits',
         action='store_true',
-        help='Trun off the probability adjustment that helps generate \
+        help='Trun off the logit adjustment that helps generate \
             next token that satisfy the format rule.'
     )
     parser.add_argument(
@@ -118,7 +118,14 @@ def read_args():
         type=float,
         nargs='+',
         default=[1.0],
-        help='The probability threshold of nucleus sampling. \
+        help='The probability threshold of the sample function. \
+            Default is %(default)s.'
+    )
+    parser.add_argument(
+        '--sample-threshold-head-multiplier', '--threshold-hm', '-g',
+        type=float,
+        default=1.0,
+        help='The multiplier of probability threshold when in head section. \
             Default is %(default)s.'
     )
     parser.add_argument(
@@ -193,7 +200,7 @@ def gen_handler(
             primer_seq=primer_seq,
             softmax_temperature=args.softmax_temperature,
             try_count_limit=args.try_count_limit,
-            use_adjust_prob=(not args.no_adjust_prob),
+            use_adjust_logit=(not args.no_adjust_logit),
             sample_function=args.sample_function,
             sample_threshold=args.sample_threshold,
             print_exception=args.print_exception,

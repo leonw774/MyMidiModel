@@ -163,6 +163,7 @@ else
         --softmax-temperature "$softmax_temperature" \
         --sample-function "$sample_function" \
         --sample-threshold "$sample_threshold" \
+        --sample-threshold-head-multiplier "$SAMPLE_THRESHOLD_HEAD_MULTIPLIER" \
         -- "$model_file_path" "${eval_samples_dir}/uncond/uncond"
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
@@ -219,6 +220,7 @@ else
         --softmax-temperature "$softmax_temperature" \
         --sample-function "$sample_function" \
         --sample-threshold "$sample_threshold" \
+        --sample-threshold-head-multiplier "$SAMPLE_THRESHOLD_HEAD_MULTIPLIER" \
         -- "$model_file_path" "${eval_samples_dir}/instr_cond/instr_cond"
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
@@ -257,6 +259,7 @@ else
         --softmax-temperature "$softmax_temperature" \
         --sample-function "$sample_function" \
         --sample-threshold "$sample_threshold" \
+        --sample-threshold-head-multiplier "$SAMPLE_THRESHOLD_HEAD_MULTIPLIER" \
         -- "$model_file_path" "${eval_samples_dir}/primer_cont/primer_cont"
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"

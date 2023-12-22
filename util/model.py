@@ -313,7 +313,7 @@ def compute_losses(
             f'`padding` argument in compute_losses should be '
             f'one of {LOSS_PADDING_ARG_CHOICES}.'
         )
-    
+
     ignore_index = 0
     if padding == 'normal':
         ignore_index = -100
