@@ -227,10 +227,9 @@ fi
 
 if [ "$USE_PARALLEL" == true ]; then
     NUM_DEVICES=$(echo "$CUDA_VISIBLE_DEVICES" | tr "," " " | wc -w;)
-    NUM_DEVICES=$(( NUM_DEVICES + 1 ))
     NUM_TOTAL_DEVICE=$(nvidia-smi --list-gpus | wc -l)
-    if [ "$NUM_TOTAL_DEVICE" -lt $NUM_DEVICES ]; then
-        NUM_DEVICES=$NUM_CUDA_DEVICE
+    if [ "$NUM_TOTAL_DEVICE" -lt "$NUM_DEVICES" ]; then
+        NUM_DEVICES=$NUM_TOTAL_DEVICE
     fi
     if [ "$NUM_DEVICES" == "1" ]; then
         launch_command="python3"
