@@ -203,6 +203,7 @@ def gen_handler(
             use_adjust_logit=(not args.no_adjust_logit),
             sample_function=args.sample_function,
             sample_threshold=args.sample_threshold,
+            sample_threshold_head_multiplier=args.sample_threshold_head_multiplier,
             print_exception=args.print_exception,
             show_tqdm=(not args.no_sample_tqdm)
         )
