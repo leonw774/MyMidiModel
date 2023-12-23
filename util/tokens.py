@@ -141,7 +141,7 @@ def token_to_str(token: namedtuple) -> str:
         # event:pitch:duration:velocity:track:instrument(:position)
         # negative token.duration means is_cont==True
         text = NOTE_EVENTS_CHAR
-        if token.duration > 0:
+        if token.duration < 0:
             text += '~'
         text += ( f':{itob36str(token.pitch)}'
                 + f':{itob36str(abs(token.duration))}'
