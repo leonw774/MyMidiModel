@@ -207,9 +207,9 @@ Shell scripts
   - Read parameters from config files and used them as the arguments for `evaluate_model_wrapper.py`. This is for the convenience of the testing of evaluate/generation parameters.
 
 - `evaluate_model.sh`
-   1. Arguments are passed as environment variables.
-   2. Get evaluation features of the dataset's `TEST_PATHS_FILE` files using `get_eval_features_of_midis.py`.
-   3. Get evaluation features of the unconditional, instrument-informed, and prime continution generation result of the model using the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`.
+  1. Arguments are passed as environment variables.
+  2. Get evaluation features of the dataset's `TEST_PATHS_FILE` files using `get_eval_features_of_midis.py`.
+  3. Get evaluation features of the unconditional, instrument-informed, and prime continution generation result of the model using the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`.
 
 - `experiment_script/`: Pre-programmed experiment execution script
   - `apply_learned_shapes_to_other.sh`

@@ -328,12 +328,14 @@ def log_losses(
     avg_train_loss = sum(train_loss_list) / len(train_loss_list)
     avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
     logging.info(
-        'Avg. train head losses: %s Avg. train loss: %.6f',
-        ', '.join([f'{l:.6f}' for l in avg_train_head_losses]), avg_train_loss
+        'Avg. train head losses: %s Avg. train loss: %.4g',
+        ', '.join([f'{l:.4g}' for l in avg_train_head_losses]),
+        avg_train_loss
     )
     logging.info(
-        'Avg. valid head losses: %s Avg. valid loss: %.6f',
-        ', '.join([f'{l:.6f}' for l in avg_valid_head_losses]), avg_valid_loss
+        'Avg. valid head losses: %s Avg. valid loss: %.4g',
+        ', '.join([f'{l:.4g}' for l in avg_valid_head_losses]),
+        avg_valid_loss
     )
     if not loss_file_path:
         return
@@ -344,13 +346,13 @@ def log_losses(
             idx = cur_num_updates - valid_len + i + 1 # count from 1
             line = (
                 f'{idx},'
-                + ','.join([f'{l:.6f}' for l in train_head_losses])
-                + f',{train_loss:.6f},'
+                + ','.join([f'{l:.4f}' for l in train_head_losses])
+                + f',{train_loss:.4f},'
             )
             if idx == cur_num_updates:
                 line += (
-                    ','.join([f'{l:.6f}' for l in avg_valid_head_losses])
-                    + f',{avg_valid_loss:.6f}'
+                    ','.join([f'{l:.4f}' for l in avg_valid_head_losses])
+                    + f',{avg_valid_loss:.4f}'
                 )
             loss_file.write(line + '\n')
 

@@ -11,6 +11,8 @@ mkdir $base_path
 mkdir "${base_path}/corpus"
 mkdir "${base_path}/logs"
 
+worker_number=32
+
 # make sure bpe programs are new
 make -C ./bpe
 
@@ -20,26 +22,33 @@ mkdir "${base_path}/corpus/lmd--snd_ours_1.0"
 ./bpe/apply_vocab -log \
     $snd_orig_path \
     "${base_path}/corpus/lmd--snd_ours_1.0/corpus" \
-    "${lmd_bpe_path}/shape_vocab" | tee "${base_path}/logs/lmd--snd_ours_1.0.log" -a
+    "${lmd_bpe_path}/shape_vocab" \
+    | tee "${base_path}/logs/lmd--snd_ours_1.0.log" -a
 
-python3 plot_bpe_log.py "${base_path}/corpus/lmd--snd_ours_1.0" "${base_path}/logs/lmd--snd_ours_1.0.log"
+python3 plot_bpe_log.py \
+    "${base_path}/corpus/lmd--snd_ours_1.0" \
+    "${base_path}/logs/lmd--snd_ours_1.0.log"
 
 cp "${lmd_bpe_path}/shape_vocab" "${base_path}/corpus/lmd--snd_ours_1.0"
 cp "${lmd_bpe_path}/paras" "${base_path}/corpus/lmd--snd_ours_1.0"
-python3 make_arrays.py --bpe --log "${base_path}/logs/lmd--snd_ours_1.0.log" \
-    --debug "${base_path}/corpus/lmd--snd_ours_1.0"
+python3 make_arrays.py --bpe --debug \
+    --log "${base_path}/logs/lmd--snd_ours_1.0.log" \
+    --worker-number $worker_number -- "${base_path}/corpus/lmd--snd_ours_1.0"
 
 
 mkdir "${base_path}/corpus/snd--lmd_ours_1.0"
 ./bpe/apply_vocab -log \
     $lmd_orig_path \
     "${base_path}/corpus/snd--lmd_ours_1.0/corpus" \
-    "${snd_bpe_path}/shape_vocab" | tee "${base_path}/logs/snd--lmd_ours_1.0.log" -a
+    "${snd_bpe_path}/shape_vocab" \
+    | tee "${base_path}/logs/snd--lmd_ours_1.0.log" -a
 
-python3 plot_bpe_log.py "${base_path}/corpus/snd--lmd_ours_1.0" "${base_path}/logs/snd--lmd_ours_1.0.log"
+python3 plot_bpe_log.py \
+    "${base_path}/corpus/snd--lmd_ours_1.0" \
+    "${base_path}/logs/snd--lmd_ours_1.0.log"
 
 cp "${snd_bpe_path}/shape_vocab" "${base_path}/corpus/snd--lmd_ours_1.0"
 cp "${snd_bpe_path}/paras" "${base_path}/corpus/snd--lmd_ours_1.0"
-python3 make_arrays.py --bpe --log "${base_path}/logs/snd--lmd_ours_1.0.log" \
-    --debug "${base_path}/corpus/snd--lmd_ours_1.0"
-
+python3 make_arrays.py --bpe --debug \
+    --log "${base_path}/logs/snd--lmd_ours_1.0.log" \
+    --worker-number $worker_number -- "${base_path}/corpus/snd--lmd_ours_1.0"
