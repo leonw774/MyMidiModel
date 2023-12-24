@@ -216,9 +216,10 @@ echo "Model dir: $model_dir_path"
 
 train_flags=()
 test "$PERMUTE_MPS" == true          && train_flags+=("--permute-mps")
+test "$NOT_USE_MPS_NUMBER" == true   && train_flags+=("--not-use-mps-number")
 test "$PERMUTE_TRACK_NUMBER" == true && train_flags+=("--permute-track-number")
 test "$USE_LINEAR_ATTENTION" == true && train_flags+=("--use-linear-attn")
-test "$NOT_USE_MPS_NUMBER" == true   && train_flags+=("--not-use-mps-number")
+test "$FLATTEN_VIRTUAL_PIECES" == true && train_flags+=("--flatten-virtual-pieces")
 
 if [ "${#train_flags[@]}" -ne 0 ]; then
     echo "Added '${train_flags[*]}' to train.py's argument" \

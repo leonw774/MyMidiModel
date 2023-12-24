@@ -69,6 +69,10 @@ def parse_args():
         default=0
     )
     data_group.add_argument(
+        '--flatten-virtual-pieces',
+        action='store_true'
+    )
+    data_group.add_argument(
         '--permute-mps',
         action='store_true'
     )
