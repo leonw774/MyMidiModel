@@ -164,7 +164,10 @@ else
         --softmax-temperature "$softmax_temperature" \
         --sample-function "$sample_function" \
         --sample-threshold "$sample_threshold" \
-        -- "$model_file_path" "${eval_samples_dir}/uncond/uncond"
+        -- "$model_file_path" "${eval_samples_dir}/uncond/uncond" \
+        || {
+            echo "Generation failed. evaluate_model.sh exit." | ttee -a "$log_path"
+        }
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
 fi
@@ -177,7 +180,7 @@ python3 get_eval_features_of_midis.py \
     --reference-file-path "$test_eval_features_path" \
     -- "${eval_samples_dir}/uncond" \
     || {
-        echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
+        echo "Evaluation failed. evaluate_model.sh exit." | tee -a "$log_path"
         exit 1;
     }
 
@@ -220,7 +223,10 @@ else
         --softmax-temperature "$softmax_temperature" \
         --sample-function "$sample_function" \
         --sample-threshold "$sample_threshold" \
-        -- "$model_file_path" "${eval_samples_dir}/instr_cond/instr_cond"
+        -- "$model_file_path" "${eval_samples_dir}/instr_cond/instr_cond" \
+        || {
+            echo "Generation failed. evaluate_model.sh exit." | ttee -a "$log_path"
+        }
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
 fi
@@ -258,7 +264,10 @@ else
         --softmax-temperature "$softmax_temperature" \
         --sample-function "$sample_function" \
         --sample-threshold "$sample_threshold" \
-        -- "$model_file_path" "${eval_samples_dir}/primer_cont/primer_cont"
+        -- "$model_file_path" "${eval_samples_dir}/primer_cont/primer_cont" \
+        || {
+            echo "Generation failed. evaluate_model.sh exit." | ttee -a "$log_path"
+        }
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
 fi
