@@ -167,6 +167,7 @@ else
         -- "$model_file_path" "${eval_samples_dir}/uncond/uncond" \
         || {
             echo "Generation failed. evaluate_model.sh exit." | ttee -a "$log_path"
+            exit 1;
         }
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
@@ -226,6 +227,7 @@ else
         -- "$model_file_path" "${eval_samples_dir}/instr_cond/instr_cond" \
         || {
             echo "Generation failed. evaluate_model.sh exit." | ttee -a "$log_path"
+            exit 1;
         }
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
@@ -267,6 +269,7 @@ else
         -- "$model_file_path" "${eval_samples_dir}/primer_cont/primer_cont" \
         || {
             echo "Generation failed. evaluate_model.sh exit." | ttee -a "$log_path"
+            exit 1;
         }
     duration=$(( SECONDS - start_time ))
     echo "Finished. Used time: ${duration} seconds" | tee -a "$log_path"
