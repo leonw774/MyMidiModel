@@ -31,13 +31,13 @@ EARLY_STOP=10
 # do eval with valid set?
 VALID_EVAL_SAMPLE_NUMBER=0
 
-# device
+# training device
 USE_DEVICE="cuda"
 USE_PARALLEL=true
 MAX_PIECE_PER_GPU=8
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
-# eval
+# evaluation setting
 EVAL_MIDI_TO_PIECE_PARAS_FILE=""
 EVAL_SAMPLE_NUMBER="" # if not set, will used the number of test files
 EVAL_WORKER_NUMBER=32
