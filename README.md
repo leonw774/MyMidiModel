@@ -2,7 +2,7 @@
 
 ## Contents
 
-- [To run the code](#to-run-the-code)
+- [To run the experiment](#to-run-the-experiment)
 - [Configuration Files](#configuration-files-configs)
 - [Dataset](#datasets-datamidis)
 - [Corpus Structure](#corpus-structure-datacorpus)
@@ -12,7 +12,7 @@
 - [Tool Scripts](#tool-scripts)
 
 
-## To run the code
+## To run the experiment
 
 ### Step 1
 
