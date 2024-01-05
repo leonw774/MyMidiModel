@@ -142,10 +142,10 @@ int main(int argc, char *argv[]) {
     // read notes from corpus
     Corpus corpus = readCorpusFile(inCorpusFile, tpq);
     int numTracks = 0;
-    for (auto p: corpus.trackInstrMap) {
+    for (auto p: corpus.trackInstrMaps) {
         numTracks += p.size();
     }
-    std::cout << "Reading done. There are " << corpus.trackInstrMap.size()
+    std::cout << "Reading done. There are " << corpus.trackInstrMaps.size()
         << " pieces and "  << numTracks << " tracks." << std::endl;
 
     // sort and count notes

@@ -26,6 +26,8 @@ flatten_shape_counter_t getShapeScore(
     const double samplingRate
 );
 
-std::pair<Shape, unsigned int> findMaxValPair(const flatten_shape_counter_t& shapeScore);
+std::pair<Shape, unsigned int> findMaxValPair(
+    const flatten_shape_counter_t& shapeScore
+);
 
 #endif

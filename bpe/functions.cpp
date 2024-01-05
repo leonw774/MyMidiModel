@@ -6,14 +6,15 @@
 #include <limits>
 #include "omp.h"
 
+/*
+    binary gcd
+    https://hbfs.wordpress.com/2013/12/10/the-speed-of-gcd/
+    use gcc build-in function __builtin_ctz
+*/
 unsigned int gcd(unsigned int a, unsigned int b) {
     if (a == b) return a;
     if (a == 0 || b == 0) return ((a > b) ? a : b);
     if (a == 1 || b == 1) return 1;
-    // binary gcd
-    // https://lemire.me/blog/2013/12/26/fastest-way-to-compute-the-greatest-common-divisor/
-    // https://hbfs.wordpress.com/2013/12/10/the-speed-of-gcd/
-    // use gcc build-in function __builtin_ctz
     unsigned int shift = __builtin_ctz(a|b);
     a >>= shift;
     do {
@@ -39,13 +40,14 @@ unsigned int gcd(unsigned int* arr, unsigned int size) {
 
 /*  
     Do merging in O(logt) time, t is arraySize
-    A merge between two counter with size of A and B takes $\sum_{i=A}^{A+B} \log{i}$ time
+    A merge between two counter with size of A and B takes
+    $\sum_{i=A}^{A+B} \log{i}$ time
     Since $\int_A^{A+B} \log{x} dx = (A+B)\log{A+B} - A\log{A} - B$
     We could say a merge is O(n logn), where n is number of elements to count
     so that the total time complexity is O(n logn logt)
 
     This function alters the input array.
-    The return index is the index of the counter merged all other counters. 
+    The return index is the index of the counter merged all other counters.
  */
 int mergeCounters(shape_counter_t counterArray[], size_t arraySize) {
     std::vector<int> mergingMapIndices;
@@ -58,7 +60,11 @@ int mergeCounters(shape_counter_t counterArray[], size_t arraySize) {
         for (int i = mergingMapIndices.size() - 1; i > 0; i -= 2) {
             int a = mergingMapIndices[i];
             int b = mergingMapIndices[i-1];
-            for (auto it = counterArray[a].cbegin(); it != counterArray[a].cend(); it++) {
+            for (
+                auto it = counterArray[a].cbegin();
+                it != counterArray[a].cend();
+                it++
+            ) {
                 counterArray[b][it->first] += it->second;
             }
         }
@@ -100,7 +106,6 @@ size_t updateNeighbor(
                     // immediately following
                     if (nOnsetTime >= offsetTime) { 
                         if (immdFollowOnset == -1) {
-                            // we want offsetTime <= nOnsetTime <= offsetTime + gap limit
                             if (nOnsetTime - offsetTime > gapLimit) {
                                 break;
                             }
@@ -131,26 +136,38 @@ Shape getShapeOfMultiNotePair(
 ) {
     if (rmn.onset < lmn.onset) {
         // return getShapeOfMultiNotePair(rmn, lmn, shapeDict);
-        throw std::runtime_error("right multi-note has smaller onset than left multi-note");
+        throw std::runtime_error(
+            "right multi-note has smaller onset than left multi-note");
     }
     const Shape lShape = shapeDict[lmn.shapeIndex],
                 rShape = shapeDict[rmn.shapeIndex];
     const int rightSize = rShape.size();
     const unsigned int rightStretch = rmn.stretch;
+    const int32_t deltaOnset = (int32_t) rmn.onset - (int32_t) lmn.onset;
 
-    // times = { right_onset_1, ..., right_onset_n, right_dur_1, ..., right_dur_n, left_stretch}
+    // times = {
+    //   right_onset_1, ..., right_onset_n,
+    //   right_stretch_1, ..., right_stretch_n,
+    //   left_stretch
+    // }
     unsigned int times[rightSize*2+1]; 
     int t = 0;
     for (const RelNote& rRelNote: rShape) {
-        times[t] = (rRelNote.relOnset * rightStretch + rmn.onset - lmn.onset);
+        times[t] = rRelNote.relOnset * rightStretch + deltaOnset;
         times[t+rightSize] = (unsigned int) rRelNote.relDur * rightStretch;
         t++;
     }
     times[rightSize*2] = lmn.stretch;
     unsigned int newStretch = gcd(times, rightSize*2+1);
-    unsigned int lStretchRatio = lmn.stretch / newStretch;
 
-    // check to prevent overflow, because RelNote's onset is stored in uint8 and onsetLimit is 0x7f
+    // re-calculate the new time values
+    for (unsigned int& time: times) {
+        time /= newStretch;
+    }
+    const unsigned int lStretchRatio = times[rightSize*2];
+
+    // check to prevent overflow, because RelNote's onset is stored in uint8
+    // and onsetLimit is 0x7f
     // if overflowed, return empty shape
     for (int i = 0; i < rightSize; ++i) {
         if (times[i] / newStretch > RelNote::onsetLimit) {
@@ -173,12 +190,14 @@ Shape getShapeOfMultiNotePair(
             lRelNote.isCont
         ));
     }
+
+    const int8_t deltaPitch = (int8_t) rmn.pitch - (int8_t) lmn.pitch;
     t = 0;
     for (const RelNote& rRelNote: rShape) {
         pairShape.push_back(RelNote(
-            times[t] / newStretch,
-            rRelNote.relPitch + rmn.pitch - lmn.pitch,
-            times[t+rightSize] / newStretch,
+            times[t],
+            rRelNote.relPitch + deltaPitch,
+            times[t+rightSize],
             rRelNote.isCont
         ));
         t++;
@@ -196,7 +215,8 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelcocity) {
         int thread_num = omp_get_thread_num();
         // for each track
         for (const Track &track: corpus.mns[i]) {
-            // key: 64 bits: upper 16 unused, 8 for velocity, 8 for time stretch, 32 for onset
+            // key: 64 bits
+            //     16 unused, 8 for velocity, 8 for time stretch, 32 for onset
             // value: occurence count
             std::map<uint64_t, uint8_t> curTrackMulpiSizes;
             for (int k = 0; k < track.size(); ++k) {
@@ -207,7 +227,11 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelcocity) {
                 }
                 curTrackMulpiSizes[key] += 1;
             }
-            for (auto it = curTrackMulpiSizes.cbegin(); it != curTrackMulpiSizes.cend(); ++it) {
+            for (
+                auto it = curTrackMulpiSizes.cbegin();
+                it != curTrackMulpiSizes.cend();
+                ++it
+            ) {
                 multipiSizes[thread_num].push_back(it->second);
             }
         }
@@ -231,7 +255,8 @@ flatten_shape_counter_t getShapeScore(
     const double samplingRate
 ) {
     if (samplingRate <= 0 || 1 < samplingRate) {
-        throw std::runtime_error("samplingRate in shapeScoring not in range (0, 1]");
+        throw std::runtime_error(
+            "samplingRate in shapeScoring not in range (0, 1]");
     }
     bool isOursMerge = (adjacency == "ours");
 
@@ -256,24 +281,34 @@ flatten_shape_counter_t getShapeScore(
             // for each multinote
             for (int k = 0; k < track.size(); ++k) {
                 // for each neighbor
-                for (int n = 1; n <= track[k].neighbor; ++n) {
+                const MultiNote& curMN = track[k];
+                for (int n = 1; n <= curMN.neighbor; ++n) {
+                    const MultiNote& neighborMN = track[k+n];
                     if (isOursMerge) {
-                        if (track[k].vel != track[k+n].vel) continue;
+                        if (curMN.vel != neighborMN.vel) continue;
                     }
                     else {
                         // mulpi
-                        if (track[k].onset != track[k+n].onset) break;
-                        if (track[k].vel != track[k+n].vel) continue;
-                        if (track[k].stretch != track[k+n].stretch) continue;
+                        if (curMN.onset != neighborMN.onset) break;
+                        if (curMN.vel != neighborMN.vel) continue;
+                        if (curMN.stretch != neighborMN.stretch) continue;
                     }
-                    Shape shape = getShapeOfMultiNotePair(track[k], track[k+n], shapeDict);
+                    Shape shape = getShapeOfMultiNotePair(
+                        curMN,
+                        neighborMN,
+                        shapeDict
+                    );
                     // empty shape mean overflow happened
                     if (shape.size() == 0) continue;
                     tempScoreDiff[shape] += 1;
                 }
             }
         }
-        for (auto it = tempScoreDiff.cbegin(); it != tempScoreDiff.cend(); it++) {
+        for (
+            auto it = tempScoreDiff.cbegin();
+            it != tempScoreDiff.cend();
+            it++
+        ) {
             shapeScoreParallel[thread_num][it->first] += it->second;
         }
     }
@@ -289,7 +324,9 @@ flatten_shape_counter_t getShapeScore(
 }
 
 
-std::pair<Shape, unsigned int> findMaxValPair(const flatten_shape_counter_t& shapeScore) {
+std::pair<Shape, unsigned int> findMaxValPair(
+    const flatten_shape_counter_t& shapeScore
+) {
     #pragma omp declare reduction\
         (maxsecond: std::pair<Shape, unsigned int>:\
             omp_out = omp_in.second > omp_out.second ? omp_in : omp_out\

@@ -64,16 +64,22 @@ unsigned int getMaxRelOffset(const Shape& s);
 
 std::vector<Shape> getDefaultShapeDict();
 
-typedef std::map<Shape, unsigned int> shape_counter_t;
+template <>
+struct std::hash<Shape> {
+    size_t operator()(const Shape& s) const;
+};
+
+// typedef std::map<Shape, unsigned int> shape_counter_t;
+typedef std::unordered_map<Shape, unsigned int> shape_counter_t;
 
 struct MultiNote {
     uint32_t onset;
-    // onsetLimit:  When tpq is 12, 0x7ffffff ticks is 1,491,308 minutes in
-    //              the tempo of 120 quarter note per minute,
+    // onsetLimit: When tpq is 12, 0x7ffffff ticks is 1,491,308 minutes in
+    //             the tempo of 120 quarter note per minute,
     static const uint32_t onsetLimit = 0x7fffffff;
-    // shapeIndex:  The index of shape in the shapeDict.
-    //              0: DEFAULT_SHAPE_REGULAR, 1: DEFAULT_SHAPE_CONT
-    //              This mean iterNum cannot be greater than 0xffff - 2 = 65534
+    // shapeIndex: The index of shape in the shapeDict.
+    //             0: DEFAULT_SHAPE_REGULAR, 1: DEFAULT_SHAPE_CONT
+    //             This mean iterNum cannot be greater than 0xffff - 2 = 65534
     uint16_t shapeIndex;
     static const uint16_t shapeIndexLimit = 0xffff - 2;
     uint8_t pitch;  // pitch shiht
@@ -104,7 +110,6 @@ void printTrack(
 
 
 struct TimeStructToken {
-
     uint32_t onset;
 
     // MSB ---------> LSB
@@ -115,18 +120,18 @@ struct TimeStructToken {
     uint16_t data;
 
     TimeStructToken(uint32_t o, bool t, uint16_t n, uint16_t d);
-    bool getT() const;
+    bool isTempo() const;
     int getD() const;
     int getN() const;
 };
 
 struct Corpus {
-    // Time structures
-    std::vector<std::vector<TimeStructToken>> timeStructs;
     // Multi-notes
     std::vector<std::vector<Track>> mns;
-    // Track-program mapping
-    std::vector<std::vector<uint8_t>> trackInstrMap;
+    // Time structures
+    std::vector<std::vector<TimeStructToken>> timeStructLists;
+    // Track-program mappings
+    std::vector<std::vector<uint8_t>> trackInstrMaps;
 
     void pushNewPiece();
     void shrink();
@@ -138,7 +143,10 @@ std::map<std::string, std::string> readParasFile(std::ifstream& paraFile);
 
 Corpus readCorpusFile(std::ifstream& corpusFile, int tpq);
 
-void writeShapeVocabFile(std::ostream& vocabOutfile, const std::vector<Shape>& shapeDict);
+void writeShapeVocabFile(
+    std::ostream& vocabOutfile,
+    const std::vector<Shape>& shapeDict
+);
 
 void writeOutputCorpusFile(
     std::ostream& tokenizedCorpusFile,
