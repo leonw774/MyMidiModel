@@ -277,7 +277,7 @@ class MyMidiTransformer(nn.Module):
         ```
         model.eval()
         model.inferencing = True
-            ```
+        ```
         """
         super().eval()
         self.inferencing = True
@@ -285,36 +285,44 @@ class MyMidiTransformer(nn.Module):
 # end class MyMidiTransformer
 
 LOSS_PADDING_ARG_CHOICES = ['ignore', 'normal']
-"""
-- ignore: PADDING = IGNORE, no exception
-- normal: the model have to correctly predict it to be padding
-"""
 LOSS_PADDING_ARG_CHOICES_DEFAULT = 'ignore'
 
 def compute_losses(
         pred_logits: List[Tensor],
         target_labels: Tensor,
-        padding: str = LOSS_PADDING_ARG_CHOICES_DEFAULT
+        padding: str = LOSS_PADDING_ARG_CHOICES_DEFAULT,
+        reduction: str = 'mean',
     ) -> Tuple[Tensor, List[Tensor]]:
     """
     Parameters:
-    - `pred_logits` is a list:
-        - Length: out_attr_number
-        - Elements are tenors.
-          - Shape is (batch_size, seq_size, attr_vocab_size)
+    - `pred_logits` is a list of tenors and has size out_attr_number.
+      Shape is (batch_size, seq_size, attr_vocab_size)
     - `target_labels` has shape (batch_size, seq_size, out_attr_number)
-    - `padding` decide how to handle padding symbol and how to reduce
-      the loss vector. Can be one in `LOSS_PADDING_ARG_CHOICE`.
+    - `padding` decide how the padding in some tokens' attribute
+      should be handled.
+        - 'ignore': PADDING = IGNORE, no exception
+        - 'normal': Model have to correctly predict it to be padding
+    - `reduction` decide how to reduce the loss tensor.
+        - 'mean': The sum of loss of each attribute is divided by the
+          number of non-ignored indices in that attribute.
+          (MMT's method)
+      - 'sum': The sum of loss of each attribute is divided by the
+          number of non-ignored indices in the event attribute.
+          (SymphonyNet's method)
 
     Return final loss and a list of losses of each head.
     """
     if padding not in LOSS_PADDING_ARG_CHOICES:
         raise ValueError(
-            f'`padding` argument in compute_losses should be '
-            f'one of {LOSS_PADDING_ARG_CHOICES}.'
+            f'`padding` argument should be in {LOSS_PADDING_ARG_CHOICES}.'
         )
 
-    ignore_index = 0
+    if reduction not in ['mean', 'sum']:
+        raise ValueError(
+            '`reduction` argument should be \'mean\' or \'sum\'.'
+        )
+
+    ignore_index = 0 # padding is index 0
     if padding == 'normal':
         ignore_index = -100
         ignore_mask = target_labels[..., ATTR_NAME_INDEX['evt']].eq(0)
@@ -328,10 +336,15 @@ def compute_losses(
             # become (batch_size, attr_vocab_size, seq_size)
             # because input shape should be (batch, category, dimensions... )
             target=target_labels[..., k], # (batch_size, seq_size)
-            ignore_index=ignore_index, # padding is index 0
-            reduction='mean' # return scalar tensor
+            ignore_index=ignore_index,
+            reduction=reduction # return scalar tensor
         )
         for k, logits in enumerate(pred_logits)
     ]
+    if reduction == 'sum':
+        event_number = torch.count_nonzero(
+            target_labels[..., ATTR_NAME_INDEX['evt']]
+        )
+        head_losses = [hl / event_number for hl in head_losses]
     loss = torch.stack(head_losses).mean()
     return loss, head_losses
