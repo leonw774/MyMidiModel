@@ -1,9 +1,5 @@
-*.o
-*.log
 .vscode
 models/**/*
-bpe/learn_vocab
-bpe/apply_vocab
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

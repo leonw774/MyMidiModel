@@ -22,7 +22,7 @@ from .model import MyMidiTransformer
 
 
 # the same code from `dataset.py`
-def permute_track_number(array: np.ndarray, track_number_size: int) -> NDArray:
+def permute_track_number(array: NDArray, track_number_size: int) -> NDArray:
     new_array = array.copy()
     max_track_number = track_number_size - 1
     # add one because there is a padding token at the beginning of the vocab

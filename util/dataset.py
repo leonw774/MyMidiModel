@@ -74,17 +74,17 @@ class MidiDataset(Dataset):
 
         - `virtual_piece_step_ratio`: Should be not less than 0.
            Default is 0.
-          - If > 0, over-length pieces will have multiple virtual
-            pieces. The start of a virtual pieces will be from the
-            measure token that has the smallest index greater than
-            `max_seq_length * virtual_piece_step_ratio * N`, where N
-            is positive integer. Any virtual piece starting from the
-            same index are merged as one.
-          - If `virtual_piece_step_ratio` is `1 / max_seq_length`,
-            then its the same as using all possible measures as the
-            starting index.
-          - If == 0, each piece has only one virtual piece, starting
-            from the index 0.
+            - If > 0, over-length pieces will have multiple virtual
+              pieces. The start of a virtual pieces will be from the
+              measure token that has the smallest index greater than
+              `max_seq_length * virtual_piece_step_ratio * N`, where N
+              is positive integer. Any virtual piece starting from the
+              same index are merged as one.
+            - If `virtual_piece_step_ratio` is `1 / max_seq_length`,
+              then its the same as using all possible measures as the
+              starting index.
+            - If == 0, each piece has only one virtual piece, starting
+              from the index 0.
         
         - `flatten_virtual_pieces`: Default is False.
             - If True, all virtual pieces has a indexing number.
