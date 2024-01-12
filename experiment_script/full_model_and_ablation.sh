@@ -15,11 +15,11 @@ else
             do_full=""
             arg_array=( "$@" )
             
+            if [[ " ${arg_array[*]} " =~ " --full " ]]; then
+                do_full="true"
+            fi
             if [[ " ${arg_array[*]} " =~ " --ablation " ]]; then
                 do_ablation="true"
-            fi
-            if [[ " ${arg_array[*]} " =~ " --full " ]]; then
-                do_full="false"
             fi
         else
             echo "invalid argument"
@@ -28,8 +28,8 @@ else
     fi
 fi
 
-# model_setting="vanilla_small"
-model_setting="test_cpu"
+model_setting="vanilla_small"
+# model_setting="test_cpu"
 
 if [ "$do_full" == 'true' ]; then
     # full model
