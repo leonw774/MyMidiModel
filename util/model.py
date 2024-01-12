@@ -199,7 +199,7 @@ class MyMidiTransformer(nn.Module):
         position_memory = None
         if self.not_use_mps_number:
             if memory is None:
-                batch_size, seq_size, _ = x.size
+                batch_size, seq_size, _ = x.size()
                 potision_number = (
                     torch.arange(seq_size).repeat((batch_size, 1))
                 )

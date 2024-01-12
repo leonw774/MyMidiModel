@@ -42,8 +42,8 @@ You can recreate our experiment by running the three scripts in `experiment_scri
 ``` bash
 ./experiment_script/data_preproc_and_bpe.sh
 ./experiment_script/apply_learned_shape_to_other.sh
-./experiment_script/full_model_and_ablation.sh snd
-./experiment_script/full_model_and_ablation.sh lmd_full
+./experiment_script/full_model_and_ablation.sh snd --full --ablation
+./experiment_script/full_model_and_ablation.sh lmd_full --full --ablation
 ```
 
 

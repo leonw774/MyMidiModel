@@ -13,7 +13,7 @@ RelNote::RelNote(uint8_t o, uint8_t p, uint8_t d, uint8_t c) {
     isCont = c;
 }
 
-// Compoare on relOnset first and then relPitch, relDur, isCont
+// Compare on relOnset first and then relPitch, relDur, isCont
 // Decide how shape set should be represented sequentially
 // mainly when output to shape_vocab and vocab.json
 // This order allows fast computation since we get the zero-point
@@ -25,8 +25,9 @@ bool RelNote::operator<(const RelNote& rhs) const {
     // return isCont < rhs.isCont;
 
     // wicked casting: RelNote -> uint32_t
+    // masking with 0x00ffffff because we only want lower 3 bytes
     return
-        (*((uint32_t*) this) & 0x00ffffff) // we only want lower 3 bytes
+        (*((uint32_t*) this) & 0x00ffffff) 
         <
         (*((uint32_t*) &(rhs)) & 0x00ffffff);
 }
@@ -116,7 +117,7 @@ size_t std::hash<Shape>::operator()(const Shape& s) const {
         // the highest byte is the lowerest byte of next element
         x = *((uint32_t*) &s[i]);
         // formula from boost::hash_combine
-        // taken away some term to reduce compute time
+        // take away the `hash()` to reduce compute time
         // h ^= hash<uint32_t>()(x) + 0x9e3779b9 + (h << 6) + (h >> 2);
         h ^= x + 0x9e3779b9 + (h << 6) + (h >> 2);
     }

@@ -325,24 +325,28 @@ def log_losses(
         sum(head_losses) / len(head_losses)
         for head_losses in zip(*train_head_losses_list)
     ]
-    avg_valid_head_losses = [
-        sum(head_losses) / len(head_losses)
-        for head_losses in zip(*valid_head_losses_list)
-    ]
     avg_train_loss = sum(train_loss_list) / len(train_loss_list)
-    avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
     logging.info(
         'Avg. train head losses: %s Avg. train loss: %.4g',
         ', '.join([f'{l:.4g}' for l in avg_train_head_losses]),
         avg_train_loss
     )
-    logging.info(
-        'Avg. valid head losses: %s Avg. valid loss: %.4g',
-        ', '.join([f'{l:.4g}' for l in avg_valid_head_losses]),
-        avg_valid_loss
-    )
+
+    if len(valid_loss_list) != 0:
+        avg_valid_head_losses = [
+            sum(head_losses) / len(head_losses)
+            for head_losses in zip(*valid_head_losses_list)
+        ]
+        avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
+        logging.info(
+            'Avg. valid head losses: %s Avg. valid loss: %.4g',
+            ', '.join([f'{l:.4g}' for l in avg_valid_head_losses]),
+            avg_valid_loss
+        )
+
     if not loss_file_path:
         return
+
     valid_len = len(train_head_losses_list)
     with open(loss_file_path, 'a', encoding='utf8') as loss_file:
         for i, (train_loss, train_head_losses) in enumerate(
@@ -353,7 +357,7 @@ def log_losses(
                 + ','.join([f'{l:.4f}' for l in train_head_losses])
                 + f',{train_loss:.4f},'
             )
-            if idx == cur_num_updates:
+            if idx == cur_num_updates and len(valid_loss_list) != 0:
                 line += (
                     ','.join([f'{l:.4f}' for l in avg_valid_head_losses])
                     + f',{avg_valid_loss:.4f}'
@@ -921,7 +925,10 @@ def main():
             )
             log_generated_aggr_eval_features(generated_aggr_eval_features)
 
-        avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
+        if len(valid_loss_list) != 0:
+            avg_valid_loss = sum(valid_loss_list) / len(valid_loss_list)
+        else:
+            avg_valid_loss = 0
         if avg_valid_loss >= min_avg_valid_loss:
             early_stop_counter += 1
             if (args.train.early_stop >= 0

@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
             getShapeScore(corpus, shapeDict, adjacency, samplingRate);
         const std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScore);
         if (maxValPair.second <= minScoreLimit) {
-            std::cout << "End early because found best score <= minScoreLimit";
+            std::cout << "End early because found best score <= minScoreLimit\n";
             break;
         }
         Shape maxScoreShape = maxValPair.first;

@@ -204,7 +204,12 @@ def get_note_tokens(
         note_token = note_token_list[i]
         if note_token.duration > max_duration:
             if not use_cont_note:
-                note_token.duration = max_duration
+                note_token_list.append(
+                    note_token._replace(
+                        onset=cur_onset,
+                        duration=max_duration
+                    )
+                )
                 continue
             cur_dur = note_token.duration
             cur_onset = note_token.onset

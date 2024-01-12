@@ -9,12 +9,17 @@ else
         dataset_name=$1
         do_ablation='no'
     else
-        if [ $# -eq 2 ]; then
+        if [ $# -eq 2 ] || [ $# -eq 3 ]; then
             dataset_name=$1
-            do_ablation=$2
-            if [ "$do_ablation" != '--ablation' ]; then
-                echo "invalid argument"
-                exit 1
+            do_ablation=""
+            do_full=""
+            arg_array=( "$@" )
+            
+            if [[ " ${arg_array[*]} " =~ " --ablation " ]]; then
+                do_ablation="true"
+            fi
+            if [[ " ${arg_array[*]} " =~ " --full " ]]; then
+                do_full="false"
             fi
         else
             echo "invalid argument"
@@ -23,12 +28,14 @@ else
     fi
 fi
 
-model_setting="vanilla_small"
+# model_setting="vanilla_small"
+model_setting="test_cpu"
 
-if [ "$do_ablation" != '--ablation' ]; then
+if [ "$do_full" == 'true' ]; then
     # full model
     ./pipeline.sh "$dataset_name" ours_sample1.0 $model_setting --use-existed
-else
+fi
+if [ "$do_ablation" == 'true' ]; then
     # no BPE
     ONLY_EVAL_UNCOND=true ./pipeline.sh "$dataset_name" no_bpe $model_setting --use-existed
 
