@@ -258,7 +258,7 @@ flatten_shape_counter_t getShapeScore(
         throw std::runtime_error(
             "samplingRate in shapeScoring not in range (0, 1]");
     }
-    bool isOursMerge = (adjacency == "ours");
+    bool isOursAdj = (adjacency == "ours");
 
     std::vector<unsigned int> samplePieceIndices;
     for (int i = 0; i < corpus.mns.size(); ++i) {
@@ -284,7 +284,7 @@ flatten_shape_counter_t getShapeScore(
                 const MultiNote& curMN = track[k];
                 for (int n = 1; n <= curMN.neighbor; ++n) {
                     const MultiNote& neighborMN = track[k+n];
-                    if (isOursMerge) {
+                    if (isOursAdj) {
                         if (curMN.vel != neighborMN.vel) continue;
                     }
                     else {

@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
     bool doLog = false;
     int nonOptStartIndex = 1;
     std::string cmdLineUsage =
-        "./learn_vocab [-log] inCorpusDirPath outCorpusDirPath iterNum"
+        "./learn_vocab [-log] inCorpusDirPath outCorpusDirPath iterNum "
         "adjacency samplingRate minScoreLimit [workerNum]";
     while ((cmd_opt = getopt(argc, argv, "l:c:")) != -1) {
         nonOptStartIndex++;
@@ -154,6 +154,7 @@ int main(int argc, char *argv[]) {
     }
     for (int iterCount = 0; iterCount < iterNum; ++iterCount) {
         iterStartTime = std::chrono::system_clock::now();
+        
         size_t totalNeighborNumber = updateNeighbor(corpus, shapeDict, tpq); 
 
         // get shape scores

@@ -206,7 +206,7 @@ def get_note_tokens(
             if not use_cont_note:
                 note_token_list.append(
                     note_token._replace(
-                        onset=cur_onset,
+                        onset=note_token.onset,
                         duration=max_duration
                     )
                 )

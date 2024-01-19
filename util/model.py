@@ -193,8 +193,7 @@ class MyMidiTransformer(nn.Module):
             # with shape of (batch_size, embed_size)
             x = x[:, -1:] # become (batch_size, 1, embed_size)
         embs = [emb(x[..., i]) for i, emb in enumerate(self.embedding_layers)]
-        # emb_sum = sum(embs)
-        emb_sum = reduce(torch.add, embs) # cool trick
+        emb_sum = sum(embs)
 
         position_memory = None
         if self.not_use_mps_number:
