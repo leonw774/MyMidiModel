@@ -15,6 +15,8 @@
 #include <algorithm>
 #include <chrono>
 
+#define SHPAE_COUNTER_TREE_BASED // Tree or Hash
+
 // these setting must correspond to what is defined in tokens.py
 #define BEGIN_TOKEN_STR         "BOS"
 #define END_TOKEN_STR           "EOS"
@@ -69,8 +71,11 @@ struct std::hash<Shape> {
     size_t operator()(const Shape& s) const;
 };
 
-// typedef std::map<Shape, unsigned int> shape_counter_t;
-typedef std::unordered_map<Shape, unsigned int> shape_counter_t;
+#ifdef SHPAE_COUNTER_TREE_BASED
+    typedef std::map<Shape, unsigned int> shape_counter_t;
+#else
+    typedef std::unordered_map<Shape, unsigned int> shape_counter_t;
+#endif
 
 struct MultiNote {
     uint32_t onset;
