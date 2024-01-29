@@ -228,7 +228,8 @@ def midi_to_features(
     try:
         temp_piece = midi_to_piece(
             midi=midi,
-            **midi_to_piece_paras
+            **midi_to_piece_paras,
+            deny_long_empty_measures=False
         )
     except AssertionError as e:
         return e

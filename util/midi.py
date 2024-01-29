@@ -513,7 +513,6 @@ def midi_to_token_list(
         + body_token_list + [EndOfScoreToken()]
     )
 
-    detect_long_empty_measures(full_token_list)
     return full_token_list
 
 
@@ -524,7 +523,8 @@ def midi_to_piece(
         max_duration: int,
         velocity_step: int,
         use_cont_note: bool,
-        tempo_quantization: Tuple[int, int, int]) -> str:
+        tempo_quantization: Tuple[int, int, int],
+        deny_long_empty_measures: bool = True) -> str:
     """
     Parameters:
     - `midi`: A miditoolkit MidiFile object
@@ -539,6 +539,8 @@ def midi_to_piece(
       the over-length notes.
     - `tempo_quantization`: Three values are (min, max, step). where
       min and max are INCLUSIVE.
+    - deny_long_empty_measures: If we reject midi file with long
+      empty measures.
     """
 
     assert isinstance(tpq, int) and tpq > 2 and tpq % 2 == 0, \
@@ -569,6 +571,9 @@ def midi_to_piece(
         use_cont_note,
         tempo_quantization
     )
+
+    if deny_long_empty_measures:
+        detect_long_empty_measures(token_list)
 
     text_list = list(map(token_to_str, token_list))
     return ' '.join(text_list)
