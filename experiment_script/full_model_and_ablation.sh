@@ -43,5 +43,5 @@ if [ "$do_ablation" == 'true' ]; then
     ONLY_EVAL_UNCOND=true ./pipeline.sh "$dataset_name" ours_sample1.0 "${model_setting}_no_mps" --use-existed
 
     # no continuative duration encoding
-    ONLY_EVAL_UNCOND=true ./pipeline.sh "${dataset_name}_no_contin" ours_sample1.0 vanilla_small --use-existed
+    ONLY_EVAL_UNCOND=true ./pipeline.sh "${dataset_name}_no_contin" ours_sample1.0 $model_setting --use-existed
 fi

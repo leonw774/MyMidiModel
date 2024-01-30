@@ -62,7 +62,10 @@ if [ -n "${BPE_ITER_NUM+x}" ] && [ "$BPE_ITER_NUM" -ne 0 ]; then
     bpe_corpus_dir_path+="_bpe${BPE_ITER_NUM}_${ADJACENCY}_${SAMPLE_RATE}"
 
     if [ -d "$bpe_corpus_dir_path" ] \
-        && [ -f "${bpe_corpus_dir_path}/corpus" ] \
+        && {
+            [ -f "${bpe_corpus_dir_path}/corpus" ] \
+            || [ -f "${bpe_corpus_dir_path}/arrays.npz" ]; \
+        } \
         && [ -f "${bpe_corpus_dir_path}/shape_vocab" ]; then
         
         echo "BPE Output directory: $bpe_corpus_dir_path already" \
