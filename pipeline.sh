@@ -73,7 +73,7 @@ if [ -n "${BPE_ITER_NUM+x}" ] && [ "$BPE_ITER_NUM" -ne 0 ]; then
             | tee -a "$log_path"
 
         if [ -n "$use_existed_flag" ]; then
-            printf "Flag --use-existed is set\nLearn bpe vocab is skipped" \
+            printf "Flag --use-existed is set\nLearn bpe vocab is skipped\n" \
                 | tee -a "$log_path"
             do_bpe=false
             do_midi_to_corpus=false
