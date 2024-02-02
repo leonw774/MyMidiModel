@@ -4,6 +4,11 @@ help_text="./evaluate_model.sh \
 midi_config_name eval_config_name \
 [model_dir_path] [log_path] [use_device]"
 
+if [ $# -ne 4 ] && [ $# -ne 5 ]; then
+    echo "$help_text"
+    exit 1
+fi
+
 midi_config_name=$1
 eval_config_name=$2
 model_dir_path=$3

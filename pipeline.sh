@@ -1,20 +1,21 @@
 #!/bin/bash
 echo "pipeline.sh start."
+
+help_text="Expect arguments to be three configuration file name for \
+midi preprocessing, bpe, and model/eval setting, \
+and an optional '--use-existed' flag at the fourth position."
+
 use_existed_flag=""
 if [ $# -eq 4 ]; then
     if [ "$4" == '--use-existed' ]; then
         use_existed_flag="--use-existed"
     else
-        echo "Expect arguments to be three configuration file name for \
-            midi preprocessing, bpe, and model/eval setting, \
-            and an optional '--use-existed' flag at the fourth position."
+        echo "$help_text"
         exit 1
     fi
 else
     if [ $# -ne 3 ]; then
-        echo "Expect arguments to be three configuration file name for \
-            midi preprocessing, bpe, and model/eval setting, \
-            and an optional '--use-existed' flag at the fourth position."
+        echo "$help_text"
         exit 1
     fi
 fi
