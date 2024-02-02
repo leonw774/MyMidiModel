@@ -37,7 +37,7 @@ Run `./pipeline.sh {corpus_config} {bpe_config} {model_config}` to do everything
 
 You can add `--use-existed` at the end of the command to tell `pipeline.sh` to just use the existing data.
 
-You can recreate our experiment by running the three scripts in `experiment_script`.
+You can recreate our experiment by running the scripts in `experiment_script`.
 
 ``` bash
 ./experiment_script/data_preproc_and_bpe.sh
@@ -53,11 +53,11 @@ You can recreate our experiment by running the three scripts in `experiment_scri
 
 - Files in `configs/bpe` set parameters for `bpe/learn_vocabs` (implementation of Multi-note BPE).
 
-- Files in `configs/model` set parameters for `train.py` and `evaluate_model*`.
+- Files in `configs/model` set parameters for `train.py` and the config file name under `configs/eval` to be used by `evaluate_model.sh`.
 
 - Files in `configs/split` contain lists of paths, relative to each dataset root, of midi files to be used as test set and validation set of the datasets. Their path are referenced by variable `TEST_PATHS_FILE` and `VALID_PATHS_FILE` in files of `configs/corpus`.
 
-- Files in `configs/eval_midi_to_piece_paras` store parameters for `evaluate_model.sh` and `evaluate_model_wrapper.py`. Their path are referenced by variable `EVAL_MIDI_TO_PIECE_PARAS_FILE` in files of `configs/model`. Set the variable to empty if default is to be used. If you want a different parameter you can make a new file and reference the path.
+- Files in `configs/eval` store parameters for `evaluate_model.sh`.
 
 
 ## Dataset (`data/midis/`)

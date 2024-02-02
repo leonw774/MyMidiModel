@@ -39,6 +39,12 @@ for config_file_path in "${config_file_paths[@]}"; do
         exit 1
     fi
 done
+if source "configs/eval/${EVAL_CONFIG_NAME}.sh"; then
+    echo "configs/eval/${EVAL_CONFIG_NAME}.sh: success"
+else
+    echo "configs/eval/${EVAL_CONFIG_NAME}.sh: fail"
+    exit 1
+fi
 
 log_path="logs/$(date '+%Y%m%d-%H%M%S')-${full_config_name}.log"
 echo "Log file: $log_path"
@@ -264,9 +270,9 @@ $launch_command train.py \
     --lr-decay-end-updates "$LEARNING_RATE_DECAY_END_UPDATES" \
     --lr-decay-end-ratio "$LEARNING_RATE_DECAY_END_RATIO" \
     \
-    --softmax-temperature "$SOFTMAX_TEMPERATURE" \
     --sample-function "$SAMPLE_FUNCTION" \
     --sample-threshold "$SAMPLE_THRESHOLD" \
+    --softmax-temperature "$SOFTMAX_TEMPERATURE" \
     --valid-eval-sample-number "$VALID_EVAL_SAMPLE_NUMBER" \
     --valid-eval-worker-number "$EVAL_WORKER_NUMBER" \
     \
@@ -287,17 +293,8 @@ if [ -n "${NO_EVAL+x}" ]; then
     exit 0
 fi
 
-python3 evaluate_model_wrapper.py \
-    --model-dir-path "$model_dir_path" \
-    --midi-to-piece-paras "$EVAL_MIDI_TO_PIECE_PARAS_FILE" \
-    --softmax-temperature "$SOFTMAX_TEMPERATURE" \
-    --sample-function "$SAMPLE_FUNCTION" \
-    --sample-threshold "$SAMPLE_THRESHOLD" \
-    --eval-sample-number "$EVAL_SAMPLE_NUMBER" \
-    --worker-number "$EVAL_WORKER_NUMBER" \
-    --seed "$SEED" --log-path "$log_path" \
-    --only-eval-uncond "$ONLY_EVAL_UNCOND" \
-    -- "$MIDI_DIR_PATH" "$TEST_PATHS_FILE" "$PRIMER_LENGTH" \
+./evaluate_model.sh "$1" "$EVAL_CONFIG_NAME" \
+    "$model_dir_path" "$log_path" "" \
     || {
         echo "Evaluation failed. pipeline.sh exit." | tee -a "$log_path"
         exit 1;

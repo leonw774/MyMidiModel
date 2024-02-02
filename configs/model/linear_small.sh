@@ -37,11 +37,5 @@ USE_PARALLEL=true
 MAX_PIECE_PER_GPU=16
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
-# evaluation setting
-EVAL_MIDI_TO_PIECE_PARAS_FILE=""
-EVAL_SAMPLE_NUMBER="" # if not set, will used the number of test files
-EVAL_WORKER_NUMBER=32
-PRIMER_LENGTH=4
-SAMPLE_FUNCTION="none"
-SAMPLE_THRESHOLD=1.0
-SOFTMAX_TEMPERATURE=1.0
+# generation & evaluation setting
+EVAL_CONFIG_NAME="default"

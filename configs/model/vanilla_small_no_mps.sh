@@ -45,3 +45,6 @@ PRIMER_LENGTH=4
 SAMPLE_FUNCTION="top-p"
 SAMPLE_THRESHOLD=0.95
 SOFTMAX_TEMPERATURE=1.0
+
+# generation & evaluation setting
+EVAL_CONFIG_NAME="default"
