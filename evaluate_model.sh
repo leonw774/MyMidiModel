@@ -102,10 +102,22 @@ if [ "$test_file_number" -gt 0 ]; then
     # Get features of dataset if no result file
 
     if [ -f "$test_eval_features_path" ] \
-        && [ -f "$test_eval_features_primer_path" ]; then
-        echo "Midi dataset ${MIDI_DIR_PATH}" \
-            "already has eval features file." | tee -a "$log_path"
+        || [ -f "$test_eval_features_primer_path" ]; then
+        # Copy test files into test_copy_dir_path
+        test -d "$test_copy_dir_path" \
+            && rm -r "$test_copy_dir_path"
+        mkdir "$test_copy_dir_path"
+        while read -r test_midi_path; do
+            cp "${MIDI_DIR_PATH}/${test_midi_path}" "$test_copy_dir_path"
+        done < "$TEST_PATHS_FILE"
+    fi
+
+    if [ -f "$test_eval_features_path" ]; then
+        echo "Eval feature file ${test_eval_features_path}" \
+            "already exists." | tee -a "$log_path"
     else
+        echo "Get evaluation features of $MIDI_DIR_PATH" | tee -a "$log_path"
+
         # Copy test files into test_copy_dir_path
         test -d "$test_copy_dir_path" \
             && rm -r "$test_copy_dir_path"
@@ -114,7 +126,6 @@ if [ "$test_file_number" -gt 0 ]; then
             cp "${MIDI_DIR_PATH}/${test_midi_path}" "$test_copy_dir_path"
         done < "$TEST_PATHS_FILE"
 
-        echo "Get evaluation features of $MIDI_DIR_PATH" | tee -a "$log_path"
         python3 get_eval_features_of_midis.py \
             --seed "$SEED" --midi-to-piece-paras "$MIDI_TO_PIECE_PARAS" \
             --log "$log_path" --worker-number "$EVAL_WORKER_NUMBER" \
@@ -126,10 +137,16 @@ if [ "$test_file_number" -gt 0 ]; then
             }
         temp_path="${test_copy_dir_path}/eval_features.json"
         mv "$temp_path" "$test_eval_features_path"
+    fi
 
+    if [ -f "$test_eval_features_primer_path" ]; then
+        echo "Eval feature file ${test_eval_features_primer_path}" \
+            "already exists." | tee -a "$log_path"
+    else
         echo "Get evaluation features of $MIDI_DIR_PATH" \
             "without first $PRIMER_MEASURE_LENGTH measures" \
             | tee -a "$log_path"
+
         python3 get_eval_features_of_midis.py \
             --seed "$SEED" --midi-to-piece-paras "$MIDI_TO_PIECE_PARAS" \
             --log "$log_path" --worker-number "$EVAL_WORKER_NUMBER" \
@@ -142,9 +159,9 @@ if [ "$test_file_number" -gt 0 ]; then
             }
         temp_path="${test_copy_dir_path}/eval_features.json"
         mv "$temp_path" "$test_eval_features_primer_path"
-
-        rm -r "$test_copy_dir_path"
     fi
+
+    test -d "$test_copy_dir_path" && rm -r "$test_copy_dir_path"
 fi
 
 test -z "$model_dir_path" && exit 0 

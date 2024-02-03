@@ -290,7 +290,7 @@ def generate(
     if max_generation_step <= 0:
         raise ValueError(
             f'primer_seq is longer than model\'s max_seq_length. '
-            f'({primer_length} > {model.max_seq_length})'
+            f'({primer_length} > {model.max_seq_length}) '
             f'No generation is performed.'
         )
 
