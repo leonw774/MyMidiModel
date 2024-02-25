@@ -19,7 +19,7 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelocity=false);
 
 typedef std::vector<std::pair<Shape, unsigned int>> flatten_shape_counter_t;
 
-flatten_shape_counter_t getShapeScore(
+flatten_shape_counter_t getShapeCounter(
     Corpus& corpus,
     const std::vector<Shape>& shapeDict,
     const std::string& adjacency,
@@ -27,7 +27,7 @@ flatten_shape_counter_t getShapeScore(
 );
 
 std::pair<Shape, unsigned int> findMaxValPair(
-    const flatten_shape_counter_t& shapeScore
+    const flatten_shape_counter_t& shapeCounter
 );
 
 #endif

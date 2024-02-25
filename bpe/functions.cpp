@@ -48,7 +48,7 @@ unsigned int gcd(unsigned int* arr, unsigned int size) {
 
     This function alters the input array.
     The return index is the index of the counter merged all other counters.
- */
+*/
 int mergeCounters(shape_counter_t counterArray[], size_t arraySize) {
     std::vector<int> mergingMapIndices;
     for (int i = 0; i < arraySize; ++i) {
@@ -248,7 +248,7 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelcocity) {
 }
 
 
-flatten_shape_counter_t getShapeScore(
+flatten_shape_counter_t getShapeCounter(
     Corpus& corpus,
     const std::vector<Shape>& shapeDict,
     const std::string& adjacency,
@@ -269,15 +269,14 @@ flatten_shape_counter_t getShapeScore(
     }
 
     unsigned int max_thread_num = omp_get_max_threads();
-    shape_counter_t shapeScoreParallel[max_thread_num];
+    shape_counter_t shapeCountersParallel[max_thread_num];
     #pragma omp parallel for
     for (int h = 0; h < samplePieceIndices.size(); ++h) {
         int i = samplePieceIndices[h];
         int thread_num = omp_get_thread_num();
-        // to reduce the times we do "find" operations in big set
-        shape_counter_t tempScoreDiff;
+        shape_counter_t& myShapeCounter = shapeCountersParallel[thread_num];
         // for each track
-        for (const Track &track: corpus.mns[i]) {
+        for (const Track& track: corpus.mns[i]) {
             // for each multinote
             for (int k = 0; k < track.size(); ++k) {
                 // for each neighbor
@@ -300,32 +299,25 @@ flatten_shape_counter_t getShapeScore(
                     );
                     // empty shape mean overflow happened
                     if (shape.size() == 0) continue;
-                    tempScoreDiff[shape] += 1;
+                    myShapeCounter[shape] += 1;
                 }
             }
         }
-        for (
-            auto it = tempScoreDiff.cbegin();
-            it != tempScoreDiff.cend();
-            it++
-        ) {
-            shapeScoreParallel[thread_num][it->first] += it->second;
-        }
     }
 
-    int mergedIndex = mergeCounters(shapeScoreParallel, max_thread_num);
-    flatten_shape_counter_t shapeScore;
-    shapeScore.reserve(shapeScoreParallel[mergedIndex].size());
-    shapeScore.assign(
-        shapeScoreParallel[mergedIndex].cbegin(),
-        shapeScoreParallel[mergedIndex].cend()
+    int mergedIndex = mergeCounters(shapeCountersParallel, max_thread_num);
+    flatten_shape_counter_t shapeCounter;
+    shapeCounter.reserve(shapeCountersParallel[mergedIndex].size());
+    shapeCounter.assign(
+        shapeCountersParallel[mergedIndex].cbegin(),
+        shapeCountersParallel[mergedIndex].cend()
     );
-    return shapeScore;
+    return shapeCounter;
 }
 
 
 std::pair<Shape, unsigned int> findMaxValPair(
-    const flatten_shape_counter_t& shapeScore
+    const flatten_shape_counter_t& shapeCounter
 ) {
     #pragma omp declare reduction\
         (maxsecond: std::pair<Shape, unsigned int>:\
@@ -334,9 +326,9 @@ std::pair<Shape, unsigned int> findMaxValPair(
     std::pair<Shape, unsigned int> maxSecondPair;
     maxSecondPair.second = 0;
     #pragma omp parallel for reduction(maxsecond: maxSecondPair)
-    for (int i = 0; i < shapeScore.size(); ++i) {
-        if (shapeScore[i].second > maxSecondPair.second) {
-            maxSecondPair = shapeScore[i];
+    for (int i = 0; i < shapeCounter.size(); ++i) {
+        if (shapeCounter[i].second > maxSecondPair.second) {
+            maxSecondPair = shapeCounter[i];
         }
     }
     return maxSecondPair;

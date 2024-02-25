@@ -159,9 +159,9 @@ int main(int argc, char *argv[]) {
 
         // get shape scores
         partStartTime = std::chrono::system_clock::now();
-        const flatten_shape_counter_t &shapeScore =
-            getShapeScore(corpus, shapeDict, adjacency, samplingRate);
-        const std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeScore);
+        const flatten_shape_counter_t& shapeCounter =
+            getShapeCounter(corpus, shapeDict, adjacency, samplingRate);
+        const std::pair<Shape, unsigned int> maxValPair = findMaxValPair(shapeCounter);
         if (maxValPair.second <= minScoreLimit) {
             std::cout << "End early because found best score <= minScoreLimit\n";
             break;
@@ -170,7 +170,7 @@ int main(int argc, char *argv[]) {
         if (doLog){
             std::cout << iterCount
                 << ", " << (double) totalNeighborNumber / multinoteCount
-                << ", " << shapeScore.size()
+                << ", " << shapeCounter.size()
                 << ", \"" << shape2str(maxScoreShape) << "\", "
                 << maxValPair.second << ", ";
         }
