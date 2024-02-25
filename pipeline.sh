@@ -40,12 +40,6 @@ for config_file_path in "${config_file_paths[@]}"; do
         exit 1
     fi
 done
-if source "configs/eval/${EVAL_CONFIG_NAME}.sh"; then
-    echo "configs/eval/${EVAL_CONFIG_NAME}.sh: success"
-else
-    echo "configs/eval/${EVAL_CONFIG_NAME}.sh: fail"
-    exit 1
-fi
 
 log_path="logs/$(date '+%Y%m%d-%H%M%S')-${full_config_name}.log"
 echo "Log file: $log_path"
@@ -212,6 +206,13 @@ python3 make_arrays.py \
 if [ -n "${NO_TRAIN+x}" ]; then
     echo "No training. pipeline.sh exit." | tee -a "$log_path"
     exit 0
+fi
+
+if source "configs/eval/${EVAL_CONFIG_NAME}.sh"; then
+    echo "configs/eval/${EVAL_CONFIG_NAME}.sh: success"
+else
+    echo "configs/eval/${EVAL_CONFIG_NAME}.sh: fail"
+    exit 1
 fi
 
 model_dir_path="models/$(date '+%Y%m%d-%H%M%S')-"$full_config_name
