@@ -170,7 +170,7 @@ Shape getShapeOfMultiNotePair(
     // and onsetLimit is 0x7f
     // if overflowed, return empty shape
     for (int i = 0; i < rightSize; ++i) {
-        if (times[i] / newStretch > RelNote::onsetLimit) {
+        if (times[i] > RelNote::onsetLimit) {
             return Shape();
         }
     }
