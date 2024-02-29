@@ -1,15 +1,21 @@
 # MyMidiModel
 
-## Contents
+**Table of Contents**
 
 - [To run the experiment](#to-run-the-experiment)
-- [Configuration Files](#configuration-files-configs)
-- [Dataset](#datasets-datamidis)
-- [Corpus Structure](#corpus-structure-datacorpus)
-- [Multinote BPE](#multinote-bpe-bpe)
-- [Model](#model-models)
-- [Code](#code-util)
-- [Tool Scripts](#tool-scripts)
+  - [Step 1](#step-1)
+  - [Step 2 (Optional)](#step-2-optional)
+  - [Step 3](#step-3)
+- [Configuration Files (`configs/`)](#configuration-files-configs)
+- [Dataset (`data/midis/`)](#dataset-datamidis)
+- [Corpus Structure (`data/corpus/`)](#corpus-structure-datacorpus)
+- [Multinote BPE (`bpe/`)](#multinote-bpe-bpe)
+- [Model (`models/`)](#model-models)
+- [Codes (`util/`)](#codes-util)
+  - [Some terms used in function name](#some-terms-used-in-function-name)
+- [Tool Scripts (`./`)](#tool-scripts-)
+  - [Pythons scripts](#pythons-scripts)
+  - [Shell scripts](#shell-scripts)
 
 
 ## To run the experiment
@@ -23,7 +29,6 @@ conda env create --name {ENV_NAME} --file environment.yml
 ```
 
 You may need to clear cache first by `pip cache purge` and `conda clean --all`.
-
 
 ### Step 2 (Optional)
 
@@ -46,6 +51,11 @@ You can recreate our experiment by running the scripts in `experiment_script`.
 ./experiment_script/full_model_and_ablation.sh lmd_full --full --ablation
 ```
 
+(Optional 12-layer Linear Transformer model trained on LMD)
+
+``` bash
+ONLY_EVAL_UNCOND=true ./pipeline.sh lmd_full ours_sample1.0 linear_mid --use-existed
+```
 
 ## Configuration Files (`configs/`)
 
@@ -80,7 +90,6 @@ Corpi are located at `data/corpus/`. A complete "corpus" is directory containing
 
 - `arrays.npz`: A zip file of numpy arrays in `.npy` format. Can be accessed by `numpy.load()` and it will return an instance of `NpzFile` class. This is the "final form" of the representation (i.e. include pre-computed positional encoding) that would be used to train model. Created by `make_arrays.py`.
 
-
 Other possible files and directories are:
 
 - `stats/`: A directoy that contains statistics about the corpus. Some figures outputed by `make_arrays.py` and by `plot_bpe_log.py` would be end up here.
@@ -105,7 +114,6 @@ Source codes:
 - `learn_vocab.cpp`
 
 - `functions.cpp` and `functions.hpp`: Other functions and algorithms.
-
 
 They should compile to two binaries with `make -C bpe all`:
 
@@ -178,7 +186,7 @@ They should compile to two binaries with `make -C bpe all`:
 
 ## Tool Scripts (`./`)
 
-Pythons scripts
+### Pythons scripts
 
 - `evaluate_model_wrapper.py`: Use python's `argparse` module to make using `evaluate_model.sh` easier.
 
@@ -200,8 +208,7 @@ Pythons scripts
 
 - `verify_corpus_equality.py`: To make sure two corpus are representing the same list of midi files.
 
-
-Shell scripts
+### Shell scripts
 
 - `evaluate_model_wrapper_wrapper.sh`
   - Read parameters from config files and used them as the arguments for `evaluate_model_wrapper.py`. This is for the convenience of the testing of evaluate/generation parameters.
