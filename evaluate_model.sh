@@ -103,9 +103,8 @@ if [ "$test_file_number" -gt 0 ]; then
 
     if [ -f "$test_eval_features_path" ] \
         || [ -f "$test_eval_features_primer_path" ]; then
-        # Copy test files into test_copy_dir_path
-        test -d "$test_copy_dir_path" \
-            && rm -r "$test_copy_dir_path"
+        echo "Copying test files into $test_copy_dir_path"
+        test -d "$test_copy_dir_path" && rm -r "$test_copy_dir_path"
         mkdir "$test_copy_dir_path"
         while read -r test_midi_path; do
             cp "${MIDI_DIR_PATH}/${test_midi_path}" "$test_copy_dir_path"
@@ -119,8 +118,7 @@ if [ "$test_file_number" -gt 0 ]; then
         echo "Get evaluation features of $MIDI_DIR_PATH" | tee -a "$log_path"
 
         # Copy test files into test_copy_dir_path
-        test -d "$test_copy_dir_path" \
-            && rm -r "$test_copy_dir_path"
+        test -d "$test_copy_dir_path" && rm -r "$test_copy_dir_path"
         mkdir "$test_copy_dir_path"
         while read -r test_midi_path; do
             cp "${MIDI_DIR_PATH}/${test_midi_path}" "$test_copy_dir_path"
