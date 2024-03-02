@@ -101,8 +101,8 @@ if [ "$test_file_number" -gt 0 ]; then
 
     # Get features of dataset if no result file
 
-    if [ -f "$test_eval_features_path" ] \
-        || [ -f "$test_eval_features_primer_path" ]; then
+    if [ ! -f "$test_eval_features_path" ] \
+        || [ ! -f "$test_eval_features_primer_path" ]; then
         echo "Copying test files into $test_copy_dir_path"
         test -d "$test_copy_dir_path" && rm -r "$test_copy_dir_path"
         mkdir "$test_copy_dir_path"
