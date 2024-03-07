@@ -377,8 +377,8 @@ def generate(
 
     # build memory for primer if use linear transformer
     if model.use_linear_attn:
-        for i in range(1, primer_length):
-            input_primer_seq = model.to_input_attrs(primer_seq[:, :i])
+        for i in range(primer_length):
+            input_primer_seq = model.to_input_attrs(primer_seq[:, :i+1])
             input_primer_seq = input_primer_seq.to(model_device)
             _, recurrent_memory = model(input_primer_seq, recurrent_memory)
 

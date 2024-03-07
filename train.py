@@ -974,10 +974,12 @@ if __name__ == '__main__':
         exit(EXIT_CODE)
     except KeyboardInterrupt:
         try:
-            is_main_process = accelerate.state.AcceleratorState().is_main_process
+            int_is_main_process = (
+                accelerate.state.AcceleratorState().is_main_process
+            )
         except ValueError:
-            is_main_process = True
-        if is_main_process:
+            int_is_main_process = True
+        if int_is_main_process:
             logging.info('Training stopped by KeyboardInterrupt')
             logging.info('==== train.py exit ====')
         exit(1)
