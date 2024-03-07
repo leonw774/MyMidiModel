@@ -419,6 +419,8 @@ def main():
         }
         if args.primer.endswith('.mid') or args.primer.endswith('.midi'):
             print('From midi file:', args.primer)
+            if args.sample_number == 0:
+                args.sample_number = 1
             primer_path_list = [args.primer]
             primer_text_list_list = midi_file_list_to_text_list_list(
                 primer_path_list,
