@@ -376,11 +376,13 @@ def generate(
     )
 
     # build memory for primer if use linear transformer
+    # using item from index 0 to primer_length-2
+    # item at index primer_length-1 will be used in main loop
     if model.use_linear_attn:
-        for i in range(primer_length):
-            input_primer_seq = model.to_input_attrs(primer_seq[:, :i+1])
-            input_primer_seq = input_primer_seq.to(model_device)
-            _, recurrent_memory = model(input_primer_seq, recurrent_memory)
+        for i in range(primer_length-1):
+            input_item_seq = model.to_input_attrs(primer_seq[:, i:i+1])
+            input_item_seq = input_item_seq.to(model_device)
+            _, recurrent_memory = model(input_item_seq, recurrent_memory)
 
     generate_range_tqdm = tqdm(
         range(max_generation_step),
