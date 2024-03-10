@@ -2,7 +2,7 @@ CFLAGS = -O2
 
 all: apply_vocab learn_vocab;
 
-debug: CFLAGS = -g -Og -pg
+debug: CFLAGS = -g -pg
 debug: apply_vocab learn_vocab;
 
 apply_vocab: apply_vocab.cpp classes.o functions.o;

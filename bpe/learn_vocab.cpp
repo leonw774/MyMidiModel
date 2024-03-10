@@ -114,12 +114,12 @@ int main(int argc, char *argv[]) {
     }
 
     // read notes from corpus
-    Corpus corpus = readCorpusFile(inCorpusFile, tpq);
+    Corpus corpus = readCorpusFile(inCorpusFile, tpq, maxTrackNum);
     int numTracks = 0;
-    for (auto p: corpus.trackInstrMaps) {
-        numTracks += p.size();
+    for (int i = 0; i < corpus.pieceNum; i++) {
+        numTracks += corpus.trackInstrMaps[i].size();
     }
-    std::cout << "Reading done. There are " << corpus.trackInstrMaps.size()
+    std::cout << "Reading done. There are " << corpus.pieceNum
         << " pieces and "  << numTracks << " tracks." << std::endl;
 
     std::vector<Shape> shapeDict = getDefaultShapeDict();
@@ -183,11 +183,12 @@ int main(int argc, char *argv[]) {
         // merge MultiNotes with newly added shape
         // for each piece
         #pragma omp parallel for
-        for (int i = 0; i < corpus.mns.size(); ++i) {
+        for (int i = 0; i < corpus.pieceNum; ++i) {
             // for each track
+            std::vector<Track>& piece = corpus.mns[i];
             #pragma omp parallel for
-            for (int j = 0; j < corpus.mns[i].size(); ++j) {
-                Track& track = corpus.mns[i][j];
+            for (int j = 0; j < piece.size(); ++j) {
+                Track& track = piece[j];
                 // for each multinote
                 for (int k = 0; k < track.size(); ++k) {
                     // for each neighbor

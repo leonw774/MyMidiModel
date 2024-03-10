@@ -132,21 +132,24 @@ struct TimeStructToken {
 
 struct Corpus {
     // Multi-notes
-    std::vector<std::vector<Track>> mns;
+    std::vector<Track> *mns;
     // Time structures
-    std::vector<std::vector<TimeStructToken>> timeStructLists;
+    std::vector<TimeStructToken> *timeStructLists;
     // Track-program mappings
-    std::vector<std::vector<uint8_t>> trackInstrMaps;
+    std::vector<uint8_t> *trackInstrMaps;
+    unsigned int pieceNum;
 
-    void pushNewPiece();
-    void shrink();
+    Corpus(unsigned int pieceNum);
+    ~Corpus();
+
+    void shrink(unsigned int i);
     size_t getMultiNoteCount();
     void sortAllTracks();
 };
 
 std::map<std::string, std::string> readParasFile(std::ifstream& paraFile);
 
-Corpus readCorpusFile(std::ifstream& corpusFile, int tpq);
+Corpus readCorpusFile(std::ifstream& corpusFile, int tpq, int maxTrackNum);
 
 void writeShapeVocabFile(
     std::ostream& vocabOutfile,

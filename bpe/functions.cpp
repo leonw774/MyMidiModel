@@ -89,7 +89,7 @@ size_t updateNeighbor(
     }
     // for each piece
     #pragma omp parallel for reduction(+: totalNeighborNumber)
-    for (int i = 0; i < corpus.mns.size(); ++i) {
+    for (int i = 0; i < corpus.pieceNum; ++i) {
         // for each track
         for (Track& track: corpus.mns[i]) {
             // for each multinote
@@ -211,10 +211,11 @@ double calculateAvgMulpiSize(const Corpus& corpus, bool ignoreVelcocity) {
     unsigned int max_thread_num = omp_get_max_threads();
     std::vector<uint8_t> multipiSizes[max_thread_num];
     #pragma omp parallel for
-    for (int i = 0; i < corpus.mns.size(); ++i) {
+    for (int i = 0; i < corpus.pieceNum; ++i) {
         int thread_num = omp_get_thread_num();
+        std::vector<Track>& piece = corpus.mns[i];
         // for each track
-        for (const Track &track: corpus.mns[i]) {
+        for (const Track &track: piece) {
             // key: 64 bits
             //     16 unused, 8 for velocity, 8 for time stretch, 32 for onset
             // value: occurence count
@@ -261,7 +262,7 @@ flatten_shape_counter_t getShapeCounter(
     bool isOursAdj = (adjacency == "ours");
 
     std::vector<unsigned int> samplePieceIndices;
-    for (int i = 0; i < corpus.mns.size(); ++i) {
+    for (int i = 0; i < corpus.pieceNum; ++i) {
         if (samplingRate != 1.0) {
             if (((double) rand()) / RAND_MAX > samplingRate) continue;
         }
@@ -275,8 +276,9 @@ flatten_shape_counter_t getShapeCounter(
         int i = samplePieceIndices[h];
         int thread_num = omp_get_thread_num();
         shape_counter_t& myShapeCounter = shapeCountersParallel[thread_num];
+        std::vector<Track>& piece = corpus.mns[i];
         // for each track
-        for (const Track& track: corpus.mns[i]) {
+        for (const Track& track: piece) {
             // for each multinote
             for (int k = 0; k < track.size(); ++k) {
                 // for each neighbor

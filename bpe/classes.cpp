@@ -217,46 +217,43 @@ int TimeStructToken::getN() const {
   Corpus
 ********/
 
-void Corpus::pushNewPiece() {
-    mns.push_back(std::vector<Track>());
-    timeStructLists.push_back(std::vector<TimeStructToken>());
-    trackInstrMaps.push_back(std::vector<uint8_t>());
+Corpus::Corpus(unsigned int _size) {
+    pieceNum = _size;
+    mns = new std::vector<Track>[_size];
+    timeStructLists = new std::vector<TimeStructToken>[_size];
+    trackInstrMaps = new std::vector<uint8_t>[_size];
 }
 
-void Corpus::shrink() {
-    for (std::vector<Track>& tracks: mns) {
-        for (Track& track: tracks) {
-            track.shrink_to_fit();
-        }
-        tracks.shrink_to_fit();
-    }
-    mns.shrink_to_fit();
+Corpus::~Corpus() {
+    delete[] mns;
+    delete[] timeStructLists;
+    delete[] trackInstrMaps;
+}
 
-    for (std::vector<TimeStructToken> timeStructs: timeStructLists) {
-        timeStructs.shrink_to_fit();
+void Corpus::shrink(unsigned int i) {
+    for (Track& track: mns[i]) {
+        track.shrink_to_fit();
     }
-    timeStructLists.shrink_to_fit();
-
-    for (std::vector<uint8_t>& trackInstrMap: trackInstrMaps) {
-        trackInstrMap.shrink_to_fit();
-    }
-    trackInstrMaps.shrink_to_fit();
+    mns[i].shrink_to_fit();
+    timeStructLists[i].shrink_to_fit();
 }
 
 size_t Corpus::getMultiNoteCount() {
     size_t multinoteCount = 0;
-    for (int i = 0; i < mns.size(); ++i) {
-        for (int j = 0; j < mns[i].size(); ++j) {
-            multinoteCount += mns[i][j].size();
+    for (int i = 0; i < pieceNum; ++i) {
+        std::vector<Track>& piece = mns[i];
+        for (int j = 0; j < piece.size(); ++j) {
+            multinoteCount += piece[j].size();
         }
     }
     return multinoteCount;
 }
 
 void Corpus::sortAllTracks() {
-    for (int i = 0; i < mns.size(); ++i) {
-        for (int j = 0; j < mns[i].size(); ++j) {
-            std::sort(mns[i][j].begin(), mns[i][j].end());
+    for (int i = 0; i < pieceNum; ++i) {
+        std::vector<Track>& piece = mns[i];
+        for (int j = 0; j < piece.size(); ++j) {
+            std::sort(piece[j].begin(), piece[j].end());
         }
     }
 }
@@ -291,17 +288,34 @@ std::map<std::string, std::string> readParasFile(std::ifstream& parasFile) {
     return resultMap;
 }
 
-Corpus readCorpusFile(std::ifstream& inCorpusFile, int tpq) {
+Corpus readCorpusFile(std::ifstream& inCorpusFile, int tpq, int maxTrackNum) {
+    // reset flags
     inCorpusFile.clear();
     inCorpusFile.seekg(0, std::ios::beg);
 
-    Corpus corpus;
-
+    // get file size
     // inCorpusFile.seekg(0, std::ios::end);
     // std::streampos filesize = inCorpusFile.tellg();
     // inCorpusFile.seekg(0, std::ios::beg);
-    // std::cout << "File size: " << filesize << " bytes" << std::endl;
 
+    // count lines and spaces
+    std::vector<int> tokenCounts;
+    while (inCorpusFile.good()) {
+        std::string line;
+        getline(inCorpusFile, line);
+        if (line.size() == 0) {
+            break;
+        }
+        tokenCounts.push_back(std::count(line.begin(), line.end(), ' '));
+    }
+    Corpus corpus(tokenCounts.size());
+    // std::cout << corpus.pieceNum << std::endl;
+
+    // reset flags again
+    inCorpusFile.clear();
+    inCorpusFile.seekg(0, std::ios::beg);
+
+    unsigned int curPieceIdx = 0;
     uint32_t curMeasureStart = 0, curMeasureLength = 0, curTime = 0;
     while (inCorpusFile.good()) {
         unsigned char c = inCorpusFile.get(), i;
@@ -309,22 +323,33 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int tpq) {
         switch (c) {
             case BEGIN_TOKEN_STR[0]: // BOS
                 while (inCorpusFile.get() != ' ');
-                corpus.pushNewPiece();
+                corpus.mns[curPieceIdx].reserve(maxTrackNum);
+                corpus.trackInstrMaps[curPieceIdx].reserve(maxTrackNum);
                 curMeasureStart = curMeasureLength = curTime = 0;
                 break;
 
             case END_TOKEN_STR[0]: // EOS
+                corpus.shrink(curPieceIdx);
+                curPieceIdx++;
                 while (inCorpusFile.get() != '\n');
                 break;
 
             case SEP_TOKEN_STR[0]: // SEP
                 while (inCorpusFile.get() != ' ');
+                for (Track &t: corpus.mns[curPieceIdx]) {
+                    t.reserve(tokenCounts[curPieceIdx]);
+                }
+                corpus.timeStructLists[curPieceIdx].reserve(
+                    tokenCounts[curPieceIdx]
+                );
                 break;
 
             case TRACK_EVENTS_CHAR:
-                corpus.mns.back().push_back(Track());
+                corpus.mns[curPieceIdx].push_back(Track());
                 inCorpusFile.getline(a, 8, ':');
-                corpus.trackInstrMaps.back().push_back((uint8_t) b36strtoi(a));
+                corpus.trackInstrMaps[curPieceIdx].push_back(
+                    (uint8_t) b36strtoi(a)
+                );
                 while (inCorpusFile.get() != ' '); // eat the track number
                 break;
 
@@ -336,14 +361,14 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int tpq) {
                 inCorpusFile.getline(a, 8, ' ');
                 denom = b36strtoi(a);
                 curMeasureLength = 4 * tpq * numer / denom;
-                corpus.timeStructLists.back().push_back(
+                corpus.timeStructLists[curPieceIdx].push_back(
                     TimeStructToken(curMeasureStart, false, numer, denom)
                 );
                 break;
 
             case TEMPO_EVENTS_CHAR:
                 inCorpusFile.getline(a, 8, ' ');
-                corpus.timeStructLists.back().push_back(
+                corpus.timeStructLists[curPieceIdx].push_back(
                     TimeStructToken(curTime, true, b36strtoi(a), 0)
                 );
                 break;
@@ -366,7 +391,7 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int tpq) {
                 v = b36strtoi(a);
                 inCorpusFile.getline(a, 8, ' ');
                 t = b36strtoi(a);
-                corpus.mns.back()[t].push_back(
+                corpus.mns[curPieceIdx][t].push_back(
                     MultiNote(isCont, curTime, p, d, v)
                 );
                 break;
@@ -381,16 +406,6 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int tpq) {
                 
         }
     }
-    if (corpus.mns.back().size() == 0) {
-        corpus.mns.pop_back();
-    }
-    if (corpus.timeStructLists.back().size() == 0) {
-        corpus.timeStructLists.pop_back();
-    }
-    if (corpus.trackInstrMaps.back().size() == 0) {
-        corpus.trackInstrMaps.pop_back();
-    }
-    corpus.shrink();
     return corpus;
 }
 
@@ -429,7 +444,7 @@ void writeOutputCorpusFile(
     }
 
 
-    for (int i = 0; i < corpus.mns.size(); ++i) {
+    for (int i = 0; i < corpus.pieceNum; ++i) {
         outCorpusFile << BEGIN_TOKEN_STR << " ";
         for (int j = 0; j < corpus.trackInstrMaps[i].size(); ++j) {
             outCorpusFile << TRACK_EVENTS_CHAR
