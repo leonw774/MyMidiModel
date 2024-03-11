@@ -29,11 +29,11 @@ unsigned int gcd(unsigned int a, unsigned int b) {
 
 unsigned int gcd(unsigned int* arr, unsigned int size) {
     int g = arr[0];
-    for (int i = 1; i < size && g != 1; ++i) {
+    for (int i = 1; i < size; ++i) {
         if (arr[i] != 0) {
             g = gcd(g, arr[i]);
+            if (g == 1) break;
         }
-        if (g == 1) break;
     }
     return g;
 }
@@ -50,9 +50,9 @@ unsigned int gcd(unsigned int* arr, unsigned int size) {
     The return index is the index of the counter merged all other counters.
 */
 int mergeCounters(shape_counter_t counterArray[], size_t arraySize) {
-    std::vector<int> mergingMapIndices;
+    std::vector<int> mergingMapIndices(arraySize);
     for (int i = 0; i < arraySize; ++i) {
-        mergingMapIndices.push_back(i);
+        mergingMapIndices[i] = i;
     }
     while (mergingMapIndices.size() > 1) {
         // count from back to not disturb the index number when erasing
@@ -141,7 +141,7 @@ Shape getShapeOfMultiNotePair(
     }
     const Shape lShape = shapeDict[lmn.shapeIndex],
                 rShape = shapeDict[rmn.shapeIndex];
-    const int rightSize = rShape.size();
+    const int rSize = rShape.size(), lSize = lShape.size();
     const unsigned int rightStretch = rmn.stretch;
     const int32_t deltaOnset = (int32_t) rmn.onset - (int32_t) lmn.onset;
 
@@ -150,59 +150,101 @@ Shape getShapeOfMultiNotePair(
     //   right_stretch_1, ..., right_stretch_n,
     //   left_stretch
     // }
-    unsigned int times[rightSize*2+1]; 
+    unsigned int times[rSize*2+1]; 
     int t = 0;
     for (const RelNote& rRelNote: rShape) {
         times[t] = rRelNote.relOnset * rightStretch + deltaOnset;
-        times[t+rightSize] = (unsigned int) rRelNote.relDur * rightStretch;
+        times[t+rSize] = (unsigned int) rRelNote.relDur * rightStretch;
         t++;
     }
-    times[rightSize*2] = lmn.stretch;
-    unsigned int newStretch = gcd(times, rightSize*2+1);
+    times[rSize*2] = lmn.stretch;
+    unsigned int newStretch = gcd(times, rSize*2+1);
 
     // re-calculate the new time values
     for (unsigned int& time: times) {
         time /= newStretch;
     }
-    const unsigned int lStretchRatio = times[rightSize*2];
+    const unsigned int lStretchRatio = times[rSize*2];
 
     // check to prevent overflow, because RelNote's onset is stored in uint8
     // and onsetLimit is 0x7f
     // if overflowed, return empty shape
-    for (int i = 0; i < rightSize; ++i) {
+    for (int i = 0; i < rSize; ++i) {
         if (times[i] > RelNote::onsetLimit) {
             return Shape();
         }
     }
+    unsigned int newLRelOnsets[lSize];
+    unsigned int newLRelDur[lSize];
+    t = 0;
     for (const RelNote& lRelNote: lShape) {
-        if (lRelNote.relOnset * lStretchRatio > RelNote::onsetLimit) {
+        newLRelOnsets[t] = lRelNote.relOnset * lStretchRatio;
+        newLRelDur[t] = lRelNote.relDur * lStretchRatio;
+        if (newLRelOnsets[t] > RelNote::onsetLimit
+            || newLRelDur[t] > RelNote::durLimit) {
             return Shape();
         }
-    }
-
-    Shape pairShape;
-    pairShape.reserve(lShape.size() + rShape.size());
-    for (const RelNote& lRelNote: lShape) {
-        pairShape.push_back(RelNote(
-            lRelNote.relOnset * lStretchRatio,
-            lRelNote.relPitch,
-            lRelNote.relDur * lStretchRatio,
-            lRelNote.isCont
-        ));
+        t++;
     }
 
     const int8_t deltaPitch = (int8_t) rmn.pitch - (int8_t) lmn.pitch;
-    t = 0;
-    for (const RelNote& rRelNote: rShape) {
-        pairShape.push_back(RelNote(
-            times[t],
-            rRelNote.relPitch + deltaPitch,
-            times[t+rightSize],
-            rRelNote.isCont
-        ));
-        t++;
+    // the merge part of merge sort
+    int lpos = 0, rpos = 0;
+    RelNote corLRelNote, curRRelNote;
+    corLRelNote = RelNote(
+        newLRelOnsets[0],
+        lShape[0].relPitch,
+        newLRelDur[0],
+        lShape[0].isCont
+    );
+    curRRelNote = RelNote(
+        times[0],
+        rShape[0].relPitch + deltaPitch,
+        times[rSize],
+        rShape[0].isCont
+    );
+    Shape pairShape(lSize + rSize);
+    enum MergeCase {LEFT, RIGHT};
+    while (lpos < lSize || rpos < rSize) {
+        int mergeCase = 0;
+        if (rpos == rSize) {
+            mergeCase = MergeCase::LEFT;
+        }
+        else if (lpos == lSize) {
+            mergeCase = MergeCase::RIGHT;
+        }
+        else if (corLRelNote < curRRelNote) {
+            mergeCase = MergeCase::LEFT;
+        }
+        else {
+            mergeCase = MergeCase::RIGHT;
+        }
+
+        if (mergeCase == MergeCase::LEFT) {
+            pairShape[lpos+rpos] = corLRelNote;
+            lpos++;
+            if (lpos != lSize) {
+                corLRelNote = RelNote(
+                    newLRelOnsets[lpos],
+                    lShape[lpos].relPitch,
+                    newLRelDur[lpos],
+                    lShape[lpos].isCont
+                );
+            }
+        }
+        else {
+            pairShape[lpos+rpos] = curRRelNote;
+            rpos++;
+            if (rpos != rSize) {
+                curRRelNote = RelNote(
+                    times[rpos],
+                    rShape[rpos].relPitch + deltaPitch,
+                    times[rpos+rSize],
+                    rShape[rpos].isCont
+                );
+            }
+        }
     }
-    std::sort(pairShape.begin(), pairShape.end());
     return pairShape;
 }
 

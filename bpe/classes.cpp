@@ -26,10 +26,7 @@ bool RelNote::operator<(const RelNote& rhs) const {
 
     // wicked casting: RelNote -> uint32_t
     // masking with 0x00ffffff because we only want lower 3 bytes
-    return
-        (*((uint32_t*) this) & 0x00ffffff) 
-        <
-        (*((uint32_t*) &(rhs)) & 0x00ffffff);
+    return *((uint32_t*) this) < *((uint32_t*) &(rhs));
 }
 
 bool RelNote::operator==(const RelNote& rhs) const {
@@ -37,10 +34,7 @@ bool RelNote::operator==(const RelNote& rhs) const {
     //     && relPitch == rhs.relPitch
     //     && relDur == rhs.relDur
     //     && isCont == rhs.isCont);
-    return 
-        (*((uint32_t*) this) & 0x00ffffff)
-        ==
-        (*((uint32_t*) &(rhs)) & 0x00ffffff);
+    return *((uint32_t*) this) == *((uint32_t*) &(rhs));
 }
 
 /********
@@ -299,16 +293,16 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int tpq, int maxTrackNum) {
     // inCorpusFile.seekg(0, std::ios::beg);
 
     // count lines and spaces
-    std::vector<int> tokenCounts;
+    std::vector<int> tokenNums;
     while (inCorpusFile.good()) {
         std::string line;
         getline(inCorpusFile, line);
         if (line.size() == 0) {
             break;
         }
-        tokenCounts.push_back(std::count(line.begin(), line.end(), ' '));
+        tokenNums.push_back(std::count(line.begin(), line.end(), ' '));
     }
-    Corpus corpus(tokenCounts.size());
+    Corpus corpus(tokenNums.size());
     // std::cout << corpus.pieceNum << std::endl;
 
     // reset flags again
@@ -337,10 +331,10 @@ Corpus readCorpusFile(std::ifstream& inCorpusFile, int tpq, int maxTrackNum) {
             case SEP_TOKEN_STR[0]: // SEP
                 while (inCorpusFile.get() != ' ');
                 for (Track &t: corpus.mns[curPieceIdx]) {
-                    t.reserve(tokenCounts[curPieceIdx]);
+                    t.reserve(tokenNums[curPieceIdx]);
                 }
                 corpus.timeStructLists[curPieceIdx].reserve(
-                    tokenCounts[curPieceIdx]
+                    tokenNums[curPieceIdx]
                 );
                 break;
 

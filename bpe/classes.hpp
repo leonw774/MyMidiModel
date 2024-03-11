@@ -32,22 +32,20 @@
 #define CONT_NOTE_EVENTS_STR    "N~"
 
 struct RelNote {
-    uint8_t isCont : 1; // Lowest byte: lower 1 bit
-    uint8_t relDur : 7; // Lowest byte: upper 7 bits
-    int8_t relPitch;    // Middle byte
-    uint8_t relOnset;   // Highest byte
+    uint8_t isCont;   // Lowest byte: Boolean
+    uint8_t relDur;   // Lower middle byte
+    int8_t relPitch;  // Higher middle byte
+    uint8_t relOnset; // Highest byte
     // Members are ordered such that it's value is:
     //      (MSB) aRandomByte relOnset relPitch relDur isCont (LSB)
     // when viewed as unsigned 32bit int
 
     static const uint8_t onsetLimit = 0x7f;
-    static const uint8_t durLimit = 0x7f;
+    static const uint8_t durLimit = 0xff;
 
     RelNote();
 
     RelNote(uint8_t o, uint8_t p, uint8_t d, uint8_t c);
-
-    inline void setRelDur(const uint8_t o);
 
     bool operator<(const RelNote& rhs) const;
 
