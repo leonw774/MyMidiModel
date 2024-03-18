@@ -366,17 +366,20 @@ def piece_to_features(
         measure_onsets.append(measure_onsets[-1] + cur_measure_length)
 
     max_position = max_measure_length
-    present_instrument = {track.program for track in midi.instruments}
-    instrument_number = len(present_instrument)
+    present_instrument = {
+        128 if track.is_drum else track.program
+        for track in midi.instruments
+    }
+    instruments_count = len(present_instrument)
     instrument_index_mapping = {
         program: idx
         for idx, program in enumerate(present_instrument)
     }
-    bar_instrumentation = np.zeros(
-        shape=(len(measure_onsets), instrument_number),
+    bar_instrument = np.zeros(
+        shape=(len(measure_onsets), instruments_count),
         dtype=np.bool8
     )
-    grooving_per_bar = np.zeros(
+    bar_grooving = np.zeros(
         shape=(len(measure_onsets), max_position),
         dtype=np.bool8
     )
@@ -384,12 +387,13 @@ def piece_to_features(
         for note in track.notes:
             # find measure index so that the measure has the largest onset
             # while smaller than note.start
-            measure_index = bisect.bisect_right(measure_onsets, note.start) - 1
-            program_number = instrument_index_mapping[track.program]
-            bar_instrumentation[measure_index, program_number] |= True
+            measure_index = bisect.bisect_right(measure_onsets, note.start)-1
+            note_instrument = 128 if track.is_drum else track.program
+            program_number = instrument_index_mapping[note_instrument]
+            bar_instrument[measure_index, program_number] |= True
             position = note.start - measure_onsets[measure_index]
             assert position < max_position
-            grooving_per_bar[measure_index, position] |= True
+            bar_grooving[measure_index, position] |= True
 
     pairs = list(itertools.combinations(range(len(measure_onsets)), 2))
     if len(pairs) > max_pairs_number:
@@ -397,15 +401,15 @@ def piece_to_features(
 
     instrumentation_similarities = [
         1 - (
-            sum(np.logical_xor(bar_instrumentation[a], bar_instrumentation[b]))
-            / instrument_number
+            sum(np.logical_xor(bar_instrument[a], bar_instrument[b]))
+            / instruments_count
         )
         for a, b in pairs
     ]
 
     grooving_similarities = [
         1 - (
-            sum(np.logical_xor(grooving_per_bar[a], grooving_per_bar[b]))
+            sum(np.logical_xor(bar_grooving[a], bar_grooving[b]))
             / max_position
         )
         for a, b in pairs
