@@ -72,7 +72,7 @@ ONLY_EVAL_UNCOND=true ./pipeline.sh lmd_full ours_sample1.0 linear_mid --use-exi
 
 ## Dataset (`data/midis/`)
 
-The datasets we used, SymphonyNet_Dataset and lmd_full, are expected to be found under `data/midis`. However, the path `midi_to_corpus.py` would be looking is the `MIDI_DIR_PATH` variables set in the the corpus configuration file. So it could be in any place you want. Just set the path right.
+The datasets we used, [SymphonyNet_Dataset](https://symphonynet.github.io/) and [lmd_full](https://colinraffel.com/projects/lmd/), are expected to be found under `data/midis`. However, the path `midi_to_corpus.py` would be looking is the `MIDI_DIR_PATH` variables set in the the corpus configuration file. So it could be in any place you want. Just set the path right.
 
 
 ## Corpus Structure (`data/corpus/`)
