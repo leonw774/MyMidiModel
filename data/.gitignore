@@ -6,3 +6,4 @@ midis/*
 *.npy
 *.zip
 *.json
+*.mscz
