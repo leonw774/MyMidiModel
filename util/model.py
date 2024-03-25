@@ -26,7 +26,7 @@ except ImportError:
 
 from . import tokens
 from .vocabs import Vocabs
-from .corpus import ATTR_NAME_INDEX, ALL_ATTR_NAMES, OUTPUT_ATTR_NAMES
+from .arrays import ATTR_NAME_INDEX, ALL_ATTR_NAMES, OUTPUT_ATTR_NAMES
 
 
 class MyMidiTransformer(nn.Module):

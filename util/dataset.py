@@ -14,14 +14,9 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
 from . import tokens
-from .corpus import (
-    get_corpus_vocabs,
-    to_pathlist_file_path,
-    ATTR_NAME_INDEX,
-    get_full_array_string
-)
-
-F.pad: Callable
+from .corpus import to_pathlist_file_path
+from .vocabs import get_corpus_vocabs
+from .arrays import ATTR_NAME_INDEX, get_full_array_string
 
 
 def deeper_getsizeof(obj, depth = 1):
@@ -455,6 +450,9 @@ class MidiDataset(Dataset):
 
     def __len__(self):
         return self._length
+
+
+F.pad: Callable
 
 def collate_left(piece_list: List[torch.Tensor]) -> torch.Tensor:
     """Stack pieces batch-first to a 3-d array and left-pad them"""

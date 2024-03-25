@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from util.midi import piece_to_midi
-from util.corpus import get_full_array_string, array_to_text_list
+from util.arrays import get_full_array_string, array_to_text_list
 from util.dataset import MidiDataset, collate_mididataset
 # from util.model import MidiTransformerDecoder
 

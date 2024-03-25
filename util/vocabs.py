@@ -1,4 +1,5 @@
-import re
+import json
+
 from tqdm import tqdm
 
 from . import tokens
@@ -7,7 +8,7 @@ from .tokens import (
     get_largest_possible_position,
     get_supported_time_signatures
 )
-from .corpus_reader import CorpusReader
+from .corpus import CorpusReader, to_vocabs_file_path
 
 class Vocabs:
 
@@ -87,6 +88,14 @@ class Vocabs:
             'tempos': vars(self.tempos),
             'time_signatures': vars(self.time_signatures),
         }
+
+
+def get_corpus_vocabs(corpus_dir_path: str) -> Vocabs:
+    vocab_path = to_vocabs_file_path(corpus_dir_path)
+    with open(vocab_path, 'r', encoding='utf8') as vocabs_file:
+        corpus_vocabs_dict = json.load(vocabs_file)
+    corpus_vocabs = Vocabs.from_dict(corpus_vocabs_dict)
+    return corpus_vocabs
 
 
 def build_vocabs(
@@ -207,7 +216,7 @@ def build_vocabs(
         f'Event vocab size: {len(event_vocab)}\n'
         f'- Measure-time signature: {len(event_measure_time_sig)}\n'
         f'  - Supported: {len(supported_time_signatures)}\n'
-        f'  - Existed in corpus: {len(corpus_measure_time_sigs)})\n'
+        f'  - Existed in corpus: {len(corpus_measure_time_sigs)}\n'
         f'- Position: {len(event_position)}\n'
         f'- Tempo: {len(event_tempo)}\n'
         f'- Shape: {len(event_multi_note_shapes)}\n'

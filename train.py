@@ -21,10 +21,9 @@ from torch.optim import AdamW, lr_scheduler
 # from torch.profiler import profile, record_function, ProfilerActivity
 import torchinfo
 
-from util.corpus import (
-    get_corpus_vocabs, to_pathlist_file_path,
-    ALL_ATTR_NAMES, OUTPUT_ATTR_NAMES
-)
+from util.corpus import to_pathlist_file_path
+from util.vocabs import get_corpus_vocabs
+from util.arrays import ALL_ATTR_NAMES, OUTPUT_ATTR_NAMES
 from util.dataset import MidiDataset, collate_mididataset
 from util.evaluations import (
     midi_list_to_features,

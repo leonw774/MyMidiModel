@@ -17,9 +17,10 @@ from util.midi import (
     midi_to_piece, piece_to_midi, get_first_k_measures, get_first_k_ticks
 )
 from util.corpus import (
-    text_list_to_array, to_corpus_file_path, to_paras_file_path,
-    dump_corpus_paras, get_full_array_string
+    to_corpus_file_path, to_paras_file_path, dump_corpus_paras
 )
+from util.arrays import text_list_to_array, get_full_array_string
+
 from util.model import MyMidiTransformer
 from util.generation import generate, permute_track_number
 from util.type_wrappers import or_none

@@ -23,11 +23,11 @@ from util.tokens import (
 )
 from util.tokens import b36strtoi
 from util.vocabs import build_vocabs
-from util.corpus_reader import CorpusReader
 from util.corpus import (
-    to_shape_vocab_file_path, to_vocabs_file_path, to_arrays_file_path,
-    get_corpus_paras, text_list_to_array, get_full_array_string
+    CorpusReader, to_shape_vocab_file_path, to_vocabs_file_path,
+    to_arrays_file_path, get_corpus_paras
 )
+from util.arrays import text_list_to_array, get_full_array_string
 
 
 def parse_args():
@@ -135,10 +135,15 @@ def main():
 
     logging.info('Begin build vocabs for %s', args.corpus_dir_path)
     corpus_paras = get_corpus_paras(args.corpus_dir_path)
+
     with CorpusReader(args.corpus_dir_path) as corpus_reader:
         assert len(corpus_reader) > 0, f'empty corpus: {args.corpus_dir_path}'
 
-        vocabs, summary_string = build_vocabs(corpus_reader, corpus_paras, bpe_shapes_list)
+        vocabs, summary_string = build_vocabs(
+            corpus_reader,
+            corpus_paras,
+            bpe_shapes_list
+        )
         logging.info(summary_string)
 
         with open(vocab_path, 'w+', encoding='utf8') as vocabs_file:
@@ -194,7 +199,10 @@ def main():
         with zipfile_cm as npz_file:
             for file_name in tqdm(os.listdir(npy_dir_path), ncols=80):
                 # arcname is file_name -> file should be at root
-                npz_file.write(os.path.join(npy_dir_path, file_name), file_name)
+                npz_file.write(
+                    os.path.join(npy_dir_path, file_name),
+                    file_name
+                )
         os.rename(npy_zip_path, npz_path)
         # delete the npys
         shutil.rmtree(npy_dir_path)
@@ -202,7 +210,10 @@ def main():
 
         # for debugging
         if args.debug:
-            debug_txt_path = os.path.join(args.corpus_dir_path, 'make_array_debug.txt')
+            debug_txt_path = os.path.join(
+                args.corpus_dir_path,
+                'make_array_debug.txt'
+            )
             print(f'Write debug file: {debug_txt_path}')
 
             piece_0 = next(iter(corpus_reader))
@@ -235,16 +246,18 @@ def main():
         distributions = {
             'instrument': Counter(),
             'shape': Counter(),
-            'tokens_number': {
+            'type_number': {
                 t: [] for t in token_types
             }
         }
-        regular_single_note_str = ' ' + NOTE_EVENTS_CHAR + ':'
-        cont_single_note_str = ' ' + NOTE_EVENTS_CHAR + '~:'
+        regular_single_str = ' ' + NOTE_EVENTS_CHAR + ':'
+        cont_single_str    = ' ' + NOTE_EVENTS_CHAR + '~:'
         for piece in tqdm(corpus_reader, desc='Making statistics', ncols=80):
             if args.bpe:
-                distributions['shape']['0,0,1;'] += piece.count(regular_single_note_str)
-                distributions['shape']['0,0,1~;'] += piece.count(cont_single_note_str)
+                regular_single_count = piece.count(regular_single_str)
+                distributions['shape']['0,0,1;'] += regular_single_count
+                cont_single_count = piece.count(cont_single_str)
+                distributions['shape']['0,0,1~;'] += cont_single_count
                 for text in piece.split():
                     if text[0] == MULTI_NOTE_EVENTS_CHAR:
                         distributions['shape'][text[1:].split(':')[0]] += 1
@@ -272,13 +285,15 @@ def main():
                 all_token_number
             ]
             for i, token_type in enumerate(token_types):
-                distributions['tokens_number'][token_type].append(numbers[i])
+                distributions['type_number'][token_type].append(numbers[i])
     # with CorpuesReader exit
 
     descriptions = dict()
-    for token_type, numbers_per_piece in distributions['tokens_number'].items():
-        numbers_per_piece: list
-        d: Dict[str, np.float64] = dict(Series(numbers_per_piece).dropna().describe())
+    for token_type, number_per_piece in distributions['type_number'].items():
+        number_per_piece: list
+        d: Dict[str, np.float64] = dict(
+            Series(number_per_piece).dropna().describe()
+        )
         descriptions[token_type] = {
             k: float(v) for k, v in d.items()
         }
@@ -320,62 +335,86 @@ def main():
                 s[:25]+'...' if len(s) > 25 else s
                 for _, s in sorted_nondefault_shape_count
             ],
-            height=[c / total_shape_num for c, _ in sorted_nondefault_shape_count],
+            height=[
+                c / total_shape_num
+                for c, _ in sorted_nondefault_shape_count
+            ]
         )
-        plt.savefig(os.path.join(stats_dir_path, 'nondefault_shape_distribution.png'))
+        plt.savefig(os.path.join(
+            stats_dir_path, 'nondefault_shape_distribution.png'
+        ))
         plt.clf()
 
+    track_descriptions = [
+        f'{e}={round(v, 3)}'
+        for e, v in descriptions['track'].items()
+    ]
     plt.figure(figsize=(16.8, 6.4))
     plt.title('track_number distribution')
     plt.xticks(rotation=90, fontsize='small')
     plt.text(
         x=0.01,
         y=0.5,
-        s='\n'.join([f'{e}={round(v, 3)}' for e, v in descriptions['track'].items()]),
+        s='\n'.join(track_descriptions),
         transform=plt.gcf().transFigure
     )
     plt.subplots_adjust(left=0.125)
-    max_track_count = max(distributions['tokens_number']['track'])
-    plt.hist(distributions['tokens_number']['track'], bins=max_track_count)
+    max_track_count = max(distributions['type_number']['track'])
+    plt.hist(distributions['type_number']['track'], bins=max_track_count)
     plt.xlabel('number of tracks')
     plt.ylabel('number of pieces')
-    plt.savefig(os.path.join(stats_dir_path, 'number_of_track_distribution.png'))
+    plt.savefig(os.path.join(
+        stats_dir_path, 'number_of_track_distribution.png'
+    ))
     plt.clf()
 
+    multinote_description = [
+        f'{e}={round(v, 3)}'
+        for e, v in descriptions['multinote'].items()
+    ]
     plt.figure(figsize=(16.8, 6.4))
     plt.title('number of note/multinote tokens')
     plt.text(
         x=0.01,
         y=0.5,
-        s='\n'.join([f'{e}={round(v, 3)}' for e, v in descriptions['multinote'].items()]),
+        s='\n'.join(multinote_description),
         transform=plt.gcf().transFigure
     )
     plt.subplots_adjust(left=0.125)
-    multinote_numbers_per_piece = distributions['tokens_number']['multinote']
-    plt.hist(multinote_numbers_per_piece, bins=min(100, len(multinote_numbers_per_piece)))
+    multinote_numbers_per_piece = distributions['type_number']['multinote']
+    plt.hist(
+        multinote_numbers_per_piece,
+        bins=min(100, len(multinote_numbers_per_piece))
+    )
     plt.yscale('log')
     plt.xlabel('number of note/multinote tokens')
     plt.ylabel('number of pieces')
-    plt.savefig(os.path.join(stats_dir_path, 'number_of_multinote_tokens_distribution.png'))
+    plt.savefig(os.path.join(
+        stats_dir_path, 'number_of_multinote_tokens_distribution.png'
+    ))
     plt.clf()
 
     plt.figure(figsize=(16.8, 6.4))
     plt.title('token types distribution')
     token_number_sum = [
-        sum(distributions['tokens_number'][t])
+        sum(distributions['type_number'][t])
         for t in token_types[:-1] # not use 'all'
     ]
     plt.barh(token_types[:-1], token_number_sum)
-    plt.savefig(os.path.join(stats_dir_path, 'token_types_distribution.png'))
+    plt.savefig(os.path.join(
+        stats_dir_path, 'token_types_distribution.png'
+    ))
     plt.clf()
 
     stats_dict = {
         'distribution': distributions,
         'descriptions': descriptions
     }
-    with open(os.path.join(stats_dir_path, 'stats.json'), 'w+', encoding='utf8') as statfile:
+    stats_file_path = os.path.join(stats_dir_path, 'stats.json')
+    with open(stats_file_path, 'w+', encoding='utf8') as statfile:
         json.dump(stats_dict, statfile)
-    logging.info('Dumped stats.json at %s', os.path.join(stats_dir_path, 'stats.json'))
+    logging.info(
+        'Dumped stats.json at %s', stats_file_path)
     logging.info('Make statistics time: %.3f', time()-start_time)
 
     logging.info('==== make_arrays.py exited ====')

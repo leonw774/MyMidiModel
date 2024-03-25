@@ -553,8 +553,8 @@ def midi_to_piece(
             and tempo_quantization[2] > 0), 'Bad tempo_quantization'
 
     assert len(midi.instruments) > 0, 'No tracks in MidiFile'
-    for inst in midi.instruments:
-        inst.remove_invalid_notes(verbose=False)
+    for track in midi.instruments:
+        track.remove_invalid_notes(verbose=False)
     # print('original ticks per beat:', midi.ticks_per_beat)
     change_tpq(midi, tpq)
 

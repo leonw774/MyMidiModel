@@ -9,8 +9,7 @@ from psutil import cpu_count
 from tqdm import tqdm
 
 from util.midi import piece_to_midi
-from util.corpus_reader import CorpusReader
-from util.corpus import get_corpus_paras
+from util.corpus import CorpusReader, get_corpus_paras
 
 def compare_two_pieces(
         piece_index: int,
@@ -155,6 +154,7 @@ def verify_corpus_equality(
 
 
 if __name__ == '__main__':
+    print('Begin verify corpus equality.')
     if len(sys.argv) == 3:
         _a_corpus_dir = sys.argv[1]
         _b_corpus_dir = sys.argv[2]

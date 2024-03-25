@@ -139,12 +139,25 @@ They should compile to two binaries with `make -C bpe all`:
 
 ## Codes (`util/`)
 
-- `corpus.py`
-  - Define corpus directory structure and the array form of the representation.
-  - Contain piece-to-array and array-to-piece functions.
+### Some terms used in function name
 
-- `corpus_reader.py`
+- A **"midi"** means a `miditoolkit.MidiFile` instance.
+
+- A **"piece"** means a string of text representation of midi file, without tailing `\n`.
+
+- A **"text-list"** means a list of strings obtained from `piece.split(' ')` or can be turned into a "piece" after `' '.join(text_list)`.
+
+- An **"array"** means a 2-d numpy array that encoded a piece with respect to a vocabulary set.
+
+### Modules
+
+- `corpus.py`
+  - Define corpus directory structure.
   - Define corpus reader class
+
+- `arrays.py`
+  - Define the array form of the representation.
+  - Contain text-list-to-array and array-to-text-list functions.
 
 - `dataset.py`
   - Define `MidiDataset` class and the collate function.
@@ -171,17 +184,6 @@ They should compile to two binaries with `make -C bpe all`:
 - `vocabs.py`
   - Define `Vocabs` class that record the vocabulary set, vocabulary building configurations and midi preprocessing parameters.
   - Contain the build-vocabulary function.
-
-
-### Some terms used in function name
-
-- A **"midi"** means a `miditoolkit.MidiFile` instance.
-
-- A **"piece"** means a string of text representation of midi file, without tailing `\n`.
-
-- A **"text list"** means a list of strings obtained from `piece.split(' ')` or can be turned into a "piece" after `' '.join(text_list)`.
-
-- An **"array"** means a 2-d numpy array that encoded a piece with respect to a vocabulary set.
 
 
 ## Tool Scripts (`./`)

@@ -14,7 +14,7 @@ from .tokens import (
 )
 from .midi import piece_to_midi
 from .vocabs import Vocabs
-from .corpus import (
+from .arrays import (
     ATTR_NAME_INDEX, ALL_ATTR_NAMES, OUTPUT_ATTR_NAMES,
     array_to_text_list, text_list_to_array
 )
