@@ -37,7 +37,7 @@ from util.model import (
     MyMidiTransformer, compute_losses,
     LOSS_PADDING_ARG_CHOICES, LOSS_PADDING_ARG_CHOICES_DEFAULT
 )
-from util.type_wrappers import or_none
+from util.argparse_helper import or_none
 
 
 def parse_args():
@@ -168,7 +168,7 @@ def parse_args():
         type=float,
         nargs='+',
         default=[1.0],
-        help='Control the temperature of softmax before multinomial sampling. \
+        help='Set the temperature of softmax before multinomial sampling. \
             Default is %(default)s.'
     )
     eval_group.add_argument(

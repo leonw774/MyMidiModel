@@ -135,4 +135,5 @@ def main(corpus_dir_path, log_file_path):
     print('Write bpe_stats json and png done.')
 
 if __name__ == '__main__':
+    print('Begin to write bpe_stats json and png.')
     main(sys.argv[1], sys.argv[2])

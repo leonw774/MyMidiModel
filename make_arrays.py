@@ -136,7 +136,7 @@ def main():
     logging.info('Begin build vocabs for %s', args.corpus_dir_path)
     corpus_paras = get_corpus_paras(args.corpus_dir_path)
 
-    with CorpusReader(args.corpus_dir_path) as corpus_reader:
+    with CorpusReader(args.corpus_dir_path, use_tqdm=False) as corpus_reader:
         assert len(corpus_reader) > 0, f'empty corpus: {args.corpus_dir_path}'
 
         vocabs, summary_string = build_vocabs(

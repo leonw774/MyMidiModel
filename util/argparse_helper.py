@@ -1,4 +1,7 @@
-from typing import Callable, TypeVar, Union
+from argparse import ArgumentDefaultsHelpFormatter
+from typing import Callable, TypeVar, Union, List
+
+# Type wrapper
 
 T = TypeVar('T')
 def or_none(
@@ -30,3 +33,15 @@ def or_default(
         except Exception:
             return default
     return wrapper
+
+
+class MyHelpFormatter(ArgumentDefaultsHelpFormatter):
+    """When you need newline in help texts, use this"""
+    def _split_lines(self, text: str, width: int) -> List[str]:
+        if r'\n' in text:
+            return [
+                line
+                for forced_split_line in text.split(r'\n')
+                for line in self._split_lines(forced_split_line, width)
+            ]
+        return super()._split_lines(text, width)

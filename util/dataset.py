@@ -69,7 +69,7 @@ class MidiDataset(Dataset):
 
         - `virtual_piece_step_ratio`: Should be not less than 0.
            Default is 0.
-            - If > 0, over-length pieces will have multiple virtual
+            - If > 0, split over-length pieces into multiple virtual
               pieces. The start of a virtual pieces will be from the
               measure token that has the smallest index greater than
               `max_seq_length * virtual_piece_step_ratio * N`, where N
@@ -82,9 +82,9 @@ class MidiDataset(Dataset):
               from the index 0.
         
         - `flatten_virtual_pieces`: Default is False.
-            - If True, all virtual pieces has a indexing number.
+            - If True, all virtual pieces has distinct index number.
             - If False, virtual pieces within same real piece shares
-              the same indexing number, It will be randomly one of the
+              the same index number, It will be randomly one of the
               virtual pieces when accessed by `__getitem__`.
 
         - `excluded_path_list`: The list of relative or absolute paths

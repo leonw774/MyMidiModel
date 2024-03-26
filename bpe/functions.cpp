@@ -99,13 +99,13 @@ size_t updateNeighbor(
                 unsigned int offsetTime = onsetTime + (
                     relOffsets[track[k].shapeIndex] * track[k].stretch
                 );
-                unsigned int immdFollowOnset = -1;
+                unsigned int immdFollowOnset = 0;
                 int n = 1;
                 while (k+n < track.size() && n < MultiNote::neighborLimit) {
                     unsigned int nOnsetTime = track[k+n].onset;
                     // immediately following
                     if (nOnsetTime >= offsetTime) { 
-                        if (immdFollowOnset == -1) {
+                        if (immdFollowOnset == 0) {
                             if (nOnsetTime - offsetTime > gapLimit) {
                                 break;
                             }

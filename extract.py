@@ -1,5 +1,4 @@
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from typing import List
+from argparse import ArgumentParser
 
 from matplotlib import pyplot as plt
 from matplotlib import cm
@@ -16,6 +15,8 @@ from util.tokens import (
 )
 from util.midi import piece_to_midi
 from util.corpus import CorpusReader, get_corpus_paras
+from util.argparse_helper import MyHelpFormatter
+
 
 PIANOROLL_MEASURELINE_COLOR = (0.8, 0.8, 0.8, 1.0)
 PIANOROLL_TRACK_COLORMAP = cm.get_cmap('rainbow')
@@ -193,15 +194,6 @@ def piece_to_roll(piece: str, tpq: int) -> Figure:
     plt.tight_layout()
     return plt.gcf()
 
-class MyHelpFormatter(ArgumentDefaultsHelpFormatter):
-    def _split_lines(self, text: str, width: int) -> List[str]:
-        if r'\n' in text:
-            return [
-                line
-                for forced_split_line in text.split(r'\n')
-                for line in self._split_lines(forced_split_line, width)
-            ]
-        return super()._split_lines(text, width)
 
 def read_args():
     parser = ArgumentParser(formatter_class=MyHelpFormatter)

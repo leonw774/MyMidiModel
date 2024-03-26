@@ -23,10 +23,10 @@ from util.arrays import text_list_to_array, get_full_array_string
 
 from util.model import MyMidiTransformer
 from util.generation import generate, permute_track_number
-from util.type_wrappers import or_none
+from util.argparse_helper import or_none, MyHelpFormatter
 
 def read_args():
-    parser = ArgumentParser()
+    parser = ArgumentParser(formatter_class=MyHelpFormatter)
 
     parser.add_argument(
         '--primer', '-p',
@@ -51,28 +51,25 @@ def read_args():
         '--unit', '-u',
         choices=['measure', 'tick', 'token'],
         default='measure',
-        help='Specify the unit of PRIMER_LENGTH. \
-            "measure": will use the first PRIMER_LENGTH measures \
-            of the piece no matter how long it actually is. \
-            "tick": the length of a tick is the unit. \
-            The length of tick is determined by the setting of the corpus \
-            on which the model is trained. \
-            "token": will use the first PRIMER_LENGTH tokens of the piece. \
+        help='Specify the unit of PRIMER_LENGTH: \\n\
+            - "measure": use the first PRIMER_LENGTH measures of the piece \
+            no matter how long it actually is. \\n\
+            - "tick": tick is the time unit. The length of tick is determined \
+            by parameters of the corpus on which the model is trained. \\n\
+            - "token": use the first PRIMER_LENGTH tokens of the piece. \\n\
             Default is %(default)s'
     )
     parser.add_argument(
         '--sample-number', '-n',
         type=int,
         default=0,
-        help='How many sample will be generated. Default is %(default)s. \
-            If no primer used, it simply generate SAMPLE_NUMBER samples. \
+        help='How many sample will be generated. Default is %(default)s. \\n\
+            If no primer used, it simply generate SAMPLE_NUMBER samples. \\n\
             If primer is a midi file, it generate SAMPLE_NUMBER samples \
-            using that primer repeatly. \
-            If primer is list of midi file paths, it generate samples with \
-            the first SAMPLE_NUMBER primers. \
-            If no primer ised, 0 means 1. \
-            If primer is set, 0 is to use all primers in the list. \
-            Default is %(default)s'
+            using that primer repeatly. \\n\
+            If primer is list of midi file paths, it generates samples with \
+            the first SAMPLE_NUMBER primers. When SAMPLE_NUMBER == 0, \
+            it using all of them'
     )
     parser.add_argument(
         '--output-text', '-o',

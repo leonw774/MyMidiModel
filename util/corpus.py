@@ -40,12 +40,13 @@ class CorpusReader:
     In the first iteration call, the offsets of each line are cached.
     After that, each line is obtained by file.seek() and file.read().
     """
-    def __init__(self, corpus_dir_path: str) -> None:
+    def __init__(self, corpus_dir_path: str, use_tqdm=True) -> None:
         self.corpus_file_path = to_corpus_file_path(corpus_dir_path)
         self.pathlist_file_path = to_pathlist_file_path(corpus_dir_path)
+        self.file = open(self.corpus_file_path, 'r', encoding='utf8')
         self.line_cache = []
         self.length = None
-        self.file = open(self.corpus_file_path, 'r', encoding='utf8')
+        self.use_tqdm = use_tqdm
 
     def prepare(self) -> None:
         for _ in self:
@@ -71,7 +72,8 @@ class CorpusReader:
         tqdm_file_iter = tqdm(
             self.file,
             desc=f'CorpusReader iter: ({self.corpus_file_path})',
-            ncols=0
+            ncols=0,
+            disable=(not self.use_tqdm)
         )
         for line_index, line in enumerate(tqdm_file_iter):
             # not just newline
@@ -79,7 +81,7 @@ class CorpusReader:
                 # is piece
                 if line.startswith(BEGIN_TOKEN_STR):
                     # is new piece
-                    if line_index > len(self.line_cache): 
+                    if line_index > len(self.line_cache):
                         self.line_cache.append((offset, len(line)))
                     yield line[:-1] # remove \n at the end
             offset += len(line)
@@ -100,7 +102,7 @@ class CorpusReader:
                 self.file,
                 desc=f'CorpusReader: [{index}] ({self.corpus_file_path})',
                 ncols=0,
-                total=None
+                disable=(not self.use_tqdm)
             )
             for line_index, line in enumerate(tqdm_file_iter):
                 # not just newline

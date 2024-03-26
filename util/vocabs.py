@@ -146,9 +146,9 @@ def build_vocabs(
         for n, d in supported_time_signatures
     ]
 
-    measure_substr  = ' '+tokens.MEASURE_EVENTS_CHAR
-    position_substr = ' '+tokens.POSITION_EVENTS_CHAR
-    tempo_substr    = ' '+tokens.TEMPO_EVENTS_CHAR
+    measure_substr  = ' ' + tokens.MEASURE_EVENTS_CHAR
+    position_substr = ' ' + tokens.POSITION_EVENTS_CHAR
+    tempo_substr    = ' ' + tokens.TEMPO_EVENTS_CHAR
     max_mps_number = 0
     corpus_measure_time_sigs = set()
     token_count_per_piece = []

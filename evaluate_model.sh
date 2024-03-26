@@ -222,7 +222,7 @@ python3 get_eval_features_of_midis.py \
 ### Check if stop here
 
 if [ "$test_file_number" == 0 ]; then
-    echo "no test files given, "\
+    echo "no test files given," \
         "instrument-conditioned and primer-continuation are omitted." \
         "evaluate_model.py exit." \
         | tee -a "$log_path"
@@ -230,7 +230,7 @@ if [ "$test_file_number" == 0 ]; then
 fi
 
 if [ "$ONLY_EVAL_UNCOND" == true ]; then
-    echo "ONLY_EVAL_UNCOND is set and true, "\
+    echo "ONLY_EVAL_UNCOND is set and true," \
         "instrument-conditioned and primer-continuation are omitted." \
         "evaluate_model.py exit." \
         | tee -a "$log_path"

@@ -59,15 +59,73 @@ ONLY_EVAL_UNCOND=true ./pipeline.sh lmd_full ours_sample1.0 linear_mid --use-exi
 
 ## Configuration Files (`configs/`)
 
-- Files in `configs/corpus` set parameters for `midi_to_corpus.py` and `make_arrays.py` (`MAX_TRACK_NUMBER`, `MAX_DURATION`, etc.)
+- Files in `configs/corpus` set parameters for `midi_to_corpus.py` and `make_arrays.py`
+  - Vocabulary parameters:
+    - `TPQ`: ticks per quarter note / time units per quarter note
+    - `MAX_TRACK_NUMBER`
+    - `MAX_DURATION`
+    - `VELOCITY_STEP`: quantize velocity value to `(VELOCITY_STEP * 1, VELOCITY_STEP * 2, ... VELOCITY_STEP * k)` where `k = 128 // VELOCITY_STEP`
+    - `CONTINUING_NOTE`: use continuing note or not
+    - `TEMPO_MIN`, `TEMPO_MAX`, `TEMPO_STEP`
+  - Dataset processing setting
+    - `MIDI_WORKER_NUMBER`
+    - `MIDI_DIR_PATH`: the path to dataset directory
+    - `DATA_NAME`
+    - `TEST_PATHS_FILE`, `VALID_PATHS_FILE`: point to a file in `configs/split`
 
-- Files in `configs/bpe` set parameters for `bpe/learn_vocabs` (implementation of Multi-note BPE).
+- Files in `configs/bpe` set parameters for `bpe/learn_vocabs` (implementation of Multi-note BPE algorithm).
+  - `BPE_ITER_NUM`: number of iteration / size of vocabulary
+  - `ADJACENCY`: name of the adjacency; can be "ours" or "mulpi"
+  - `MIN_SCORE_LIMIT`: early-stop if the score of best shape (ie: its frequency) is less than it
+  - `SAMPLE_RATE`: track sampling rate
+  - `BPE_LOG`: output log or not
+  - `BPE_WORKER_NUMBER`
 
 - Files in `configs/model` set parameters for `train.py` and the config file name under `configs/eval` to be used by `evaluate_model.sh`.
+  - `SEED`: random seed in training process
+  - Dataset parameters
+    - `MAX_SEQ_LENGTH`: max sequence length to feed into model
+    - `VIRTUAL_PIECE_STEP_RATIO`: if > 0, split over-length pieces into multiple virtual pieces
+    - `FLATTEN_VIRTUAL_PIECES`: if true, all virtual pieces has a index number. Otherwise, virtual pieces within same real piece shares the same index number
+    - `PERMUTE_MPS`: whether or not the dataset should permute all the maximal permutable subarrays as data augmentation
+    - `PERMUTE_TRACK_NUMBER`: Permute all the track numbers relative to the instruments as data augmentation
+    - `PITCH_AUGMENTATION_RANGE`
+  - Model parameter
+    - `USE_LINEAR_ATTENTION`
+    - `LAYERS_NUMBER`
+    - `ATTN_HEADS_NUMBER`
+    - `EMBEDDING_DIM`
+    - `NOT_USE_MPS_NUMBER`
+  - Training parameter
+    - `BATCH_SIZE`
+    - `MAX_UPDATES`: number of updates before training stop
+    - `VALIDATION_INTERVAL`: number of update before each validation
+    - `LOSS_PADDING`: How should loss function handle padding symbol; can be "ignore", "wildcard", and "normal"
+    - `MAX_GRAD_NORM`
+    - Learning rate schedule (linear warmup and then decay to end ratio) parameters
+      - `LEARNING_RATE_PEAK`
+      - `LEARNING_RATE_WARMUP_UPDATES`
+      - `LEARNING_RATE_DECAY_END_UPDATES`
+      - `LEARNING_RATE_DECAY_END_RATIO`
+    - `EARLY_STOP`: number of non-improved validation before early
+  - Others
+    - `VALID_EVAL_SAMPLE_NUMBER`: number of samples the validated model generates to be evaluated
+    - `USE_DEVICE`
+    - `EVAL_CONFIG_NAME`: point to a file in `configs/eval`
 
 - Files in `configs/split` contain lists of paths, relative to each dataset root, of midi files to be used as test set and validation set of the datasets. Their path are referenced by variable `TEST_PATHS_FILE` and `VALID_PATHS_FILE` in files of `configs/corpus`.
 
 - Files in `configs/eval` store parameters for `evaluate_model.sh`.
+  - `SEED`: random seed in evaluation/generation process
+  - Generation setting
+    - `EVAL_SAMPLE_NUMBER`
+    - `EVAL_WORKER_NUMBER`
+    - `PRIMER_MEASURE_LENGTH`: number of measure for primer-continuation generation task
+    - `SAMPLE_FUNCTION`: can be "none", "top-p", "top-k"
+    - `SAMPLE_THRESHOLD`
+    - `SOFTMAX_TEMPERATURE`
+  - Evaluation setting
+    - `EVAL_MIDI_TO_PIECE_PARAS_FILE`: the vocabulary parameter to quantize MIDI files when evaluating them
 
 
 ## Dataset (`data/midis/`)
@@ -88,7 +146,7 @@ Corpi are located at `data/corpus/`. A complete "corpus" is directory containing
 
 - `vocabs.json`: The vocabulary to be used by the model. The format is defined in `util/vocabs.py`. Created by `make_arrays.py`.
 
-- `arrays.npz`: A zip file of numpy arrays in `.npy` format. Can be accessed by `numpy.load()` and it will return an instance of `NpzFile` class. This is the "final form" of the representation (i.e. include pre-computed positional encoding) that would be used to train model. Created by `make_arrays.py`.
+- `arrays.npz`: A zip file of numpy arrays in `.npy` format. Can be accessed by `numpy.load()` and it will return an instance of `NpzFile` class. This is the "final form" of the representation (i.e. include pre-computed MPS order positio numbers) that would be used to train model. Created by `make_arrays.py`.
 
 Other possible files and directories are:
 
