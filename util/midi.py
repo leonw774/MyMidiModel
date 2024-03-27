@@ -6,7 +6,7 @@ from miditoolkit import MidiFile, Instrument, TempoChange, TimeSignature, Note
 
 from . import tokens
 from .tokens import (
-    BeginOfScoreToken, SectionSeperatorToken, EndOfScoreToken,
+    BeginOfSequenceToken, SectionSeperatorToken, EndOfSequenceToken,
     NoteToken, TempoToken, PositionToken, MeasureToken, TrackToken,
     TYPE_PRIORITY,
     get_supported_time_signatures, token_to_str, b36strtoi,
@@ -181,10 +181,11 @@ def get_note_tokens(
     note_token_list = [
         NoteToken(
             onset=note.start,
-            track_number=track_number,
             pitch=note.pitch,
             duration=note.end-note.start,
-            velocity=quantize_velocity(note.velocity, velocity_step)
+            is_continuing=0,
+            velocity=quantize_velocity(note.velocity, velocity_step),
+            track_number=track_number
         )
         for track_number, track in enumerate(midi.instruments)
         for note in track.notes
@@ -197,8 +198,6 @@ def get_note_tokens(
     ]
 
     # handle too long duration
-    # continuing is represented by negative duration
-    continuing_duration = -max_duration
     note_list_length = len(note_token_list)
     for i in range(note_list_length):
         note_token = note_token_list[i]
@@ -218,7 +217,8 @@ def get_note_tokens(
                     note_token_list.append(
                         note_token._replace(
                             onset=cur_onset,
-                            duration=continuing_duration
+                            duration=max_duration,
+                            is_continuing=1,
                         )
                     )
                     cur_onset += max_duration
@@ -426,12 +426,10 @@ def get_position_tokens(
     nmt_token_list.sort()
 
     position_token_list = []
-
     cur_measure_onset = 0
     last_added_position_onset = 0
 
     for token in nmt_token_list:
-
         if token.type_priority == TYPE_PRIORITY['MeasureToken']:
             cur_measure_onset = token.onset
 
@@ -443,6 +441,7 @@ def get_position_tokens(
                 )
             )
             last_added_position_onset = token.onset
+
         elif token.type_priority == TYPE_PRIORITY['NoteToken']:
             if token.onset > last_added_position_onset:
                 position_token_list.append(
@@ -508,9 +507,9 @@ def midi_to_token_list(
 
     head_token_list = get_head_tokens(midi)
     full_token_list = (
-        [BeginOfScoreToken()]
+        [BeginOfSequenceToken()]
         + head_token_list + [SectionSeperatorToken()]
-        + body_token_list + [EndOfScoreToken()]
+        + body_token_list + [EndOfSequenceToken()]
     )
 
     return full_token_list

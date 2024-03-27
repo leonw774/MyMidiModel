@@ -106,19 +106,13 @@ unsigned int getMaxRelOffset(const Shape& s) {
 size_t std::hash<Shape>::operator()(const Shape& s) const {
     size_t h = 0;
     uint32_t x;
-    for (int i = 0; i < s.size() - 1; ++i) {
-        // it is "safe" to not use the lower-3-byte mask because
-        // the highest byte is the lowerest byte of next element
+    for (int i = 0; i < s.size(); ++i) {
         x = *((uint32_t*) &s[i]);
         // formula from boost::hash_combine
         // take away the `hash()` to reduce compute time
         // h ^= hash<uint32_t>()(x) + 0x9e3779b9 + (h << 6) + (h >> 2);
         h ^= x + 0x9e3779b9 + (h << 6) + (h >> 2);
     }
-    // only need to mask for the last one
-    x = *((uint32_t*) &s.back()) & 0x00ffffff;
-    // h ^= hash<uint32_t>()(x) + 0x9e3779b9 + (h << 6) + (h >> 2);
-    h ^= x + 0x9e3779b9 + (h << 6) + (h >> 2);
     return h;
 }
 

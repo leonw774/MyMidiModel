@@ -2,20 +2,20 @@ from collections import namedtuple
 
 _COMMON_FIELD_NAMES = ['onset', 'type_priority']
 TYPE_PRIORITY = {
-    'BeginOfScoreToken': 0,
+    'BeginOfSequenceToken': 0,
     'TrackToken': 1,
     'SectionSeperatorToken': 2,
     'MeasureToken': 3,
     'PositionToken': 4,
     'TempoToken': 5,
     'NoteToken': 6,
-    'EndOfScoreToken': 7,
+    'EndOfSequenceToken': 7,
 }
 
-BeginOfScoreToken = namedtuple(
-    'BeginOfScoreToken',
+BeginOfSequenceToken = namedtuple(
+    'BeginOfSequenceToken',
     _COMMON_FIELD_NAMES,
-    defaults=[-1, TYPE_PRIORITY['BeginOfScoreToken']]
+    defaults=[-1, TYPE_PRIORITY['BeginOfSequenceToken']]
 )
 TrackToken = namedtuple(
     'TrackToken',
@@ -39,20 +39,20 @@ PositionToken = namedtuple(
 )
 TempoToken = namedtuple(
     'TempoToken',
-    _COMMON_FIELD_NAMES + ['bpm', 'position'],
-    defaults=[-1, TYPE_PRIORITY['TempoToken'], -1, -1]
+    _COMMON_FIELD_NAMES + ['bpm'],
+    defaults=[-1, TYPE_PRIORITY['TempoToken'], -1]
 )
 NoteToken = namedtuple(
     'NoteToken',
     _COMMON_FIELD_NAMES + [
-        'track_number', 'pitch', 'duration', 'velocity', 'position'
+        'track_number', 'pitch', 'duration', 'is_continuing', 'velocity'
     ],
     defaults=[-1, TYPE_PRIORITY['NoteToken'], -1, -1, -1, -1, -1]
 )
-EndOfScoreToken = namedtuple(
-    'EndOfScoreToken',
+EndOfSequenceToken = namedtuple(
+    'EndOfSequenceToken',
     _COMMON_FIELD_NAMES,
-    defaults=[float('inf'), TYPE_PRIORITY['EndOfScoreToken'],]
+    defaults=[float('inf'), TYPE_PRIORITY['EndOfSequenceToken'],]
 )
 
 SUPPORT_TIME_SIGNATURE_N_MAX = 24
@@ -67,7 +67,7 @@ def get_supported_time_signatures(
     return {
         (numerator, denominator)
         for denominator in [
-            int(2 ** (log2d+1)) for log2d in range(denominator_log2_max)]
+            int(2 ** (log2d + 1)) for log2d in range(denominator_log2_max)]
         for numerator in range(
             1, min(numerator_max, int(denominator * nd_raio_max)) + 1)
     }
@@ -138,17 +138,15 @@ def token_to_str(token: namedtuple) -> str:
     type_priority = token.type_priority
 
     if type_priority == TYPE_PRIORITY['NoteToken']:
-        # event:pitch:duration:velocity:track:instrument(:position)
+        # event('is_continuing'):pitch:duration:velocity:track
         # negative token.duration means is_cont==True
-        text = NOTE_EVENTS_CHAR
-        if token.duration < 0:
-            text += '~'
-        text += ( f':{itob36str(token.pitch)}'
-                + f':{itob36str(abs(token.duration))}'
-                + f':{itob36str(token.velocity)}'
-                + f':{itob36str(token.track_number)}')
-        if token.position != -1:
-            text += f':{itob36str(token.position)}'
+        text = (NOTE_EVENTS_CHAR
+            + ('~' if token.is_continuing == 1 else '')
+            + f':{itob36str(token.pitch)}'
+            + f':{itob36str(token.duration)}'
+            + f':{itob36str(token.velocity)}'
+            + f':{itob36str(token.track_number)}'
+        )
         return text
 
     elif type_priority == TYPE_PRIORITY['PositionToken']:
@@ -163,13 +161,7 @@ def token_to_str(token: namedtuple) -> str:
         )
 
     elif type_priority == TYPE_PRIORITY['TempoToken']:
-        if token.position == -1:
-            return f'{TEMPO_EVENTS_CHAR}{itob36str(token.bpm)}'
-        return (
-            f'{TEMPO_EVENTS_CHAR}{itob36str(token.bpm)}'
-            f':'
-            f'{itob36str(token.position)}'
-        )
+        return f'{TEMPO_EVENTS_CHAR}{itob36str(token.bpm)}'
 
     elif type_priority == TYPE_PRIORITY['TrackToken']:
         return (
@@ -178,13 +170,13 @@ def token_to_str(token: namedtuple) -> str:
             f':{itob36str(token.track_number)}'
         )
 
-    elif type_priority == TYPE_PRIORITY['BeginOfScoreToken']:
+    elif type_priority == TYPE_PRIORITY['BeginOfSequenceToken']:
         return BEGIN_TOKEN_STR
 
     elif type_priority == TYPE_PRIORITY['SectionSeperatorToken']:
         return SEP_TOKEN_STR
 
-    elif type_priority == TYPE_PRIORITY['EndOfScoreToken']:
+    elif type_priority == TYPE_PRIORITY['EndOfSequenceToken']:
         return END_TOKEN_STR
 
     else:

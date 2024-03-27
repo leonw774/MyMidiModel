@@ -91,7 +91,10 @@ if [ -n "${BPE_ITER_NUM+x}" ] && [ "$BPE_ITER_NUM" -ne 0 ]; then
                 do_midi_to_corpus=false
                 echo "Learn bpe vocab is skipped" | tee -a "$log_path"
             else
-                rm -f "${bpe_corpus_dir_path}/*"
+                rm "${bpe_corpus_dir_path}/corpus"
+                rm "${bpe_corpus_dir_path}/arrays.npz"
+                rm "${bpe_corpus_dir_path}/shape_vocab"
+                echo "Removed"
             fi
         fi
     fi

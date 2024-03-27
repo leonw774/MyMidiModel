@@ -452,8 +452,6 @@ class MidiDataset(Dataset):
         return self._length
 
 
-F.pad: Callable
-
 def collate_left(piece_list: List[torch.Tensor]) -> torch.Tensor:
     """Stack pieces batch-first to a 3-d array and left-pad them"""
     # print('\n'.join(map(str, piece_list)))
@@ -467,6 +465,7 @@ def collate_right(piece_list: List[torch.Tensor]) -> torch.Tensor:
     max_length = max(tensor.size(0) for tensor in piece_list)
 
     # Pad tensors to the right with zeros and stack them
+    F.pad: Callable # because pylint
     padded_piece_list = [
         F.pad(
             input=piece,

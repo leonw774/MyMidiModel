@@ -1,4 +1,3 @@
-from functools import reduce
 from typing import List, Tuple
 
 import torch

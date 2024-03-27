@@ -13,8 +13,8 @@
 - [Model (`models/`)](#model-models)
 - [Codes (`util/`)](#codes-util)
   - [Some terms used in function name](#some-terms-used-in-function-name)
-- [Tool Scripts (`./`)](#tool-scripts-)
-  - [Pythons scripts](#pythons-scripts)
+- [Tool and Experiment Scripts (`./`)](#tool-scripts-)
+  - [Python scripts](#pythons-scripts)
   - [Shell scripts](#shell-scripts)
 
 
@@ -64,7 +64,7 @@ ONLY_EVAL_UNCOND=true ./pipeline.sh lmd_full ours_sample1.0 linear_mid --use-exi
     - `TPQ`: ticks per quarter note / time units per quarter note
     - `MAX_TRACK_NUMBER`
     - `MAX_DURATION`
-    - `VELOCITY_STEP`: quantize velocity value to `(VELOCITY_STEP * 1, VELOCITY_STEP * 2, ... VELOCITY_STEP * k)` where `k = 128 // VELOCITY_STEP`
+    - `VELOCITY_STEP`: quantize velocity value to `(VELOCITY_STEP * 1, VELOCITY_STEP * 2, ... VELOCITY_STEP * k)` where `k = 127 // VELOCITY_STEP`
     - `CONTINUING_NOTE`: use continuing note or not
     - `TEMPO_MIN`, `TEMPO_MAX`, `TEMPO_STEP`
   - Dataset processing setting
@@ -165,11 +165,9 @@ Stuffs about Multi-note BPE are all in `bpe/`.
 
 Source codes:
 
-- `apply_vocab.cpp`
+- `apply_vocab.cpp` and `learn_vocab.cpp`
 
 - `classes.cpp` and `classes.hpp`: Define class of corpus, multi-note, rel-note, etc. And I/O functions.
-
-- `learn_vocab.cpp`
 
 - `functions.cpp` and `functions.hpp`: Other functions and algorithms.
 
@@ -185,6 +183,9 @@ They should compile to two binaries with `make -C bpe all`:
 - Models are created by `train.py`.
 
 - Learning rate schedule is hard-coded warmup and linear decay.
+
+- `accelerate` from Huggingface when flag set for distributed training
+  - in our config file, we use 4 devices
 
 - A completed trained model is stored at `models/{DATE_AND_FULL_CONFIG_NAME}/best_model.pt` as a "pickled" python object that would be saved and loaded by `torch.save()` and `torch.load()`.
 
@@ -244,15 +245,13 @@ They should compile to two binaries with `make -C bpe all`:
   - Contain the build-vocabulary function.
 
 
-## Tool Scripts (`./`)
+## Tool and Experiment Scripts (`./`)
 
-### Pythons scripts
-
-- `evaluate_model_wrapper.py`: Use python's `argparse` module to make using `evaluate_model.sh` easier.
+### Python scripts
 
 - `extract.py`: Used for debugging. Extract piece(s) from the given corpus directory into text representation(s), midi file(s), or piano-roll graph(s) in png.
 
-- `generate_with_models.py`: Use trained model to generate midi files, with or without a primer.
+- `generate_with_models.py`: Use model to generate midi files, with or without primer(s).
 
 - `get_eval_features_of_midis.py`: Do as per its name. It will get midi files in a directory. Output results as a JSON file `eval_features.json` at the root of the directory.
 
@@ -270,13 +269,10 @@ They should compile to two binaries with `make -C bpe all`:
 
 ### Shell scripts
 
-- `evaluate_model_wrapper_wrapper.sh`
-  - Read parameters from config files and used them as the arguments for `evaluate_model_wrapper.py`. This is for the convenience of the testing of evaluate/generation parameters.
-
 - `evaluate_model.sh`
-  1. Arguments are passed as environment variables.
+  1. Read a file in `config/eval` for its arguments.
   2. Get evaluation features of the dataset's `TEST_PATHS_FILE` files using `get_eval_features_of_midis.py`.
-  3. Get evaluation features of the unconditional, instrument-informed, and prime continution generation result of the model using the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`.
+  3. Get evaluation features of the unconditional, instrument-conditioned, and primer-continution generation result of the model using the combination of `generate_with_models.py` and `get_eval_features_of_midis.py`.
 
 - `experiment_script/`: Pre-programmed experiment execution script
   - `apply_learned_shapes_to_other.sh`

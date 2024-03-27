@@ -154,7 +154,6 @@ def verify_corpus_equality(
 
 
 if __name__ == '__main__':
-    print('Begin verify corpus equality.')
     if len(sys.argv) == 3:
         _a_corpus_dir = sys.argv[1]
         _b_corpus_dir = sys.argv[2]
